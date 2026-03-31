@@ -3,7 +3,7 @@ import InputField from "../ui/InputField";
 
 const AddAccountModal = ({ open, onClose, accForm, setAccForm, onSubmit }) => (
     <Modal open={open} onClose={onClose}>
-        <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: 20, border: "1px solid rgba(99,102,241,.2)", padding: 28 }}>
+        <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(99,102,241,.2)", borderBottom: "none", padding: "24px 20px 36px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Tambah Akun</h3>
                 <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>

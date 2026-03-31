@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 import AddTransactionModal from "../components/dashboard/AddTransactionModal";
 import AddAccountModal from "../components/dashboard/AddAccountModal";
 import DasborView from "../components/dashboard/views/DasborView";
@@ -25,10 +26,11 @@ const NAV_LABELS = {
 
 const Dashboard = ({ session, onLogout, showToast }) => {
     const { t } = useLanguage();
+    const isMobile = useIsMobile();
     const user = session.user;
     const userName = user.user_metadata?.full_name || user.email.split("@")[0];
 
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
     const [activeMenu, setActiveMenu] = useState("dasbor");
     const [showAddTx, setShowAddTx] = useState(false);
     const [showAddAccount, setShowAddAccount] = useState(false);
@@ -440,21 +442,27 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
             <PricingModal open={showPricing} onClose={() => setShowPricing(false)} currentPlan={subscription?.plan} />
 
-            <Sidebar open={sidebarOpen} activeMenu={activeMenu} setActiveMenu={setActiveMenu} user={{ name: userName, plan: subscription?.plan, expiresAt: subscription?.expires_at }} />
+            <Sidebar open={sidebarOpen} activeMenu={activeMenu} setActiveMenu={(m) => { setActiveMenu(m); if (isMobile) setSidebarOpen(false); }} user={{ name: userName, plan: subscription?.plan, expiresAt: subscription?.expires_at }} />
 
-            <main style={{ flex: 1, marginLeft: sidebarOpen ? 260 : 0, transition: "margin-left .3s", minHeight: "100vh" }}>
-                <header style={{ position: "sticky", top: 0, zIndex: 40, padding: "14px 28px", background: "rgba(6,6,14,.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>{sidebarOpen ? "☰" : "→"}</button>
-                        <h1 style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{activeLabel}</h1>
-                    </div>
+            {/* Mobile overlay backdrop */}
+            {isMobile && sidebarOpen && (
+                <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 49, backdropFilter: "blur(2px)" }} />
+            )}
+
+            <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 260 : 0), transition: "margin-left .3s", minHeight: "100vh", minWidth: 0 }}>
+                <header style={{ position: "sticky", top: 0, zIndex: 40, padding: isMobile ? "12px 16px" : "14px 28px", background: "rgba(6,6,14,.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <button onClick={() => setShowAddTx(true)} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>+ {t("nav.transaction")}</button>
-                        <button onClick={onLogout} style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.15)", color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.logout")}</button>
+                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{sidebarOpen ? "☰" : "☰"}</button>
+                        <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? 120 : "none" }}>{activeLabel}</h1>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
+                        <button onClick={() => setShowAddTx(true)} style={{ padding: isMobile ? "8px 12px" : "8px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>+ {isMobile ? "" : t("nav.transaction")}{isMobile ? "Tx" : ""}</button>
+                        {!isMobile && <button onClick={onLogout} style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.15)", color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.logout")}</button>}
+                        {isMobile && <button onClick={onLogout} style={{ padding: "8px 10px", borderRadius: 10, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.15)", color: "#f87171", fontSize: 16, cursor: "pointer" }}>⏻</button>}
                     </div>
                 </header>
 
-                <div style={{ padding: 28 }}>
+                <div style={{ padding: isMobile ? "16px 12px" : 28 }}>
                     {/* Banner subscription dinamis */}
                     {(() => {
                         const plan = subscription?.plan;

@@ -12,7 +12,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
 
     return (
         <Modal open={open} onClose={onClose}>
-            <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: 24, border: "1px solid rgba(99,102,241,.2)", padding: "32px 28px", position: "relative", overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(99,102,241,.2)", borderBottom: "none", padding: "28px 20px 36px", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%,rgba(99,102,241,.1),transparent 50%)", pointerEvents: "none" }} />
                 <div style={{ position: "relative", zIndex: 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>

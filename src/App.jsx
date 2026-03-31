@@ -32,6 +32,15 @@ input::placeholder { color: #475569; }
 .tag { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 .link-btn { background: none; border: none; color: #818cf8; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; padding: 0; }
 .link-btn:hover { color: #a5b4fc; text-decoration: underline; }
+/* Mobile touch tap highlight removal */
+* { -webkit-tap-highlight-color: transparent; }
+/* Prevent horizontal overflow */
+html, body { overflow-x: hidden; }
+/* Better touch target sizing */
+@media (max-width: 768px) {
+  .btn-primary, .btn-secondary { padding: 13px 24px !important; font-size: 14px !important; }
+  .nav-link { padding: 10px 12px; font-size: 15px; }
+}
 `;
 
 export default function App() {

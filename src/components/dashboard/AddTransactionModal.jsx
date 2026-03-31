@@ -26,7 +26,7 @@ const AddTransactionModal = ({ open, onClose, txForm, setTxForm, onSubmit, onTra
 
     return (
     <Modal open={open} onClose={onClose}>
-        <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: 20, border: "1px solid rgba(99,102,241,.2)", padding: 28, maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(99,102,241,.2)", borderBottom: "none", padding: "24px 20px 36px", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Tambah Transaksi</h3>
                 <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
