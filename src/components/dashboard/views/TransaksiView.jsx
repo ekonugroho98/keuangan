@@ -1,0 +1,180 @@
+import { useState } from "react";
+import { fmtRp, fmtDate } from "../../../utils/formatters";
+import { useLanguage } from "../../../i18n/LanguageContext";
+
+const MONTHS_ID = [
+    { v: "01", l: "Januari" }, { v: "02", l: "Februari" }, { v: "03", l: "Maret" },
+    { v: "04", l: "April" },   { v: "05", l: "Mei" },      { v: "06", l: "Juni" },
+    { v: "07", l: "Juli" },    { v: "08", l: "Agustus" },  { v: "09", l: "September" },
+    { v: "10", l: "Oktober" }, { v: "11", l: "November" }, { v: "12", l: "Desember" },
+];
+
+const MONTHS_LOCALIZED = {
+    id: MONTHS_ID,
+    en: [
+        { v: "01", l: "January" }, { v: "02", l: "February" }, { v: "03", l: "March" },
+        { v: "04", l: "April" },   { v: "05", l: "May" },      { v: "06", l: "June" },
+        { v: "07", l: "July" },    { v: "08", l: "August" },   { v: "09", l: "September" },
+        { v: "10", l: "October" }, { v: "11", l: "November" }, { v: "12", l: "December" },
+    ],
+    ar: [
+        { v: "01", l: "يناير" }, { v: "02", l: "فبراير" }, { v: "03", l: "مارس" },
+        { v: "04", l: "أبريل" }, { v: "05", l: "مايو" },   { v: "06", l: "يونيو" },
+        { v: "07", l: "يوليو" }, { v: "08", l: "أغسطس" },  { v: "09", l: "سبتمبر" },
+        { v: "10", l: "أكتوبر" },{ v: "11", l: "نوفمبر" }, { v: "12", l: "ديسمبر" },
+    ],
+    es: [
+        { v: "01", l: "Enero" },      { v: "02", l: "Febrero" },   { v: "03", l: "Marzo" },
+        { v: "04", l: "Abril" },      { v: "05", l: "Mayo" },      { v: "06", l: "Junio" },
+        { v: "07", l: "Julio" },      { v: "08", l: "Agosto" },    { v: "09", l: "Septiembre" },
+        { v: "10", l: "Octubre" },    { v: "11", l: "Noviembre" }, { v: "12", l: "Diciembre" },
+    ],
+    zh: [
+        { v: "01", l: "一月" }, { v: "02", l: "二月" }, { v: "03", l: "三月" },
+        { v: "04", l: "四月" }, { v: "05", l: "五月" }, { v: "06", l: "六月" },
+        { v: "07", l: "七月" }, { v: "08", l: "八月" }, { v: "09", l: "九月" },
+        { v: "10", l: "十月" }, { v: "11", l: "十一月" },{ v: "12", l: "十二月" },
+    ],
+    ja: [
+        { v: "01", l: "1月" }, { v: "02", l: "2月" }, { v: "03", l: "3月" },
+        { v: "04", l: "4月" }, { v: "05", l: "5月" }, { v: "06", l: "6月" },
+        { v: "07", l: "7月" }, { v: "08", l: "8月" }, { v: "09", l: "9月" },
+        { v: "10", l: "10月"},  { v: "11", l: "11月"}, { v: "12", l: "12月"},
+    ],
+};
+
+const selectStyle = {
+    padding: "7px 12px", borderRadius: 9,
+    background: "rgba(255,255,255,.04)",
+    border: "1px solid rgba(255,255,255,.08)",
+    color: "#cbd5e1", fontSize: 12, fontFamily: "inherit",
+    outline: "none", cursor: "pointer",
+};
+
+const TransaksiView = ({ transactions }) => {
+    const { t, lang } = useLanguage();
+    const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
+
+    const now = new Date();
+    const [filterYear,  setFilterYear]  = useState(String(now.getFullYear()));
+    const [filterMonth, setFilterMonth] = useState(String(now.getMonth() + 1).padStart(2, "0"));
+    const [filterDate,  setFilterDate]  = useState("");
+
+    const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
+
+    const filtered = transactions.filter(tx => {
+        if (filterDate)  return tx.date === filterDate;
+        if (filterYear  && tx.date?.slice(0, 4) !== filterYear)  return false;
+        if (filterMonth && tx.date?.slice(5, 7) !== filterMonth) return false;
+        return true;
+    });
+
+    const sumIn  = filtered.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
+    const sumOut = filtered.filter(tx => tx.type === "expense" || tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
+
+    const isFiltered = filterYear || filterMonth || filterDate;
+
+    const handleReset = () => {
+        setFilterYear("");
+        setFilterMonth("");
+        setFilterDate("");
+    };
+
+    const typeLabel = (type) => {
+        if (type === "income")   return { text: t("tx.income"),   bg: "rgba(16,185,129,.1)",  color: "#34d399" };
+        if (type === "transfer") return { text: t("tx.transfer"), bg: "rgba(6,182,212,.1)",   color: "#22d3ee" };
+        return                          { text: t("tx.expense"),  bg: "rgba(239,68,68,.1)",   color: "#f87171" };
+    };
+
+    return (
+        <div style={{ animation: "fadeIn .4s" }}>
+            <div style={{ background: "rgba(15,15,30,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
+
+                {/* Header + Filter */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>{t("tx.allTransactions")}</h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {/* Tahun */}
+                        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth(""); setFilterDate(""); }} style={selectStyle}>
+                            <option value="">{t("tx.allYears")}</option>
+                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+
+                        {/* Bulan */}
+                        <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setFilterDate(""); }} disabled={!filterYear} style={{ ...selectStyle, opacity: filterYear ? 1 : 0.4, cursor: filterYear ? "pointer" : "not-allowed" }}>
+                            <option value="">{t("tx.allMonths")}</option>
+                            {MONTHS.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                        </select>
+
+                        {/* Tanggal */}
+                        <input
+                            type="date"
+                            value={filterDate}
+                            onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); }}
+                            style={{ ...selectStyle, colorScheme: "dark" }}
+                        />
+
+                        {/* Reset */}
+                        {isFiltered && (
+                            <button onClick={handleReset} style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid rgba(239,68,68,.2)", background: "rgba(239,68,68,.08)", color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                ✕ {t("common.reset")}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Summary bar */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                        <span style={{ color: "#94a3b8", fontWeight: 600 }}>{filtered.length}</span> {t("tx.summary")}
+                    </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.06)" }} />
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                        {t("tx.income")}: <span style={{ color: "#10b981", fontWeight: 600 }}>{fmtRp(sumIn)}</span>
+                    </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.06)" }} />
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                        {t("tx.expense")}: <span style={{ color: "#f87171", fontWeight: 600 }}>{fmtRp(sumOut)}</span>
+                    </div>
+                    <div style={{ width: 1, background: "rgba(255,255,255,.06)" }} />
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                        Bersih: <span style={{ color: sumIn - sumOut >= 0 ? "#10b981" : "#f87171", fontWeight: 600 }}>{fmtRp(sumIn - sumOut)}</span>
+                    </div>
+                </div>
+
+                {/* List */}
+                {filtered.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "32px 0", color: "#475569", fontSize: 13 }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                        {t("tx.noTxPeriod")}
+                    </div>
+                ) : (
+                    filtered.map(tx => {
+                        const badge = typeLabel(tx.type);
+                        return (
+                            <div key={tx.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                    <div style={{ width: 40, height: 40, borderRadius: 12, background: tx.type === "income" ? "rgba(16,185,129,.1)" : tx.type === "transfer" ? "rgba(6,182,212,.1)" : "rgba(239,68,68,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{tx.icon}</div>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{tx.note}</div>
+                                        <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(tx.date)} · {tx.category} · {tx.account_name}</div>
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: tx.type === "income" ? "#10b981" : tx.type === "transfer" ? "#22d3ee" : "#ef4444" }}>
+                                        {tx.type === "income" ? "+" : "-"}{fmtRp(tx.amount)}
+                                    </div>
+                                    <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 6, background: badge.bg, color: badge.color, fontWeight: 600 }}>
+                                        {badge.text}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default TransaksiView;
