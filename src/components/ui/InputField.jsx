@@ -12,7 +12,7 @@ const InputField = ({ label, type = "text", value, onChange, error, placeholder,
                     width: "100%", padding: "12px 16px 12px 40px", borderRadius: 12,
                     border: `1px solid ${error ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.08)"}`,
                     background: "rgba(255,255,255,0.04)", color: "#e2e8f0",
-                    fontSize: 14, outline: "none", transition: "all 0.3s",
+                    fontSize: 16, outline: "none", transition: "all 0.3s",
                     boxSizing: "border-box", fontFamily: "inherit",
                 }}
                 onFocus={e => { e.target.style.borderColor = "rgba(99,102,241,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)"; }}

@@ -75,8 +75,8 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
             style={{
                 position: "fixed", inset: 0, zIndex: 100,
                 background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                padding: 20,
+                display: "flex", alignItems: "flex-end", justifyContent: "center",
+                overflowY: "auto",
             }}
         >
             <div
@@ -84,11 +84,11 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                 style={{
                     background: "#0f0f1a",
                     border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 20,
-                    padding: "32px 28px",
+                    borderRadius: "20px 20px 0 0",
+                    padding: "28px 20px 40px",
                     width: "100%",
                     maxWidth: 860,
-                    maxHeight: "90vh",
+                    maxHeight: "92vh",
                     overflowY: "auto",
                 }}
             >
