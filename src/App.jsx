@@ -1,0 +1,90 @@
+import { useState, useEffect } from "react";
+import LandingPage from "./pages/LandingPage";
+import Dashboard from "./pages/Dashboard";
+import Toast from "./components/ui/Toast";
+import { supabase } from "./lib/supabase";
+
+const globalStyles = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: #06060e; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0a0a1a; }
+::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 3px; }
+input::placeholder { color: #475569; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+@keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+@keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.gradient-text { background: linear-gradient(135deg,#818cf8,#6366f1,#a78bfa,#06b6d4); background-size: 200% 200%; animation: gradient 4s ease infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.nav-link { color: #94a3b8; text-decoration: none; font-size: 14px; font-weight: 500; transition: all .3s; padding: 8px 16px; border-radius: 8px; cursor: pointer; border: none; background: none; font-family: inherit; }
+.nav-link:hover { color: #fff; background: rgba(99,102,241,.1); }
+.btn-primary { background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; border: none; padding: 14px 32px; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all .3s; font-family: inherit; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(99,102,241,.4); }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.btn-secondary { background: rgba(255,255,255,.05); color: #e2e8f0; border: 1px solid rgba(255,255,255,.1); padding: 14px 32px; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all .3s; font-family: inherit; }
+.btn-secondary:hover { background: rgba(255,255,255,.1); border-color: rgba(99,102,241,.5); }
+.tag { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.link-btn { background: none; border: none; color: #818cf8; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; padding: 0; }
+.link-btn:hover { color: #a5b4fc; text-decoration: underline; }
+`;
+
+export default function App() {
+    const [session, setSession] = useState(undefined); // undefined = loading
+    const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+
+    const showToast = (msg, type = "success") => {
+        setToast({ show: true, message: msg, type });
+        setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3500);
+    };
+
+    useEffect(() => {
+        // Cek session yang sudah ada (misal user refresh halaman)
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
+
+        // Listen perubahan auth state (login, logout, token refresh)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setSession(null);
+        showToast("Berhasil logout 👋", "info");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    // Masih loading session awal
+    if (session === undefined) {
+        return (
+            <div style={{ minHeight: "100vh", background: "#06060e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <style>{globalStyles}</style>
+                <div style={{ textAlign: "center" }}>
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(99,102,241,.3)", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ color: "#64748b", fontSize: 13 }}>Memuat...</div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ fontFamily: "'Inter',-apple-system,sans-serif" }}>
+            <style>{globalStyles}</style>
+            <Toast {...toast} />
+            {session
+                ? <Dashboard session={session} onLogout={handleLogout} showToast={showToast} />
+                : <LandingPage showToast={showToast} />
+            }
+        </div>
+    );
+}
