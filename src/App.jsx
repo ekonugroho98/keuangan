@@ -8,10 +8,10 @@ const globalStyles = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-body { background: #0e0e15; }
+body { background: var(--bg-app, #0e0e15); }
 ::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: #0e0e15; }
-::-webkit-scrollbar-thumb { background: #60fcc6; border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-bg, #0e0e15); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #60fcc6); border-radius: 3px; }
 input::placeholder { color: #76747e; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
@@ -77,11 +77,11 @@ export default function App() {
     // Masih loading session awal
     if (session === undefined) {
         return (
-            <div style={{ minHeight: "100vh", background: "#0e0e15", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ minHeight: "100vh", background: "var(--bg-app)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <style>{globalStyles}</style>
                 <div style={{ textAlign: "center" }}>
-                    <div style={{ width: 40, height: 40, border: "3px solid rgba(96,252,198,.25)", borderTopColor: "#60fcc6", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
-                    <div style={{ color: "#acaab4", fontSize: 13 }}>Memuat...</div>
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(96,252,198,.25)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ color: "var(--color-muted)", fontSize: 13 }}>Memuat...</div>
                 </div>
             </div>
         );

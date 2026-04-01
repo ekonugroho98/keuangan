@@ -527,17 +527,17 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     if (loading) {
         return (
-            <div style={{ minHeight: "100vh", background: "#0e0e15", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ minHeight: "100vh", background: "var(--bg-app)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ textAlign: "center" }}>
-                    <div style={{ width: 40, height: 40, border: "3px solid rgba(96,252,198,.25)", borderTopColor: "#60fcc6", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
-                    <div style={{ color: "#acaab4", fontSize: 13 }}>{t("common.loading")}</div>
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(96,252,198,.25)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ color: "var(--color-muted)", fontSize: 13 }}>{t("common.loading")}</div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div style={{ display: "flex", minHeight: "100vh", background: "#0e0e15", color: "#e7e4ee", fontFamily: "'Plus Jakarta Sans',-apple-system,sans-serif" }}>
+        <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-app)", color: "var(--color-text)", fontFamily: "'Plus Jakarta Sans',-apple-system,sans-serif" }}>
             <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} />
             <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} isSaving={isSavingTx} />
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
@@ -553,11 +553,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 260 : 0), transition: "margin-left .3s", minHeight: "100vh", minWidth: 0 }}>
                 <header style={{ position: "sticky", top: 0, zIndex: 40, padding: isMobile ? "12px 16px" : "14px 28px", background: "rgba(14,14,21,.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{sidebarOpen ? "☰" : "☰"}</button>
-                        <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? 120 : "none" }}>{activeLabel}</h1>
+                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{sidebarOpen ? "☰" : "☰"}</button>
+                        <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? 120 : "none" }}>{activeLabel}</h1>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
-                        <button onClick={() => setShowAddTx(true)} style={{ padding: isMobile ? "8px 12px" : "8px 16px", borderRadius: 9999, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#005e44", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>+ {isMobile ? "" : t("nav.transaction")}{isMobile ? "Tx" : ""}</button>
+                        <button onClick={() => setShowAddTx(true)} style={{ padding: isMobile ? "8px 12px" : "8px 16px", borderRadius: 9999, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>+ {isMobile ? "" : t("nav.transaction")}{isMobile ? "Tx" : ""}</button>
                         {!isMobile && <button onClick={onLogout} style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.logout")}</button>}
                         {isMobile && (
                             <button onClick={onLogout} title="Logout" style={{ padding: "7px 9px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -626,10 +626,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                         {isExpired ? "🔒" : isUrgent ? "⚠️" : "💎"}
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: isExpired ? "#ff716c" : isUrgent ? "#fbbf24" : "#60fcc6", marginBottom: 3 }}>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: isExpired ? "#ff716c" : isUrgent ? "#fbbf24" : "var(--color-primary)", marginBottom: 3 }}>
                                             {isExpired ? t("sub.expired") : isUrgent ? `${t("sub.urgent")} ${daysLeft} ${t("sub.urgentSub")}` : t("sub.trial")}
                                         </div>
-                                        <div style={{ fontSize: 12, color: "#acaab4" }}>
+                                        <div style={{ fontSize: 12, color: "var(--color-muted)" }}>
                                             {isExpired
                                                 ? t("sub.expiredSub")
                                                 : isUrgent
@@ -643,7 +643,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                     {/* Progress bar hari tersisa */}
                                     {!isExpired && (
                                         <div style={{ textAlign: "center" }}>
-                                            <div style={{ fontSize: 10, color: "#76747e", marginBottom: 4 }}>{daysLeft}/14 {t("sub.days")}</div>
+                                            <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 4 }}>{daysLeft}/14 {t("sub.days")}</div>
                                             <div style={{ width: 80, height: 4, background: "rgba(255,255,255,.08)", borderRadius: 4, overflow: "hidden" }}>
                                                 <div style={{
                                                     height: "100%", borderRadius: 4,
@@ -661,7 +661,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                             background: isExpired || isUrgent
                                                 ? "linear-gradient(135deg,#ff716c,#e04f4f)"
                                                 : "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                                            color: isExpired || isUrgent ? "#fff" : "#005e44", fontSize: 13, fontWeight: 700,
+                                            color: isExpired || isUrgent ? "#fff" : "var(--color-on-primary)", fontSize: 13, fontWeight: 700,
                                             cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
                                             boxShadow: isExpired || isUrgent ? "0 4px 16px rgba(255,113,108,.35)" : "0 4px 16px rgba(96,252,198,.3)",
                                             animation: isExpired || isUrgent ? "pulse-btn 2s infinite" : "none",
@@ -684,11 +684,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                     <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🚀</div>
                                     <div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#60fcc6" }}>{t("sub.starterActive")}</div>
-                                        <div style={{ fontSize: 12, color: "#acaab4", marginTop: 2 }}>{expires?.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })} · {daysLeft} {t("sub.expiresIn")}</div>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-primary)" }}>{t("sub.starterActive")}</div>
+                                        <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 2 }}>{expires?.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })} · {daysLeft} {t("sub.expiresIn")}</div>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowPricing(true)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(96,252,198,.4)", background: "rgba(96,252,198,.1)", color: "#60fcc6", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{t("sub.renew")}</button>
+                                <button onClick={() => setShowPricing(true)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(96,252,198,.4)", background: "rgba(96,252,198,.1)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{t("sub.renew")}</button>
                             </div>
                         );
                         if (plan === "pro") return (
@@ -704,7 +704,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                     <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(245,158,11,.15)", border: "1px solid rgba(245,158,11,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⭐</div>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 700, color: "#fcd34d" }}>{t("sub.proActive")}</div>
-                                        <div style={{ fontSize: 12, color: "#acaab4", marginTop: 2 }}>{expires?.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })} · {daysLeft} {t("sub.expiresIn")}</div>
+                                        <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 2 }}>{expires?.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })} · {daysLeft} {t("sub.expiresIn")}</div>
                                     </div>
                                 </div>
                                 <button onClick={() => setShowPricing(true)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(245,158,11,.4)", background: "rgba(245,158,11,.1)", color: "#fcd34d", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{t("sub.renew")}</button>

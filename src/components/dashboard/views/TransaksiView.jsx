@@ -114,7 +114,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
     ];
 
     const typeMeta = (type) => {
-        if (type === "income")   return { badgeBg: "rgba(96,252,198,.12)",  badgeColor: "#60fcc6", iconBg: "rgba(96,252,198,.1)",  amtColor: "#60fcc6", sign: "+"  };
+        if (type === "income")   return { badgeBg: "rgba(96,252,198,.12)",  badgeColor: "var(--color-primary)", iconBg: "rgba(96,252,198,.1)",  amtColor: "var(--color-primary)", sign: "+"  };
         if (type === "transfer") return { badgeBg: "rgba(79,195,247,.12)",  badgeColor: "#4FC3F7", iconBg: "rgba(79,195,247,.1)",  amtColor: "#4FC3F7", sign: "↔ " }; // netral — bukan minus
         return                          { badgeBg: "rgba(255,113,108,.12)", badgeColor: "#ff716c", iconBg: "rgba(255,113,108,.1)", amtColor: "#ff716c", sign: "-"  };
     };
@@ -131,13 +131,13 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
             {/* ── Confirm Delete Modal ── */}
             {confirmDelete && (
                 <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.65)", backdropFilter: "blur(6px)" }}>
-                    <div style={{ background: "#13131a", border: "1px solid rgba(255,113,108,.3)", borderRadius: 18, padding: "28px 24px", maxWidth: 340, width: "90%", textAlign: "center", animation: "scaleIn .2s" }}>
+                    <div style={{ background: "var(--bg-surface-low)", border: "1px solid rgba(255,113,108,.3)", borderRadius: 18, padding: "28px 24px", maxWidth: 340, width: "90%", textAlign: "center", animation: "scaleIn .2s" }}>
                         <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
                         <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{t("tx.deleteTitle") || "Hapus Transaksi?"}</h3>
                         <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
                             <strong style={{ color: "#fff" }}>{confirmDelete.note}</strong>
                         </p>
-                        <p style={{ fontSize: 12, color: "#76747e", marginBottom: 24 }}>
+                        <p style={{ fontSize: 12, color: "var(--color-subtle)", marginBottom: 24 }}>
                             {t("tx.deleteDesc") || "Saldo akun"} <strong style={{ color: "#94a3b8" }}>{confirmDelete.account_name}</strong> {t("tx.deleteDescSuffix") || "akan otomatis dikembalikan."}
                         </p>
                         <div style={{ display: "flex", gap: 10 }}>
@@ -157,18 +157,18 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
             {/* ── Page Header ── */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 4 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(26px,4vw,36px)", fontWeight: 800, color: "#efecf7", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+                    <h1 style={{ fontSize: "clamp(26px,4vw,36px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
                         {t("tx.allTransactions") || "Transaksi"}
                     </h1>
-                    <p style={{ fontSize: 13, color: "#acaab4", margin: 0, fontWeight: 500 }}>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0, fontWeight: 500 }}>
                         {t("tx.subtitle") || "Kelola arus kas dengan presisi."}
                     </p>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#60fcc6", display: "block", marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
                         {t("tx.activePeriod") || "Periode Aktif"}
                     </span>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: "#efecf7" }}>{periodLabel}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-text)" }}>{periodLabel}</div>
                 </div>
             </div>
 
@@ -176,23 +176,23 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
 
                 {/* Pemasukan */}
-                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
+                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
                     onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
                     onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
                 >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#60fcc6", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
                             {byDate.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
                         </span>
                     </div>
-                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "#60fcc6", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
+                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
                     <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                 </div>
 
                 {/* Pengeluaran — transfer TIDAK termasuk */}
-                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: "4px solid #ff716c", transition: "transform .3s" }}
+                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #ff716c", transition: "transform .3s" }}
                     onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
                     onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
                 >
@@ -202,13 +202,13 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                             {byDate.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
                         </span>
                     </div>
-                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
+                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: "#ff716c", margin: "0 0 3px" }}>-{fmtRp(sumOut)}</h3>
                     <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                 </div>
 
                 {/* Transfer antar akun — NETRAL, tidak mempengaruhi kekayaan */}
-                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: "4px solid #4FC3F7", transition: "transform .3s" }}
+                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #4FC3F7", transition: "transform .3s" }}
                     onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
                     onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
                 >
@@ -218,13 +218,13 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                             {byDate.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
                         </span>
                     </div>
-                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
+                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: "#4FC3F7", margin: "0 0 3px" }}>↔ {fmtRp(sumTransfer)}</h3>
                     <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
                 </div>
 
                 {/* Saldo Bersih = income - expense (transfer diabaikan) */}
-                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: `4px solid ${net >= 0 ? "#a78bfa" : "#ff716c"}`, transition: "transform .3s" }}
+                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: `4px solid ${net >= 0 ? "#a78bfa" : "#ff716c"}`, transition: "transform .3s" }}
                     onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
                     onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
                 >
@@ -232,15 +232,15 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                         <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(167,139,250,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💰</div>
                         <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid rgba(167,139,250,.25)` }} />
                     </div>
-                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "#efecf7" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
+                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "var(--color-text)" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
                     <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
                 </div>
             </div>
 
             {/* ── Filter Bar (glass) ── */}
             <div style={{
-                background: "rgba(31,31,38,.6)", backdropFilter: "blur(20px)",
+                background: "var(--bg-glass)", backdropFilter: "blur(20px)",
                 border: "1px solid rgba(72,71,79,.15)",
                 borderRadius: 16, padding: "16px 18px",
                 display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between",
@@ -259,8 +259,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                                     style={{
                                         padding: "6px 14px", borderRadius: 9,
                                         border: "none",
-                                        background: isActive ? "#60fcc6" : "transparent",
-                                        color: isActive ? "#005e44" : "#acaab4",
+                                        background: isActive ? "var(--color-primary)" : "transparent",
+                                        color: isActive ? "var(--color-on-primary)" : "var(--color-muted)",
                                         fontSize: 12, fontWeight: isActive ? 700 : 500,
                                         cursor: "pointer", fontFamily: "inherit",
                                         transition: "all .15s",
@@ -281,19 +281,19 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                         <select
                             value={filterYear}
                             onChange={e => { setFilterYear(e.target.value); setFilterMonth(""); setFilterDate(""); }}
-                            style={{ background: "transparent", border: "none", color: "#60fcc6", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", outline: "none" }}
+                            style={{ background: "transparent", border: "none", color: "var(--color-primary)", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", outline: "none" }}
                         >
-                            <option value="" style={{ background: "#1f1f28" }}>{t("tx.allYears")}</option>
-                            {years.map(y => <option key={y} value={y} style={{ background: "#1f1f28" }}>{y}</option>)}
+                            <option value="" style={{ background: "var(--bg-surface)" }}>{t("tx.allYears")}</option>
+                            {years.map(y => <option key={y} value={y} style={{ background: "var(--bg-surface)" }}>{y}</option>)}
                         </select>
                         <select
                             value={filterMonth}
                             onChange={e => { setFilterMonth(e.target.value); setFilterDate(""); }}
                             disabled={!filterYear}
-                            style={{ background: "transparent", border: "none", color: filterYear ? "#60fcc6" : "#acaab4", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: filterYear ? "pointer" : "not-allowed", outline: "none", opacity: filterYear ? 1 : .5 }}
+                            style={{ background: "transparent", border: "none", color: filterYear ? "var(--color-primary)" : "var(--color-muted)", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: filterYear ? "pointer" : "not-allowed", outline: "none", opacity: filterYear ? 1 : .5 }}
                         >
-                            <option value="" style={{ background: "#1f1f28" }}>{t("tx.allMonths")}</option>
-                            {MONTHS.map(m => <option key={m.v} value={m.v} style={{ background: "#1f1f28" }}>{m.l}</option>)}
+                            <option value="" style={{ background: "var(--bg-surface)" }}>{t("tx.allMonths")}</option>
+                            {MONTHS.map(m => <option key={m.v} value={m.v} style={{ background: "var(--bg-surface)" }}>{m.l}</option>)}
                         </select>
                     </div>
                 </div>
@@ -310,7 +310,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                             placeholder={t("tx.search") || "Cari transaksi..."}
                             style={{
                                 background: "#000", border: "none", borderRadius: 12,
-                                color: "#efecf7", fontSize: 12, fontFamily: "inherit",
+                                color: "var(--color-text)", fontSize: 12, fontFamily: "inherit",
                                 padding: "8px 12px 8px 30px", outline: "none", width: 200,
                             }}
                         />
@@ -321,7 +321,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                         type="date"
                         value={filterDate}
                         onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); }}
-                        style={{ background: "#000", border: "none", borderRadius: 12, color: "#acaab4", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "dark", cursor: "pointer" }}
+                        style={{ background: "#000", border: "none", borderRadius: 12, color: "var(--color-muted)", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "dark", cursor: "pointer" }}
                     />
 
                     {/* Reset */}
@@ -336,8 +336,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
 
             {/* ── Stats Mini Bar ── */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", flexWrap: "wrap", gap: 6 }}>
-                <p style={{ fontSize: 11, color: "#acaab4", margin: 0, display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center" }}>
-                    <span><span style={{ fontWeight: 600, color: "#efecf7" }}>{filtered.length}</span> {t("tx.summary") || "transaksi"}</span>
+                <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0, display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center" }}>
+                    <span><span style={{ fontWeight: 600, color: "var(--color-text)" }}>{filtered.length}</span> {t("tx.summary") || "transaksi"}</span>
                     <span style={{ opacity: .35 }}>·</span>
                     <span style={{ color: "rgba(96,252,198,.85)", fontWeight: 600 }}>↑ {fmtRp(sumIn)}</span>
                     <span style={{ opacity: .35 }}>·</span>
@@ -356,9 +356,9 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
             {/* ── Transaction List ── */}
             <div style={{ borderRadius: 24, overflow: "hidden" }}>
                 {filtered.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", background: "#13131a", borderRadius: 24 }}>
+                    <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", background: "var(--bg-surface-low)", borderRadius: 24 }}>
                         <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
-                        <p style={{ fontSize: 13, margin: 0, color: "#acaab4" }}>{t("tx.noTxPeriod")}</p>
+                        <p style={{ fontSize: 13, margin: 0, color: "var(--color-muted)" }}>{t("tx.noTxPeriod")}</p>
                     </div>
                 ) : (
                     filtered.map((tx, idx) => {
@@ -366,10 +366,10 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                         const isHovered = hoveredId === tx.id;
                         /* alternating row: even = #13131a, odd = rgba(37,37,47,.3) */
                         const rowBg = isHovered
-                            ? "#191921"
+                            ? "var(--bg-surface-hover)"
                             : idx % 2 === 0
-                                ? "#13131a"
-                                : "rgba(37,37,47,.35)";
+                                ? "var(--bg-surface-low)"
+                                : "var(--bg-alt-row)";
 
                         return (
                             <div
@@ -401,7 +401,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                                     {/* Name + badge + meta */}
                                     <div style={{ minWidth: 0 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
-                                            <span style={{ fontSize: 14, fontWeight: 700, color: "#efecf7", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
+                                            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
                                                 {tx.note}
                                             </span>
                                             <span style={{
@@ -413,7 +413,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                                                 {typeText(tx.type)}
                                             </span>
                                         </div>
-                                        <p style={{ fontSize: 11, color: "#acaab4", margin: 0 }}>
+                                        <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0 }}>
                                             {fmtDate(tx.date)} · {tCat(tx.category)} · {tx.account_name}
                                         </p>
                                     </div>
@@ -429,7 +429,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                                     <div style={{ display: "flex", gap: 4, opacity: isHovered ? 1 : 0, transition: "opacity .15s", pointerEvents: isHovered ? "auto" : "none" }}>
                                         <button
                                             onClick={() => onEdit(tx)}
-                                            style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "#acaab4", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
+                                            style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "var(--color-muted)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
                                             onMouseOver={e => e.currentTarget.style.background = "rgba(37,37,47,.8)"}
                                             onMouseOut={e => e.currentTarget.style.background = "transparent"}
                                         >✏️</button>

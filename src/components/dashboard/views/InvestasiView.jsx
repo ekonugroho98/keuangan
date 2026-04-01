@@ -4,13 +4,13 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 
 const TYPE_KEYS = ["reksa_dana","saham","emas","crypto","deposito","properti","obligasi","lainnya"];
 const TYPE_ICONS  = { reksa_dana:"📊", saham:"📈", emas:"🥇", crypto:"₿", deposito:"🏦", properti:"🏠", obligasi:"📜", lainnya:"💼" };
-const TYPE_COLORS = { reksa_dana:"#60fcc6", saham:"#60fcc6", emas:"#f59e0b", crypto:"#f97316", deposito:"#4FC3F7", properti:"#19ce9b", obligasi:"#ec4899", lainnya:"#76747e" };
+const TYPE_COLORS = { reksa_dana:"var(--color-primary)", saham:"var(--color-primary)", emas:"#f59e0b", crypto:"#f97316", deposito:"#4FC3F7", properti:"var(--color-primary)", obligasi:"#ec4899", lainnya:"var(--color-subtle)" };
 
 const EMOJI_OPTIONS = ["📊","📈","🥇","₿","🏦","🏠","📜","💼","💎","🚀","⚡","🌿","🎯","💰","🔮","🏆","📱","🖥️","🚗","✈️"];
-const COLOR_OPTIONS = ["#60fcc6","#19ce9b","#4FC3F7","#60fcc6","#f59e0b","#ff716c","#ec4899","#f97316","#14b8a6","#76747e","#a855f7","#22c55e"];
+const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899","#f97316","#14b8a6","var(--color-subtle)","#a855f7","#22c55e"];
 
 const emptyForm = () => ({
-    name: "", type: "reksa_dana", icon: "📊", color: "#60fcc6",
+    name: "", type: "reksa_dana", icon: "📊", color: "var(--color-primary)",
     buy_price: "", current_value: "", quantity: "", unit: "unit",
     buy_date: "", notes: "",
 });
@@ -45,7 +45,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
     };
 
     const handleTypeChange = (type) => {
-        setForm(p => ({ ...p, type, icon: TYPE_ICONS[type] || "📊", color: TYPE_COLORS[type] || "#60fcc6" }));
+        setForm(p => ({ ...p, type, icon: TYPE_ICONS[type] || "📊", color: TYPE_COLORS[type] || "var(--color-primary)" }));
     };
 
     const handleSubmit = () => {
@@ -77,7 +77,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>{t("inv.title")}</h3>
-                    <p style={{ fontSize: 12, color: "#76747e", margin: "4px 0 0" }}>
+                    <p style={{ fontSize: 12, color: "var(--color-subtle)", margin: "4px 0 0" }}>
                         {investments.length} {t("inv.assets")} · {t("inv.portfolio")} {fmtRp(totalNilai)}
                     </p>
                 </div>
@@ -90,13 +90,13 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
             {investments.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
                     {[
-                        { l: t("inv.totalModal"),    v: fmtRp(totalModal),  c: "#acaab4", bg: "rgba(148,163,184,.08)", border: "rgba(148,163,184,.15)" },
-                        { l: t("inv.currentValue"),  v: fmtRp(totalNilai),  c: "#60fcc6", bg: "rgba(96,252,198,.08)",  border: "rgba(96,252,198,.2)" },
-                        { l: t("inv.gainLoss"),      v: (totalGain >= 0 ? "+" : "") + fmtRp(totalGain), c: totalGain >= 0 ? "#60fcc6" : "#ff716c", bg: totalGain >= 0 ? "rgba(96,252,198,.08)" : "rgba(255,113,108,.08)", border: totalGain >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)" },
-                        { l: t("inv.return"),        v: `${totalGain >= 0 ? "+" : ""}${totalReturnPct}%`, c: totalGain >= 0 ? "#60fcc6" : "#ff716c", bg: totalGain >= 0 ? "rgba(96,252,198,.08)" : "rgba(255,113,108,.08)", border: totalGain >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)" },
+                        { l: t("inv.totalModal"),    v: fmtRp(totalModal),  c: "var(--color-muted)", bg: "rgba(148,163,184,.08)", border: "rgba(148,163,184,.15)" },
+                        { l: t("inv.currentValue"),  v: fmtRp(totalNilai),  c: "var(--color-primary)", bg: "rgba(96,252,198,.08)",  border: "rgba(96,252,198,.2)" },
+                        { l: t("inv.gainLoss"),      v: (totalGain >= 0 ? "+" : "") + fmtRp(totalGain), c: totalGain >= 0 ? "var(--color-primary)" : "#ff716c", bg: totalGain >= 0 ? "rgba(96,252,198,.08)" : "rgba(255,113,108,.08)", border: totalGain >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)" },
+                        { l: t("inv.return"),        v: `${totalGain >= 0 ? "+" : ""}${totalReturnPct}%`, c: totalGain >= 0 ? "var(--color-primary)" : "#ff716c", bg: totalGain >= 0 ? "rgba(96,252,198,.08)" : "rgba(255,113,108,.08)", border: totalGain >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)" },
                     ].map((s, i) => (
                         <div key={i} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: "14px 18px" }}>
-                            <div style={{ fontSize: 11, color: "#76747e", marginBottom: 4 }}>{s.l}</div>
+                            <div style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 4 }}>{s.l}</div>
                             <div style={{ fontSize: 16, fontWeight: 800, color: s.c }}>{s.v}</div>
                         </div>
                     ))}
@@ -107,7 +107,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
             {investments.length === 0 && (
                 <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#acaab4", marginBottom: 6 }}>{t("inv.noData")}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("inv.noData")}</div>
                     <div style={{ fontSize: 13, color: "#48474f", marginBottom: 20 }}>{t("inv.noDataSub")}</div>
                     <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                         {t("inv.addFirst")}
@@ -134,7 +134,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                                 </div>
                                 <div style={{ minWidth: 0 }}>
                                     <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.name}</div>
-                                    <div style={{ fontSize: 11, color: "#76747e" }}>
+                                    <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
                                         {inv.quantity ? `${inv.quantity} ${inv.unit}` : ""}
                                         {inv.buy_date ? ` · ${t("inv.buy")} ${new Date(inv.buy_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}` : ""}
                                     </div>
@@ -143,22 +143,22 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
                                 <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "10px 12px" }}>
-                                    <div style={{ fontSize: 10, color: "#76747e", marginBottom: 3 }}>{t("inv.modal").toUpperCase()}</div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#acaab4" }}>{fmtRp(inv.buy_price)}</div>
+                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 3 }}>{t("inv.modal").toUpperCase()}</div>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-muted)" }}>{fmtRp(inv.buy_price)}</div>
                                 </div>
                                 <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "10px 12px" }}>
-                                    <div style={{ fontSize: 10, color: "#76747e", marginBottom: 3 }}>{t("inv.currentValueLabel").toUpperCase()}</div>
+                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 3 }}>{t("inv.currentValueLabel").toUpperCase()}</div>
                                     <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{fmtRp(inv.current_value)}</div>
                                 </div>
                             </div>
 
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.15)" : "rgba(255,113,108,.15)"}`, borderRadius: 10, padding: "8px 12px", marginBottom: 14 }}>
-                                <div style={{ fontSize: 12, color: "#76747e" }}>{t("inv.gainLoss")}</div>
+                                <div style={{ fontSize: 12, color: "var(--color-subtle)" }}>{t("inv.gainLoss")}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: isProfit ? "#60fcc6" : "#ff716c" }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c" }}>
                                         {isProfit ? "+" : ""}{fmtRp(gain)}
                                     </span>
-                                    <span style={{ fontSize: 11, fontWeight: 700, color: isProfit ? "#60fcc6" : "#ff716c", background: isProfit ? "rgba(96,252,198,.12)" : "rgba(255,113,108,.12)", padding: "2px 7px", borderRadius: 6 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c", background: isProfit ? "rgba(96,252,198,.12)" : "rgba(255,113,108,.12)", padding: "2px 7px", borderRadius: 6 }}>
                                         {isProfit ? "▲" : "▼"} {Math.abs(returnPct)}%
                                     </span>
                                 </div>
@@ -169,7 +169,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                             )}
 
                             <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => openEdit(inv)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid rgba(96,252,198,.2)", background: "rgba(96,252,198,.08)", color: "#60fcc6", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("inv.editBtn")}</button>
+                                <button onClick={() => openEdit(inv)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid rgba(96,252,198,.2)", background: "rgba(96,252,198,.08)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("inv.editBtn")}</button>
                                 <button onClick={() => setConfirmDelete(inv)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
                             </div>
                         </div>
@@ -180,10 +180,10 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
             {/* Modal Tambah/Edit */}
             {showModal && (
                 <div onClick={() => setShowModal(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: "#0f0f1a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
                             <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 17, margin: 0 }}>{editTarget ? t("inv.submitEdit") : t("inv.addNew")}</h3>
-                            <button onClick={() => setShowModal(false)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                            <button onClick={() => setShowModal(false)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                         </div>
 
                         {/* Preview */}
@@ -191,38 +191,38 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                             <div style={{ width: 44, height: 44, borderRadius: 12, background: form.color + "20", border: `1px solid ${form.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{form.icon}</div>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{form.name || t("inv.previewDefault")}</div>
-                                <div style={{ fontSize: 11, color: "#76747e" }}>
+                                <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
                                     {form.current_value && form.buy_price ? (() => {
                                         const g = parseInt(form.current_value) - parseInt(form.buy_price);
                                         const p = parseInt(form.buy_price) > 0 ? ((g / parseInt(form.buy_price)) * 100).toFixed(1) : 0;
-                                        return <span style={{ color: g >= 0 ? "#60fcc6" : "#ff716c" }}>{g >= 0 ? "+" : ""}{fmtRp(g)} ({p}%)</span>;
+                                        return <span style={{ color: g >= 0 ? "var(--color-primary)" : "#ff716c" }}>{g >= 0 ? "+" : ""}{fmtRp(g)} ({p}%)</span>;
                                     })() : t("inv.previewModalDefault")}
                                 </div>
                             </div>
                         </div>
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 8 }}>{t("inv.typeLabel")}</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("inv.typeLabel")}</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {TYPES.map(tp => (
                                 <button key={tp.v} onClick={() => handleTypeChange(tp.v)}
-                                    style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${form.type === tp.v ? tp.color + "55" : "rgba(255,255,255,.06)"}`, background: form.type === tp.v ? tp.color + "15" : "transparent", color: form.type === tp.v ? tp.color : "#76747e", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                    style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${form.type === tp.v ? tp.color + "55" : "rgba(255,255,255,.06)"}`, background: form.type === tp.v ? tp.color + "15" : "transparent", color: form.type === tp.v ? tp.color : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                     {tp.icon} {tp.l}
                                 </button>
                             ))}
                         </div>
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.nameLabel")}</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.nameLabel")}</label>
                         <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t("inv.namePlaceholder")} maxLength={50}
                             style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.modalLabel")}</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.modalLabel")}</label>
                                 <input type="number" value={form.buy_price} onChange={e => setForm(p => ({ ...p, buy_price: e.target.value }))} placeholder="5000000"
                                     style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.currentValueInput")}</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.currentValueInput")}</label>
                                 <input type="number" value={form.current_value} onChange={e => setForm(p => ({ ...p, current_value: e.target.value }))} placeholder="5500000"
                                     style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
@@ -230,22 +230,22 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
 
                         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 16 }}>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.qtyLabel")}</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.qtyLabel")}</label>
                                 <input type="number" value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} placeholder="10"
                                     style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.unitLabel")}</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.unitLabel")}</label>
                                 <input value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} placeholder="unit / lot / gram"
                                     style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                         </div>
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.buyDateLabel")}</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.buyDateLabel")}</label>
                         <input type="date" value={form.buy_date} onChange={e => setForm(p => ({ ...p, buy_date: e.target.value }))}
                             style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box", colorScheme: "dark" }} />
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 8 }}>{t("inv.iconLabel")}</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("inv.iconLabel")}</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
@@ -255,7 +255,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                             ))}
                         </div>
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 8 }}>{t("inv.colorLabel")}</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("inv.colorLabel")}</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                             {COLOR_OPTIONS.map(c => (
                                 <button key={c} onClick={() => setForm(p => ({ ...p, color: c }))}
@@ -263,7 +263,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                             ))}
                         </div>
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", display: "block", marginBottom: 6 }}>{t("inv.notesLabel")}</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.notesLabel")}</label>
                         <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="..."
                             style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 24, boxSizing: "border-box" }} />
 
@@ -278,14 +278,14 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
             {/* Confirm Delete */}
             {confirmDelete && (
                 <div onClick={() => setConfirmDelete(null)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: "#0f0f1a", border: "1px solid rgba(255,113,108,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center" }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center" }}>
                         <div style={{ fontSize: 36, marginBottom: 12 }}>{confirmDelete.icon}</div>
                         <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("inv.deleteConfirm")}</h3>
-                        <p style={{ color: "#76747e", fontSize: 13, margin: "0 0 24px" }}>
+                        <p style={{ color: "var(--color-subtle)", fontSize: 13, margin: "0 0 24px" }}>
                             <strong style={{ color: "#ff716c" }}>{confirmDelete.name}</strong> — {t("inv.deleteMsg")}
                         </p>
                         <div style={{ display: "flex", gap: 10 }}>
-                            <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "transparent", color: "#acaab4", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.cancel")}</button>
+                            <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.cancel")}</button>
                             <button onClick={() => { onDelete(confirmDelete.id); setConfirmDelete(null); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("common.delete")}</button>
                         </div>
                     </div>

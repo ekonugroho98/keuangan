@@ -1,6 +1,6 @@
 const InputField = ({ label, type = "text", value, onChange, error, placeholder, icon }) => (
     <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block", letterSpacing: 0.5 }}>{label}</label>
+        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block", letterSpacing: 0.5 }}>{label}</label>
         <div style={{ position: "relative" }}>
             <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 15, opacity: 0.5 }}>{icon}</span>
             <input

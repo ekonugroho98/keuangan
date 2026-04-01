@@ -4,9 +4,9 @@ import { useTheme } from "../../i18n/ThemeContext";
 
 const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
     const { t, lang, setLang, languages } = useLanguage();
-    const { themeId, setTheme, themes } = useTheme();
+    const { themeId, toggleTheme } = useTheme();
     const [showLangPicker, setShowLangPicker] = useState(false);
-    const [showThemePicker, setShowThemePicker] = useState(false);
+    const isDark = themeId === "dark";
 
     const sidebarItems = [
         { group: t("nav.summary"),  items: [{ id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" }] },
@@ -41,17 +41,18 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
     return (
         <aside style={{
             width: open ? 240 : 0,
-            background: "#0F0F1A",
+            background: "var(--bg-deep)",
+            borderRight: "1px solid var(--color-border)",
             height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 50,
             transition: "width 0.3s", overflow: "hidden",
             display: "flex", flexDirection: "column",
         }}>
             {/* Logo */}
             <div style={{ padding: "24px 24px 20px", display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#19ce9b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: "#003d2b" }}>K</div>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: "var(--color-on-primary)" }}>K</div>
                 <div>
-                    <h1 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>Karaya</h1>
-                    <p style={{ fontSize: 9, color: "#60fcc6", letterSpacing: 3, textTransform: "uppercase", margin: "3px 0 0" }}>Wealth Ledger</p>
+                    <h1 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1 }}>Karaya</h1>
+                    <p style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 3, textTransform: "uppercase", margin: "3px 0 0" }}>Wealth Ledger</p>
                 </div>
             </div>
 
@@ -61,7 +62,7 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                     onClick={onAddTx}
                     style={{
                         width: "100%", padding: "12px 0",
-                        background: "#19ce9b", color: "#003d2b",
+                        background: "var(--color-primary)", color: "var(--color-on-primary)",
                         fontWeight: 700, fontSize: 13,
                         borderRadius: 12, border: "none",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -80,7 +81,7 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
             <nav style={{ flex: 1, overflowY: "auto", padding: "0 12px" }}>
                 {sidebarItems.map(g => (
                     <div key={g.group} style={{ marginBottom: 20 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "#3d4456", letterSpacing: 1.5, padding: "0 12px", marginBottom: 4 }}>{g.group.toUpperCase()}</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1.5, padding: "0 12px", marginBottom: 4 }}>{g.group.toUpperCase()}</div>
                         {g.items.map(item => {
                             const isActive = activeMenu === item.id;
                             return (
@@ -92,9 +93,9 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                                         width: "100%", padding: "10px 12px",
                                         borderRadius: 0,
                                         border: "none",
-                                        borderRight: isActive ? "2px solid #00C896" : "2px solid transparent",
-                                        background: isActive ? "rgba(27,27,34,.5)" : "transparent",
-                                        color: isActive ? "#00C896" : "#8B8BA8",
+                                        borderRight: isActive ? `2px solid var(--color-primary)` : "2px solid transparent",
+                                        background: isActive ? "var(--nav-active-bg)" : "transparent",
+                                        color: isActive ? "var(--color-primary)" : "var(--color-muted)",
                                         fontSize: 13, fontWeight: isActive ? 700 : 400,
                                         cursor: "pointer", fontFamily: "inherit",
                                         transition: "all .15s", textAlign: "left",
@@ -109,16 +110,17 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                 ))}
             </nav>
 
-            {/* Language Picker */}
-            <div style={{ padding: "8px 16px", borderTop: "1px solid rgba(255,255,255,.05)", position: "relative" }}>
+            {/* Bottom controls: language + theme toggle */}
+            <div style={{ padding: "8px 16px", borderTop: "1px solid var(--color-border-soft)", position: "relative" }}>
+                {/* Language Picker */}
                 <button
-                    onClick={() => { setShowLangPicker(v => !v); setShowThemePicker(false); }}
+                    onClick={() => setShowLangPicker(v => !v)}
                     style={{
                         display: "flex", alignItems: "center", gap: 8,
                         width: "100%", padding: "8px 10px", borderRadius: 8,
                         border: "none",
                         background: "transparent",
-                        color: "#8B8BA8", fontSize: 12, cursor: "pointer",
+                        color: "var(--color-muted)", fontSize: 12, cursor: "pointer",
                         fontFamily: "inherit", transition: "all .2s",
                     }}
                 >
@@ -130,9 +132,9 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                 {showLangPicker && (
                     <div style={{
                         position: "absolute", bottom: "100%", left: 12, right: 12,
-                        background: "rgba(25,25,33,.98)", border: "1px solid rgba(255,255,255,.1)",
+                        background: "var(--bg-surface)", border: "1px solid var(--color-border)",
                         borderRadius: 12, padding: 6, zIndex: 100,
-                        boxShadow: "0 -8px 24px rgba(0,0,0,.5)",
+                        boxShadow: "0 -8px 24px rgba(0,0,0,.3)",
                     }}>
                         {languages.map(l => (
                             <button
@@ -142,8 +144,8 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                                     display: "flex", alignItems: "center", gap: 8,
                                     width: "100%", padding: "8px 10px", borderRadius: 8,
                                     border: "none",
-                                    background: lang === l.code ? "rgba(96,252,198,.15)" : "transparent",
-                                    color: lang === l.code ? "#60fcc6" : "var(--color-muted)",
+                                    background: lang === l.code ? "var(--nav-active-bg)" : "transparent",
+                                    color: lang === l.code ? "var(--color-primary)" : "var(--color-muted)",
                                     fontSize: 12, fontWeight: lang === l.code ? 600 : 400,
                                     cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                                     transition: "all .15s",
@@ -151,85 +153,51 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                             >
                                 <span style={{ fontSize: 14 }}>{l.flag}</span>
                                 <span>{l.label}</span>
-                                {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "#60fcc6" }}>✓</span>}
+                                {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-primary)" }}>✓</span>}
                             </button>
                         ))}
                     </div>
                 )}
             </div>
 
-            {/* Theme Picker */}
-            <div style={{ padding: "8px 16px", borderTop: "1px solid rgba(255,255,255,.05)", position: "relative" }}>
-                <button
-                    onClick={() => { setShowThemePicker(v => !v); setShowLangPicker(false); }}
-                    style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        width: "100%", padding: "8px 10px", borderRadius: 8,
-                        border: "none",
-                        background: "transparent",
-                        color: "#8B8BA8", fontSize: 12, cursor: "pointer",
-                        fontFamily: "inherit", transition: "all .2s",
-                    }}
-                >
-                    <span style={{ fontSize: 15 }}>{themes[themeId]?.icon || "🎨"}</span>
-                    <span style={{ flex: 1, textAlign: "left" }}>{themes[themeId]?.name || "Tema"}</span>
-                    <div style={{ display: "flex", gap: 4 }}>
-                        {Object.values(themes).map(th => (
-                            <div key={th.id} style={{
-                                width: 8, height: 8, borderRadius: "50%",
-                                background: th.preview[2],
-                                opacity: themeId === th.id ? 1 : 0.35,
-                                transition: "opacity .2s",
-                            }} />
-                        ))}
-                    </div>
-                </button>
-
-                {showThemePicker && (
-                    <div style={{
-                        position: "absolute", bottom: "100%", left: 12, right: 12,
-                        background: "rgba(25,25,33,.98)", border: "1px solid rgba(255,255,255,.1)",
-                        borderRadius: 12, padding: 6, zIndex: 100,
-                        boxShadow: "0 -8px 24px rgba(0,0,0,.5)",
-                    }}>
-                        {Object.values(themes).map(th => (
-                            <button
-                                key={th.id}
-                                onClick={() => { setTheme(th.id); setShowThemePicker(false); }}
-                                style={{
-                                    display: "flex", alignItems: "center", gap: 10,
-                                    width: "100%", padding: "8px 10px", borderRadius: 8,
-                                    border: "none",
-                                    background: themeId === th.id ? "rgba(255,255,255,.08)" : "transparent",
-                                    color: themeId === th.id ? "#fff" : "#8B8BA8",
-                                    fontSize: 12, fontWeight: themeId === th.id ? 600 : 400,
-                                    cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                                    transition: "all .15s",
-                                }}
-                            >
-                                <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
-                                    {th.preview.map((c, i) => (
-                                        <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: c }} />
-                                    ))}
-                                </div>
-                                <span style={{ fontSize: 13 }}>{th.icon}</span>
-                                <span style={{ flex: 1 }}>{th.name}</span>
-                                {themeId === th.id && <span style={{ fontSize: 10, color: th.preview[2] }}>✓</span>}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* User info */}
-            <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,.05)", display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#1f1f26", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#60fcc6", fontWeight: 700, flexShrink: 0 }}>
+            {/* User info + theme toggle */}
+            <div style={{ padding: "10px 16px", borderTop: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--bg-surface)", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "var(--color-primary)", fontWeight: 700, flexShrink: 0 }}>
                     {user.name.charAt(0)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
                     <div style={{ fontSize: 10, color: planColor, fontWeight: 600 }}>{planText}</div>
                 </div>
+                {/* Dark/Light toggle */}
+                <button
+                    onClick={toggleTheme}
+                    title={isDark ? "Mode Terang" : "Mode Gelap"}
+                    style={{
+                        flexShrink: 0,
+                        width: 36, height: 20,
+                        borderRadius: 10,
+                        border: "none",
+                        background: isDark ? "rgba(96,252,198,.2)" : "rgba(0,184,122,.15)",
+                        cursor: "pointer",
+                        position: "relative",
+                        transition: "background .3s",
+                        padding: 0,
+                    }}
+                >
+                    <div style={{
+                        position: "absolute",
+                        top: 3, left: isDark ? 3 : 17,
+                        width: 14, height: 14,
+                        borderRadius: "50%",
+                        background: "var(--color-primary)",
+                        transition: "left .3s",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 8,
+                    }}>
+                        {isDark ? "🌙" : "☀️"}
+                    </div>
+                </button>
             </div>
         </aside>
     );
