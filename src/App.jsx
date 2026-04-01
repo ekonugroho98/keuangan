@@ -12,7 +12,8 @@ body { background: var(--bg-app, #0e0e15); }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-bg, #0e0e15); }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #60fcc6); border-radius: 3px; }
-input::placeholder { color: #76747e; }
+input::placeholder { color: var(--color-subtle, #76747e); }
+input, select, textarea { color: var(--color-text); background: var(--bg-surface-low); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -28,8 +29,8 @@ input::placeholder { color: #76747e; }
 .btn-primary { background: linear-gradient(135deg,#60fcc6,#19ce9b); color: #005e44; border: none; padding: 14px 32px; border-radius: 9999px; font-weight: 700; font-size: 15px; cursor: pointer; transition: all .3s; font-family: inherit; }
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(96,252,198,.35); }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
-.btn-secondary { background: rgba(255,255,255,.05); color: #e2e8f0; border: 1px solid rgba(255,255,255,.1); padding: 14px 32px; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all .3s; font-family: inherit; }
-.btn-secondary:hover { background: rgba(255,255,255,.1); border-color: rgba(96,252,198,.4); }
+.btn-secondary { background: var(--color-border-soft); color: #e2e8f0; border: 1px solid var(--color-border); padding: 14px 32px; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all .3s; font-family: inherit; }
+.btn-secondary:hover { background: var(--color-border); border-color: rgba(96,252,198,.4); }
 .tag { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 .link-btn { background: none; border: none; color: #60fcc6; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; padding: 0; }
 .link-btn:hover { color: #60fcc6; text-decoration: underline; }

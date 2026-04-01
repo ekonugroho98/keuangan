@@ -16,7 +16,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
                 <div style={{
                     background: "linear-gradient(135deg,#13131a,#1f1f28)",
                     borderRadius: isDesktop ? 20 : "20px 20px 0 0",
-                    border: "1px solid rgba(96,252,198,.2)",
+                    border: "1px solid var(--color-border)",
                     borderBottom: isDesktop ? "1px solid rgba(96,252,198,.2)" : "none",
                     padding: "28px 20px 36px",
                     position: "relative", overflow: "hidden",

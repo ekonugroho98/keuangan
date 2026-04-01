@@ -48,15 +48,15 @@ const AddTransactionModal = ({
 
     return (
     <Modal open={open} onClose={onClose}>
-        <div style={{ background: "linear-gradient(135deg,#0e0e15,#13131a)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(96,252,198,.2)", borderBottom: "none", padding: "24px 20px 36px", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ background: "var(--bg-surface-low)", borderRadius: "20px 20px 0 0", border: "1px solid var(--color-border)", borderBottom: "none", padding: "24px 20px 36px", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)" }}>
                         {editMode ? "✏️ Edit Transaksi" : "Tambah Transaksi"}
                     </h3>
                     {editMode && <p style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Ubah detail transaksi di bawah</p>}
                 </div>
-                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                <button onClick={onClose} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
             </div>
 
             {/* Tipe — tidak bisa ganti tipe saat edit transfer */}
@@ -69,7 +69,7 @@ const AddTransactionModal = ({
                             disabled={disabled || editMode}
                             style={{
                                 flex: 1, padding: 10, borderRadius: 10,
-                                border: `1px solid ${txForm.type === t.v ? t.c + "55" : "rgba(255,255,255,.06)"}`,
+                                border: `1px solid ${txForm.type === t.v ? t.c + "55" : "var(--color-border-soft)"}`,
                                 background: txForm.type === t.v ? t.c + "15" : "transparent",
                                 color: txForm.type === t.v ? t.c : "#475569",
                                 fontWeight: 600, fontSize: 12,
@@ -104,7 +104,7 @@ const AddTransactionModal = ({
                                 <button key={a.name}
                                     onClick={() => !isDestination && setTxForm(p => ({ ...p, account: a.name }))}
                                     disabled={isDestination}
-                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#06b6d455" : "rgba(255,255,255,.06)"}`, background: selected ? "rgba(6,182,212,.15)" : "transparent", color: selected ? "#06b6d4" : isDestination ? "#334155" : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: isDestination ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isDestination ? 0.4 : 1 }}
+                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#06b6d455" : "var(--color-border-soft)"}`, background: selected ? "rgba(6,182,212,.15)" : "transparent", color: selected ? "#06b6d4" : isDestination ? "#334155" : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: isDestination ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isDestination ? 0.4 : 1 }}
                                 >{a.icon} {a.name}</button>
                             );
                         })}
@@ -121,7 +121,7 @@ const AddTransactionModal = ({
                                 <button key={a.name}
                                     onClick={() => !isSource && setTxForm(p => ({ ...p, toAccount: a.name }))}
                                     disabled={isSource}
-                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: selected ? "rgba(96,252,198,.15)" : "transparent", color: selected ? "var(--color-primary)" : isSource ? "#334155" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
+                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#60fcc655" : "var(--color-border-soft)"}`, background: selected ? "rgba(96,252,198,.15)" : "transparent", color: selected ? "var(--color-primary)" : isSource ? "#334155" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
                                 >{a.icon} {a.name}</button>
                             );
                         })}
@@ -153,7 +153,7 @@ const AddTransactionModal = ({
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {(txForm.type === "expense" ? allExpense : allIncome).map(c => (
                             <button key={c} onClick={() => setTxForm(p => ({ ...p, category: c }))}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: txForm.category === c ? "rgba(96,252,198,.15)" : "transparent", color: txForm.category === c ? "var(--color-primary)" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#60fcc655" : "var(--color-border-soft)"}`, background: txForm.category === c ? "rgba(96,252,198,.15)" : "transparent", color: txForm.category === c ? "var(--color-primary)" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                             >{tCat(c)}</button>
                         ))}
                     </div>
@@ -162,7 +162,7 @@ const AddTransactionModal = ({
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => (
                             <button key={a.name} onClick={() => setTxForm(p => ({ ...p, account: a.name }))}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.account === a.name ? a.color + "55" : "rgba(255,255,255,.06)"}`, background: txForm.account === a.name ? a.color + "15" : "transparent", color: txForm.account === a.name ? a.color : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.account === a.name ? a.color + "55" : "var(--color-border-soft)"}`, background: txForm.account === a.name ? a.color + "15" : "transparent", color: txForm.account === a.name ? a.color : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                             >{a.icon} {a.name}</button>
                         ))}
                     </div>

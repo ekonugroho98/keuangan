@@ -133,20 +133,20 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                 <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.65)", backdropFilter: "blur(6px)" }}>
                     <div style={{ background: "var(--bg-surface-low)", border: "1px solid rgba(255,113,108,.3)", borderRadius: 18, padding: "28px 24px", maxWidth: 340, width: "90%", textAlign: "center", animation: "scaleIn .2s" }}>
                         <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
-                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{t("tx.deleteTitle") || "Hapus Transaksi?"}</h3>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", marginBottom: 8 }}>{t("tx.deleteTitle") || "Hapus Transaksi?"}</h3>
                         <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
-                            <strong style={{ color: "#fff" }}>{confirmDelete.note}</strong>
+                            <strong style={{ color: "var(--color-text)" }}>{confirmDelete.note}</strong>
                         </p>
                         <p style={{ fontSize: 12, color: "var(--color-subtle)", marginBottom: 24 }}>
                             {t("tx.deleteDesc") || "Saldo akun"} <strong style={{ color: "#94a3b8" }}>{confirmDelete.account_name}</strong> {t("tx.deleteDescSuffix") || "akan otomatis dikembalikan."}
                         </p>
                         <div style={{ display: "flex", gap: 10 }}>
                             <button onClick={() => setConfirmDelete(null)}
-                                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "transparent", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                 {t("common.cancel") || "Batal"}
                             </button>
                             <button onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); }}
-                                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                                 {t("tx.deleteConfirm") || "Ya, Hapus"}
                             </button>
                         </div>

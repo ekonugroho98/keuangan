@@ -551,9 +551,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             )}
 
             <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 260 : 0), transition: "margin-left .3s", minHeight: "100vh", minWidth: 0 }}>
-                <header style={{ position: "sticky", top: 0, zIndex: 40, padding: isMobile ? "12px 16px" : "14px 28px", background: "rgba(14,14,21,.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <header style={{ position: "sticky", top: 0, zIndex: 40, padding: isMobile ? "12px 16px" : "14px 28px", background: "var(--bg-glass)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{sidebarOpen ? "☰" : "☰"}</button>
+                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{sidebarOpen ? "☰" : "☰"}</button>
                         <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? 120 : "none" }}>{activeLabel}</h1>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
@@ -594,10 +594,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                 marginBottom: 24,
                                 display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
                                 boxShadow: isExpired
-                                    ? "0 0 24px rgba(255,113,108,.15), inset 0 1px 0 rgba(255,255,255,.05)"
+                                    ? "0 0 24px rgba(255,113,108,.15), inset 0 1px 0 var(--color-border-soft)"
                                     : isUrgent
-                                        ? "0 0 24px rgba(245,158,11,.15), inset 0 1px 0 rgba(255,255,255,.05)"
-                                        : "0 0 32px rgba(96,252,198,.15), inset 0 1px 0 rgba(255,255,255,.05)",
+                                        ? "0 0 24px rgba(245,158,11,.15), inset 0 1px 0 var(--color-border-soft)"
+                                        : "0 0 32px rgba(96,252,198,.15), inset 0 1px 0 var(--color-border-soft)",
                             }}>
                                 {/* Shimmer effect */}
                                 <div style={{
@@ -644,7 +644,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                     {!isExpired && (
                                         <div style={{ textAlign: "center" }}>
                                             <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 4 }}>{daysLeft}/14 {t("sub.days")}</div>
-                                            <div style={{ width: 80, height: 4, background: "rgba(255,255,255,.08)", borderRadius: 4, overflow: "hidden" }}>
+                                            <div style={{ width: 80, height: 4, background: "var(--color-border-soft)", borderRadius: 4, overflow: "hidden" }}>
                                                 <div style={{
                                                     height: "100%", borderRadius: 4,
                                                     width: `${(daysLeft / 14) * 100}%`,
@@ -679,7 +679,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                 border: "1.5px solid rgba(96,252,198,.3)", borderRadius: 16,
                                 padding: "16px 24px", marginBottom: 24,
                                 display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-                                boxShadow: "0 0 24px rgba(96,252,198,.1), inset 0 1px 0 rgba(255,255,255,.04)",
+                                boxShadow: "0 0 24px rgba(96,252,198,.1), inset 0 1px 0 var(--color-border-soft)",
                             }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                     <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🚀</div>
@@ -698,7 +698,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                                 border: "1.5px solid rgba(245,158,11,.3)", borderRadius: 16,
                                 padding: "16px 24px", marginBottom: 24,
                                 display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-                                boxShadow: "0 0 24px rgba(245,158,11,.1), inset 0 1px 0 rgba(255,255,255,.04)",
+                                boxShadow: "0 0 24px rgba(245,158,11,.1), inset 0 1px 0 var(--color-border-soft)",
                             }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                     <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(245,158,11,.15)", border: "1px solid rgba(245,158,11,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⭐</div>
