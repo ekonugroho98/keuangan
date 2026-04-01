@@ -504,6 +504,32 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         showToast("Akun berhasil ditambahkan!");
     };
 
+    // ── ADJUST BALANCE ───────────────────────────────────────
+    const handleAdjustBalance = async (account, newBalance) => {
+        const diff = newBalance - account.balance;
+        if (diff === 0) return;
+        // Update account balance
+        const { data: updatedAcc, error: accErr } = await supabase
+            .from("accounts").update({ balance: newBalance }).eq("id", account.id).select().single();
+        if (accErr) { showToast("Gagal update saldo", "info"); return; }
+        // Record adjustment transaction
+        const adjTx = {
+            user_id: user.id,
+            account_id: account.id,
+            account_name: account.name,
+            type: diff > 0 ? "income" : "expense",
+            amount: Math.abs(diff),
+            category: "Koreksi Saldo",
+            note: `Koreksi saldo ${account.name}`,
+            icon: "⚖️",
+            date: new Date().toISOString().slice(0, 10),
+        };
+        const { data: newTx } = await supabase.from("transactions").insert(adjTx).select().single();
+        setAccounts(p => p.map(a => a.id === account.id ? updatedAcc : a));
+        if (newTx) setTransactions(p => [newTx, ...p]);
+        showToast(`Saldo ${account.name} diperbarui`);
+    };
+
     // ── AI HANDLER ───────────────────────────────────────────
     const handleAi = () => {
         if (!aiInput.trim()) return;
@@ -715,7 +741,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
                     {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
                     {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} />}
-                    {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} />}
+                    {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} />}
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
                     {activeMenu === "goals" && <GoalsView goals={goals} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} />}
