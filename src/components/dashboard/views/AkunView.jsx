@@ -42,10 +42,12 @@ const card = {
 };
 
 /* ── component ── */
-const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) => {
+const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, onAdjustBalance }) => {
     const { t } = useLanguage();
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
     const [activeTab, setActiveTab] = useState(accounts[0]?.id || null);
+    const [editBalanceAcc, setEditBalanceAcc] = useState(null); // account being edited
+    const [newBalanceInput, setNewBalanceInput] = useState("");
 
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
     const bankCount    = accounts.filter(a => a.type === "bank").length;
@@ -60,6 +62,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
         : [];
 
     return (
+        <>
         <div style={{ animation: "fadeIn .4s", display: "flex", flexDirection: "column", gap: 22 }}>
 
             {/* ── Page Header ── */}
@@ -196,6 +199,22 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
                                     >
                                         {t("acc.viewTx") || "Lihat Transaksi"}
                                     </button>
+                                    <button
+                                        onClick={() => { setEditBalanceAcc(a); setNewBalanceInput(String(acctBalance)); }}
+                                        title="Edit Saldo"
+                                        style={{
+                                            padding: "8px 11px", borderRadius: 9,
+                                            border: `1px solid ${color}30`,
+                                            background: "transparent",
+                                            color, fontSize: 13,
+                                            cursor: "pointer", fontFamily: "inherit",
+                                            transition: "background .15s",
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                        onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                    >
+                                        ✏️
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -311,6 +330,82 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
                 </div>
             )}
         </div>
+        {/* ── Edit Saldo Modal ── */}
+        {editBalanceAcc && (
+            <div
+                onClick={() => setEditBalanceAcc(null)}
+                style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(0,0,0,.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            >
+                <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 400 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${accentColor(editBalanceAcc.type)}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                            {editBalanceAcc.icon}
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{editBalanceAcc.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--color-muted)" }}>
+                                Saldo saat ini: <span style={{ fontWeight: 700, color: accentColor(editBalanceAcc.type) }}>{fmtRp(editBalanceAcc.balance)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>
+                        Saldo Baru
+                    </label>
+                    <input
+                        type="number"
+                        value={newBalanceInput}
+                        onChange={e => setNewBalanceInput(e.target.value)}
+                        placeholder="Masukkan saldo baru..."
+                        autoFocus
+                        style={{
+                            width: "100%", padding: "12px 14px",
+                            background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
+                            borderRadius: 12, color: "var(--color-text)", fontSize: 16,
+                            fontWeight: 700, outline: "none", fontFamily: "inherit",
+                            marginBottom: 8,
+                        }}
+                    />
+
+                    {/* Selisih preview */}
+                    {newBalanceInput !== "" && parseInt(newBalanceInput) !== editBalanceAcc.balance && (
+                        <div style={{
+                            padding: "8px 14px", borderRadius: 10, marginBottom: 16,
+                            background: parseInt(newBalanceInput) > editBalanceAcc.balance ? "rgba(5,150,105,.08)" : "rgba(220,38,38,.08)",
+                            border: `1px solid ${parseInt(newBalanceInput) > editBalanceAcc.balance ? "rgba(5,150,105,.2)" : "rgba(220,38,38,.2)"}`,
+                            fontSize: 12, color: "var(--color-muted)",
+                        }}>
+                            Selisih:{" "}
+                            <span style={{ fontWeight: 700, color: parseInt(newBalanceInput) > editBalanceAcc.balance ? "var(--color-primary)" : "var(--color-expense)" }}>
+                                {parseInt(newBalanceInput) > editBalanceAcc.balance ? "+" : ""}{fmtRp(parseInt(newBalanceInput || 0) - editBalanceAcc.balance)}
+                            </span>
+                            {" "}→ transaksi koreksi otomatis dibuat
+                        </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                            onClick={() => setEditBalanceAcc(null)}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={() => {
+                                const nb = parseInt(newBalanceInput);
+                                if (isNaN(nb) || nb < 0) return;
+                                onAdjustBalance && onAdjustBalance(editBalanceAcc, nb);
+                                setEditBalanceAcc(null);
+                            }}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                            Simpan Saldo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 
