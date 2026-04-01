@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useTheme } from "../../i18n/ThemeContext";
 
 const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
     const { t, lang, setLang, languages } = useLanguage();
+    const { themeId, setTheme, themes } = useTheme();
     const [showLangPicker, setShowLangPicker] = useState(false);
+    const [showThemePicker, setShowThemePicker] = useState(false);
 
     const sidebarItems = [
         { group: t("nav.summary"),  items: [{ id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" }] },
@@ -109,7 +112,7 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
             {/* Language Picker */}
             <div style={{ padding: "8px 16px", borderTop: "1px solid rgba(255,255,255,.05)", position: "relative" }}>
                 <button
-                    onClick={() => setShowLangPicker(v => !v)}
+                    onClick={() => { setShowLangPicker(v => !v); setShowThemePicker(false); }}
                     style={{
                         display: "flex", alignItems: "center", gap: 8,
                         width: "100%", padding: "8px 10px", borderRadius: 8,
@@ -140,7 +143,7 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                                     width: "100%", padding: "8px 10px", borderRadius: 8,
                                     border: "none",
                                     background: lang === l.code ? "rgba(96,252,198,.15)" : "transparent",
-                                    color: lang === l.code ? "#60fcc6" : "#acaab4",
+                                    color: lang === l.code ? "#60fcc6" : "var(--color-muted)",
                                     fontSize: 12, fontWeight: lang === l.code ? 600 : 400,
                                     cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                                     transition: "all .15s",
@@ -149,6 +152,69 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
                                 <span style={{ fontSize: 14 }}>{l.flag}</span>
                                 <span>{l.label}</span>
                                 {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "#60fcc6" }}>✓</span>}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Theme Picker */}
+            <div style={{ padding: "8px 16px", borderTop: "1px solid rgba(255,255,255,.05)", position: "relative" }}>
+                <button
+                    onClick={() => { setShowThemePicker(v => !v); setShowLangPicker(false); }}
+                    style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        width: "100%", padding: "8px 10px", borderRadius: 8,
+                        border: "none",
+                        background: "transparent",
+                        color: "#8B8BA8", fontSize: 12, cursor: "pointer",
+                        fontFamily: "inherit", transition: "all .2s",
+                    }}
+                >
+                    <span style={{ fontSize: 15 }}>{themes[themeId]?.icon || "🎨"}</span>
+                    <span style={{ flex: 1, textAlign: "left" }}>{themes[themeId]?.name || "Tema"}</span>
+                    <div style={{ display: "flex", gap: 4 }}>
+                        {Object.values(themes).map(th => (
+                            <div key={th.id} style={{
+                                width: 8, height: 8, borderRadius: "50%",
+                                background: th.preview[2],
+                                opacity: themeId === th.id ? 1 : 0.35,
+                                transition: "opacity .2s",
+                            }} />
+                        ))}
+                    </div>
+                </button>
+
+                {showThemePicker && (
+                    <div style={{
+                        position: "absolute", bottom: "100%", left: 12, right: 12,
+                        background: "rgba(25,25,33,.98)", border: "1px solid rgba(255,255,255,.1)",
+                        borderRadius: 12, padding: 6, zIndex: 100,
+                        boxShadow: "0 -8px 24px rgba(0,0,0,.5)",
+                    }}>
+                        {Object.values(themes).map(th => (
+                            <button
+                                key={th.id}
+                                onClick={() => { setTheme(th.id); setShowThemePicker(false); }}
+                                style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    width: "100%", padding: "8px 10px", borderRadius: 8,
+                                    border: "none",
+                                    background: themeId === th.id ? "rgba(255,255,255,.08)" : "transparent",
+                                    color: themeId === th.id ? "#fff" : "#8B8BA8",
+                                    fontSize: 12, fontWeight: themeId === th.id ? 600 : 400,
+                                    cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                                    transition: "all .15s",
+                                }}
+                            >
+                                <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                                    {th.preview.map((c, i) => (
+                                        <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: c }} />
+                                    ))}
+                                </div>
+                                <span style={{ fontSize: 13 }}>{th.icon}</span>
+                                <span style={{ flex: 1 }}>{th.name}</span>
+                                {themeId === th.id && <span style={{ fontSize: 10, color: th.preview[2] }}>✓</span>}
                             </button>
                         ))}
                     </div>
