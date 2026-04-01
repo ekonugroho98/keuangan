@@ -3,14 +3,14 @@ import InputField from "../ui/InputField";
 
 const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading, onSwitchToSignup }) => (
     <Modal open={open} onClose={onClose}>
-        <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(99,102,241,.2)", borderBottom: "none", padding: "28px 20px 36px", position: "relative", overflow: "hidden" }}>
+        <div style={{ background: "linear-gradient(135deg,#13131a,#1f1f28)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(96,252,198,.2)", borderBottom: "none", padding: "28px 20px 36px", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "relative", zIndex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
                     <div>
                         <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>Selamat Datang! 👋</h2>
-                        <p style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>Masuk ke akun lu</p>
+                        <p style={{ color: "#76747e", fontSize: 12, marginTop: 4 }}>Masuk ke akun lu</p>
                     </div>
-                    <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                    <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                 </div>
 
                 <InputField label="EMAIL" icon="📧" type="email" placeholder="email@example.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} error={errors.email} />
@@ -26,7 +26,7 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
                 </button>
 
                 <div style={{ textAlign: "center", marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.06)" }}>
-                    <span style={{ color: "#64748b", fontSize: 12 }}>Belum punya akun? </span>
+                    <span style={{ color: "#76747e", fontSize: 12 }}>Belum punya akun? </span>
                     <button className="link-btn" onClick={onSwitchToSignup}>Daftar gratis</button>
                 </div>
             </div>

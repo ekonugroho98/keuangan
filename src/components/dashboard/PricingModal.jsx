@@ -4,8 +4,8 @@ const plans = [
         name: "Free Trial",
         price: "Gratis",
         period: "14 hari",
-        color: "#6366f1",
-        gradient: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+        color: "#acaab4",
+        gradient: "linear-gradient(135deg,#76747e,#48474f)",
         features: [
             "✅ Semua fitur dasar",
             "✅ Catat transaksi",
@@ -23,8 +23,8 @@ const plans = [
         name: "Starter",
         price: "Rp 29.000",
         period: "/bulan",
-        color: "#10b981",
-        gradient: "linear-gradient(135deg,#10b981,#059669)",
+        color: "#60fcc6",
+        gradient: "linear-gradient(135deg,#60fcc6,#19ce9b)",
         badge: "Populer",
         features: [
             "✅ Semua fitur Free Trial",
@@ -82,7 +82,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
             <div
                 onClick={e => e.stopPropagation()}
                 style={{
-                    background: "#0f0f1a",
+                    background: "#0e0e15",
                     border: "1px solid rgba(255,255,255,0.08)",
                     borderRadius: "20px 20px 0 0",
                     padding: "28px 20px 40px",
@@ -112,7 +112,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                                 key={plan.id}
                                 style={{
                                     background: isActive
-                                        ? `linear-gradient(180deg, rgba(${plan.id === "starter" ? "16,185,129" : plan.id === "pro" ? "245,158,11" : "99,102,241"},.12) 0%, transparent 100%)`
+                                        ? `linear-gradient(180deg, rgba(${plan.id === "starter" ? "0,200,150" : plan.id === "pro" ? "245,158,11" : "99,99,130"},.12) 0%, transparent 100%)`
                                         : "rgba(255,255,255,0.03)",
                                     border: `1px solid ${isActive ? plan.color + "55" : "rgba(255,255,255,0.06)"}`,
                                     borderRadius: 16,
@@ -139,8 +139,8 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                                 {isActive && (
                                     <div style={{
                                         position: "absolute", top: -10, left: 16,
-                                        background: "rgba(99,102,241,.8)",
-                                        color: "#fff", fontSize: 10, fontWeight: 700,
+                                        background: "rgba(96,252,198,.8)",
+                                        color: "#005e44", fontSize: 10, fontWeight: 700,
                                         padding: "3px 10px", borderRadius: 20,
                                     }}>
                                         ✓ Aktif
@@ -185,7 +185,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                                             : plan.disabled
                                                 ? "rgba(255,255,255,0.05)"
                                                 : plan.gradient,
-                                        color: isActive || plan.disabled ? "#475569" : "#fff",
+                                        color: isActive || plan.disabled ? "#475569" : plan.id === "starter" ? "#005e44" : "#fff",
                                         fontSize: 13,
                                         fontWeight: 600,
                                         cursor: isActive || plan.disabled ? "default" : "pointer",

@@ -117,7 +117,7 @@ const LandingPage = ({ showToast }) => {
     const closeLogin = () => { setShowLogin(false); setFormErrors({}); };
 
     return (
-        <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", background: "#06060e", color: "#e2e8f0", minHeight: "100vh", overflowX: "hidden" }}>
+        <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", background: "#0e0e15", color: "#e2e8f0", minHeight: "100vh", overflowX: "hidden" }}>
             <Navbar scrollY={scrollY} onLogin={() => setShowLogin(true)} onSignup={() => setShowSignup(true)} />
             <HeroSection onSignup={() => setShowSignup(true)} onDemo={() => setShowDemo(true)} />
             <FeaturesSection />

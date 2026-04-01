@@ -43,158 +43,401 @@ const MONTHS_LOCALIZED = {
     ],
 };
 
-const selectStyle = {
-    padding: "7px 12px", borderRadius: 9,
-    background: "rgba(255,255,255,.04)",
-    border: "1px solid rgba(255,255,255,.08)",
-    color: "#cbd5e1", fontSize: 12, fontFamily: "inherit",
-    outline: "none", cursor: "pointer",
-};
+const MONTH_NAMES_ID  = ["","Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+const MONTH_NAMES_EN  = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 
 const TransaksiView = ({ transactions, onEdit, onDelete }) => {
     const { t, lang } = useLanguage();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
+    const tCat = (name) => t("cat.name." + name) || name;
 
     const now = new Date();
-    const [filterYear,  setFilterYear]  = useState(String(now.getFullYear()));
-    const [filterMonth, setFilterMonth] = useState(String(now.getMonth() + 1).padStart(2, "0"));
-    const [filterDate,  setFilterDate]  = useState("");
-    const [hoveredId,   setHoveredId]   = useState(null);
-    const [confirmDelete, setConfirmDelete] = useState(null); // tx yang mau dihapus
+    const [filterYear,    setFilterYear]    = useState(String(now.getFullYear()));
+    const [filterMonth,   setFilterMonth]   = useState(String(now.getMonth() + 1).padStart(2, "0"));
+    const [filterDate,    setFilterDate]    = useState("");
+    const [filterType,    setFilterType]    = useState("all");
+    const [search,        setSearch]        = useState("");
+    const [hoveredId,     setHoveredId]     = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
 
-    const filtered = transactions.filter(tx => {
+    /* --- filtered by date/year/month --- */
+    const byDate = transactions.filter(tx => {
         if (filterDate)  return tx.date === filterDate;
         if (filterYear  && tx.date?.slice(0, 4) !== filterYear)  return false;
         if (filterMonth && tx.date?.slice(5, 7) !== filterMonth) return false;
         return true;
     });
 
-    const sumIn  = filtered.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
-    const sumOut = filtered.filter(tx => tx.type === "expense" || tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
-    const isFiltered = filterYear || filterMonth || filterDate;
+    const sumIn       = byDate.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
+    const sumOut      = byDate.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0); // transfer TIDAK dihitung keluar
+    const sumTransfer = byDate.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
+    const net         = sumIn - sumOut; // bersih = pemasukan - pengeluaran saja (transfer netral)
 
-    const handleReset = () => { setFilterYear(""); setFilterMonth(""); setFilterDate(""); };
+    /* --- further filtered by type + search --- */
+    const filtered = byDate.filter(tx => {
+        if (filterType !== "all" && tx.type !== filterType) return false;
+        if (search) {
+            const q = search.toLowerCase();
+            return (
+                tx.note?.toLowerCase().includes(q) ||
+                tx.category?.toLowerCase().includes(q) ||
+                tx.account_name?.toLowerCase().includes(q)
+            );
+        }
+        return true;
+    });
 
-    const typeLabel = (type) => {
-        if (type === "income")   return { text: t("tx.income"),   bg: "rgba(16,185,129,.1)",  color: "#34d399" };
-        if (type === "transfer") return { text: t("tx.transfer"), bg: "rgba(6,182,212,.1)",   color: "#22d3ee" };
-        return                          { text: t("tx.expense"),  bg: "rgba(239,68,68,.1)",   color: "#f87171" };
+    const handleReset = () => {
+        setFilterYear(String(now.getFullYear()));
+        setFilterMonth(String(now.getMonth() + 1).padStart(2, "0"));
+        setFilterDate("");
+        setSearch("");
+        setFilterType("all");
+    };
+
+    /* periode label */
+    const monthNames = MONTH_NAMES_MAP[lang] || MONTH_NAMES_ID;
+    const periodLabel = filterDate
+        ? fmtDate(filterDate)
+        : filterMonth && filterYear
+            ? `${monthNames[parseInt(filterMonth)] || filterMonth} ${filterYear}`
+            : filterYear || "Semua Periode";
+
+    const TYPE_TABS = [
+        { id: "all",      label: t("tx.all")      || "Semua"       },
+        { id: "income",   label: t("tx.income")   || "Pemasukan"   },
+        { id: "expense",  label: t("tx.expense")  || "Pengeluaran" },
+        { id: "transfer", label: t("tx.transfer") || "Transfer"    },
+    ];
+
+    const typeMeta = (type) => {
+        if (type === "income")   return { badgeBg: "rgba(96,252,198,.12)",  badgeColor: "#60fcc6", iconBg: "rgba(96,252,198,.1)",  amtColor: "#60fcc6", sign: "+"  };
+        if (type === "transfer") return { badgeBg: "rgba(79,195,247,.12)",  badgeColor: "#4FC3F7", iconBg: "rgba(79,195,247,.1)",  amtColor: "#4FC3F7", sign: "↔ " }; // netral — bukan minus
+        return                          { badgeBg: "rgba(255,113,108,.12)", badgeColor: "#ff716c", iconBg: "rgba(255,113,108,.1)", amtColor: "#ff716c", sign: "-"  };
+    };
+
+    const typeText = (type) => {
+        if (type === "income")   return t("tx.income")   || "Pemasukan";
+        if (type === "transfer") return t("tx.transfer") || "Transfer";
+        return t("tx.expense") || "Pengeluaran";
     };
 
     return (
-        <div style={{ animation: "fadeIn .4s" }}>
-            {/* Confirm delete popup */}
+        <div style={{ animation: "fadeIn .4s", display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* ── Confirm Delete Modal ── */}
             {confirmDelete && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.6)", backdropFilter: "blur(6px)" }}>
-                    <div style={{ background: "#0f0f1e", border: "1px solid rgba(239,68,68,.3)", borderRadius: 18, padding: "28px 24px", maxWidth: 340, width: "90%", textAlign: "center", animation: "scaleIn .2s" }}>
+                <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.65)", backdropFilter: "blur(6px)" }}>
+                    <div style={{ background: "#13131a", border: "1px solid rgba(255,113,108,.3)", borderRadius: 18, padding: "28px 24px", maxWidth: 340, width: "90%", textAlign: "center", animation: "scaleIn .2s" }}>
                         <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
-                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Hapus Transaksi?</h3>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{t("tx.deleteTitle") || "Hapus Transaksi?"}</h3>
                         <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>
                             <strong style={{ color: "#fff" }}>{confirmDelete.note}</strong>
                         </p>
-                        <p style={{ fontSize: 12, color: "#64748b", marginBottom: 24 }}>
-                            Saldo akun <strong style={{ color: "#94a3b8" }}>{confirmDelete.account_name}</strong> akan otomatis dikembalikan.
+                        <p style={{ fontSize: 12, color: "#76747e", marginBottom: 24 }}>
+                            {t("tx.deleteDesc") || "Saldo akun"} <strong style={{ color: "#94a3b8" }}>{confirmDelete.account_name}</strong> {t("tx.deleteDescSuffix") || "akan otomatis dikembalikan."}
                         </p>
                         <div style={{ display: "flex", gap: 10 }}>
                             <button onClick={() => setConfirmDelete(null)}
                                 style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "transparent", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                Batal
+                                {t("common.cancel") || "Batal"}
                             </button>
                             <button onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); }}
-                                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                                Ya, Hapus
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                {t("tx.deleteConfirm") || "Ya, Hapus"}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div style={{ background: "rgba(15,15,30,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
+            {/* ── Page Header ── */}
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 4 }}>
+                <div>
+                    <h1 style={{ fontSize: "clamp(26px,4vw,36px)", fontWeight: 800, color: "#efecf7", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+                        {t("tx.allTransactions") || "Transaksi"}
+                    </h1>
+                    <p style={{ fontSize: 13, color: "#acaab4", margin: 0, fontWeight: 500 }}>
+                        {t("tx.subtitle") || "Kelola arus kas dengan presisi."}
+                    </p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#60fcc6", display: "block", marginBottom: 4 }}>
+                        {t("tx.activePeriod") || "Periode Aktif"}
+                    </span>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#efecf7" }}>{periodLabel}</div>
+                </div>
+            </div>
 
-                {/* Header + Filter */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>{t("tx.allTransactions")}</h3>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth(""); setFilterDate(""); }} style={selectStyle}>
-                            <option value="">{t("tx.allYears")}</option>
-                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+            {/* ── Summary Cards ── */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+
+                {/* Pemasukan */}
+                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
+                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#60fcc6", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                            {byDate.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
+                        </span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "#60fcc6", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
+                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
+                </div>
+
+                {/* Pengeluaran — transfer TIDAK termasuk */}
+                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: "4px solid #ff716c", transition: "transform .3s" }}
+                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(255,113,108,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📉</div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#ff716c", background: "rgba(255,113,108,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                            {byDate.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
+                        </span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "#ff716c", margin: "0 0 3px" }}>-{fmtRp(sumOut)}</h3>
+                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
+                </div>
+
+                {/* Transfer antar akun — NETRAL, tidak mempengaruhi kekayaan */}
+                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: "4px solid #4FC3F7", transition: "transform .3s" }}
+                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(79,195,247,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                            {byDate.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
+                        </span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "#4FC3F7", margin: "0 0 3px" }}>↔ {fmtRp(sumTransfer)}</h3>
+                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
+                </div>
+
+                {/* Saldo Bersih = income - expense (transfer diabaikan) */}
+                <div style={{ background: "#1f1f28", borderRadius: 16, padding: 20, borderLeft: `4px solid ${net >= 0 ? "#a78bfa" : "#ff716c"}`, transition: "transform .3s" }}
+                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(167,139,250,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💰</div>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid rgba(167,139,250,.25)` }} />
+                    </div>
+                    <p style={{ fontSize: 11, color: "#acaab4", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "#efecf7" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
+                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
+                </div>
+            </div>
+
+            {/* ── Filter Bar (glass) ── */}
+            <div style={{
+                background: "rgba(31,31,38,.6)", backdropFilter: "blur(20px)",
+                border: "1px solid rgba(72,71,79,.15)",
+                borderRadius: 16, padding: "16px 18px",
+                display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between",
+            }}>
+                {/* Left: type tabs + year/month */}
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+
+                    {/* Type tabs — pill group */}
+                    <div style={{ display: "flex", background: "#000", borderRadius: 12, padding: 4, gap: 2 }}>
+                        {TYPE_TABS.map(tab => {
+                            const isActive = filterType === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setFilterType(tab.id)}
+                                    style={{
+                                        padding: "6px 14px", borderRadius: 9,
+                                        border: "none",
+                                        background: isActive ? "#60fcc6" : "transparent",
+                                        color: isActive ? "#005e44" : "#acaab4",
+                                        fontSize: 12, fontWeight: isActive ? 700 : 500,
+                                        cursor: "pointer", fontFamily: "inherit",
+                                        transition: "all .15s",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Divider */}
+                    <div style={{ width: 1, height: 24, background: "rgba(72,71,79,.3)" }} />
+
+                    {/* Year + Month dropdowns - transparent style */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <select
+                            value={filterYear}
+                            onChange={e => { setFilterYear(e.target.value); setFilterMonth(""); setFilterDate(""); }}
+                            style={{ background: "transparent", border: "none", color: "#60fcc6", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", outline: "none" }}
+                        >
+                            <option value="" style={{ background: "#1f1f28" }}>{t("tx.allYears")}</option>
+                            {years.map(y => <option key={y} value={y} style={{ background: "#1f1f28" }}>{y}</option>)}
                         </select>
-                        <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setFilterDate(""); }} disabled={!filterYear} style={{ ...selectStyle, opacity: filterYear ? 1 : 0.4, cursor: filterYear ? "pointer" : "not-allowed" }}>
-                            <option value="">{t("tx.allMonths")}</option>
-                            {MONTHS.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                        <select
+                            value={filterMonth}
+                            onChange={e => { setFilterMonth(e.target.value); setFilterDate(""); }}
+                            disabled={!filterYear}
+                            style={{ background: "transparent", border: "none", color: filterYear ? "#60fcc6" : "#acaab4", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: filterYear ? "pointer" : "not-allowed", outline: "none", opacity: filterYear ? 1 : .5 }}
+                        >
+                            <option value="" style={{ background: "#1f1f28" }}>{t("tx.allMonths")}</option>
+                            {MONTHS.map(m => <option key={m.v} value={m.v} style={{ background: "#1f1f28" }}>{m.l}</option>)}
                         </select>
-                        <input type="date" value={filterDate} onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); }} style={{ ...selectStyle, colorScheme: "dark" }} />
-                        {isFiltered && (
-                            <button onClick={handleReset} style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid rgba(239,68,68,.2)", background: "rgba(239,68,68,.08)", color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                ✕ {t("common.reset")}
-                            </button>
-                        )}
                     </div>
                 </div>
 
-                {/* Summary bar */}
-                <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>
-                        <span style={{ color: "#94a3b8", fontWeight: 600 }}>{filtered.length}</span> {t("tx.summary")}
+                {/* Right: search + date + reset */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    {/* Search */}
+                    <div style={{ position: "relative" }}>
+                        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, opacity: .5, pointerEvents: "none" }}>🔍</span>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder={t("tx.search") || "Cari transaksi..."}
+                            style={{
+                                background: "#000", border: "none", borderRadius: 12,
+                                color: "#efecf7", fontSize: 12, fontFamily: "inherit",
+                                padding: "8px 12px 8px 30px", outline: "none", width: 200,
+                            }}
+                        />
                     </div>
-                    <div style={{ width: 1, background: "rgba(255,255,255,.06)" }} />
-                    <div style={{ fontSize: 12, color: "#64748b" }}>{t("tx.income")}: <span style={{ color: "#10b981", fontWeight: 600 }}>{fmtRp(sumIn)}</span></div>
-                    <div style={{ width: 1, background: "rgba(255,255,255,.06)" }} />
-                    <div style={{ fontSize: 12, color: "#64748b" }}>{t("tx.expense")}: <span style={{ color: "#f87171", fontWeight: 600 }}>{fmtRp(sumOut)}</span></div>
-                    <div style={{ width: 1, background: "rgba(255,255,255,.06)" }} />
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Bersih: <span style={{ color: sumIn - sumOut >= 0 ? "#10b981" : "#f87171", fontWeight: 600 }}>{fmtRp(sumIn - sumOut)}</span></div>
-                </div>
 
-                {/* List */}
+                    {/* Date picker */}
+                    <input
+                        type="date"
+                        value={filterDate}
+                        onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); }}
+                        style={{ background: "#000", border: "none", borderRadius: 12, color: "#acaab4", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "dark", cursor: "pointer" }}
+                    />
+
+                    {/* Reset */}
+                    {(filterDate || search || filterType !== "all") && (
+                        <button onClick={handleReset}
+                            style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid rgba(255,113,108,.2)", background: "rgba(255,113,108,.08)", color: "#ff716c", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                            ✕ {t("common.reset")}
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Stats Mini Bar ── */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", flexWrap: "wrap", gap: 6 }}>
+                <p style={{ fontSize: 11, color: "#acaab4", margin: 0, display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center" }}>
+                    <span><span style={{ fontWeight: 600, color: "#efecf7" }}>{filtered.length}</span> {t("tx.summary") || "transaksi"}</span>
+                    <span style={{ opacity: .35 }}>·</span>
+                    <span style={{ color: "rgba(96,252,198,.85)", fontWeight: 600 }}>↑ {fmtRp(sumIn)}</span>
+                    <span style={{ opacity: .35 }}>·</span>
+                    <span style={{ color: "rgba(255,113,108,.85)", fontWeight: 600 }}>↓ {fmtRp(sumOut)}</span>
+                    {sumTransfer > 0 && <>
+                        <span style={{ opacity: .35 }}>·</span>
+                        <span style={{ color: "rgba(79,195,247,.85)", fontWeight: 600 }}>↔ {fmtRp(sumTransfer)}</span>
+                    </>}
+                    <span style={{ opacity: .35 }}>·</span>
+                    <span style={{ color: net >= 0 ? "rgba(239,236,247,.8)" : "rgba(255,113,108,.9)", fontWeight: 600 }}>
+                        {t("tx.net") || "Bersih"}: {net >= 0 ? "+" : ""}{fmtRp(net)}
+                    </span>
+                </p>
+            </div>
+
+            {/* ── Transaction List ── */}
+            <div style={{ borderRadius: 24, overflow: "hidden" }}>
                 {filtered.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "32px 0", color: "#475569", fontSize: 13 }}>
-                        <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                        {t("tx.noTxPeriod")}
+                    <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", background: "#13131a", borderRadius: 24 }}>
+                        <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+                        <p style={{ fontSize: 13, margin: 0, color: "#acaab4" }}>{t("tx.noTxPeriod")}</p>
                     </div>
                 ) : (
-                    filtered.map(tx => {
-                        const badge = typeLabel(tx.type);
+                    filtered.map((tx, idx) => {
+                        const meta = typeMeta(tx.type);
                         const isHovered = hoveredId === tx.id;
+                        /* alternating row: even = #13131a, odd = rgba(37,37,47,.3) */
+                        const rowBg = isHovered
+                            ? "#191921"
+                            : idx % 2 === 0
+                                ? "#13131a"
+                                : "rgba(37,37,47,.35)";
+
                         return (
                             <div
                                 key={tx.id}
                                 onMouseEnter={() => setHoveredId(tx.id)}
                                 onMouseLeave={() => setHoveredId(null)}
-                                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 8px", borderBottom: "1px solid rgba(255,255,255,.04)", borderRadius: 10, transition: "background .15s", background: isHovered ? "rgba(255,255,255,.02)" : "transparent", gap: 8 }}
+                                style={{
+                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                    padding: "14px 16px",
+                                    background: rowBg,
+                                    transition: "background .15s",
+                                    gap: 12,
+                                }}
                             >
-                                {/* Kiri: icon + info */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                                    <div style={{ width: 40, height: 40, borderRadius: 12, background: tx.type === "income" ? "rgba(16,185,129,.1)" : tx.type === "transfer" ? "rgba(6,182,212,.1)" : "rgba(239,68,68,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{tx.icon}</div>
+                                {/* Left: icon + info */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
+                                    {/* Icon box 48x48 */}
+                                    <div style={{
+                                        width: 48, height: 48, borderRadius: 14,
+                                        background: meta.iconBg,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 20, flexShrink: 0,
+                                        transition: "transform .2s",
+                                        transform: isHovered ? "scale(1.1)" : "scale(1)",
+                                    }}>
+                                        {tx.icon}
+                                    </div>
+
+                                    {/* Name + badge + meta */}
                                     <div style={{ minWidth: 0 }}>
-                                        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.note}</div>
-                                        <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(tx.date)} · {tx.category} · {tx.account_name}</div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+                                            <span style={{ fontSize: 14, fontWeight: 700, color: "#efecf7", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
+                                                {tx.note}
+                                            </span>
+                                            <span style={{
+                                                fontSize: 9, padding: "2px 8px", borderRadius: 9999,
+                                                background: meta.badgeBg, color: meta.badgeColor,
+                                                fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
+                                                whiteSpace: "nowrap",
+                                            }}>
+                                                {typeText(tx.type)}
+                                            </span>
+                                        </div>
+                                        <p style={{ fontSize: 11, color: "#acaab4", margin: 0 }}>
+                                            {fmtDate(tx.date)} · {tCat(tx.category)} · {tx.account_name}
+                                        </p>
                                     </div>
                                 </div>
 
-                                {/* Kanan: jumlah + badge + action buttons */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                                    <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: tx.type === "income" ? "#10b981" : tx.type === "transfer" ? "#22d3ee" : "#ef4444" }}>
-                                            {tx.type === "income" ? "+" : "-"}{fmtRp(tx.amount)}
-                                        </div>
-                                        <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 6, background: badge.bg, color: badge.color, fontWeight: 600 }}>
-                                            {badge.text}
-                                        </span>
-                                    </div>
+                                {/* Right: amount + actions */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
+                                    <span style={{ fontSize: 16, fontWeight: 700, color: meta.amtColor, letterSpacing: "-0.3px", whiteSpace: "nowrap" }}>
+                                        {meta.sign}{fmtRp(tx.amount)}
+                                    </span>
 
-                                    {/* Action buttons — always visible on mobile, hover on desktop */}
+                                    {/* Action buttons */}
                                     <div style={{ display: "flex", gap: 4, opacity: isHovered ? 1 : 0, transition: "opacity .15s", pointerEvents: isHovered ? "auto" : "none" }}>
                                         <button
                                             onClick={() => onEdit(tx)}
-                                            title="Edit transaksi"
-                                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(99,102,241,.3)", background: "rgba(99,102,241,.1)", color: "#818cf8", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                            style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "#acaab4", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
+                                            onMouseOver={e => e.currentTarget.style.background = "rgba(37,37,47,.8)"}
+                                            onMouseOut={e => e.currentTarget.style.background = "transparent"}
                                         >✏️</button>
                                         <button
                                             onClick={() => setConfirmDelete(tx)}
-                                            title="Hapus transaksi"
-                                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(239,68,68,.25)", background: "rgba(239,68,68,.08)", color: "#f87171", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                            style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "#ff716c", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
+                                            onMouseOver={e => e.currentTarget.style.background = "rgba(255,113,108,.1)"}
+                                            onMouseOut={e => e.currentTarget.style.background = "transparent"}
                                         >🗑️</button>
                                     </div>
                                 </div>

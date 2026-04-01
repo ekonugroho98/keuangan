@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const GlowCard = ({ children, glowColor = "rgba(99,102,241,0.15)", onClick, style: xs = {} }) => {
+const GlowCard = ({ children, glowColor = "rgba(96,252,198,0.15)", onClick, style: xs = {} }) => {
     const [pos, setPos] = useState({ x: 0, y: 0 });
     const [hover, setHover] = useState(false);
     const ref = useRef(null);
@@ -13,7 +13,7 @@ const GlowCard = ({ children, glowColor = "rgba(99,102,241,0.15)", onClick, styl
             onClick={onClick}
             style={{
                 position: "relative", overflow: "hidden",
-                background: "rgba(15,15,30,0.6)", backdropFilter: "blur(20px)",
+                background: "rgba(25,25,33,0.6)", backdropFilter: "blur(20px)",
                 border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20,
                 transition: "transform 0.3s, box-shadow 0.3s",
                 transform: hover ? "translateY(-4px)" : "none",

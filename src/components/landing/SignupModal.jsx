@@ -12,19 +12,19 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
 
     return (
         <Modal open={open} onClose={onClose}>
-            <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(99,102,241,.2)", borderBottom: "none", padding: "28px 20px 36px", position: "relative", overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%,rgba(99,102,241,.1),transparent 50%)", pointerEvents: "none" }} />
+            <div style={{ background: "linear-gradient(135deg,#13131a,#1f1f28)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(96,252,198,.2)", borderBottom: "none", padding: "28px 20px 36px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%,rgba(96,252,198,.1),transparent 50%)", pointerEvents: "none" }} />
                 <div style={{ position: "relative", zIndex: 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                         <div>
                             <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>Daftar Gratis</h2>
-                            <p style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>{selectedPlan ? `Paket: ${selectedPlan.name}` : "Mulai trial 14 hari"}</p>
+                            <p style={{ color: "#76747e", fontSize: 12, marginTop: 4 }}>{selectedPlan ? `Paket: ${selectedPlan.name}` : "Mulai trial 14 hari"}</p>
                         </div>
-                        <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                        <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                     </div>
 
                     <div style={{ display: "flex", gap: 8, margin: "16px 0 24px" }}>
-                        {[1, 2].map(s => <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= s ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,.06)" }} />)}
+                        {[1, 2].map(s => <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= s ? "linear-gradient(135deg,#60fcc6,#19ce9b)" : "rgba(255,255,255,.06)" }} />)}
                     </div>
 
                     {step === 1 ? (
@@ -61,7 +61,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
                     )}
 
                     <div style={{ textAlign: "center", marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,.06)" }}>
-                        <span style={{ color: "#64748b", fontSize: 12 }}>Sudah punya akun? </span>
+                        <span style={{ color: "#76747e", fontSize: 12 }}>Sudah punya akun? </span>
                         <button className="link-btn" onClick={onSwitchToLogin}>Masuk</button>
                     </div>
                 </div>

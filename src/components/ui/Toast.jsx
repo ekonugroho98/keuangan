@@ -1,8 +1,8 @@
 const Toast = ({ message, show, type = "success" }) => {
     if (!show) return null;
     const styles = {
-        success: { bg: "rgba(16,185,129,0.15)", border: "rgba(16,185,129,0.3)", text: "#34d399", icon: "✓" },
-        info: { bg: "rgba(99,102,241,0.15)", border: "rgba(99,102,241,0.3)", text: "#818cf8", icon: "ℹ" },
+        success: { bg: "rgba(96,252,198,0.15)", border: "rgba(96,252,198,0.3)", text: "#60fcc6", icon: "✓" },
+        info: { bg: "rgba(96,252,198,0.15)", border: "rgba(96,252,198,0.3)", text: "#60fcc6", icon: "ℹ" },
     };
     const c = styles[type] || styles.info;
     return (
