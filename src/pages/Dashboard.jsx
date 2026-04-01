@@ -559,7 +559,15 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
                         <button onClick={() => setShowAddTx(true)} style={{ padding: isMobile ? "8px 12px" : "8px 16px", borderRadius: 9999, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#005e44", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>+ {isMobile ? "" : t("nav.transaction")}{isMobile ? "Tx" : ""}</button>
                         {!isMobile && <button onClick={onLogout} style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.logout")}</button>}
-                        {isMobile && <button onClick={onLogout} style={{ padding: "8px 10px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", fontSize: 16, cursor: "pointer" }}>⏻</button>}
+                        {isMobile && (
+                            <button onClick={onLogout} title="Logout" style={{ padding: "7px 9px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                    <polyline points="16 17 21 12 16 7" />
+                                    <line x1="21" y1="12" x2="9" y2="12" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </header>
 
