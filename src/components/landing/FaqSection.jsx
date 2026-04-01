@@ -26,13 +26,13 @@ const FaqSection = () => {
                     <FadeIn key={i} delay={i * .05}>
                         <div
                             onClick={() => setActiveFaq(activeFaq === i ? null : i)}
-                            style={{ background: "rgba(15,15,30,.6)", border: `1px solid ${activeFaq === i ? "rgba(99,102,241,.3)" : "rgba(255,255,255,.06)"}`, borderRadius: 14, padding: "18px 22px", cursor: "pointer", transition: "all .3s", marginBottom: 10 }}
+                            style={{ background: "rgba(25,25,33,.6)", border: `1px solid ${activeFaq === i ? "rgba(96,252,198,.3)" : "rgba(255,255,255,.06)"}`, borderRadius: 14, padding: "18px 22px", cursor: "pointer", transition: "all .3s", marginBottom: 10 }}
                         >
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <h3 style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{f.q}</h3>
-                                <span style={{ color: "#6366f1", fontSize: 18, transform: activeFaq === i ? "rotate(45deg)" : "none", transition: "transform .3s", flexShrink: 0, marginLeft: 16 }}>+</span>
+                                <span style={{ color: "#60fcc6", fontSize: 18, transform: activeFaq === i ? "rotate(45deg)" : "none", transition: "transform .3s", flexShrink: 0, marginLeft: 16 }}>+</span>
                             </div>
-                            {activeFaq === i && <p style={{ marginTop: 14, color: "#94a3b8", lineHeight: 1.7, fontSize: 13, animation: "slideUp .3s" }}>{f.a}</p>}
+                            {activeFaq === i && <p style={{ marginTop: 14, color: "#acaab4", lineHeight: 1.7, fontSize: 13, animation: "slideUp .3s" }}>{f.a}</p>}
                         </div>
                     </FadeIn>
                 ))}

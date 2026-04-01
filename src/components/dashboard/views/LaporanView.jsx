@@ -45,7 +45,7 @@ const selectStyle = {
     padding: "7px 12px", borderRadius: 9,
     background: "rgba(255,255,255,.04)",
     border: "1px solid rgba(255,255,255,.08)",
-    color: "#cbd5e1", fontSize: 12, fontFamily: "inherit",
+    color: "#c5c5d9", fontSize: 12, fontFamily: "inherit",
     outline: "none", cursor: "pointer",
 };
 
@@ -99,7 +99,7 @@ const LaporanView = ({ transactions = [] }) => {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
                 <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>{t("rep.title")}</h3>
-                    <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>{t("rep.period")}: {periodLabel}</p>
+                    <p style={{ fontSize: 12, color: "#76747e", margin: "4px 0 0" }}>{t("rep.period")}: {periodLabel}</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={selectStyle}>
@@ -116,30 +116,30 @@ const LaporanView = ({ transactions = [] }) => {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
 
                 {/* Ringkasan */}
-                <div style={{ background: "rgba(15,15,30,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
+                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 16 }}>{t("rep.summary")} {periodLabel}</h3>
                     {[
-                        { l: t("rep.totalIncome"),   v: fmtRp(income),    c: "#10b981" },
-                        { l: t("rep.totalExpense"),  v: fmtRp(expense),   c: "#ef4444" },
-                        { l: t("rep.totalTransfer"), v: fmtRp(transfer),  c: "#22d3ee" },
-                        { l: t("rep.netBalance"),    v: fmtRp(net),       c: net >= 0 ? "#6366f1" : "#f87171" },
-                        { l: t("rep.savingRate"),    v: `${savingRate}%`, c: savingRate >= 20 ? "#10b981" : "#f59e0b" },
-                        { l: t("rep.avgPerDay"),     v: fmtRp(avgPerDay), c: "#8b5cf6" },
-                        { l: t("rep.txCount"),       v: filtered.length,  c: "#94a3b8" },
+                        { l: t("rep.totalIncome"),   v: fmtRp(income),    c: "#60fcc6" },
+                        { l: t("rep.totalExpense"),  v: fmtRp(expense),   c: "#ff716c" },
+                        { l: t("rep.totalTransfer"), v: fmtRp(transfer),  c: "#4FC3F7" },
+                        { l: t("rep.netBalance"),    v: fmtRp(net),       c: net >= 0 ? "#60fcc6" : "#ff716c" },
+                        { l: t("rep.savingRate"),    v: `${savingRate}%`, c: savingRate >= 20 ? "#60fcc6" : "#f59e0b" },
+                        { l: t("rep.avgPerDay"),     v: fmtRp(avgPerDay), c: "#19ce9b" },
+                        { l: t("rep.txCount"),       v: filtered.length,  c: "#acaab4" },
                     ].map((r, i) => (
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: i > 0 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
-                            <span style={{ fontSize: 13, color: "#94a3b8" }}>{r.l}</span>
+                            <span style={{ fontSize: 13, color: "#acaab4" }}>{r.l}</span>
                             <span style={{ fontSize: 14, fontWeight: 700, color: r.c }}>{r.v}</span>
                         </div>
                     ))}
                 </div>
 
                 {/* Bar chart harian */}
-                <div style={{ background: "rgba(15,15,30,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
+                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{t("rep.dailyExpense")}</h3>
-                    <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>{periodLabel} · {t("rep.maxPerDay")} {fmtRp(maxDaily === 1 ? 0 : maxDaily)}{t("rep.perDay")}</p>
+                    <p style={{ fontSize: 11, color: "#76747e", marginBottom: 16 }}>{periodLabel} · {t("rep.maxPerDay")} {fmtRp(maxDaily === 1 ? 0 : maxDaily)}{t("rep.perDay")}</p>
                     {expense === 0 ? (
-                        <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", fontSize: 13 }}>
+                        <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#48474f", fontSize: 13 }}>
                             {t("rep.noExpense")}
                         </div>
                     ) : (
@@ -151,8 +151,8 @@ const LaporanView = ({ transactions = [] }) => {
                                 return (
                                     <div key={day} title={`${day}: ${fmtRp(val)}`}
                                         style={{ flex: 1, minWidth: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "default" }}>
-                                        <div style={{ width: "100%", height: h || 2, borderRadius: 3, background: val === 0 ? "rgba(255,255,255,.04)" : isHigh ? "linear-gradient(135deg,#ef4444,#f87171)" : "linear-gradient(135deg,#6366f1,#818cf8)", transition: "height .4s" }} />
-                                        {daysInMonth <= 14 && <span style={{ fontSize: 8, color: "#475569" }}>{day}</span>}
+                                        <div style={{ width: "100%", height: h || 2, borderRadius: 3, background: val === 0 ? "rgba(255,255,255,.04)" : isHigh ? "linear-gradient(135deg,#ff716c,#ff716c)" : "linear-gradient(135deg,#60fcc6,#60fcc6)", transition: "height .4s" }} />
+                                        {daysInMonth <= 14 && <span style={{ fontSize: 8, color: "#48474f" }}>{day}</span>}
                                     </div>
                                 );
                             })}
@@ -160,28 +160,28 @@ const LaporanView = ({ transactions = [] }) => {
                     )}
                     {daysInMonth > 14 && (
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                            <span style={{ fontSize: 9, color: "#475569" }}>1</span>
-                            <span style={{ fontSize: 9, color: "#475569" }}>{Math.round(daysInMonth / 2)}</span>
-                            <span style={{ fontSize: 9, color: "#475569" }}>{daysInMonth}</span>
+                            <span style={{ fontSize: 9, color: "#48474f" }}>1</span>
+                            <span style={{ fontSize: 9, color: "#48474f" }}>{Math.round(daysInMonth / 2)}</span>
+                            <span style={{ fontSize: 9, color: "#48474f" }}>{daysInMonth}</span>
                         </div>
                     )}
                 </div>
 
                 {/* Breakdown Kategori */}
-                <div style={{ background: "rgba(15,15,30,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
+                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{t("rep.breakdown")}</h3>
-                    <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>{t("rep.breakdownSub")} · {periodLabel}</p>
+                    <p style={{ fontSize: 11, color: "#76747e", marginBottom: 16 }}>{t("rep.breakdownSub")} · {periodLabel}</p>
                     {sortedCats.length === 0 ? (
-                        <div style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: "20px 0" }}>{t("rep.noExpense")}</div>
+                        <div style={{ color: "#48474f", fontSize: 13, textAlign: "center", padding: "20px 0" }}>{t("rep.noExpense")}</div>
                     ) : sortedCats.map(([cat, amt], i) => {
                         const pct = expense > 0 ? Math.round((amt / expense) * 100) : 0;
-                        const colors = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444","#ec4899"];
+                        const colors = ["#60fcc6","#19ce9b","#4FC3F7","#60fcc6","#f59e0b","#ff716c","#ec4899"];
                         const c = colors[i % colors.length];
                         return (
                             <div key={cat} style={{ marginBottom: 14 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                    <span style={{ fontSize: 12, color: "#cbd5e1" }}>{cat}</span>
-                                    <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "#475569" }}>({pct}%)</span></span>
+                                    <span style={{ fontSize: 12, color: "#c5c5d9" }}>{cat}</span>
+                                    <span style={{ fontSize: 12, color: "#acaab4", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "#48474f" }}>({pct}%)</span></span>
                                 </div>
                                 <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.04)" }}>
                                     <div style={{ height: "100%", borderRadius: 3, background: c, width: `${pct}%`, transition: "width .8s" }} />

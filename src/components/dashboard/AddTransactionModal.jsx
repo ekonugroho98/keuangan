@@ -1,11 +1,12 @@
 import Modal from "../ui/Modal";
 import InputField from "../ui/InputField";
 import { expenseCategories, incomeCategories } from "../../constants/categories";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const TYPES = [
-    { v: "expense",  l: "Pengeluaran", c: "#ef4444" },
-    { v: "income",   l: "Pemasukan",   c: "#10b981" },
-    { v: "transfer", l: "Transfer",    c: "#06b6d4" },
+    { v: "expense",  l: "Pengeluaran", c: "#ff716c" },
+    { v: "income",   l: "Pemasukan",   c: "#60fcc6" },
+    { v: "transfer", l: "Antar Rekening", c: "#06b6d4" },
 ];
 
 const AddTransactionModal = ({
@@ -18,6 +19,11 @@ const AddTransactionModal = ({
     // Loading state
     isSaving = false,
 }) => {
+    const { t } = useLanguage();
+    /* Terjemahkan nama kategori default, custom tetap nama asli */
+    const DEFAULT_CATS = new Set([...expenseCategories, ...incomeCategories]);
+    const tCat = (name) => DEFAULT_CATS.has(name) ? (t("cat.name." + name) || name) : name;
+
     const extraExpense = customCategories.filter(c => c.type !== "income").map(c => c.name);
     const extraIncome  = customCategories.filter(c => c.type !== "expense").map(c => c.name);
     const allExpense = [...expenseCategories, ...extraExpense];
@@ -38,11 +44,11 @@ const AddTransactionModal = ({
         ? "Menyimpan..."
         : editMode
             ? "✅ Update Transaksi"
-            : isTransfer ? "🔄 Transfer Dana" : "Simpan Transaksi";
+            : isTransfer ? "🔀 Pindah Antar Rekening" : "Simpan Transaksi";
 
     return (
     <Modal open={open} onClose={onClose}>
-        <div style={{ background: "linear-gradient(135deg,#0f0f1e,#1a1a2e)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(99,102,241,.2)", borderBottom: "none", padding: "24px 20px 36px", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ background: "linear-gradient(135deg,#0e0e15,#13131a)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(96,252,198,.2)", borderBottom: "none", padding: "24px 20px 36px", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
@@ -50,7 +56,7 @@ const AddTransactionModal = ({
                     </h3>
                     {editMode && <p style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Ubah detail transaksi di bawah</p>}
                 </div>
-                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#94a3b8", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
             </div>
 
             {/* Tipe — tidak bisa ganti tipe saat edit transfer */}
@@ -79,8 +85,8 @@ const AddTransactionModal = ({
             {/* Transfer edit: only note editable */}
             {editMode && isTransfer ? (
                 <>
-                    <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-                        ℹ️ Transfer hanya bisa diubah catatannya. Untuk mengubah akun / jumlah, <strong style={{ color: "#f87171" }}>hapus dan buat ulang</strong>.
+                    <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#acaab4", lineHeight: 1.6 }}>
+                        ℹ️ Transfer hanya bisa diubah catatannya. Untuk mengubah akun / jumlah, <strong style={{ color: "#ff716c" }}>hapus dan buat ulang</strong>.
                     </div>
                     <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
                 </>
@@ -89,7 +95,7 @@ const AddTransactionModal = ({
                 <>
                     <InputField label="JUMLAH (Rp)" icon="💰" type="number" placeholder="150000" value={txForm.amount} onChange={e => setTxForm(p => ({ ...p, amount: e.target.value }))} />
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 6, display: "block" }}>DARI AKUN</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>DARI AKUN</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => {
                             const selected = txForm.account === a.name;
@@ -106,7 +112,7 @@ const AddTransactionModal = ({
 
                     <div style={{ textAlign: "center", fontSize: 20, marginBottom: 16, color: "#06b6d4" }}>↓</div>
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 6, display: "block" }}>KE AKUN</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>KE AKUN</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => {
                             const selected = txForm.toAccount === a.name;
@@ -115,7 +121,7 @@ const AddTransactionModal = ({
                                 <button key={a.name}
                                     onClick={() => !isSource && setTxForm(p => ({ ...p, toAccount: a.name }))}
                                     disabled={isSource}
-                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#10b98155" : "rgba(255,255,255,.06)"}`, background: selected ? "rgba(16,185,129,.15)" : "transparent", color: selected ? "#10b981" : isSource ? "#334155" : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
+                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: selected ? "rgba(96,252,198,.15)" : "transparent", color: selected ? "#60fcc6" : isSource ? "#334155" : "#acaab4", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
                                 >{a.icon} {a.name}</button>
                             );
                         })}
@@ -125,14 +131,14 @@ const AddTransactionModal = ({
                         <div style={{ background: "rgba(6,182,212,.08)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ textAlign: "center" }}>
                                 <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>DARI</div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171" }}>{txForm.account}</div>
-                                <div style={{ fontSize: 11, color: "#f87171" }}>-Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#ff716c" }}>{txForm.account}</div>
+                                <div style={{ fontSize: 11, color: "#ff716c" }}>-Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
                             </div>
                             <div style={{ fontSize: 20 }}>→</div>
                             <div style={{ textAlign: "center" }}>
                                 <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>KE</div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "#10b981" }}>{txForm.toAccount}</div>
-                                <div style={{ fontSize: 11, color: "#10b981" }}>+Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#60fcc6" }}>{txForm.toAccount}</div>
+                                <div style={{ fontSize: 11, color: "#60fcc6" }}>+Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
                             </div>
                         </div>
                     )}
@@ -143,16 +149,16 @@ const AddTransactionModal = ({
                 <>
                     <InputField label="JUMLAH (Rp)" icon="💰" type="number" placeholder="150000" value={txForm.amount} onChange={e => setTxForm(p => ({ ...p, amount: e.target.value }))} />
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 6, display: "block" }}>KATEGORI</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>{t("addTx.category") || "KATEGORI"}</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {(txForm.type === "expense" ? allExpense : allIncome).map(c => (
                             <button key={c} onClick={() => setTxForm(p => ({ ...p, category: c }))}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#6366f155" : "rgba(255,255,255,.06)"}`, background: txForm.category === c ? "rgba(99,102,241,.15)" : "transparent", color: txForm.category === c ? "#818cf8" : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                            >{c}</button>
+                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: txForm.category === c ? "rgba(96,252,198,.15)" : "transparent", color: txForm.category === c ? "#60fcc6" : "#acaab4", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                            >{tCat(c)}</button>
                         ))}
                     </div>
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 6, display: "block" }}>AKUN SUMBER</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>AKUN SUMBER</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => (
                             <button key={a.name} onClick={() => setTxForm(p => ({ ...p, account: a.name }))}
@@ -171,11 +177,11 @@ const AddTransactionModal = ({
                     background: ((!canSubmit && !editMode) || isSaving)
                         ? "rgba(255,255,255,.07)"
                         : editMode
-                            ? "linear-gradient(135deg,#10b981,#059669)"
+                            ? "linear-gradient(135deg,#60fcc6,#19ce9b)"
                             : isTransfer
                                 ? "linear-gradient(135deg,#06b6d4,#0891b2)"
-                                : "linear-gradient(135deg,#6366f1,#8b5cf6)",
-                    color: "#fff", fontWeight: 700, fontSize: 13,
+                                : "linear-gradient(135deg,#60fcc6,#19ce9b)",
+                    color: ((!canSubmit && !editMode) || isSaving) ? "#94a3b8" : isTransfer ? "#fff" : "#005e44", fontWeight: 700, fontSize: 13,
                     cursor: ((!canSubmit && !editMode) || isSaving) ? "not-allowed" : "pointer",
                     opacity: ((!canSubmit && !editMode) || isSaving) ? .5 : 1,
                     fontFamily: "inherit",
