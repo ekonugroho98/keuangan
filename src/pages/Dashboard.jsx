@@ -35,6 +35,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [showAddTx, setShowAddTx] = useState(false);
     const [showEditTx, setShowEditTx] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
+    const [isSavingTx, setIsSavingTx] = useState(false);
     const [showAddAccount, setShowAddAccount] = useState(false);
     const [txForm, setTxForm] = useState({ type: "expense", amount: "", category: "Makanan", note: "", account: "", toAccount: "" });
     const [accForm, setAccForm] = useState({ name: "", type: "bank", balance: "" });
@@ -319,7 +320,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     // ── ADD TRANSACTION ──────────────────────────────────────
     const addTx = async () => {
-        if (!txForm.amount) return;
+        if (!txForm.amount || isSavingTx) return;
+        setIsSavingTx(true);
         const newTx = {
             user_id: user.id,
             type: txForm.type,
@@ -331,7 +333,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             icon: categoryIcons[txForm.category] || "📦",
         };
         const { data, error } = await supabase.from("transactions").insert(newTx).select().single();
-        if (error) { showToast("Gagal menyimpan transaksi", "info"); return; }
+        if (error) { showToast("Gagal menyimpan transaksi", "info"); setIsSavingTx(false); return; }
 
         // Update saldo akun
         const acc = accounts.find(a => a.name === newTx.account_name);
@@ -346,6 +348,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
         setTransactions(p => [data, ...p]);
         setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "" });
+        setIsSavingTx(false);
         setShowAddTx(false);
         showToast("Transaksi berhasil ditambahkan!");
     };
@@ -365,18 +368,19 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     };
 
     const editTx = async () => {
-        if (!editingTx) return;
+        if (!editingTx || isSavingTx) return;
         const newAmount = parseInt(txForm.amount);
-        if (!newAmount) return;
+        if (!newAmount && editingTx.type !== "transfer") return;
 
+        setIsSavingTx(true);
         const oldAcc = accounts.find(a => a.name === editingTx.account_name);
-        const newAcc = accounts.find(a => a.name === txForm.account);
 
         // Untuk transfer: hanya update note
         if (editingTx.type === "transfer") {
             const { data, error } = await supabase.from("transactions")
                 .update({ note: txForm.note })
                 .eq("id", editingTx.id).select().single();
+            setIsSavingTx(false);
             if (error) { showToast("Gagal mengubah transaksi", "error"); return; }
             setTransactions(p => p.map(t => t.id === editingTx.id ? data : t));
             setShowEditTx(false); setEditingTx(null);
@@ -396,7 +400,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         // Apply saldo akun baru (mungkin akun berbeda)
         const targetAcc = accounts.find(a => a.name === txForm.account) || oldAcc;
         if (targetAcc) {
-            // Ambil saldo terkini dari state (sudah di-update di step sebelumnya)
             const currentBalance = targetAcc.id === oldAcc?.id
                 ? (txForm.type === "income" ? oldAcc.balance - editingTx.amount : oldAcc.balance + editingTx.amount)
                 : targetAcc.balance;
@@ -419,6 +422,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         };
         const { data, error } = await supabase.from("transactions")
             .update(updatedFields).eq("id", editingTx.id).select().single();
+        setIsSavingTx(false);
         if (error) { showToast("Gagal mengubah transaksi", "error"); return; }
 
         setTransactions(p => p.map(t => t.id === editingTx.id ? data : t));
@@ -450,25 +454,23 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         const amount = parseInt(txForm.amount);
         const fromAcc = accounts.find(a => a.name === txForm.account);
         const toAcc = accounts.find(a => a.name === txForm.toAccount);
-        if (!amount || !fromAcc || !toAcc || fromAcc.id === toAcc.id) return;
+        if (!amount || !fromAcc || !toAcc || fromAcc.id === toAcc.id || isSavingTx) return;
 
+        setIsSavingTx(true);
         const date = new Date().toISOString().slice(0, 10);
         const note = txForm.note || `Transfer ${fromAcc.name} → ${toAcc.name}`;
 
-        // Insert 1 transaksi transfer (dari akun asal saja)
         const { data: txData, error: txError } = await supabase.from("transactions").insert([
             { user_id: user.id, type: "transfer", amount, category: "Transfer", note, date, account_name: fromAcc.name, icon: "🔄" },
         ]).select();
-        if (txError) { showToast("Gagal menyimpan transfer", "error"); return; }
+        if (txError) { showToast("Gagal menyimpan transfer", "error"); setIsSavingTx(false); return; }
 
-        // Update saldo kedua akun
         const [resFrom, resTo] = await Promise.all([
             supabase.from("accounts").update({ balance: fromAcc.balance - amount }).eq("id", fromAcc.id).select().single(),
             supabase.from("accounts").update({ balance: toAcc.balance + amount   }).eq("id", toAcc.id  ).select().single(),
         ]);
-        if (resFrom.error || resTo.error) { showToast("Transfer dicatat tapi saldo gagal diupdate", "error"); return; }
+        if (resFrom.error || resTo.error) { showToast("Transfer dicatat tapi saldo gagal diupdate", "error"); setIsSavingTx(false); return; }
 
-        // Update state lokal
         setTransactions(p => [...(txData || []).reverse(), ...p]);
         setAccounts(p => p.map(a => {
             if (a.id === fromAcc.id) return resFrom.data;
@@ -476,6 +478,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             return a;
         }));
         setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "" });
+        setIsSavingTx(false);
         setShowAddTx(false);
         showToast(`✅ Transfer Rp ${amount.toLocaleString("id-ID")} dari ${fromAcc.name} ke ${toAcc.name} berhasil!`);
     };
@@ -535,8 +538,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     return (
         <div style={{ display: "flex", minHeight: "100vh", background: "#06060e", color: "#e2e8f0", fontFamily: "'Inter',-apple-system,sans-serif" }}>
-            <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} />
-            <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} />
+            <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} />
+            <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} isSaving={isSavingTx} />
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
             <PricingModal open={showPricing} onClose={() => setShowPricing(false)} currentPlan={subscription?.plan} />
 
