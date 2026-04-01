@@ -1,6 +1,6 @@
 const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi }) => (
     <div style={{ animation: "fadeIn .4s", maxWidth: 700 }}>
-        <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 24 }}>
+        <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--color-border-soft)" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🤖</div>
                 <div>
@@ -16,7 +16,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi }) => (
                         maxWidth: "80%", padding: "12px 16px",
                         borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                         background: m.role === "user" ? "linear-gradient(135deg,#60fcc6,#19ce9b)" : "var(--color-border-soft)",
-                        color: "#e2e8f0", fontSize: 14, lineHeight: 1.7, animation: "slideUp .3s",
+                        color: "var(--color-text)", fontSize: 14, lineHeight: 1.7, animation: "slideUp .3s",
                     }}>{m.text}</div>
                 ))}
                 {aiTyping && (
@@ -32,7 +32,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi }) => (
                     onChange={e => setAiInput(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleAi()}
                     placeholder="Tanya AI soal keuangan lu..."
-                    style={{ flex: 1, background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: "12px 16px", color: "#e2e8f0", fontSize: 14, outline: "none", fontFamily: "inherit" }}
+                    style={{ flex: 1, background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: "12px 16px", color: "var(--color-text)", fontSize: 14, outline: "none", fontFamily: "inherit" }}
                 />
                 <button onClick={handleAi} style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", border: "none", color: "var(--color-text)", fontSize: 20, cursor: "pointer" }}>↑</button>
             </div>

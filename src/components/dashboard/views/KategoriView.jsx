@@ -114,7 +114,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                         </div>
 
                         {/* Preview */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,.03)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
                             <div style={{ width: 44, height: 44, borderRadius: 12, background: form.color + "20", border: `1px solid ${form.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{form.icon}</div>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>{form.name || t("cat.namePlaceholder")}</div>
