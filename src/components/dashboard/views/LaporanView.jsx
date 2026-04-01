@@ -99,7 +99,7 @@ const LaporanView = ({ transactions = [] }) => {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
                 <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>{t("rep.title")}</h3>
-                    <p style={{ fontSize: 12, color: "#76747e", margin: "4px 0 0" }}>{t("rep.period")}: {periodLabel}</p>
+                    <p style={{ fontSize: 12, color: "var(--color-subtle)", margin: "4px 0 0" }}>{t("rep.period")}: {periodLabel}</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={selectStyle}>
@@ -119,16 +119,16 @@ const LaporanView = ({ transactions = [] }) => {
                 <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 16 }}>{t("rep.summary")} {periodLabel}</h3>
                     {[
-                        { l: t("rep.totalIncome"),   v: fmtRp(income),    c: "#60fcc6" },
+                        { l: t("rep.totalIncome"),   v: fmtRp(income),    c: "var(--color-primary)" },
                         { l: t("rep.totalExpense"),  v: fmtRp(expense),   c: "#ff716c" },
                         { l: t("rep.totalTransfer"), v: fmtRp(transfer),  c: "#4FC3F7" },
-                        { l: t("rep.netBalance"),    v: fmtRp(net),       c: net >= 0 ? "#60fcc6" : "#ff716c" },
-                        { l: t("rep.savingRate"),    v: `${savingRate}%`, c: savingRate >= 20 ? "#60fcc6" : "#f59e0b" },
-                        { l: t("rep.avgPerDay"),     v: fmtRp(avgPerDay), c: "#19ce9b" },
-                        { l: t("rep.txCount"),       v: filtered.length,  c: "#acaab4" },
+                        { l: t("rep.netBalance"),    v: fmtRp(net),       c: net >= 0 ? "var(--color-primary)" : "#ff716c" },
+                        { l: t("rep.savingRate"),    v: `${savingRate}%`, c: savingRate >= 20 ? "var(--color-primary)" : "#f59e0b" },
+                        { l: t("rep.avgPerDay"),     v: fmtRp(avgPerDay), c: "var(--color-primary)" },
+                        { l: t("rep.txCount"),       v: filtered.length,  c: "var(--color-muted)" },
                     ].map((r, i) => (
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: i > 0 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
-                            <span style={{ fontSize: 13, color: "#acaab4" }}>{r.l}</span>
+                            <span style={{ fontSize: 13, color: "var(--color-muted)" }}>{r.l}</span>
                             <span style={{ fontSize: 14, fontWeight: 700, color: r.c }}>{r.v}</span>
                         </div>
                     ))}
@@ -137,7 +137,7 @@ const LaporanView = ({ transactions = [] }) => {
                 {/* Bar chart harian */}
                 <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{t("rep.dailyExpense")}</h3>
-                    <p style={{ fontSize: 11, color: "#76747e", marginBottom: 16 }}>{periodLabel} · {t("rep.maxPerDay")} {fmtRp(maxDaily === 1 ? 0 : maxDaily)}{t("rep.perDay")}</p>
+                    <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 16 }}>{periodLabel} · {t("rep.maxPerDay")} {fmtRp(maxDaily === 1 ? 0 : maxDaily)}{t("rep.perDay")}</p>
                     {expense === 0 ? (
                         <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#48474f", fontSize: 13 }}>
                             {t("rep.noExpense")}
@@ -170,18 +170,18 @@ const LaporanView = ({ transactions = [] }) => {
                 {/* Breakdown Kategori */}
                 <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{t("rep.breakdown")}</h3>
-                    <p style={{ fontSize: 11, color: "#76747e", marginBottom: 16 }}>{t("rep.breakdownSub")} · {periodLabel}</p>
+                    <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 16 }}>{t("rep.breakdownSub")} · {periodLabel}</p>
                     {sortedCats.length === 0 ? (
                         <div style={{ color: "#48474f", fontSize: 13, textAlign: "center", padding: "20px 0" }}>{t("rep.noExpense")}</div>
                     ) : sortedCats.map(([cat, amt], i) => {
                         const pct = expense > 0 ? Math.round((amt / expense) * 100) : 0;
-                        const colors = ["#60fcc6","#19ce9b","#4FC3F7","#60fcc6","#f59e0b","#ff716c","#ec4899"];
+                        const colors = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899"];
                         const c = colors[i % colors.length];
                         return (
                             <div key={cat} style={{ marginBottom: 14 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                                     <span style={{ fontSize: 12, color: "#c5c5d9" }}>{cat}</span>
-                                    <span style={{ fontSize: 12, color: "#acaab4", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "#48474f" }}>({pct}%)</span></span>
+                                    <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "#48474f" }}>({pct}%)</span></span>
                                 </div>
                                 <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.04)" }}>
                                     <div style={{ height: "100%", borderRadius: 3, background: c, width: `${pct}%`, transition: "width .8s" }} />

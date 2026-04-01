@@ -32,7 +32,7 @@ const FaqSection = () => {
                                 <h3 style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{f.q}</h3>
                                 <span style={{ color: "#60fcc6", fontSize: 18, transform: activeFaq === i ? "rotate(45deg)" : "none", transition: "transform .3s", flexShrink: 0, marginLeft: 16 }}>+</span>
                             </div>
-                            {activeFaq === i && <p style={{ marginTop: 14, color: "#acaab4", lineHeight: 1.7, fontSize: 13, animation: "slideUp .3s" }}>{f.a}</p>}
+                            {activeFaq === i && <p style={{ marginTop: 14, color: "var(--color-muted)", lineHeight: 1.7, fontSize: 13, animation: "slideUp .3s" }}>{f.a}</p>}
                         </div>
                     </FadeIn>
                 ))}

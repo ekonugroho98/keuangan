@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="id">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Karaya Finance - Transaksi</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary": "#e4e1eb",
+                        "surface-tint": "#60fcc6",
+                        "inverse-surface": "#fcf8ff",
+                        "on-secondary": "#525159",
+                        "secondary-fixed-dim": "#d6d3dd",
+                        "error-container": "#9f0519",
+                        "on-surface-variant": "#acaab4",
+                        "surface-container-highest": "#25252f",
+                        "outline-variant": "#48474f",
+                        "on-secondary-fixed-variant": "#5b5b63",
+                        "tertiary-dim": "#ff716c",
+                        "primary": "#60fcc6",
+                        "surface-container-high": "#1f1f28",
+                        "secondary-container": "#46464e",
+                        "on-secondary-fixed": "#3f3f46",
+                        "on-primary-fixed": "#004935",
+                        "on-error-container": "#ffa8a3",
+                        "secondary-fixed": "#e4e1eb",
+                        "surface-variant": "#25252f",
+                        "on-tertiary-fixed-variant": "#760913",
+                        "error-dim": "#d7383b",
+                        "inverse-on-surface": "#55545d",
+                        "on-secondary-container": "#d1cfd9",
+                        "error": "#ff716c",
+                        "on-background": "#efecf7",
+                        "surface-dim": "#0e0e15",
+                        "tertiary-fixed-dim": "#ff7b75",
+                        "on-primary-container": "#003d2b",
+                        "on-tertiary-container": "#490006",
+                        "primary-fixed-dim": "#4eeeb9",
+                        "surface-container-lowest": "#000000",
+                        "on-primary-fixed-variant": "#00694d",
+                        "surface-container-low": "#13131a",
+                        "secondary-dim": "#d6d3dd",
+                        "primary-container": "#19ce9b",
+                        "primary-fixed": "#60fcc6",
+                        "background": "#0e0e15",
+                        "surface-container": "#191921",
+                        "on-tertiary-fixed": "#3a0004",
+                        "on-surface": "#efecf7",
+                        "tertiary": "#ff8983",
+                        "inverse-primary": "#006d50",
+                        "tertiary-container": "#ff716c",
+                        "surface": "#0e0e15",
+                        "on-tertiary": "#60000a",
+                        "on-error": "#490006",
+                        "primary-dim": "#4eeeb9",
+                        "outline": "#76747e",
+                        "on-primary": "#005e44",
+                        "tertiary-fixed": "#ff928c",
+                        "surface-bright": "#2b2b36"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Plus Jakarta Sans"],
+                        "label": ["Plus Jakarta Sans"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0e0e15;
+            color: #efecf7;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .glass-effect {
+            background: rgba(31, 31, 38, 0.6);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen pb-24">
+    <!-- TopAppBar -->
+    <header class="fixed top-0 w-full z-50 bg-[#0e0e15]/70 backdrop-blur-xl shadow-[0px_24px_48px_rgba(0,0,0,0.4)]">
+        <div class="flex justify-between items-center px-6 py-4 w-full max-w-[1200px] mx-auto">
+            <div class="text-xl font-bold text-[#60fcc6] tracking-tight font-['Plus_Jakarta_Sans']">Karaya Finance</div>
+            <nav class="hidden md:flex gap-8 items-center">
+                <a class="text-slate-400 hover:text-[#60fcc6] transition-colors" href="#">Dashboard</a>
+                <a class="text-[#60fcc6] font-semibold" href="#">Transaksi</a>
+                <a class="text-slate-400 hover:text-[#60fcc6] transition-colors" href="#">Laporan</a>
+                <a class="text-slate-400 hover:text-[#60fcc6] transition-colors" href="#">Profil</a>
+            </nav>
+            <button
+                class="bg-[#60fcc6] text-[#005e44] px-6 py-2 rounded-full font-bold active:scale-95 duration-200 transition-transform">
+                + Transaksi
+            </button>
+        </div>
+    </header>
+    <main class="pt-28 px-6 max-w-[1200px] mx-auto">
+        <!-- Header Section -->
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tight text-on-surface mb-1">Transaksi</h1>
+                <p class="text-on-surface-variant font-medium">Kelola arus kas dengan presisi kuratorial.</p>
+            </div>
+            <div class="text-right hidden md:block">
+                <span class="text-xs font-bold tracking-widest uppercase text-primary mb-2 block">Periode Aktif</span>
+                <div class="text-2xl font-bold">April 2026</div>
+            </div>
+        </div>
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <!-- Pemasukan -->
+            <div
+                class="bg-surface-container-high p-6 rounded-2xl border-l-4 border-primary shadow-lg transition-transform hover:scale-[1.02] duration-300">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 rounded-xl bg-primary/10 text-primary">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">trending_up</span>
+                    </div>
+                    <span class="text-primary text-xs font-bold bg-primary/5 px-2 py-1 rounded">↑ 12%</span>
+                </div>
+                <p class="text-on-surface-variant text-sm font-medium mb-1">Pemasukan</p>
+                <h3 class="text-2xl font-bold text-primary">+Rp 18.400.000</h3>
+                <p class="text-xs text-on-surface-variant/60 mt-2">vs bulan lalu</p>
+            </div>
+            <!-- Pengeluaran -->
+            <div
+                class="bg-surface-container-high p-6 rounded-2xl border-l-4 border-error shadow-lg transition-transform hover:scale-[1.02] duration-300">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 rounded-xl bg-error/10 text-error">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">trending_down</span>
+                    </div>
+                    <span class="text-error text-xs font-bold bg-error/5 px-2 py-1 rounded">↓ 8%</span>
+                </div>
+                <p class="text-on-surface-variant text-sm font-medium mb-1">Pengeluaran</p>
+                <h3 class="text-2xl font-bold text-error">-Rp 12.742.045</h3>
+                <p class="text-xs text-on-surface-variant/60 mt-2">lebih hemat</p>
+            </div>
+            <!-- Bersih -->
+            <div
+                class="bg-surface-container-high p-6 rounded-2xl border-l-4 border-blue-400 shadow-lg transition-transform hover:scale-[1.02] duration-300">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 rounded-xl bg-blue-400/10 text-blue-400">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">payments</span>
+                    </div>
+                    <div class="w-8 h-8 rounded-full border-2 border-blue-400/20"></div>
+                </div>
+                <p class="text-on-surface-variant text-sm font-medium mb-1">Saldo Bersih</p>
+                <h3 class="text-2xl font-bold text-on-surface">Rp 5.657.955</h3>
+                <p class="text-xs text-on-surface-variant/60 mt-2">akumulasi bulan ini</p>
+            </div>
+        </div>
+        <!-- Filter Bar & Search -->
+        <div
+            class="glass-effect p-4 rounded-2xl mb-6 flex flex-col lg:flex-row gap-4 items-center justify-between border border-outline-variant/10">
+            <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                <div class="flex bg-surface-container-lowest rounded-xl p-1">
+                    <button
+                        class="px-4 py-1.5 rounded-lg text-sm font-bold bg-primary text-on-primary shadow-md">Semua</button>
+                    <button
+                        class="px-4 py-1.5 rounded-lg text-sm font-medium text-on-surface-variant hover:text-on-surface">Pemasukan</button>
+                    <button
+                        class="px-4 py-1.5 rounded-lg text-sm font-medium text-on-surface-variant hover:text-on-surface">Pengeluaran</button>
+                    <button
+                        class="px-4 py-1.5 rounded-lg text-sm font-medium text-on-surface-variant hover:text-on-surface">Transfer</button>
+                </div>
+                <div class="h-8 w-[1px] bg-outline-variant/20 hidden sm:block"></div>
+                <div class="flex items-center gap-2">
+                    <select
+                        class="bg-transparent border-none text-sm font-bold focus:ring-0 text-primary cursor-pointer">
+                        <option>2026</option>
+                    </select>
+                    <select
+                        class="bg-transparent border-none text-sm font-bold focus:ring-0 text-primary cursor-pointer">
+                        <option>April</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 w-full lg:w-auto">
+                <div class="relative w-full lg:w-64">
+                    <span
+                        class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+                    <input
+                        class="w-full bg-surface-container-lowest border-none rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/20"
+                        placeholder="Cari transaksi..." type="text" />
+                </div>
+                <button
+                    class="p-2 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined">calendar_today</span>
+                </button>
+            </div>
+        </div>
+        <!-- Stats Summary Small -->
+        <div class="px-2 mb-6 flex justify-between items-center">
+            <p class="text-xs text-on-surface-variant font-medium">
+                12 transaksi · <span class="text-primary/80">Pemasukan: Rp 18.4jt</span> · <span
+                    class="text-error/80">Pengeluaran: Rp 12.7jt</span> · <span class="text-on-surface/80">Bersih: Rp
+                    5.6jt</span>
+            </p>
+            <button class="text-xs font-bold text-primary flex items-center gap-1 hover:underline">
+                <span class="material-symbols-outlined text-sm">download</span> Ekspor CSV
+            </button>
+        </div>
+        <!-- Transaction List -->
+        <div class="space-y-1 overflow-hidden rounded-3xl">
+            <!-- Row 1 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">payments</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Gaji</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold uppercase tracking-wider">Pemasukan</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">25 Apr · Karir · Rekening Utama</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-primary tracking-tight">+8.400.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 2 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-highest/30 hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-error/10 flex items-center justify-center text-error group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">lunch_dining</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Makan Siang</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold uppercase tracking-wider">Pengeluaran</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">24 Apr · Makanan · Cash</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-error tracking-tight">-45.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 3 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-error/10 flex items-center justify-center text-error group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">movie</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Netflix</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold uppercase tracking-wider">Pengeluaran</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">22 Apr · Hiburan · Kartu Kredit</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-error tracking-tight">-59.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 4 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-highest/30 hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-error/10 flex items-center justify-center text-error group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Kos/Sewa</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold uppercase tracking-wider">Pengeluaran</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">20 Apr · Tempat Tinggal · Bank Transfer</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-error tracking-tight">-1.500.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 5 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-blue-400/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">sync</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Transfer GoPay</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 font-bold uppercase tracking-wider">Transfer</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">18 Apr · Transfer · E-Wallet</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-on-surface tracking-tight">-500.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 6 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-highest/30 hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">work</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Freelance Design</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold uppercase tracking-wider">Pemasukan</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">15 Apr · Sampingan · PayPal</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-primary tracking-tight">+2.000.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 7 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-error/10 flex items-center justify-center text-error group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">directions_car</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Transport</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold uppercase tracking-wider">Pengeluaran</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">11 Apr · Transportasi · GoPay</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-error tracking-tight">-35.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 8 -->
+            <div
+                class="group flex items-center justify-between p-4 bg-surface-container-highest/30 hover:bg-surface-container transition-colors">
+                <div class="flex items-center gap-4 flex-1">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-error/10 flex items-center justify-center text-error group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1;">shopping_bag</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-on-surface">Belanja Online</h4>
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold uppercase tracking-wider">Pengeluaran</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">10 Apr · Kebutuhan · Debit Card</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <span class="text-lg font-bold text-error tracking-tight">-320.000</span>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant"><span
+                                class="material-symbols-outlined text-lg">edit</span></button>
+                        <button class="p-2 rounded-lg hover:bg-error/10 text-error"><span
+                                class="material-symbols-outlined text-lg">delete</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Pagination -->
+        <div class="mt-12 flex justify-center items-center gap-4">
+            <button
+                class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary border border-outline-variant/10">
+                <span class="material-symbols-outlined">chevron_left</span>
+            </button>
+            <div class="flex gap-2">
+                <span
+                    class="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold text-sm">1</span>
+                <span
+                    class="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center font-bold text-sm hover:text-primary cursor-pointer">2</span>
+                <span
+                    class="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center font-bold text-sm hover:text-primary cursor-pointer">3</span>
+            </div>
+            <button
+                class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary border border-outline-variant/10">
+                <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+        </div>
+    </main>
+    <!-- BottomNavBar (Mobile Only) -->
+    <nav
+        class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-[#1f1f26]/70 backdrop-blur-20px z-50 rounded-t-3xl shadow-[0px_-12px_32px_rgba(0,0,0,0.3)]">
+        <div class="flex flex-col items-center justify-center text-slate-400">
+            <span class="material-symbols-outlined">grid_view</span>
+            <span class="text-[10px] font-medium mt-1">Dashboard</span>
+        </div>
+        <div class="flex flex-col items-center justify-center bg-[#60fcc6] text-[#0e0e15] rounded-xl px-4 py-1">
+            <span class="material-symbols-outlined">swap_horiz</span>
+            <span class="text-[10px] font-medium">Transaksi</span>
+        </div>
+        <div class="flex flex-col items-center justify-center text-slate-400">
+            <span class="material-symbols-outlined">analytics</span>
+            <span class="text-[10px] font-medium mt-1">Laporan</span>
+        </div>
+        <div class="flex flex-col items-center justify-center text-slate-400">
+            <span class="material-symbols-outlined">person</span>
+            <span class="text-[10px] font-medium mt-1">Profil</span>
+        </div>
+    </nav>
+</body>
+
+</html>

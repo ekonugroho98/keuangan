@@ -5,7 +5,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 
 const TYPES = [
     { v: "expense",  l: "Pengeluaran", c: "#ff716c" },
-    { v: "income",   l: "Pemasukan",   c: "#60fcc6" },
+    { v: "income",   l: "Pemasukan",   c: "var(--color-primary)" },
     { v: "transfer", l: "Antar Rekening", c: "#06b6d4" },
 ];
 
@@ -56,7 +56,7 @@ const AddTransactionModal = ({
                     </h3>
                     {editMode && <p style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Ubah detail transaksi di bawah</p>}
                 </div>
-                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
             </div>
 
             {/* Tipe — tidak bisa ganti tipe saat edit transfer */}
@@ -85,7 +85,7 @@ const AddTransactionModal = ({
             {/* Transfer edit: only note editable */}
             {editMode && isTransfer ? (
                 <>
-                    <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#acaab4", lineHeight: 1.6 }}>
+                    <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
                         ℹ️ Transfer hanya bisa diubah catatannya. Untuk mengubah akun / jumlah, <strong style={{ color: "#ff716c" }}>hapus dan buat ulang</strong>.
                     </div>
                     <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
@@ -95,7 +95,7 @@ const AddTransactionModal = ({
                 <>
                     <InputField label="JUMLAH (Rp)" icon="💰" type="number" placeholder="150000" value={txForm.amount} onChange={e => setTxForm(p => ({ ...p, amount: e.target.value }))} />
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>DARI AKUN</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>DARI AKUN</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => {
                             const selected = txForm.account === a.name;
@@ -112,7 +112,7 @@ const AddTransactionModal = ({
 
                     <div style={{ textAlign: "center", fontSize: 20, marginBottom: 16, color: "#06b6d4" }}>↓</div>
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>KE AKUN</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>KE AKUN</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => {
                             const selected = txForm.toAccount === a.name;
@@ -121,7 +121,7 @@ const AddTransactionModal = ({
                                 <button key={a.name}
                                     onClick={() => !isSource && setTxForm(p => ({ ...p, toAccount: a.name }))}
                                     disabled={isSource}
-                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: selected ? "rgba(96,252,198,.15)" : "transparent", color: selected ? "#60fcc6" : isSource ? "#334155" : "#acaab4", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
+                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: selected ? "rgba(96,252,198,.15)" : "transparent", color: selected ? "var(--color-primary)" : isSource ? "#334155" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
                                 >{a.icon} {a.name}</button>
                             );
                         })}
@@ -137,8 +137,8 @@ const AddTransactionModal = ({
                             <div style={{ fontSize: 20 }}>→</div>
                             <div style={{ textAlign: "center" }}>
                                 <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>KE</div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "#60fcc6" }}>{txForm.toAccount}</div>
-                                <div style={{ fontSize: 11, color: "#60fcc6" }}>+Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>{txForm.toAccount}</div>
+                                <div style={{ fontSize: 11, color: "var(--color-primary)" }}>+Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
                             </div>
                         </div>
                     )}
@@ -149,16 +149,16 @@ const AddTransactionModal = ({
                 <>
                     <InputField label="JUMLAH (Rp)" icon="💰" type="number" placeholder="150000" value={txForm.amount} onChange={e => setTxForm(p => ({ ...p, amount: e.target.value }))} />
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>{t("addTx.category") || "KATEGORI"}</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>{t("addTx.category") || "KATEGORI"}</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {(txForm.type === "expense" ? allExpense : allIncome).map(c => (
                             <button key={c} onClick={() => setTxForm(p => ({ ...p, category: c }))}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: txForm.category === c ? "rgba(96,252,198,.15)" : "transparent", color: txForm.category === c ? "#60fcc6" : "#acaab4", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: txForm.category === c ? "rgba(96,252,198,.15)" : "transparent", color: txForm.category === c ? "var(--color-primary)" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                             >{tCat(c)}</button>
                         ))}
                     </div>
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#acaab4", marginBottom: 6, display: "block" }}>AKUN SUMBER</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>AKUN SUMBER</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                         {accounts.map(a => (
                             <button key={a.name} onClick={() => setTxForm(p => ({ ...p, account: a.name }))}
@@ -181,7 +181,7 @@ const AddTransactionModal = ({
                             : isTransfer
                                 ? "linear-gradient(135deg,#06b6d4,#0891b2)"
                                 : "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                    color: ((!canSubmit && !editMode) || isSaving) ? "#94a3b8" : isTransfer ? "#fff" : "#005e44", fontWeight: 700, fontSize: 13,
+                    color: ((!canSubmit && !editMode) || isSaving) ? "#94a3b8" : isTransfer ? "#fff" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13,
                     cursor: ((!canSubmit && !editMode) || isSaving) ? "not-allowed" : "pointer",
                     opacity: ((!canSubmit && !editMode) || isSaving) ? .5 : 1,
                     fontFamily: "inherit",

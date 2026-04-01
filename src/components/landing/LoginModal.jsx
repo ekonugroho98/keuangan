@@ -18,7 +18,7 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
                             <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>Selamat Datang! 👋</h2>
                             <p style={{ color: "#76747e", fontSize: 12, marginTop: 4 }}>Masuk ke akun lu</p>
                         </div>
-                        <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                        <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                     </div>
 
                     <InputField label="EMAIL" icon="📧" type="email" placeholder="email@example.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} error={errors.email} />

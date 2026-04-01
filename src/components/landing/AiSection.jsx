@@ -20,7 +20,7 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                     <h2 style={{ fontSize: "clamp(28px,4vw,38px)", fontWeight: 800, marginTop: 16, marginBottom: 20, color: "#fff" }}>
                         {t("lp.ai.h2")} <span className="gradient-text">{t("lp.ai.h2g")}</span>
                     </h2>
-                    <p style={{ color: "#acaab4", lineHeight: 1.8, fontSize: 15, marginBottom: 28 }}>{t("lp.ai.desc")}</p>
+                    <p style={{ color: "var(--color-muted)", lineHeight: 1.8, fontSize: 15, marginBottom: 28 }}>{t("lp.ai.desc")}</p>
                     {aiFeatures.map((f, i) => (
                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                             <span style={{ width: 22, height: 22, borderRadius: 6, background: "rgba(96,252,198,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#60fcc6" }}>✓</span>
@@ -51,7 +51,7 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                                     }}>{m.text}</div>
                                 ))}
                                 {isTyping && (
-                                    <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: "rgba(255,255,255,.05)", color: "#acaab4", fontSize: 12 }}>
+                                    <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: "rgba(255,255,255,.05)", color: "var(--color-muted)", fontSize: 12 }}>
                                         <span style={{ animation: "pulse 1s ease infinite" }}>●●●</span>
                                     </div>
                                 )}

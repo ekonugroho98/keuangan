@@ -14,7 +14,7 @@ const PhoneMockup = () => (
             boxShadow: "0 32px 80px rgba(0,0,0,.6), 0 0 40px rgba(96,252,198,.08)",
             position: "relative", zIndex: 1,
         }}>
-            <div style={{ height: "100%", background: "#191921", borderRadius: 38, overflow: "hidden", padding: 16 }}>
+            <div style={{ height: "100%", background: "var(--bg-surface-hover)", borderRadius: 38, overflow: "hidden", padding: 16 }}>
                 {/* Phone header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                     <span style={{ fontSize: 18 }}>☰</span>
@@ -22,7 +22,7 @@ const PhoneMockup = () => (
                 </div>
                 {/* Balance */}
                 <div style={{ marginBottom: 20 }}>
-                    <p style={{ fontSize: 9, color: "#acaab4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Saldo Total</p>
+                    <p style={{ fontSize: 9, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Saldo Total</p>
                     <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0 }}>Rp 24.500.000</h3>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9, fontWeight: 700, color: "#60fcc6", background: "rgba(96,252,198,.1)", padding: "2px 8px", borderRadius: 99, marginTop: 4 }}>↑ +2.3%</div>
                 </div>
@@ -33,7 +33,7 @@ const PhoneMockup = () => (
                     ))}
                 </div>
                 {/* Transactions */}
-                <p style={{ fontSize: 9, color: "#acaab4", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Transaksi Terbaru</p>
+                <p style={{ fontSize: 9, color: "var(--color-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Transaksi Terbaru</p>
                 {[
                     { icon: "🍽️", name: "Makan Siang", amount: "-Rp 45K", color: "#ff716c" },
                     { icon: "💰", name: "Gaji", amount: "+Rp 8.5M", color: "#60fcc6" },
@@ -82,7 +82,7 @@ const HeroSection = ({ onSignup, onDemo }) => {
                         </FadeIn>
 
                         <FadeIn delay={0.2}>
-                            <p style={{ fontSize: "clamp(15px,2vw,18px)", color: "#acaab4", maxWidth: 480, marginBottom: 40, lineHeight: 1.7 }}>
+                            <p style={{ fontSize: "clamp(15px,2vw,18px)", color: "var(--color-muted)", maxWidth: 480, marginBottom: 40, lineHeight: 1.7 }}>
                                 {t("lp.hero.desc")}
                             </p>
                         </FadeIn>
@@ -101,7 +101,7 @@ const HeroSection = ({ onSignup, onDemo }) => {
                                         {i > 0 && <div style={{ width: 1, height: 40, background: "rgba(255,255,255,.1)" }} />}
                                         <div>
                                             <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}><CountUp end={s.v} suffix={s.s} /></div>
-                                            <div style={{ fontSize: 11, color: "#acaab4", textTransform: "uppercase", letterSpacing: 2, fontWeight: 600, marginTop: 2 }}>{s.l}</div>
+                                            <div style={{ fontSize: 11, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 2, fontWeight: 600, marginTop: 2 }}>{s.l}</div>
                                         </div>
                                     </div>
                                 ))}

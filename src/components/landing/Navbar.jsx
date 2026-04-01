@@ -64,7 +64,7 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                                                     display: "flex", alignItems: "center", gap: 8,
                                                     width: "100%", padding: "8px 10px", borderRadius: 8, border: "none",
                                                     background: lang === l.code ? "rgba(96,252,198,.15)" : "transparent",
-                                                    color: lang === l.code ? "#60fcc6" : "#acaab4",
+                                                    color: lang === l.code ? "#60fcc6" : "var(--color-muted)",
                                                     fontSize: 12, fontWeight: lang === l.code ? 600 : 400,
                                                     cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                                                 }}>

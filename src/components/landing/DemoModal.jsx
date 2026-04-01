@@ -5,7 +5,7 @@ const DemoModal = ({ open, onClose, onSignup }) => (
         <div style={{ background: "linear-gradient(135deg,#13131a,#1f1f28)", borderRadius: "20px 20px 0 0", border: "1px solid rgba(96,252,198,.2)", borderBottom: "none", padding: "28px 20px 36px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Preview Dashboard ✨</h2>
-                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "#acaab4", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
             </div>
 
             <div style={{ background: "rgba(0,0,0,.3)", borderRadius: 14, padding: 18, border: "1px solid rgba(255,255,255,.06)", marginBottom: 16 }}>

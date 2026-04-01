@@ -13,7 +13,7 @@ const FeaturesSection = () => {
     }));
 
     return (
-        <section id="fitur" style={{ padding: "96px 24px", background: "#13131a", position: "relative" }}>
+        <section id="fitur" style={{ padding: "96px 24px", background: "var(--bg-surface-low)", position: "relative" }}>
             <div style={{ maxWidth: 1200, margin: "0 auto" }}>
                 <FadeIn>
                     <div style={{ marginBottom: 56 }}>
@@ -43,7 +43,7 @@ const FeaturesSection = () => {
                                     {f.i}
                                 </div>
                                 <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 10 }}>{f.t}</h3>
-                                <p style={{ color: "#acaab4", lineHeight: 1.7, fontSize: 14, margin: 0 }}>{f.d}</p>
+                                <p style={{ color: "var(--color-muted)", lineHeight: 1.7, fontSize: 14, margin: 0 }}>{f.d}</p>
                             </div>
                         </FadeIn>
                     ))}

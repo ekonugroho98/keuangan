@@ -4,7 +4,7 @@ const plans = [
         name: "Free Trial",
         price: "Gratis",
         period: "14 hari",
-        color: "#acaab4",
+        color: "var(--color-muted)",
         gradient: "linear-gradient(135deg,#76747e,#48474f)",
         features: [
             "✅ Semua fitur dasar",
@@ -23,7 +23,7 @@ const plans = [
         name: "Starter",
         price: "Rp 29.000",
         period: "/bulan",
-        color: "#60fcc6",
+        color: "var(--color-primary)",
         gradient: "linear-gradient(135deg,#60fcc6,#19ce9b)",
         badge: "Populer",
         features: [
@@ -82,7 +82,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
             <div
                 onClick={e => e.stopPropagation()}
                 style={{
-                    background: "#0e0e15",
+                    background: "var(--bg-app)",
                     border: "1px solid rgba(255,255,255,0.08)",
                     borderRadius: "20px 20px 0 0",
                     padding: "28px 20px 40px",
@@ -140,7 +140,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                                     <div style={{
                                         position: "absolute", top: -10, left: 16,
                                         background: "rgba(96,252,198,.8)",
-                                        color: "#005e44", fontSize: 10, fontWeight: 700,
+                                        color: "var(--color-on-primary)", fontSize: 10, fontWeight: 700,
                                         padding: "3px 10px", borderRadius: 20,
                                     }}>
                                         ✓ Aktif
@@ -185,7 +185,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                                             : plan.disabled
                                                 ? "rgba(255,255,255,0.05)"
                                                 : plan.gradient,
-                                        color: isActive || plan.disabled ? "#475569" : plan.id === "starter" ? "#005e44" : "#fff",
+                                        color: isActive || plan.disabled ? "#475569" : plan.id === "starter" ? "var(--color-on-primary)" : "#fff",
                                         fontSize: 13,
                                         fontWeight: 600,
                                         cursor: isActive || plan.disabled ? "default" : "pointer",

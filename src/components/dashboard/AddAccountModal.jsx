@@ -21,7 +21,7 @@ const AddAccountModal = ({ open, onClose, accForm, setAccForm, onSubmit }) => (
                             padding: "6px 14px", borderRadius: 8,
                             border: `1px solid ${accForm.type === t.v ? "#60fcc655" : "rgba(255,255,255,.06)"}`,
                             background: accForm.type === t.v ? "rgba(96,252,198,.15)" : "transparent",
-                            color: accForm.type === t.v ? "#60fcc6" : "#acaab4",
+                            color: accForm.type === t.v ? "var(--color-primary)" : "var(--color-muted)",
                             fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
                         }}
                     >{t.l}</button>
@@ -36,7 +36,7 @@ const AddAccountModal = ({ open, onClose, accForm, setAccForm, onSubmit }) => (
                 style={{
                     width: "100%", padding: 13, borderRadius: 9999, border: "none",
                     background: !accForm.name || !accForm.balance ? "rgba(255,255,255,.05)" : "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                    color: !accForm.name || !accForm.balance ? "#94a3b8" : "#005e44", fontWeight: 700, fontSize: 13,
+                    color: !accForm.name || !accForm.balance ? "#94a3b8" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13,
                     cursor: !accForm.name || !accForm.balance ? "not-allowed" : "pointer",
                     opacity: !accForm.name || !accForm.balance ? .4 : 1, fontFamily: "inherit",
                 }}
