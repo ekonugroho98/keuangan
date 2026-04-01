@@ -20,7 +20,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
     const { t } = useLanguage();
 
     /* Terjemahkan nama kategori default; custom tetap pakai nama aslinya */
-    const tCat = (name, isDefault) => isDefault ? (t("cat.name." + name) || name) : name;
+    const tCat = (name, isDefault) => { if (!isDefault) return name; const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
     const [showModal,     setShowModal]     = useState(false);
     const [editTarget,    setEditTarget]    = useState(null);
@@ -189,7 +189,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
             {/* ── Filter Bar ── */}
             <div style={{ background: "var(--bg-glass)", backdropFilter: "blur(20px)", border: "1px solid rgba(72,71,79,.15)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 {/* Type tabs */}
-                <div style={{ display: "flex", background: "#000", borderRadius: 10, padding: 4, gap: 2 }}>
+                <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 10, padding: 4, gap: 2 }}>
                     {TYPE_TABS.map(tab => {
                         const isActive = filterType === tab.id;
                         return (
@@ -204,7 +204,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                 <div style={{ position: "relative" }}>
                     <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: .4, pointerEvents: "none" }}>🔍</span>
                     <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t("cat.search") || "Cari kategori..."}
-                        style={{ background: "#000", border: "none", borderRadius: 9, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "8px 12px 8px 28px", outline: "none", width: 180 }} />
+                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 9, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "8px 12px 8px 28px", outline: "none", width: 180 }} />
                 </div>
             </div>
 

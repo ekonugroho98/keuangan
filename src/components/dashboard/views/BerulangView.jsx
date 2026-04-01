@@ -75,7 +75,7 @@ const SCard = ({ label, value, sub, color, icon }) => (
 /* ─── MAIN ─── */
 const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdit, onDelete, customCategories = [] }) => {
     const { t, lang } = useLanguage();
-    const tCat = (name) => t("cat.name." + name) || name;
+    const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
     const mergedCategories = [
         ...allCategories,
@@ -236,7 +236,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         </div>
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("rec.nextDateLabel")}</label>
-                        <input type="date" value={form.next_date} onChange={e => setForm(p => ({ ...p, next_date: e.target.value }))} style={{ ...inputStyle, marginBottom: 16, colorScheme: "dark" }} />
+                        <input type="date" value={form.next_date} onChange={e => setForm(p => ({ ...p, next_date: e.target.value }))} style={{ ...inputStyle, marginBottom: 16, colorScheme: "normal" }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("rec.iconLabel")}</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
@@ -307,7 +307,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
 
             {/* ── Filter Bar ── */}
             <div style={{ background: "var(--bg-glass)", backdropFilter: "blur(20px)", border: "1px solid rgba(72,71,79,.15)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", background: "#000", borderRadius: 10, padding: 4, gap: 2 }}>
+                <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 10, padding: 4, gap: 2 }}>
                     {STATUS_TABS.map(tab => {
                         const isActive  = filterStatus === tab.id;
                         const tabColor  = tab.accent || "var(--color-primary)";
@@ -337,7 +337,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                 <div style={{ position: "relative" }}>
                     <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: .4, pointerEvents: "none" }}>🔍</span>
                     <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t("rec.search") || "Cari transaksi berulang..."}
-                        style={{ background: "#000", border: "none", borderRadius: 9, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "8px 12px 8px 28px", outline: "none", width: 200 }} />
+                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 9, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "8px 12px 8px 28px", outline: "none", width: 200 }} />
                 </div>
             </div>
 
