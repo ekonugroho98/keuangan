@@ -50,7 +50,7 @@ const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 const TransaksiView = ({ transactions, onEdit, onDelete }) => {
     const { t, lang } = useLanguage();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
-    const tCat = (name) => t("cat.name." + name) || name;
+    const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
     const now = new Date();
     const [filterYear,    setFilterYear]    = useState(String(now.getFullYear()));
@@ -249,7 +249,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
 
                     {/* Type tabs — pill group */}
-                    <div style={{ display: "flex", background: "#000", borderRadius: 12, padding: 4, gap: 2 }}>
+                    <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 12, padding: 4, gap: 2 }}>
                         {TYPE_TABS.map(tab => {
                             const isActive = filterType === tab.id;
                             return (
@@ -309,7 +309,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                             onChange={e => setSearch(e.target.value)}
                             placeholder={t("tx.search") || "Cari transaksi..."}
                             style={{
-                                background: "#000", border: "none", borderRadius: 12,
+                                background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12,
                                 color: "var(--color-text)", fontSize: 12, fontFamily: "inherit",
                                 padding: "8px 12px 8px 30px", outline: "none", width: 200,
                             }}
@@ -321,7 +321,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                         type="date"
                         value={filterDate}
                         onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); }}
-                        style={{ background: "#000", border: "none", borderRadius: 12, color: "var(--color-muted)", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "dark", cursor: "pointer" }}
+                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12, color: "var(--color-muted)", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "normal", cursor: "pointer" }}
                     />
 
                     {/* Reset */}

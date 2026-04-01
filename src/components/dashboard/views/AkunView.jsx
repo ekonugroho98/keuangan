@@ -44,7 +44,7 @@ const card = {
 /* ── component ── */
 const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) => {
     const { t } = useLanguage();
-    const tCat = (name) => t("cat.name." + name) || name;
+    const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
     const [activeTab, setActiveTab] = useState(accounts[0]?.id || null);
 
     const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);

@@ -22,7 +22,7 @@ const AddTransactionModal = ({
     const { t } = useLanguage();
     /* Terjemahkan nama kategori default, custom tetap nama asli */
     const DEFAULT_CATS = new Set([...expenseCategories, ...incomeCategories]);
-    const tCat = (name) => DEFAULT_CATS.has(name) ? (t("cat.name." + name) || name) : name;
+    const tCat = (name) => { if (!DEFAULT_CATS.has(name)) return name; const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
     const extraExpense = customCategories.filter(c => c.type !== "income").map(c => c.name);
     const extraIncome  = customCategories.filter(c => c.type !== "expense").map(c => c.name);
