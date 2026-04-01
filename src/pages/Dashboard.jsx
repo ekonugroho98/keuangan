@@ -33,6 +33,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
     const [activeMenu, setActiveMenu] = useState("dasbor");
     const [showAddTx, setShowAddTx] = useState(false);
+    const [showEditTx, setShowEditTx] = useState(false);
+    const [editingTx, setEditingTx] = useState(null);
     const [showAddAccount, setShowAddAccount] = useState(false);
     const [txForm, setTxForm] = useState({ type: "expense", amount: "", category: "Makanan", note: "", account: "", toAccount: "" });
     const [accForm, setAccForm] = useState({ name: "", type: "bank", balance: "" });
@@ -348,6 +350,101 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         showToast("Transaksi berhasil ditambahkan!");
     };
 
+    // ── EDIT TRANSAKSI ───────────────────────────────────────
+    const openEditTx = (tx) => {
+        setEditingTx(tx);
+        setTxForm({
+            type:      tx.type,
+            amount:    String(tx.amount),
+            category:  tx.category,
+            note:      tx.note,
+            account:   tx.account_name,
+            toAccount: "",
+        });
+        setShowEditTx(true);
+    };
+
+    const editTx = async () => {
+        if (!editingTx) return;
+        const newAmount = parseInt(txForm.amount);
+        if (!newAmount) return;
+
+        const oldAcc = accounts.find(a => a.name === editingTx.account_name);
+        const newAcc = accounts.find(a => a.name === txForm.account);
+
+        // Untuk transfer: hanya update note
+        if (editingTx.type === "transfer") {
+            const { data, error } = await supabase.from("transactions")
+                .update({ note: txForm.note })
+                .eq("id", editingTx.id).select().single();
+            if (error) { showToast("Gagal mengubah transaksi", "error"); return; }
+            setTransactions(p => p.map(t => t.id === editingTx.id ? data : t));
+            setShowEditTx(false); setEditingTx(null);
+            showToast("Catatan transfer diperbarui ✅");
+            return;
+        }
+
+        // Reverse saldo akun lama
+        if (oldAcc) {
+            const revertedBalance = editingTx.type === "income"
+                ? oldAcc.balance - editingTx.amount
+                : oldAcc.balance + editingTx.amount;
+            await supabase.from("accounts").update({ balance: revertedBalance }).eq("id", oldAcc.id);
+            setAccounts(p => p.map(a => a.id === oldAcc.id ? { ...a, balance: revertedBalance } : a));
+        }
+
+        // Apply saldo akun baru (mungkin akun berbeda)
+        const targetAcc = accounts.find(a => a.name === txForm.account) || oldAcc;
+        if (targetAcc) {
+            // Ambil saldo terkini dari state (sudah di-update di step sebelumnya)
+            const currentBalance = targetAcc.id === oldAcc?.id
+                ? (txForm.type === "income" ? oldAcc.balance - editingTx.amount : oldAcc.balance + editingTx.amount)
+                : targetAcc.balance;
+            const newBalance = txForm.type === "income"
+                ? currentBalance + newAmount
+                : currentBalance - newAmount;
+            const { data: updatedAcc } = await supabase.from("accounts")
+                .update({ balance: newBalance }).eq("id", targetAcc.id).select().single();
+            if (updatedAcc) setAccounts(p => p.map(a => a.id === targetAcc.id ? updatedAcc : a));
+        }
+
+        // Update transaksi di DB
+        const updatedFields = {
+            type:         txForm.type,
+            amount:       newAmount,
+            category:     txForm.category,
+            note:         txForm.note || txForm.category,
+            account_name: txForm.account || editingTx.account_name,
+            icon:         categoryIcons[txForm.category] || editingTx.icon || "📦",
+        };
+        const { data, error } = await supabase.from("transactions")
+            .update(updatedFields).eq("id", editingTx.id).select().single();
+        if (error) { showToast("Gagal mengubah transaksi", "error"); return; }
+
+        setTransactions(p => p.map(t => t.id === editingTx.id ? data : t));
+        setShowEditTx(false);
+        setEditingTx(null);
+        showToast("Transaksi berhasil diperbarui ✅");
+    };
+
+    // ── DELETE TRANSAKSI ─────────────────────────────────────
+    const deleteTx = async (tx) => {
+        // Reverse saldo akun
+        const acc = accounts.find(a => a.name === tx.account_name);
+        if (acc && tx.type !== "transfer") {
+            const revertedBalance = tx.type === "income"
+                ? acc.balance - tx.amount
+                : acc.balance + tx.amount;
+            await supabase.from("accounts").update({ balance: revertedBalance }).eq("id", acc.id);
+            setAccounts(p => p.map(a => a.id === acc.id ? { ...a, balance: revertedBalance } : a));
+        }
+        // Delete dari DB
+        const { error } = await supabase.from("transactions").delete().eq("id", tx.id);
+        if (error) { showToast("Gagal menghapus transaksi", "error"); return; }
+        setTransactions(p => p.filter(t => t.id !== tx.id));
+        showToast("Transaksi dihapus 🗑️", "info");
+    };
+
     // ── TRANSFER DANA ────────────────────────────────────────
     const addTransfer = async () => {
         const amount = parseInt(txForm.amount);
@@ -439,6 +536,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     return (
         <div style={{ display: "flex", minHeight: "100vh", background: "#06060e", color: "#e2e8f0", fontFamily: "'Inter',-apple-system,sans-serif" }}>
             <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} />
+            <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} />
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
             <PricingModal open={showPricing} onClose={() => setShowPricing(false)} currentPlan={subscription?.plan} />
 
@@ -605,7 +703,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     })()}
 
                     {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
-                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} />}
+                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} />}
                     {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} />}
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} />}
