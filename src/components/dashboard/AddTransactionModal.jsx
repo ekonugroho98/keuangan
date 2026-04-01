@@ -15,6 +15,8 @@ const AddTransactionModal = ({
     accounts, customCategories = [],
     // Edit mode
     editMode = false, onUpdate,
+    // Loading state
+    isSaving = false,
 }) => {
     const extraExpense = customCategories.filter(c => c.type !== "income").map(c => c.name);
     const extraIncome  = customCategories.filter(c => c.type !== "expense").map(c => c.name);
@@ -32,9 +34,11 @@ const AddTransactionModal = ({
         onSubmit();
     };
 
-    const submitLabel = editMode
-        ? "✅ Update Transaksi"
-        : isTransfer ? "🔄 Transfer Dana" : "Simpan Transaksi";
+    const submitLabel = isSaving
+        ? "Menyimpan..."
+        : editMode
+            ? "✅ Update Transaksi"
+            : isTransfer ? "🔄 Transfer Dana" : "Simpan Transaksi";
 
     return (
     <Modal open={open} onClose={onClose}>
@@ -161,21 +165,29 @@ const AddTransactionModal = ({
                 </>
             )}
 
-            <button onClick={handleSubmit} disabled={!canSubmit && !editMode}
+            <button onClick={handleSubmit} disabled={(!canSubmit && !editMode) || isSaving}
                 style={{
                     width: "100%", padding: 13, borderRadius: 12, border: "none",
-                    background: (!canSubmit && !editMode)
-                        ? "rgba(255,255,255,.05)"
+                    background: ((!canSubmit && !editMode) || isSaving)
+                        ? "rgba(255,255,255,.07)"
                         : editMode
                             ? "linear-gradient(135deg,#10b981,#059669)"
                             : isTransfer
                                 ? "linear-gradient(135deg,#06b6d4,#0891b2)"
                                 : "linear-gradient(135deg,#6366f1,#8b5cf6)",
                     color: "#fff", fontWeight: 700, fontSize: 13,
-                    cursor: (!canSubmit && !editMode) ? "not-allowed" : "pointer",
-                    opacity: (!canSubmit && !editMode) ? .4 : 1, fontFamily: "inherit",
+                    cursor: ((!canSubmit && !editMode) || isSaving) ? "not-allowed" : "pointer",
+                    opacity: ((!canSubmit && !editMode) || isSaving) ? .5 : 1,
+                    fontFamily: "inherit",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    transition: "opacity .2s, background .2s",
                 }}
-            >{submitLabel}</button>
+            >
+                {isSaving && (
+                    <span style={{ width: 15, height: 15, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />
+                )}
+                {submitLabel}
+            </button>
         </div>
     </Modal>
     );
