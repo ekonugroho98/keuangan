@@ -45,7 +45,7 @@ const selectStyle = {
     padding: "7px 12px", borderRadius: 9,
     background: "var(--color-border-soft)",
     border: "1px solid var(--color-border-soft)",
-    color: "#c5c5d9", fontSize: 12, fontFamily: "inherit",
+    color: "var(--color-text)", fontSize: 12, fontFamily: "inherit",
     outline: "none", cursor: "pointer",
 };
 
@@ -116,7 +116,7 @@ const LaporanView = ({ transactions = [] }) => {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
 
                 {/* Ringkasan */}
-                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>{t("rep.summary")} {periodLabel}</h3>
                     {[
                         { l: t("rep.totalIncome"),   v: fmtRp(income),    c: "var(--color-primary)" },
@@ -135,11 +135,11 @@ const LaporanView = ({ transactions = [] }) => {
                 </div>
 
                 {/* Bar chart harian */}
-                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>{t("rep.dailyExpense")}</h3>
                     <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 16 }}>{periodLabel} · {t("rep.maxPerDay")} {fmtRp(maxDaily === 1 ? 0 : maxDaily)}{t("rep.perDay")}</p>
                     {expense === 0 ? (
-                        <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "#48474f", fontSize: 13 }}>
+                        <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 13 }}>
                             {t("rep.noExpense")}
                         </div>
                     ) : (
@@ -152,7 +152,7 @@ const LaporanView = ({ transactions = [] }) => {
                                     <div key={day} title={`${day}: ${fmtRp(val)}`}
                                         style={{ flex: 1, minWidth: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "default" }}>
                                         <div style={{ width: "100%", height: h || 2, borderRadius: 3, background: val === 0 ? "var(--color-border-soft)" : isHigh ? "linear-gradient(135deg,#ff716c,#ff716c)" : "linear-gradient(135deg,#60fcc6,#60fcc6)", transition: "height .4s" }} />
-                                        {daysInMonth <= 14 && <span style={{ fontSize: 8, color: "#48474f" }}>{day}</span>}
+                                        {daysInMonth <= 14 && <span style={{ fontSize: 8, color: "var(--color-subtle)" }}>{day}</span>}
                                     </div>
                                 );
                             })}
@@ -160,19 +160,19 @@ const LaporanView = ({ transactions = [] }) => {
                     )}
                     {daysInMonth > 14 && (
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                            <span style={{ fontSize: 9, color: "#48474f" }}>1</span>
-                            <span style={{ fontSize: 9, color: "#48474f" }}>{Math.round(daysInMonth / 2)}</span>
-                            <span style={{ fontSize: 9, color: "#48474f" }}>{daysInMonth}</span>
+                            <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>1</span>
+                            <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>{Math.round(daysInMonth / 2)}</span>
+                            <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>{daysInMonth}</span>
                         </div>
                     )}
                 </div>
 
                 {/* Breakdown Kategori */}
-                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>{t("rep.breakdown")}</h3>
                     <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 16 }}>{t("rep.breakdownSub")} · {periodLabel}</p>
                     {sortedCats.length === 0 ? (
-                        <div style={{ color: "#48474f", fontSize: 13, textAlign: "center", padding: "20px 0" }}>{t("rep.noExpense")}</div>
+                        <div style={{ color: "var(--color-subtle)", fontSize: 13, textAlign: "center", padding: "20px 0" }}>{t("rep.noExpense")}</div>
                     ) : sortedCats.map(([cat, amt], i) => {
                         const pct = expense > 0 ? Math.round((amt / expense) * 100) : 0;
                         const colors = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899"];
@@ -180,8 +180,8 @@ const LaporanView = ({ transactions = [] }) => {
                         return (
                             <div key={cat} style={{ marginBottom: 14 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                    <span style={{ fontSize: 12, color: "#c5c5d9" }}>{cat}</span>
-                                    <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "#48474f" }}>({pct}%)</span></span>
+                                    <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{cat}</span>
+                                    <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "var(--color-subtle)" }}>({pct}%)</span></span>
                                 </div>
                                 <div style={{ height: 6, borderRadius: 3, background: "var(--color-border-soft)" }}>
                                     <div style={{ height: "100%", borderRadius: 3, background: c, width: `${pct}%`, transition: "width .8s" }} />

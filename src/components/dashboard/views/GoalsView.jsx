@@ -67,11 +67,11 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
 
             {/* Empty state */}
             {goals.length === 0 && (
-                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("goals.noData")}</div>
                     <div style={{ fontSize: 13, color: "#48474f", marginBottom: 20 }}>{t("goals.noDataSub")}</div>
-                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                         {t("goals.addFirst")}
                     </button>
                 </div>
@@ -84,7 +84,7 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
                     const done = g.current >= g.target;
                     return (
                         <div key={g.id} style={{
-                            background: "rgba(25,25,33,.6)",
+                            background: "var(--bg-surface)",
                             border: `1px solid ${done ? g.color + "44" : "var(--color-border-soft)"}`,
                             borderRadius: 16, padding: 24, position: "relative",
                         }}>
@@ -130,7 +130,7 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
                         </div>
 
                         {/* Preview */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,.03)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
                             <div style={{ width: 44, height: 44, borderRadius: 12, background: form.color + "20", border: `1px solid ${form.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{form.icon}</div>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>{form.name || "Nama Target"}</div>
@@ -174,7 +174,7 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
                         </div>
 
                         <button onClick={handleSubmit} disabled={!canSubmit}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "var(--color-text)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "var(--color-primary)", color: "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
                             {editTarget ? t("common.saveChanges") : t("goals.submitAdd")}
                         </button>
                     </div>

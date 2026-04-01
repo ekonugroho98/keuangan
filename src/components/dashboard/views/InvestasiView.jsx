@@ -81,7 +81,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                         {investments.length} {t("inv.assets")} · {t("inv.portfolio")} {fmtRp(totalNilai)}
                     </p>
                 </div>
-                <button onClick={openAdd} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={openAdd} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                     {t("inv.addNew")}
                 </button>
             </div>
@@ -105,11 +105,11 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
 
             {/* Empty state */}
             {investments.length === 0 && (
-                <div style={{ background: "rgba(25,25,33,.6)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("inv.noData")}</div>
                     <div style={{ fontSize: 13, color: "#48474f", marginBottom: 20 }}>{t("inv.noDataSub")}</div>
-                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                         {t("inv.addFirst")}
                     </button>
                 </div>
@@ -123,7 +123,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                     const isProfit = gain >= 0;
                     const typeInfo = TYPES.find(tp => tp.v === inv.type) || TYPES[7];
                     return (
-                        <div key={inv.id} style={{ background: "rgba(25,25,33,.6)", border: `1px solid ${inv.color}22`, borderRadius: 16, padding: 22, position: "relative" }}>
+                        <div key={inv.id} style={{ background: "var(--bg-surface)", border: `1px solid ${inv.color}22`, borderRadius: 16, padding: 22, position: "relative" }}>
                             <div style={{ position: "absolute", top: 14, right: 14, fontSize: 9, fontWeight: 700, color: typeInfo.color, background: typeInfo.color + "15", border: `1px solid ${typeInfo.color}30`, borderRadius: 6, padding: "2px 8px" }}>
                                 {typeInfo.l.toUpperCase()}
                             </div>
@@ -142,11 +142,11 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                             </div>
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                                <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "10px 12px" }}>
+                                <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 12px" }}>
                                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 3 }}>{t("inv.modal").toUpperCase()}</div>
                                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-muted)" }}>{fmtRp(inv.buy_price)}</div>
                                 </div>
-                                <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 10, padding: "10px 12px" }}>
+                                <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 12px" }}>
                                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 3 }}>{t("inv.currentValueLabel").toUpperCase()}</div>
                                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{fmtRp(inv.current_value)}</div>
                                 </div>
@@ -187,7 +187,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                         </div>
 
                         {/* Preview */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,.03)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
                             <div style={{ width: 44, height: 44, borderRadius: 12, background: form.color + "20", border: `1px solid ${form.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{form.icon}</div>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>{form.name || t("inv.previewDefault")}</div>
@@ -268,7 +268,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                             style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 24, boxSizing: "border-box" }} />
 
                         <button onClick={handleSubmit} disabled={!canSubmit}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "var(--color-text)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "var(--color-primary)", color: "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
                             {editTarget ? t("inv.submitEdit") : t("inv.submitAdd")}
                         </button>
                     </div>
