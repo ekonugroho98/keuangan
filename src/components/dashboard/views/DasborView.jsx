@@ -53,7 +53,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
             {/* Saldo Total */}
             <div style={{ ...card, borderLeft: "4px solid #00C896" }}>
                 <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{t("dash.totalBalance")}</p>
-                <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{fmtRp(totalBalance)}</h2>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px" }}>{fmtRp(totalBalance)}</h2>
                 <p style={{ fontSize: 10, color: "var(--color-muted)" }}>🏦 {accounts.length} {t("dash.accountsCount")}</p>
             </div>
 
@@ -63,7 +63,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                     <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>{t("dash.incomeMonth")}</p>
                     <span style={{ fontSize: 16 }}>📈</span>
                 </div>
-                <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{fmtRp(thisIncome)}</h2>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px" }}>{fmtRp(thisIncome)}</h2>
                 {incomePct && (
                     <p style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 700 }}>
                         {incomePct.startsWith("+") ? "↑" : "↓"} {incomePct} <span style={{ fontWeight: 400, color: "var(--color-muted)" }}>{t("dash.fromLastMonth")}</span>
@@ -77,7 +77,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                     <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1 }}>{t("dash.expenseMonth")}</p>
                     <span style={{ fontSize: 16 }}>📉</span>
                 </div>
-                <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{fmtRp(thisExpense)}</h2>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px" }}>{fmtRp(thisExpense)}</h2>
                 {expensePct && (
                     <p style={{ fontSize: 10, color: expensePct.startsWith("+") ? "#ff716c" : "var(--color-primary)", fontWeight: 700 }}>
                         {expensePct.startsWith("+") ? "↑" : "↓"} {expensePct} <span style={{ fontWeight: 400, color: "var(--color-muted)" }}>{t("dash.fromLastMonth")}</span>
@@ -97,7 +97,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                         />
                     </svg>
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}>{thisSavingRate}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--color-text)" }}>{thisSavingRate}%</span>
                     </div>
                 </div>
                 <div>
@@ -112,7 +112,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
         {/* ROW 2: AKUN — full width horizontal scroll */}
         <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", margin: 0 }}>{t("dash.yourAccounts")}</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("dash.yourAccounts")}</h3>
                 <button onClick={() => setActiveMenu("akun")} style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("dash.viewAll")} →</button>
             </div>
             <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
@@ -125,9 +125,9 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                     }}>
                         <div>
                             <span style={{ fontSize: 9, background: "var(--bg-surface-low)", padding: "2px 7px", borderRadius: 4, color: "var(--color-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{a.type}</span>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.icon} {a.name}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text)", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.icon} {a.name}</div>
                         </div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{fmtRp(a.balance)}</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text)" }}>{fmtRp(a.balance)}</div>
                     </div>
                 ))}
                 <div
@@ -153,17 +153,17 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
             <div style={card}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <div>
-                        <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{t("dash.recentTx")}</h3>
+                        <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("dash.recentTx")}</h3>
                         <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{t("dash.last5tx")}</span>
                     </div>
                     <button onClick={() => setActiveMenu("transaksi")} style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("dash.viewAll")}</button>
                 </div>
                 {transactions.slice(0, 5).map(tx => (
-                    <div key={tx.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderTop: "1px solid rgba(255,255,255,.04)" }}>
+                    <div key={tx.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderTop: "1px solid var(--color-border-soft)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                             <div style={{ width: 30, height: 30, borderRadius: 8, background: tx.type === "income" ? "rgba(96,252,198,.1)" : "rgba(255,113,108,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{tx.icon}</div>
                             <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.note}</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.note}</div>
                                 <div style={{ fontSize: 10, color: "var(--color-muted)" }}>{fmtDate(tx.date)}</div>
                             </div>
                         </div>
@@ -175,7 +175,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
 
             {/* Kategori Teratas */}
             <div style={card}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{t("dash.topCategories")}</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>{t("dash.topCategories")}</h3>
                 <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{t("dash.topCatSub")}</span>
                 <div style={{ marginTop: 14 }}>
                     {sortedCats.slice(0, 5).map(([cat, amt], i) => (
@@ -195,7 +195,7 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
             {/* Kesehatan + Quick Stats */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={card}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>{t("dash.financialHealth")}</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 14 }}>{t("dash.financialHealth")}</h3>
                     {[
                         { label: t("dash.savingRate"),   val: savingRate,  color: savingRate > 20  ? "var(--color-primary)" : "#f59e0b", note: savingRate > 20  ? t("dash.goodRate")   : t("dash.needImprove") },
                         { label: t("dash.expenseRatio"), val: expenseRate, color: expenseRate < 70 ? "var(--color-primary)" : "#ff716c", note: expenseRate < 70 ? t("dash.veryGood")  : t("dash.tooHigh") },
@@ -214,18 +214,18 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                 </div>
 
                 <div style={card}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>{t("dash.quickStats")}</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 14 }}>{t("dash.quickStats")}</h3>
                     {[
                         { l: t("dash.totalAccounts"),   v: accounts.length, i: "🏦" },
                         { l: t("dash.totalCategories"), v: totalCats,        i: "🏷️" },
                         { l: t("dash.txThisMonth"),     v: txThis.length,    i: "💳" },
                     ].map((s, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderTop: i > 0 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
+                        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderTop: i > 0 ? "1px solid var(--color-border-soft)" : "none" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ fontSize: 16 }}>{s.i}</span>
                                 <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{s.l}</span>
                             </div>
-                            <span style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{s.v}</span>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text)" }}>{s.v}</span>
                         </div>
                     ))}
                 </div>

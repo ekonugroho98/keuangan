@@ -56,8 +56,8 @@ const emptyForm = () => ({
 
 const inputStyle = {
     width: "100%", padding: "10px 14px", boxSizing: "border-box",
-    background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)",
-    borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none",
+    background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)",
+    borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none",
 };
 
 /* ─── SummaryCard ─── */
@@ -171,11 +171,11 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                 <div onClick={() => setConfirmDelete(null)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
                     <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center" }}>
                         <div style={{ fontSize: 38, marginBottom: 12 }}>{confirmDelete.icon}</div>
-                        <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("rec.deleteConfirm")}</h3>
+                        <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("rec.deleteConfirm")}</h3>
                         <p style={{ color: "var(--color-subtle)", fontSize: 13, margin: "0 0 24px" }}><strong style={{ color: "#ff716c" }}>{confirmDelete.name}</strong></p>
                         <div style={{ display: "flex", gap: 10 }}>
-                            <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.cancel")}</button>
-                            <button onClick={() => { onDelete(confirmDelete.id); setConfirmDelete(null); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("common.delete")}</button>
+                            <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.cancel")}</button>
+                            <button onClick={() => { onDelete(confirmDelete.id); setConfirmDelete(null); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("common.delete")}</button>
                         </div>
                     </div>
                 </div>
@@ -184,10 +184,10 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
             {/* ── Add/Edit Modal ── */}
             {showModal && (
                 <div onClick={() => setShowModal(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 460, maxHeight: "90vh", overflowY: "auto" }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 460, maxHeight: "90vh", overflowY: "auto" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-                            <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 17, margin: 0 }}>{editTarget ? t("rec.editTitle") : t("rec.addTitle")}</h3>
-                            <button onClick={() => setShowModal(false)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                            <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 17, margin: 0 }}>{editTarget ? t("rec.editTitle") : t("rec.addTitle")}</h3>
+                            <button onClick={() => setShowModal(false)} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                         </div>
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("rec.nameLabel")}</label>
@@ -201,7 +201,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                                 const isSel = form.category === cat;
                                 return (
                                     <button key={cat} onClick={() => setForm(p => ({ ...p, category: cat }))}
-                                        style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${isSel ? "rgba(96,252,198,.5)" : "rgba(255,255,255,.06)"}`, background: isSel ? "rgba(96,252,198,.15)" : "transparent", color: isSel ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: isSel ? 700 : 400, display: "flex", alignItems: "center", gap: 5 }}>
+                                        style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${isSel ? "rgba(96,252,198,.5)" : "var(--color-border-soft)"}`, background: isSel ? "rgba(96,252,198,.15)" : "transparent", color: isSel ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: isSel ? 700 : 400, display: "flex", alignItems: "center", gap: 5 }}>
                                         <span>{icon}</span><span>{cat}</span>
                                     </button>
                                 );
@@ -218,7 +218,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                                 {accounts.map(a => (
                                     <button key={a.id} onClick={() => setForm(p => ({ ...p, account_name: a.name }))}
-                                        style={{ padding: "7px 14px", borderRadius: 10, border: `1px solid ${form.account_name === a.name ? (a.color||"var(--color-primary)") + "55" : "rgba(255,255,255,.06)"}`, background: form.account_name === a.name ? (a.color||"var(--color-primary)") + "18" : "transparent", color: form.account_name === a.name ? (a.color||"var(--color-primary)") : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
+                                        style={{ padding: "7px 14px", borderRadius: 10, border: `1px solid ${form.account_name === a.name ? (a.color||"var(--color-primary)") + "55" : "var(--color-border-soft)"}`, background: form.account_name === a.name ? (a.color||"var(--color-primary)") + "18" : "transparent", color: form.account_name === a.name ? (a.color||"var(--color-primary)") : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
                                         {a.icon} {a.name} <span style={{ fontSize: 10, opacity: .7 }}>({fmtRp(a.balance)})</span>
                                     </button>
                                 ))}
@@ -229,7 +229,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                             {FREQ_OPTIONS.map(f => (
                                 <button key={f.v} onClick={() => handleFreqChange(f.v)}
-                                    style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1px solid ${form.frequency === f.v ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: form.frequency === f.v ? "rgba(96,252,198,.15)" : "transparent", color: form.frequency === f.v ? "var(--color-primary)" : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}>
+                                    style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1px solid ${form.frequency === f.v ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.frequency === f.v ? "rgba(96,252,198,.15)" : "transparent", color: form.frequency === f.v ? "var(--color-primary)" : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}>
                                     <div style={{ marginBottom: 3 }}>{f.icon}</div><div>{f.l}</div>
                                 </button>
                             ))}
@@ -242,7 +242,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
+                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
                                     {e}
                                 </button>
                             ))}
@@ -257,12 +257,12 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                                 <div style={{ fontSize: 11, color: "#48474f", marginBottom: 8 }}>{t("rec.linkedDebtSub")}</div>
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 24 }}>
                                     <button onClick={() => setForm(p => ({ ...p, debt_id: null }))}
-                                        style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${!form.debt_id ? "rgba(100,116,139,.5)" : "rgba(255,255,255,.06)"}`, background: !form.debt_id ? "rgba(100,116,139,.15)" : "transparent", color: !form.debt_id ? "var(--color-muted)" : "#48474f", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                        style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${!form.debt_id ? "rgba(100,116,139,.5)" : "var(--color-border-soft)"}`, background: !form.debt_id ? "rgba(100,116,139,.15)" : "transparent", color: !form.debt_id ? "var(--color-muted)" : "#48474f", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                         {t("rec.noLinked")}
                                     </button>
                                     {debts.map(d => (
                                         <button key={d.id} onClick={() => setForm(p => ({ ...p, debt_id: d.id }))}
-                                            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${form.debt_id === d.id ? (d.color||"var(--color-primary)") + "55" : "rgba(255,255,255,.06)"}`, background: form.debt_id === d.id ? (d.color||"var(--color-primary)") + "15" : "transparent", color: form.debt_id === d.id ? (d.color||"var(--color-primary)") : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${form.debt_id === d.id ? (d.color||"var(--color-primary)") + "55" : "var(--color-border-soft)"}`, background: form.debt_id === d.id ? (d.color||"var(--color-primary)") + "15" : "transparent", color: form.debt_id === d.id ? (d.color||"var(--color-primary)") : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                             {d.icon} {d.name} <span style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>({fmtRp(d.remaining)} {t("rec.remaining")})</span>
                                         </button>
                                     ))}
@@ -272,7 +272,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         {debts.length === 0 && <div style={{ marginBottom: 8 }} />}
 
                         <button onClick={handleSubmit} disabled={!canSubmit}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "rgba(255,255,255,.05)" : "var(--color-primary)", color: !canSubmit ? "#94a3b8" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "var(--color-primary)", color: !canSubmit ? "#94a3b8" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
                             {editTarget ? t("common.saveChanges") : t("rec.addTitle")}
                         </button>
                     </div>
@@ -343,7 +343,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
 
             {/* ── Empty State ── */}
             {recurrings.length === 0 ? (
-                <div style={{ background: "var(--bg-surface)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 18, padding: "52px 24px", textAlign: "center" }}>
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 18, padding: "52px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 48, marginBottom: 14 }}>🔄</div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: "0 0 8px" }}>{t("rec.noData")}</h3>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "0 0 24px" }}>{t("rec.noDataSub")}</p>
@@ -359,7 +359,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                 </div>
             ) : (
                 /* ── Recurring List ── */
-                <div style={{ borderRadius: 20, overflow: "hidden", border: "1px solid rgba(255,255,255,.06)" }}>
+                <div style={{ borderRadius: 20, overflow: "hidden", border: "1px solid var(--color-border-soft)" }}>
                     {displayed.map((r, idx) => {
                         const days    = daysUntil(r.next_date);
                         const paid    = isPaidThisMonth(r);
@@ -416,7 +416,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                                             <span style={{ fontSize: 11, color: dueColor, fontWeight: days <= 3 ? 600 : 400 }}>{dueText}</span>
                                             <span style={{ opacity: .3, fontSize: 10 }}>·</span>
                                             {/* Category */}
-                                            <span style={{ fontSize: 10, color: "var(--color-muted)", background: "rgba(255,255,255,.05)", padding: "1px 7px", borderRadius: 5 }}>
+                                            <span style={{ fontSize: 10, color: "var(--color-muted)", background: "var(--color-border-soft)", padding: "1px 7px", borderRadius: 5 }}>
                                                 {categoryIcons[r.category] || "📦"} {tCat(r.category)}
                                             </span>
                                             <span style={{ opacity: .3, fontSize: 10 }}>·</span>

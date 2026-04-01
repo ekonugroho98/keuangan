@@ -90,13 +90,13 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                 <div onClick={() => setConfirmDelete(null)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
                     <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center" }}>
                         <div style={{ fontSize: 40, marginBottom: 12 }}>{confirmDelete.icon}</div>
-                        <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("cat.deleteConfirm")}</h3>
+                        <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("cat.deleteConfirm")}</h3>
                         <p style={{ color: "var(--color-subtle)", fontSize: 13, margin: "0 0 24px" }}>
                             <strong style={{ color: "#ff716c" }}>{confirmDelete.name}</strong> — {t("cat.deleteMsg")}
                         </p>
                         <div style={{ display: "flex", gap: 10 }}>
-                            <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.cancel")}</button>
-                            <button onClick={() => { onDeleteCategory(confirmDelete.id); setConfirmDelete(null); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("common.delete")}</button>
+                            <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.cancel")}</button>
+                            <button onClick={() => { onDeleteCategory(confirmDelete.id); setConfirmDelete(null); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("common.delete")}</button>
                         </div>
                     </div>
                 </div>
@@ -105,32 +105,32 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
             {/* ── Add/Edit Modal ── */}
             {showModal && (
                 <div onClick={() => setShowModal(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 420 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 420 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-                            <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 17, margin: 0 }}>
+                            <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 17, margin: 0 }}>
                                 {editTarget ? t("cat.editTitle") : t("cat.addTitle")}
                             </h3>
-                            <button onClick={() => setShowModal(false)} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                            <button onClick={() => setShowModal(false)} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                         </div>
 
                         {/* Preview */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,.03)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: 14, marginBottom: 20 }}>
                             <div style={{ width: 44, height: 44, borderRadius: 12, background: form.color + "20", border: `1px solid ${form.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{form.icon}</div>
                             <div>
-                                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{form.name || t("cat.namePlaceholder")}</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>{form.name || t("cat.namePlaceholder")}</div>
                                 <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>{form.type === "expense" ? t("cat.expense") : form.type === "income" ? t("cat.income") : t("cat.typeBoth")}</div>
                             </div>
                         </div>
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("cat.nameLabel")}</label>
                         <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t("cat.namePlaceholder")} maxLength={30}
-                            style={{ width: "100%", padding: "10px 14px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
+                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("cat.typeLabel")}</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                             {[{ v: "expense", l: t("cat.expense"), c: "#ff716c" }, { v: "income", l: t("cat.income"), c: "var(--color-primary)" }, { v: "both", l: t("cat.typeBoth"), c: "#a78bfa" }].map(tp => (
                                 <button key={tp.v} onClick={() => setForm(p => ({ ...p, type: tp.v }))}
-                                    style={{ flex: 1, padding: "8px 4px", borderRadius: 9, border: `1px solid ${form.type === tp.v ? tp.c + "55" : "rgba(255,255,255,.06)"}`, background: form.type === tp.v ? tp.c + "15" : "transparent", color: form.type === tp.v ? tp.c : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                    style={{ flex: 1, padding: "8px 4px", borderRadius: 9, border: `1px solid ${form.type === tp.v ? tp.c + "55" : "var(--color-border-soft)"}`, background: form.type === tp.v ? tp.c + "15" : "transparent", color: form.type === tp.v ? tp.c : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                     {tp.l}
                                 </button>
                             ))}
@@ -140,7 +140,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "rgba(255,255,255,.06)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
+                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
                                     {e}
                                 </button>
                             ))}
@@ -155,7 +155,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                         </div>
 
                         <button onClick={handleSubmit} disabled={!form.name.trim()}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !form.name.trim() ? "rgba(255,255,255,.05)" : "var(--color-primary)", color: !form.name.trim() ? "#94a3b8" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: !form.name.trim() ? "not-allowed" : "pointer", opacity: !form.name.trim() ? .4 : 1, fontFamily: "inherit" }}>
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !form.name.trim() ? "var(--color-border-soft)" : "var(--color-primary)", color: !form.name.trim() ? "#94a3b8" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: !form.name.trim() ? "not-allowed" : "pointer", opacity: !form.name.trim() ? .4 : 1, fontFamily: "inherit" }}>
                             {editTarget ? t("cat.submitEdit") : t("cat.submitAdd")}
                         </button>
                     </div>
@@ -224,7 +224,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                             onMouseLeave={() => setHoveredId(null)}
                             style={{
                                 background: "var(--bg-surface)",
-                                border: `1px solid ${isHov ? color + "45" : "rgba(255,255,255,.06)"}`,
+                                border: `1px solid ${isHov ? color + "45" : "var(--color-border-soft)"}`,
                                 borderRadius: 16, padding: "18px 18px 14px",
                                 display: "flex", flexDirection: "column", gap: 10,
                                 transition: "border-color .2s, box-shadow .2s, transform .2s",
@@ -249,7 +249,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                                         <span style={{ fontSize: 8, fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,.12)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>KUSTOM</span>
                                     )}
                                     {!isCustom && (
-                                        <span style={{ fontSize: 8, fontWeight: 700, color: "#48474f", background: "rgba(255,255,255,.04)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>DEFAULT</span>
+                                        <span style={{ fontSize: 8, fontWeight: 700, color: "#48474f", background: "var(--color-border-soft)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>DEFAULT</span>
                                     )}
                                 </div>
                             </div>
@@ -276,7 +276,7 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                                             }
                                         </span>
                                     </div>
-                                    <div style={{ height: 4, borderRadius: 99, background: "rgba(255,255,255,.06)" }}>
+                                    <div style={{ height: 4, borderRadius: 99, background: "var(--color-border-soft)" }}>
                                         <div style={{
                                             height: "100%", borderRadius: 99,
                                             background: color,

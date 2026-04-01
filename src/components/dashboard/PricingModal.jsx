@@ -95,7 +95,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                 {/* Header */}
                 <div style={{ textAlign: "center", marginBottom: 32 }}>
                     <div style={{ fontSize: 28, marginBottom: 8 }}>💎</div>
-                    <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>
+                    <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>
                         Pilih Paket Langganan
                     </h2>
                     <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
@@ -127,7 +127,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                                     <div style={{
                                         position: "absolute", top: -10, right: 16,
                                         background: plan.gradient,
-                                        color: "#fff", fontSize: 10, fontWeight: 700,
+                                        color: "var(--color-text)", fontSize: 10, fontWeight: 700,
                                         padding: "3px 10px", borderRadius: 20,
                                         letterSpacing: 0.5,
                                     }}>
@@ -154,7 +154,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
 
                                 {/* Price */}
                                 <div style={{ marginBottom: 20 }}>
-                                    <span style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{plan.price}</span>
+                                    <span style={{ fontSize: 24, fontWeight: 800, color: "var(--color-text)" }}>{plan.price}</span>
                                     <span style={{ fontSize: 12, color: "#64748b", marginLeft: 4 }}>{plan.period}</span>
                                 </div>
 

@@ -37,7 +37,7 @@ const card = {
     flexDirection: "column",
     justifyContent: "space-between",
     transition: "transform .25s, box-shadow .25s, border-color .25s",
-    border: "1px solid rgba(255,255,255,.06)",
+    border: "1px solid var(--color-border-soft)",
     cursor: "default",
 };
 
@@ -72,7 +72,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
                         {t("acc.subtitle") || "Kelola rekening dan pantau saldo Anda."}
                     </p>
                 </div>
-                <div style={{ background: "rgba(96,252,198,.08)", border: "1px solid rgba(96,252,198,.2)", borderRadius: 12, padding: "8px 18px", textAlign: "right" }}>
+                <div style={{ background: "rgba(96,252,198,.08)", border: "1px solid var(--color-border)", borderRadius: 12, padding: "8px 18px", textAlign: "right" }}>
                     <div style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>
                         {t("dash.totalBalance") || "Total Saldo"}
                     </div>
@@ -150,7 +150,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
                                 onMouseOut={e => {
                                     e.currentTarget.style.transform = "translateY(0)";
                                     e.currentTarget.style.boxShadow = "none";
-                                    e.currentTarget.style.borderColor = "rgba(255,255,255,.06)";
+                                    e.currentTarget.style.borderColor = "var(--color-border-soft)";
                                 }}
                             >
                                 {/* Top: badge + icon */}
@@ -180,7 +180,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
                                 </div>
 
                                 {/* Bottom: action buttons */}
-                                <div style={{ display: "flex", gap: 8, borderTop: "1px solid rgba(255,255,255,.05)", paddingTop: 14 }}>
+                                <div style={{ display: "flex", gap: 8, borderTop: "1px solid var(--color-border-soft)", paddingTop: 14 }}>
                                     <button
                                         onClick={() => setActiveMenu && setActiveMenu("transaksi")}
                                         style={{
@@ -231,7 +231,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu }) 
 
             {/* ── Recent Transactions per Account ── */}
             {accounts.length > 0 && (
-                <div style={{ background: "var(--bg-surface)", borderRadius: 18, padding: "22px 22px 18px", border: "1px solid rgba(255,255,255,.06)" }}>
+                <div style={{ background: "var(--bg-surface)", borderRadius: 18, padding: "22px 22px 18px", border: "1px solid var(--color-border-soft)" }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: "0 0 16px" }}>
                         {t("acc.recentTxPerAccount") || "Transaksi Terbaru per Rekening"}
                     </h3>
