@@ -37,7 +37,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [editingTx, setEditingTx] = useState(null);
     const [isSavingTx, setIsSavingTx] = useState(false);
     const [showAddAccount, setShowAddAccount] = useState(false);
-    const [txForm, setTxForm] = useState({ type: "expense", amount: "", category: "Makanan", note: "", account: "", toAccount: "" });
+    const [txForm, setTxForm] = useState({ type: "expense", amount: "", category: "Makanan", note: "", account: "", toAccount: "", date: new Date().toISOString().slice(0, 10) });
     const [accForm, setAccForm] = useState({ name: "", type: "bank", balance: "" });
 
     const [accounts, setAccounts] = useState([]);
@@ -328,7 +328,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             amount: parseInt(txForm.amount),
             category: txForm.category,
             note: txForm.note || txForm.category,
-            date: new Date().toISOString().slice(0, 10),
+            date: txForm.date || new Date().toISOString().slice(0, 10),
             account_name: txForm.account || (accounts[0]?.name ?? ""),
             icon: categoryIcons[txForm.category] || "📦",
         };
@@ -347,7 +347,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         }
 
         setTransactions(p => [data, ...p]);
-        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "" });
+        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: new Date().toISOString().slice(0, 10) });
         setIsSavingTx(false);
         setShowAddTx(false);
         showToast("Transaksi berhasil ditambahkan!");
@@ -363,6 +363,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             note:      tx.note,
             account:   tx.account_name,
             toAccount: "",
+            date:      tx.date || new Date().toISOString().slice(0, 10),
         });
         setShowEditTx(true);
     };
@@ -419,6 +420,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             note:         txForm.note || txForm.category,
             account_name: txForm.account || editingTx.account_name,
             icon:         categoryIcons[txForm.category] || editingTx.icon || "📦",
+            date:         txForm.date || editingTx.date,
         };
         const { data, error } = await supabase.from("transactions")
             .update(updatedFields).eq("id", editingTx.id).select().single();
@@ -477,7 +479,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             if (a.id === toAcc.id)   return resTo.data;
             return a;
         }));
-        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "" });
+        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: new Date().toISOString().slice(0, 10) });
         setIsSavingTx(false);
         setShowAddTx(false);
         showToast(`✅ Transfer Rp ${amount.toLocaleString("id-ID")} dari ${fromAcc.name} ke ${toAcc.name} berhasil!`);
