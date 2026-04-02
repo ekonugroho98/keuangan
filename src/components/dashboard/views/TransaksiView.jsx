@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 import { fmtRp, fmtDate } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 
@@ -49,6 +50,7 @@ const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 
 const TransaksiView = ({ transactions, onEdit, onDelete }) => {
     const { t, lang } = useLanguage();
+    const isMobile = useIsMobile();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
@@ -188,7 +190,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
-                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
+                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                 </div>
 
                 {/* Pengeluaran — transfer TIDAK termasuk */}
@@ -204,7 +206,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: "#ff716c", margin: "0 0 3px" }}>-{fmtRp(sumOut)}</h3>
-                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
+                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                 </div>
 
                 {/* Transfer antar akun — NETRAL, tidak mempengaruhi kekayaan */}
@@ -220,7 +222,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: "#4FC3F7", margin: "0 0 3px" }}>↔ {fmtRp(sumTransfer)}</h3>
-                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
+                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
                 </div>
 
                 {/* Saldo Bersih = income - expense (transfer diabaikan) */}
@@ -234,7 +236,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "var(--color-text)" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
-                    <p style={{ fontSize: 10, color: "rgba(172,170,180,.5)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
+                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
                 </div>
             </div>
 
@@ -347,7 +349,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                         <span style={{ color: "rgba(79,195,247,.85)", fontWeight: 600 }}>↔ {fmtRp(sumTransfer)}</span>
                     </>}
                     <span style={{ opacity: .35 }}>·</span>
-                    <span style={{ color: net >= 0 ? "rgba(239,236,247,.8)" : "rgba(255,113,108,.9)", fontWeight: 600 }}>
+                    <span style={{ color: net >= 0 ? "var(--color-text)" : "#ff716c", fontWeight: 600 }}>
                         {t("tx.net") || "Bersih"}: {net >= 0 ? "+" : ""}{fmtRp(net)}
                     </span>
                 </p>
@@ -425,12 +427,12 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                                         {meta.sign}{fmtRp(tx.amount)}
                                     </span>
 
-                                    {/* Action buttons */}
-                                    <div style={{ display: "flex", gap: 4, opacity: isHovered ? 1 : 0, transition: "opacity .15s", pointerEvents: isHovered ? "auto" : "none" }}>
+                                    {/* Action buttons — always visible on mobile */}
+                                    <div style={{ display: "flex", gap: 4, opacity: isMobile || isHovered ? 1 : 0, transition: "opacity .15s", pointerEvents: isMobile || isHovered ? "auto" : "none" }}>
                                         <button
                                             onClick={() => onEdit(tx)}
                                             style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "var(--color-muted)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
-                                            onMouseOver={e => e.currentTarget.style.background = "rgba(37,37,47,.8)"}
+                                            onMouseOver={e => e.currentTarget.style.background = "var(--bg-surface-hover)"}
                                             onMouseOut={e => e.currentTarget.style.background = "transparent"}
                                         >✏️</button>
                                         <button

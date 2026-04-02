@@ -15,15 +15,18 @@ const Sidebar = ({ open, activeMenu, setActiveMenu, user, onAddTx }) => {
             { id: "akun",      label: t("nav.accounts"),    icon: "🏦" },
             { id: "kategori",  label: t("nav.categories"),  icon: "🏷️" },
             { id: "berulang",  label: t("nav.recurring"),   icon: "🔄" },
+            { id: "splitbill", label: t("nav.splitbill"),   icon: "🧾" },
         ]},
         { group: t("nav.planning"), items: [
             { id: "goals",     label: t("nav.goals"),       icon: "🎯" },
             { id: "hutang",    label: t("nav.debts"),       icon: "📋" },
             { id: "investasi", label: t("nav.investments"), icon: "📈" },
+            { id: "anggaran",  label: t("nav.budgets"),     icon: "💰" },
         ]},
         { group: t("nav.insight"), items: [
             { id: "laporan",   label: t("nav.reports"),     icon: "📉" },
             { id: "ai",        label: t("nav.ai"),          icon: "🤖" },
+            { id: "prediksi",  label: t("nav.prediksi"),    icon: "🔮" },
         ]},
     ];
 

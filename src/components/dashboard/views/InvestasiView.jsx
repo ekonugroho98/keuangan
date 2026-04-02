@@ -74,10 +74,10 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("inv.title")}</h3>
-                    <p style={{ fontSize: 12, color: "var(--color-subtle)", margin: "4px 0 0" }}>
+                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("inv.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
                         {investments.length} {t("inv.assets")} · {t("inv.portfolio")} {fmtRp(totalNilai)}
                     </p>
                 </div>

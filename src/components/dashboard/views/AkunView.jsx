@@ -266,7 +266,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                     onClick={() => setActiveTab(a.id)}
                                     style={{
                                         padding: "7px 16px", borderRadius: 9999,
-                                        border: isActive ? `1px solid ${color}50` : "1px solid rgba(255,255,255,.07)",
+                                        border: isActive ? `1px solid ${color}50` : "1px solid var(--color-border)",
                                         background: isActive ? `${color}15` : "transparent",
                                         color: isActive ? color : "var(--color-muted)",
                                         fontSize: 12, fontWeight: isActive ? 700 : 400,
@@ -301,7 +301,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                     <div key={tx.id} style={{
                                         display: "flex", alignItems: "center", justifyContent: "space-between",
                                         padding: "11px 10px", borderRadius: 10,
-                                        background: idx % 2 === 0 ? "rgba(19,19,26,.8)" : "rgba(37,37,47,.2)",
+                                        background: idx % 2 === 0 ? "var(--bg-surface-low)" : "var(--bg-alt-row)",
                                         marginBottom: 2, gap: 10,
                                     }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>

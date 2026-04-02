@@ -14,6 +14,9 @@ import HutangView from "../components/dashboard/views/HutangView";
 import InvestasiView from "../components/dashboard/views/InvestasiView";
 import LaporanView from "../components/dashboard/views/LaporanView";
 import AiView from "../components/dashboard/views/AiView";
+import AnggaranView from "../components/dashboard/views/AnggaranView";
+import SplitBillView from "../components/dashboard/views/SplitBillView";
+import PrediksiView from "../components/dashboard/views/PrediksiView";
 import PricingModal from "../components/dashboard/PricingModal";
 import { categoryIcons } from "../constants/categories";
 import { supabase } from "../lib/supabase";
@@ -21,7 +24,9 @@ import { supabase } from "../lib/supabase";
 const NAV_LABELS = {
     dasbor: "nav.dashboard", transaksi: "nav.transaction", akun: "nav.accounts",
     kategori: "nav.categories", berulang: "nav.recurring", goals: "nav.goals",
-    hutang: "nav.debts", investasi: "nav.investments", laporan: "nav.reports", ai: "nav.ai",
+    hutang: "nav.debts", investasi: "nav.investments", anggaran: "nav.budgets",
+    laporan: "nav.reports", ai: "nav.ai",
+    splitbill: "nav.splitbill", prediksi: "nav.prediksi",
 };
 
 const Dashboard = ({ session, onLogout, showToast }) => {
@@ -47,6 +52,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [recurrings, setRecurrings] = useState([]);
     const [customCategories, setCustomCategories] = useState([]);
     const [investments, setInvestments] = useState([]);
+    const [budgets, setBudgets] = useState([]);
+    const [splitBills, setSplitBills] = useState([]);
     const [subscription, setSubscription] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showPricing, setShowPricing] = useState(false);
@@ -62,7 +69,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     const fetchAll = async () => {
         setLoading(true);
-        const [accs, txs, gls, dbs, sub, cats, recs, invs] = await Promise.all([
+        try {
+        const [accs, txs, gls, dbs, sub, cats, recs, invs, buds, splits] = await Promise.all([
             supabase.from("accounts").select("*").order("created_at"),
             supabase.from("transactions").select("*").order("date", { ascending: false }),
             supabase.from("goals").select("*").order("created_at"),
@@ -71,6 +79,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             supabase.from("categories").select("*").order("created_at"),
             supabase.from("recurring_transactions").select("*").order("next_date"),
             supabase.from("investments").select("*").order("created_at"),
+            supabase.from("budgets").select("*").order("created_at"),
+            supabase.from("split_bills").select("*, split_bill_members(*)").order("created_at", { ascending: false }),
         ]);
 
         // Buat trial subscription jika belum ada
@@ -180,7 +190,14 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         if (cats.data) setCustomCategories(cats.data);
         if (recs.data) setRecurrings(recs.data);
         if (invs.data) setInvestments(invs.data);
+        if (buds.data) setBudgets(buds.data);
+        if (splits.data) setSplitBills(splits.data);
         setLoading(false);
+        } catch (err) {
+            console.error("fetchAll error:", err);
+            showToast("Gagal memuat data. Coba refresh halaman.", "error");
+            setLoading(false);
+        }
     };
 
     // ── CATEGORY CRUD ────────────────────────────────────────
@@ -235,6 +252,41 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         showToast("Aset dihapus");
     };
 
+    // ── BUDGETS CRUD ─────────────────────────────────────────
+    const addBudget = async (payload) => {
+        const { data, error } = await supabase.from("budgets").insert({ user_id: user.id, ...payload }).select().single();
+        if (error) { showToast("Gagal menyimpan anggaran", "error"); return; }
+        setBudgets(p => [...p, data]);
+        showToast(`💰 Anggaran "${data.category}" berhasil ditambahkan!`);
+    };
+
+    const editBudget = async (id, payload) => {
+        const { data, error } = await supabase.from("budgets").update(payload).eq("id", id).select().single();
+        if (error) { showToast("Gagal mengubah anggaran", "error"); return; }
+        setBudgets(p => p.map(b => b.id === id ? data : b));
+        showToast(`✅ Anggaran diperbarui!`);
+    };
+
+    const deleteBudget = async (id) => {
+        const { error } = await supabase.from("budgets").delete().eq("id", id);
+        if (error) { showToast("Gagal menghapus anggaran", "error"); return; }
+        setBudgets(p => p.filter(b => b.id !== id));
+        showToast("Anggaran dihapus");
+    };
+
+    const copyBudgetMonth = async (prevBudgets, targetMonth) => {
+        const inserts = prevBudgets.map(b => ({
+            user_id: user.id,
+            category: b.category,
+            amount: b.amount,
+            month: targetMonth,
+        }));
+        const { data, error } = await supabase.from("budgets").insert(inserts).select();
+        if (error) { showToast("Gagal menyalin anggaran", "error"); return; }
+        setBudgets(p => [...p, ...(data || [])]);
+        showToast(`✅ ${inserts.length} anggaran disalin ke bulan ini!`);
+    };
+
     // ── GOALS CRUD ───────────────────────────────────────────
     const addGoal = async (payload) => {
         const { data, error } = await supabase.from("goals").insert({ user_id: user.id, ...payload }).select().single();
@@ -279,6 +331,37 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         showToast("Hutang dihapus");
     };
 
+    // ── PAY DEBT ─────────────────────────────────────────────
+    const payDebt = async (debt, amount, accountName) => {
+        const today = new Date().toISOString().slice(0, 10);
+        // 1. Catat transaksi expense
+        const tx = {
+            user_id: user.id, type: "expense", amount,
+            category: "Hutang & Cicilan",
+            note: `Cicilan ${debt.name}`,
+            date: today,
+            account_name: accountName,
+            icon: "📋",
+        };
+        const { data: newTx } = await supabase.from("transactions").insert(tx).select().single();
+        if (newTx) setTransactions(p => [newTx, ...p]);
+
+        // 2. Kurangi saldo akun
+        const acc = accounts.find(a => a.name === accountName);
+        if (acc) {
+            const newBal = Math.max(0, acc.balance - amount);
+            const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
+            if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
+        }
+
+        // 3. Kurangi sisa hutang
+        const newRemaining = Math.max(0, debt.remaining - amount);
+        const { data: updDebt } = await supabase.from("debts").update({ remaining: newRemaining }).eq("id", debt.id).select().single();
+        if (updDebt) setDebts(p => p.map(d => d.id === debt.id ? updDebt : d));
+
+        showToast(`✅ Cicilan ${debt.name} Rp ${amount.toLocaleString("id-ID")} berhasil dicatat!`);
+    };
+
     // ── RECURRING TRANSACTIONS ───────────────────────────────
     const addRecurring = async (form) => {
         const { data, error } = await supabase.from("recurring_transactions").insert({
@@ -302,6 +385,42 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         if (error) { showToast("Gagal menghapus", "error"); return; }
         setRecurrings(p => p.filter(r => r.id !== id));
         showToast("Transaksi berulang dihapus");
+    };
+
+    // ── SPLIT BILL CRUD ──────────────────────────────────────
+    const addSplitBill = async (payload) => {
+        const { members, ...billData } = payload;
+        const { data: bill, error } = await supabase
+            .from("split_bills")
+            .insert({ user_id: user.id, title: billData.title, total_amount: billData.total_amount, date: billData.date, note: billData.note || "" })
+            .select().single();
+        if (error) { showToast("Gagal menyimpan tagihan", "error"); return; }
+        if (members && members.length > 0) {
+            const memberRows = members.map(m => ({ bill_id: bill.id, name: m.name, amount: m.amount, paid: false }));
+            const { data: mData } = await supabase.from("split_bill_members").insert(memberRows).select();
+            setSplitBills(p => [{ ...bill, split_bill_members: mData || [] }, ...p]);
+        } else {
+            setSplitBills(p => [{ ...bill, split_bill_members: [] }, ...p]);
+        }
+        showToast(`🧾 "${bill.title}" berhasil ditambahkan!`);
+    };
+
+    const deleteSplitBill = async (id) => {
+        await supabase.from("split_bill_members").delete().eq("bill_id", id);
+        const { error } = await supabase.from("split_bills").delete().eq("id", id);
+        if (error) { showToast("Gagal menghapus tagihan", "error"); return; }
+        setSplitBills(p => p.filter(b => b.id !== id));
+        showToast("Tagihan dihapus");
+    };
+
+    const toggleMemberPaid = async (memberId, paid) => {
+        const { data, error } = await supabase
+            .from("split_bill_members").update({ paid }).eq("id", memberId).select().single();
+        if (error) { showToast("Gagal update status", "error"); return; }
+        setSplitBills(p => p.map(bill => ({
+            ...bill,
+            split_bill_members: (bill.split_bill_members || []).map(m => m.id === memberId ? data : m),
+        })));
     };
 
     // ── COMPUTED VALUES ──────────────────────────────────────
@@ -747,10 +866,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
                     {activeMenu === "goals" && <GoalsView goals={goals} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} />}
-                    {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} />}
+                    {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={payDebt} accounts={accounts} />}
                     {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} />}
+                    {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
                     {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} />}
+                    {activeMenu === "splitbill" && <SplitBillView splitBills={splitBills} onAdd={addSplitBill} onDelete={deleteSplitBill} onTogglePaid={toggleMemberPaid} />}
+                    {activeMenu === "prediksi" && <PrediksiView transactions={transactions} budgets={budgets} accounts={accounts} />}
                 </div>
             </main>
         </div>
