@@ -7,12 +7,15 @@ const COLOR_OPTIONS = ["#ff716c","#f97316","#f59e0b","var(--color-primary)","var
 
 const emptyForm = () => ({ name: "", icon: "🏦", color: "#ff716c", total: "", remaining: "", monthly: "", due_date: "" });
 
-const HutangView = ({ debts, onAdd, onEdit, onDelete }) => {
+const HutangView = ({ debts, onAdd, onEdit, onDelete, onPayDebt, accounts = [] }) => {
     const { t } = useLanguage();
     const [showModal, setShowModal] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm());
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [payTarget, setPayTarget] = useState(null);
+    const [payAmount, setPayAmount] = useState("");
+    const [payAccount, setPayAccount] = useState("");
 
     const openAdd = () => {
         setEditTarget(null);
@@ -50,10 +53,10 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete }) => {
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("debt.title")}</h3>
-                    <p style={{ fontSize: 12, color: "var(--color-subtle)", margin: "4px 0 0" }}>
+                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("debt.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
                         {debts.length} {t("debt.active")} · {t("debt.totalSisa")} {fmtRp(totalSisa)}
                     </p>
                 </div>
@@ -134,6 +137,12 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete }) => {
                             </div>
                             {/* Actions */}
                             <div style={{ display: "flex", gap: 8 }}>
+                                {!lunas && (
+                                    <button
+                                        onClick={() => { setPayTarget(d); setPayAmount(d.monthly > 0 ? String(d.monthly) : ""); setPayAccount(accounts[0]?.name || ""); }}
+                                        style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                                    >💳 Bayar</button>
+                                )}
                                 <button onClick={() => openEdit(d)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.08)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✏️ {t("common.edit")}</button>
                                 <button onClick={() => setConfirmDelete(d)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
                             </div>
@@ -199,9 +208,52 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete }) => {
                         </div>
 
                         <button onClick={handleSubmit} disabled={!canSubmit}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "var(--color-expense)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "var(--color-expense)", color: !canSubmit ? "var(--color-muted)" : "#fff", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .4 : 1, fontFamily: "inherit" }}>
                             {editTarget ? t("common.saveChanges") : t("debt.submitAdd")}
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Bayar Cicilan Modal */}
+            {payTarget && (
+                <div onClick={() => setPayTarget(null)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 400 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                            <div>
+                                <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: 0 }}>💳 Bayar Cicilan</h3>
+                                <p style={{ color: "var(--color-muted)", fontSize: 12, margin: "4px 0 0" }}>{payTarget.name}</p>
+                            </div>
+                            <button onClick={() => setPayTarget(null)} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                        </div>
+                        <div style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)" }}>
+                            Sisa hutang: <strong style={{ color: "#fbbf24" }}>{fmtRp(payTarget.remaining)}</strong>
+                        </div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>JUMLAH BAYAR (Rp)</label>
+                        <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder={String(payTarget.monthly || payTarget.remaining)}
+                            style={{ width: "100%", padding: "10px 14px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 14, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box", fontWeight: 700 }} />
+                        {accounts.length > 0 && (
+                            <>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>DARI AKUN</label>
+                            <select value={payAccount} onChange={e => setPayAccount(e.target.value)}
+                                style={{ width: "100%", padding: "10px 14px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 20, boxSizing: "border-box" }}>
+                                {accounts.map(a => <option key={a.id} value={a.name}>{a.icon} {a.name} — {fmtRp(a.balance)}</option>)}
+                            </select>
+                            </>
+                        )}
+                        <div style={{ display: "flex", gap: 10 }}>
+                            <button onClick={() => setPayTarget(null)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Batal</button>
+                            <button
+                                disabled={!payAmount || parseInt(payAmount) <= 0}
+                                onClick={() => {
+                                    if (!payAmount || parseInt(payAmount) <= 0) return;
+                                    onPayDebt && onPayDebt(payTarget, parseInt(payAmount), payAccount);
+                                    setPayTarget(null);
+                                    setPayAmount("");
+                                }}
+                                style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: !payAmount ? "var(--color-border-soft)" : "linear-gradient(135deg,#f59e0b,#d97706)", color: !payAmount ? "var(--color-muted)" : "#fff", fontSize: 13, fontWeight: 700, cursor: !payAmount ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+                            >✅ Bayar Sekarang</button>
+                        </div>
                     </div>
                 </div>
             )}

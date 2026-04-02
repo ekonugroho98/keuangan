@@ -41,6 +41,13 @@ const MONTHS_LOCALIZED = {
     ],
 };
 
+/* 10 warna berbeda untuk kategori */
+const CAT_COLORS = [
+    "#60fcc6", "#4FC3F7", "#f59e0b", "#ff716c",
+    "#ec4899", "#a855f7", "#14b8a6", "#f97316",
+    "#6366f1", "#22c55e",
+];
+
 const selectStyle = {
     padding: "7px 12px", borderRadius: 9,
     background: "var(--color-border-soft)",
@@ -49,13 +56,151 @@ const selectStyle = {
     outline: "none", cursor: "pointer",
 };
 
+/* Toggle button group */
+const ChartToggle = ({ value, options, onChange }) => (
+    <div style={{ display: "flex", gap: 2, background: "var(--color-border-soft)", borderRadius: 8, padding: 2 }}>
+        {options.map(opt => (
+            <button key={opt.v} onClick={() => onChange(opt.v)}
+                style={{
+                    padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                    fontFamily: "inherit", fontSize: 11, fontWeight: 600, transition: "all .15s",
+                    background: value === opt.v ? "var(--bg-surface)" : "transparent",
+                    color: value === opt.v ? "var(--color-text)" : "var(--color-subtle)",
+                    boxShadow: value === opt.v ? "0 1px 3px rgba(0,0,0,.15)" : "none",
+                }}>
+                {opt.icon} {opt.l}
+            </button>
+        ))}
+    </div>
+);
+
+/* ── SVG Donut Chart ── */
+const DonutChart = ({ segments, total }) => {
+    const cx = 90, cy = 90, R = 78, innerR = 50;
+    let startAngle = -Math.PI / 2;
+
+    const arcs = segments.map(([cat, amt], i) => {
+        const pct   = total > 0 ? amt / total : 0;
+        const angle = pct * 2 * Math.PI;
+        const end   = startAngle + angle;
+
+        const x1 = cx + R * Math.cos(startAngle), y1 = cy + R * Math.sin(startAngle);
+        const x2 = cx + R * Math.cos(end),         y2 = cy + R * Math.sin(end);
+        const ix1 = cx + innerR * Math.cos(startAngle), iy1 = cy + innerR * Math.sin(startAngle);
+        const ix2 = cx + innerR * Math.cos(end),         iy2 = cy + innerR * Math.sin(end);
+        const large = angle > Math.PI ? 1 : 0;
+
+        const d = `M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${ix2} ${iy2} A${innerR} ${innerR} 0 ${large} 0 ${ix1} ${iy1}Z`;
+        startAngle = end;
+        return { d, color: CAT_COLORS[i % CAT_COLORS.length], cat, amt, pct };
+    });
+
+    return (
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <svg width={180} height={180} viewBox="0 0 180 180" style={{ flexShrink: 0 }}>
+                {arcs.map((a, i) => (
+                    <path key={i} d={a.d} fill={a.color} stroke="var(--bg-surface)" strokeWidth={2.5}>
+                        <title>{a.cat}: {fmtRp(a.amt)} ({Math.round(a.pct * 100)}%)</title>
+                    </path>
+                ))}
+                <text x={90} y={85} textAnchor="middle" fill="var(--color-muted)" fontSize={10}>Total</text>
+                <text x={90} y={104} textAnchor="middle" fill="var(--color-text)" fontSize={13} fontWeight={800}>
+                    {fmtRp(total).replace("Rp ", "")}
+                </text>
+            </svg>
+            {/* Legend */}
+            <div style={{ flex: 1, minWidth: 120, display: "flex", flexDirection: "column", gap: 7 }}>
+                {arcs.map(a => (
+                    <div key={a.cat} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <div style={{ width: 9, height: 9, borderRadius: 2, background: a.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 11, color: "var(--color-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.cat}</span>
+                        <span style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 600, flexShrink: 0 }}>{Math.round(a.pct * 100)}%</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+/* ── SVG Line Chart ── */
+const LineChart = ({ days, dailyExpense, maxDaily, avgPerDay, daysInMonth, periodLabel }) => {
+    const W = 260, H = 130, padL = 4, padR = 4, padT = 8, padB = 4;
+    const cW = W - padL - padR;
+    const cH = H - padT - padB;
+
+    const pts = days.map(day => ({
+        day,
+        val: dailyExpense[day] || 0,
+        x: padL + ((day - 1) / Math.max(daysInMonth - 1, 1)) * cW,
+        y: padT + cH - (maxDaily > 1 ? ((dailyExpense[day] || 0) / maxDaily) * cH : 0),
+    }));
+
+    const polyline = pts.map(p => `${p.x},${p.y}`).join(" ");
+    const area     = `${padL},${padT + cH} ${polyline} ${padL + cW},${padT + cH}`;
+    const avgY     = maxDaily > 1 ? padT + cH - (avgPerDay / maxDaily) * cH : padT + cH;
+
+    return (
+        <div style={{ width: "100%" }}>
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+                {/* Grid */}
+                {[25, 50, 75].map(p => (
+                    <line key={p} x1={padL} x2={padL + cW}
+                        y1={padT + cH * (1 - p / 100)} y2={padT + cH * (1 - p / 100)}
+                        stroke="var(--color-border-soft)" strokeWidth={0.5} />
+                ))}
+                {/* Baseline */}
+                <line x1={padL} x2={padL + cW} y1={padT + cH} y2={padT + cH} stroke="var(--color-border)" strokeWidth={1} />
+
+                {/* Area fill */}
+                <polygon points={area} fill="rgba(96,252,198,0.08)" />
+
+                {/* Avg line */}
+                {avgPerDay > 0 && maxDaily > 1 && (
+                    <>
+                        <line x1={padL} x2={padL + cW} y1={avgY} y2={avgY}
+                            stroke="#f59e0b" strokeWidth={1} strokeDasharray="4,3" opacity={0.8} />
+                        <text x={padL + cW - 2} y={avgY - 3} textAnchor="end"
+                            fill="#f59e0b" fontSize={7} fontWeight={700}>avg</text>
+                    </>
+                )}
+
+                {/* Line */}
+                <polyline points={polyline} fill="none" stroke="#60fcc6" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+
+                {/* Dots for non-zero days */}
+                {pts.filter(p => p.val > 0).map(p => {
+                    const isHigh = p.val >= maxDaily * 0.7;
+                    const isMed  = p.val >= maxDaily * 0.4;
+                    return (
+                        <circle key={p.day} cx={p.x} cy={p.y} r={2.5}
+                            fill={isHigh ? "#ff716c" : isMed ? "#f59e0b" : "#60fcc6"}
+                            stroke="var(--bg-surface)" strokeWidth={1.5}>
+                            <title>{p.day} {periodLabel}: {fmtRp(p.val)}</title>
+                        </circle>
+                    );
+                })}
+            </svg>
+
+            {/* X labels */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                {[1, Math.round(daysInMonth * 0.25), Math.round(daysInMonth * 0.5), Math.round(daysInMonth * 0.75), daysInMonth].map(d => (
+                    <span key={d} style={{ fontSize: 9, color: "var(--color-subtle)" }}>{d}</span>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+/* ── MAIN COMPONENT ── */
 const LaporanView = ({ transactions = [] }) => {
     const { t, lang } = useLanguage();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_LOCALIZED.id;
 
     const now = new Date();
-    const [filterYear,  setFilterYear]  = useState(String(now.getFullYear()));
-    const [filterMonth, setFilterMonth] = useState(String(now.getMonth() + 1).padStart(2, "0"));
+    const [filterYear,        setFilterYear]        = useState(String(now.getFullYear()));
+    const [filterMonth,       setFilterMonth]       = useState(String(now.getMonth() + 1).padStart(2, "0"));
+    const [dailyChartType,    setDailyChartType]    = useState("bar");   // "bar" | "line"
+    const [breakdownChartType, setBreakdownChartType] = useState("bar"); // "bar" | "donut"
 
     const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
 
@@ -76,13 +221,13 @@ const LaporanView = ({ transactions = [] }) => {
         : 30;
     const avgPerDay = daysInMonth > 0 ? Math.round(expense / daysInMonth) : 0;
 
-    const dailyExpense = {};
+    const dailyExpenseMap = {};
     filtered.filter(tx => tx.type === "expense").forEach(tx => {
         const day = parseInt(tx.date?.slice(8, 10));
-        dailyExpense[day] = (dailyExpense[day] || 0) + tx.amount;
+        if (!isNaN(day)) dailyExpenseMap[day] = (dailyExpenseMap[day] || 0) + tx.amount;
     });
-    const maxDaily = Math.max(...Object.values(dailyExpense), 1);
-    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const maxDaily = Math.max(...Object.values(dailyExpenseMap), 1);
+    const days     = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
     const catTotals = {};
     filtered.filter(tx => tx.type === "expense").forEach(tx => {
@@ -90,16 +235,16 @@ const LaporanView = ({ transactions = [] }) => {
     });
     const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
 
-    const monthLabel = filterMonth ? MONTHS.find(m => m.v === filterMonth)?.l : "";
+    const monthLabel  = filterMonth ? MONTHS.find(m => m.v === filterMonth)?.l : "";
     const periodLabel = monthLabel && filterYear ? `${monthLabel} ${filterYear}` : filterYear || t("rep.allPeriod");
 
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header + Filter */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
                 <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("rep.title")}</h3>
-                    <p style={{ fontSize: 12, color: "var(--color-subtle)", margin: "4px 0 0" }}>{t("rep.period")}: {periodLabel}</p>
+                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("rep.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>{t("rep.period")}: {periodLabel}</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={selectStyle}>
@@ -115,7 +260,7 @@ const LaporanView = ({ transactions = [] }) => {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
 
-                {/* Ringkasan */}
+                {/* ── Ringkasan ── */}
                 <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>{t("rep.summary")} {periodLabel}</h3>
                     {[
@@ -134,61 +279,140 @@ const LaporanView = ({ transactions = [] }) => {
                     ))}
                 </div>
 
-                {/* Bar chart harian */}
+                {/* ── Pengeluaran Harian ── */}
                 <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>{t("rep.dailyExpense")}</h3>
-                    <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 16 }}>{periodLabel} · {t("rep.maxPerDay")} {fmtRp(maxDaily === 1 ? 0 : maxDaily)}{t("rep.perDay")}</p>
+                    {/* Header row */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("rep.dailyExpense")}</h3>
+                        <ChartToggle
+                            value={dailyChartType}
+                            options={[
+                                { v: "bar",  icon: "▐▌", l: "Bar"  },
+                                { v: "line", icon: "〜", l: "Line" },
+                            ]}
+                            onChange={setDailyChartType}
+                        />
+                    </div>
+                    <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 14 }}>
+                        {periodLabel} · {avgPerDay > 0 ? `avg ${fmtRp(avgPerDay)}/hari` : "belum ada data"}
+                        {expense > 0 && <> · maks <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{fmtRp(maxDaily)}</span></>}
+                    </p>
+
                     {expense === 0 ? (
-                        <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 13 }}>
+                        <div style={{ height: 150, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 13 }}>
                             {t("rep.noExpense")}
                         </div>
-                    ) : (
-                        <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: 120, overflowX: "auto" }}>
-                            {days.map(day => {
-                                const val = dailyExpense[day] || 0;
-                                const h = val > 0 ? Math.max(4, Math.round((val / maxDaily) * 100)) : 0;
-                                const isHigh = val > maxDaily * 0.7;
-                                return (
-                                    <div key={day} title={`${day}: ${fmtRp(val)}`}
-                                        style={{ flex: 1, minWidth: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "default" }}>
-                                        <div style={{ width: "100%", height: h || 2, borderRadius: 3, background: val === 0 ? "var(--color-border-soft)" : isHigh ? "linear-gradient(135deg,#ff716c,#ff716c)" : "linear-gradient(135deg,#60fcc6,#60fcc6)", transition: "height .4s" }} />
-                                        {daysInMonth <= 14 && <span style={{ fontSize: 8, color: "var(--color-subtle)" }}>{day}</span>}
+                    ) : dailyChartType === "bar" ? (
+                        <>
+                            <div style={{ position: "relative", height: 150, marginBottom: 6 }}>
+                                {[75, 50, 25].map(p => (
+                                    <div key={p} style={{ position: "absolute", bottom: `${p}%`, left: 0, right: 0, borderTop: "1px dashed var(--color-border-soft)", zIndex: 0 }} />
+                                ))}
+                                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderTop: "1px solid var(--color-border)", zIndex: 0 }} />
+                                {avgPerDay > 0 && maxDaily > 1 && (() => {
+                                    const p = Math.min(95, Math.round((avgPerDay / maxDaily) * 100));
+                                    return (
+                                        <div style={{ position: "absolute", bottom: `${p}%`, left: 0, right: 0, borderTop: "1px dashed #f59e0b", zIndex: 2 }}>
+                                            <span style={{ position: "absolute", right: 2, top: -14, fontSize: 8, color: "#f59e0b", fontWeight: 700, background: "var(--bg-surface)", padding: "1px 3px", borderRadius: 3 }}>avg</span>
+                                        </div>
+                                    );
+                                })()}
+                                <div style={{ position: "absolute", inset: 0, display: "flex", gap: 2, alignItems: "flex-end", zIndex: 1 }}>
+                                    {days.map(day => {
+                                        const val  = dailyExpenseMap[day] || 0;
+                                        const hPct = val > 0 ? Math.max(2, Math.round((val / maxDaily) * 100)) : 0;
+                                        const isHigh = val >= maxDaily * 0.7;
+                                        const isMed  = val >= maxDaily * 0.4;
+                                        const bg = val === 0
+                                            ? "var(--color-border-soft)"
+                                            : isHigh ? "linear-gradient(to top,#e04f4f,#ff716c)"
+                                            : isMed  ? "linear-gradient(to top,#d97706,#f59e0b)"
+                                            : "linear-gradient(to top,#19ce9b,#60fcc6)";
+                                        return (
+                                            <div key={day}
+                                                title={val > 0 ? `${day} ${periodLabel}: ${fmtRp(val)}` : `${day}: tidak ada pengeluaran`}
+                                                style={{ flex: 1, minWidth: 4, height: val === 0 ? 2 : `${hPct}%`, borderRadius: "3px 3px 0 0", background: bg, opacity: val === 0 ? 0.2 : 1, transition: "height .5s ease", cursor: "default", alignSelf: "flex-end" }}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                {[1, Math.round(daysInMonth * 0.25), Math.round(daysInMonth * 0.5), Math.round(daysInMonth * 0.75), daysInMonth].map(d => (
+                                    <span key={d} style={{ fontSize: 9, color: "var(--color-subtle)" }}>{d}</span>
+                                ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                {[
+                                    { bg: "#60fcc6", l: "Normal" },
+                                    { bg: "#f59e0b", l: "> 40% maks" },
+                                    { bg: "#ff716c", l: "> 70% maks" },
+                                ].map(item => (
+                                    <div key={item.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                        <div style={{ width: 8, height: 8, borderRadius: 2, background: item.bg }} />
+                                        <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>{item.l}</span>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    {daysInMonth > 14 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                            <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>1</span>
-                            <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>{Math.round(daysInMonth / 2)}</span>
-                            <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>{daysInMonth}</span>
-                        </div>
+                                ))}
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <div style={{ width: 14, borderTop: "1.5px dashed #f59e0b" }} />
+                                    <span style={{ fontSize: 9, color: "var(--color-subtle)" }}>rata-rata</span>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        /* Line chart */
+                        <LineChart
+                            days={days}
+                            dailyExpense={dailyExpenseMap}
+                            maxDaily={maxDaily}
+                            avgPerDay={avgPerDay}
+                            daysInMonth={daysInMonth}
+                            periodLabel={periodLabel}
+                        />
                     )}
                 </div>
 
-                {/* Breakdown Kategori */}
+                {/* ── Breakdown Kategori ── */}
                 <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>{t("rep.breakdown")}</h3>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("rep.breakdown")}</h3>
+                        <ChartToggle
+                            value={breakdownChartType}
+                            options={[
+                                { v: "bar",   icon: "≡", l: "Bar"   },
+                                { v: "donut", icon: "◎", l: "Donut" },
+                            ]}
+                            onChange={setBreakdownChartType}
+                        />
+                    </div>
                     <p style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 16 }}>{t("rep.breakdownSub")} · {periodLabel}</p>
+
                     {sortedCats.length === 0 ? (
                         <div style={{ color: "var(--color-subtle)", fontSize: 13, textAlign: "center", padding: "20px 0" }}>{t("rep.noExpense")}</div>
-                    ) : sortedCats.map(([cat, amt], i) => {
-                        const pct = expense > 0 ? Math.round((amt / expense) * 100) : 0;
-                        const colors = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899"];
-                        const c = colors[i % colors.length];
-                        return (
-                            <div key={cat} style={{ marginBottom: 14 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                    <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{cat}</span>
-                                    <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 600 }}>{fmtRp(amt)} <span style={{ color: "var(--color-subtle)" }}>({pct}%)</span></span>
+                    ) : breakdownChartType === "donut" ? (
+                        <DonutChart segments={sortedCats.slice(0, 10)} total={expense} />
+                    ) : (
+                        sortedCats.map(([cat, amt], i) => {
+                            const pct = expense > 0 ? Math.round((amt / expense) * 100) : 0;
+                            const c   = CAT_COLORS[i % CAT_COLORS.length];
+                            return (
+                                <div key={cat} style={{ marginBottom: 14 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, alignItems: "center" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                            <div style={{ width: 8, height: 8, borderRadius: 2, background: c, flexShrink: 0 }} />
+                                            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{cat}</span>
+                                        </div>
+                                        <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 600 }}>
+                                            {fmtRp(amt)} <span style={{ color: "var(--color-subtle)", fontWeight: 400 }}>({pct}%)</span>
+                                        </span>
+                                    </div>
+                                    <div style={{ height: 6, borderRadius: 3, background: "var(--color-border-soft)" }}>
+                                        <div style={{ height: "100%", borderRadius: 3, background: c, width: `${pct}%`, transition: "width .8s" }} />
+                                    </div>
                                 </div>
-                                <div style={{ height: 6, borderRadius: 3, background: "var(--color-border-soft)" }}>
-                                    <div style={{ height: "100%", borderRadius: 3, background: c, width: `${pct}%`, transition: "width .8s" }} />
-                                </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </div>
 
             </div>
