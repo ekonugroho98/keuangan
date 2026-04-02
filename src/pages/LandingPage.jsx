@@ -116,8 +116,20 @@ const LandingPage = ({ showToast }) => {
     const closeSignup = () => { setShowSignup(false); setFormErrors({}); setFormStep(1); };
     const closeLogin = () => { setShowLogin(false); setFormErrors({}); };
 
+    /* Landing page selalu dark — theme toggle hanya berlaku untuk dashboard */
+    const darkVars = {
+        "--bg-app": "#0e0e15", "--bg-deep": "#0f0f1a", "--bg-surface": "#1f1f28",
+        "--bg-surface-low": "#13131a", "--bg-surface-hover": "#191921",
+        "--bg-glass": "rgba(31,31,38,.6)", "--bg-alt-row": "rgba(37,37,47,.35)",
+        "--color-text": "#efecf7", "--color-muted": "#acaab4", "--color-subtle": "#76747e",
+        "--color-primary": "#60fcc6", "--color-on-primary": "#005e44",
+        "--color-border": "rgba(255,255,255,.07)", "--color-border-soft": "rgba(255,255,255,.04)",
+        "--color-expense": "#ff716c", "--color-transfer": "#4FC3F7",
+        "--nav-active-bg": "rgba(27,27,34,.5)",
+    };
+
     return (
-        <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", background: "var(--bg-app)", color: "#e2e8f0", minHeight: "100vh", overflowX: "hidden" }}>
+        <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", background: "#0e0e15", color: "#e2e8f0", minHeight: "100vh", overflowX: "hidden", ...darkVars }}>
             <Navbar scrollY={scrollY} onLogin={() => setShowLogin(true)} onSignup={() => setShowSignup(true)} />
             <HeroSection onSignup={() => setShowSignup(true)} onDemo={() => setShowDemo(true)} />
             <FeaturesSection />
