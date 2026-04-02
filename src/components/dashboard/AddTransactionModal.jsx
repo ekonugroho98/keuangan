@@ -3,6 +3,34 @@ import InputField from "../ui/InputField";
 import { expenseCategories, incomeCategories } from "../../constants/categories";
 import { useLanguage } from "../../i18n/LanguageContext";
 
+/* ── DatePicker: 3 selects (day/month/year) — works in all browsers/mobile ── */
+const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const DatePicker = ({ value, onChange }) => {
+    const [y, m, d] = (value || new Date().toISOString().slice(0,10)).split("-");
+    const year = parseInt(y), month = parseInt(m), day = parseInt(d);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const years = Array.from({ length: 5 }, (_, i) => year - 2 + i);
+    const sel = { padding: "9px 8px", borderRadius: 9, border: "1px solid var(--color-border)", background: "var(--bg-surface-low)", color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer", flex: 1 };
+    const set = (newY, newM, newD) => {
+        const maxD = new Date(newY, newM, 0).getDate();
+        const safeD = Math.min(newD, maxD);
+        onChange(`${newY}-${String(newM).padStart(2,"0")}-${String(safeD).padStart(2,"0")}`);
+    };
+    return (
+        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            <select value={day} onChange={e => set(year, month, parseInt(e.target.value))} style={sel}>
+                {Array.from({ length: daysInMonth }, (_, i) => i+1).map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select value={month} onChange={e => set(year, parseInt(e.target.value), day)} style={{ ...sel, flex: 2 }}>
+                {MONTHS_ID.map((mn, i) => <option key={i+1} value={i+1}>{mn}</option>)}
+            </select>
+            <select value={year} onChange={e => set(parseInt(e.target.value), month, day)} style={{ ...sel, flex: 2 }}>
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+        </div>
+    );
+};
+
 const TYPES = [
     { v: "expense",  l: "Pengeluaran", c: "#ff716c" },
     { v: "income",   l: "Pemasukan",   c: "var(--color-primary)" },
@@ -148,8 +176,7 @@ const AddTransactionModal = ({
                     <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
                     {/* Date for transfer */}
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>📅 TANGGAL</label>
-                    <input type="date" value={txForm.date || ""} onChange={e => setTxForm(p => ({ ...p, date: e.target.value }))}
-                        style={{ width: "100%", padding: "10px 14px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16 }} />
+                    <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
                 </>
             ) : (
                 /* ── Mode Normal (expense / income) ── */
@@ -177,8 +204,7 @@ const AddTransactionModal = ({
                     <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
                     {/* Date for normal mode */}
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>📅 TANGGAL</label>
-                    <input type="date" value={txForm.date || ""} onChange={e => setTxForm(p => ({ ...p, date: e.target.value }))}
-                        style={{ width: "100%", padding: "10px 14px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16 }} />
+                    <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
                 </>
             )}
 
