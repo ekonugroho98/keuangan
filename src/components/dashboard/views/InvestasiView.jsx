@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "../../../services/goldPrice";
+import AmountInput from "../../ui/AmountInput";
 
 // ── Gold Price Panel ──────────────────────────────────────────────────────
 function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
@@ -446,9 +447,8 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
                                     {t("inv.modalLabel")}
                                 </label>
-                                <input type="number" value={form.buy_price} onChange={e => setForm(p => ({ ...p, buy_price: e.target.value }))} placeholder="5000000"
-                                    style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-                                <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 4 }}>
+                                <AmountInput value={form.buy_price} onChange={v => setForm(p => ({ ...p, buy_price: v }))} placeholder="5.000.000" />
+                                <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: -10, marginBottom: 4 }}>
                                     {form.type === "emas" && form.buy_price && form.quantity && parseFloat(form.quantity) > 0
                                         ? `= ${fmtRp(Math.round(parseInt(form.buy_price) / parseFloat(form.quantity)))}/gram`
                                         : "Total yg kamu bayarkan"
@@ -459,10 +459,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
                                     {t("inv.currentValueInput")}
                                 </label>
-                                <input type="number" value={form.current_value}
-                                    onChange={e => setForm(p => ({ ...p, current_value: e.target.value }))}
-                                    placeholder={form.buy_price || "Default: sama dengan modal"}
-                                    style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                                <AmountInput value={form.current_value} onChange={v => setForm(p => ({ ...p, current_value: v }))} placeholder={form.buy_price ? String(form.buy_price) : "Default: sama dengan modal"} />
                                 {form.type === "emas" && !form.current_value && (
                                     <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
                                         💡 Kosongkan untuk pakai harga beli sebagai nilai sekarang

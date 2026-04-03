@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
+import AmountInput from "../../ui/AmountInput";
 
 const EMOJI_OPTIONS = ["🏠","🚗","✈️","📱","💻","🎓","💍","🏖️","💰","🏋️","🎮","📚","🌟","🏦","🎁","🚀","🛍️","🍕","☕","🌿","❤️","🔧","🏪","🎵","🐾","⚡","🎬","💊","🌍","🏆"];
 const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899","#14b8a6","#f97316","var(--color-subtle)","#a855f7","#22c55e"];
@@ -145,13 +146,11 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
 
                         {/* Jumlah target */}
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("goals.targetLabel")}</label>
-                        <input type="number" value={form.target} onChange={e => setForm(p => ({ ...p, target: e.target.value }))} placeholder="5000000"
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
+                        <AmountInput value={form.target} onChange={v => setForm(p => ({ ...p, target: v }))} placeholder="5.000.000" inputStyle={{ marginBottom: 16 }} />
 
                         {/* Dana terkumpul */}
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("goals.currentLabel")}</label>
-                        <input type="number" value={form.current} onChange={e => setForm(p => ({ ...p, current: e.target.value }))} placeholder="0"
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
+                        <AmountInput value={form.current} onChange={v => setForm(p => ({ ...p, current: v }))} placeholder="0" inputStyle={{ marginBottom: 16 }} />
 
                         {/* Icon */}
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>ICON</label>

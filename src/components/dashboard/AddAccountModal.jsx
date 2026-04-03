@@ -1,5 +1,6 @@
 import Modal from "../ui/Modal";
 import InputField from "../ui/InputField";
+import AmountInput from "../ui/AmountInput";
 
 const AddAccountModal = ({ open, onClose, accForm, setAccForm, onSubmit }) => (
     <Modal open={open} onClose={onClose}>
@@ -28,7 +29,7 @@ const AddAccountModal = ({ open, onClose, accForm, setAccForm, onSubmit }) => (
                 ))}
             </div>
 
-            <InputField label="SALDO AWAL (Rp)" icon="💰" type="number" placeholder="0" value={accForm.balance} onChange={e => setAccForm(p => ({ ...p, balance: e.target.value }))} />
+            <AmountInput label="SALDO AWAL (Rp)" icon="💰" placeholder="0" value={accForm.balance} onChange={v => setAccForm(p => ({ ...p, balance: v }))} />
 
             <button
                 onClick={onSubmit}
