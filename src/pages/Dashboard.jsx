@@ -959,7 +959,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                         return null;
                     })()}
 
-                    {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
+                    {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} investments={investments} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
                     {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} />}
                     {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} />}
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
