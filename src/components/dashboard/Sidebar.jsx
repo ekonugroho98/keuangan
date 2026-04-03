@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../i18n/ThemeContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
@@ -31,8 +31,21 @@ const Sidebar = ({
     const [avatarColor, setAvatarColor] = useState(
         () => localStorage.getItem("karaya_avatar_color") || "var(--color-primary)"
     );
+    const [appName,    setAppName]    = useState(
+        () => localStorage.getItem("karaya_app_name")    || "Karaya"
+    );
+    const [appTagline, setAppTagline] = useState(
+        () => localStorage.getItem("karaya_app_tagline") || "Wealth Ledger"
+    );
+    const [editAppName,    setEditAppName]    = useState("");
+    const [editAppTagline, setEditAppTagline] = useState("");
 
     const isDark = themeId === "dark";
+
+    /* sync browser tab title with custom app name on mount */
+    useEffect(() => {
+        if (appName !== "Karaya") document.title = `${appName} — Duit Lu, Kendali Lu`;
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ── handlers ── */
     const handleUpdateName = async () => {
@@ -58,6 +71,17 @@ const Sidebar = ({
     const handleAvatarColor = (c) => {
         setAvatarColor(c);
         localStorage.setItem("karaya_avatar_color", c);
+    };
+
+    const handleSaveAppName = () => {
+        const name    = editAppName.trim()    || "Karaya";
+        const tagline = editAppTagline.trim() || "Wealth Ledger";
+        setAppName(name);
+        setAppTagline(tagline);
+        localStorage.setItem("karaya_app_name",    name);
+        localStorage.setItem("karaya_app_tagline", tagline);
+        document.title = `${name} — Duit Lu, Kendali Lu`;
+        setProfileView("menu");
     };
 
     const closeProfile = () => { setShowProfileMenu(false); setProfileView("menu"); };
@@ -267,11 +291,62 @@ const Sidebar = ({
             </div>
         );
 
+        /* ── Nama Aplikasi ── */
+        if (profileView === "appname") return (
+            <div>
+                <button style={backBtn} onClick={() => setProfileView("menu")}>← Kembali</button>
+                <div style={sectionLabel}>NAMA APLIKASI</div>
+                <input
+                    value={editAppName}
+                    onChange={e => setEditAppName(e.target.value)}
+                    style={{ ...inputSt, marginBottom: 10 }}
+                    placeholder={`Nama aplikasi (default: Karaya)`}
+                    maxLength={24}
+                />
+                <div style={sectionLabel}>TAGLINE / SUBTITLE</div>
+                <input
+                    value={editAppTagline}
+                    onChange={e => setEditAppTagline(e.target.value)}
+                    style={{ ...inputSt, marginBottom: 16 }}
+                    placeholder={`Tagline (default: Wealth Ledger)`}
+                    maxLength={32}
+                    onKeyDown={e => e.key === "Enter" && handleSaveAppName()}
+                />
+                {/* Preview */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--bg-surface-low)", borderRadius: 10, marginBottom: 14 }}>
+                    <img src="/favicon.svg" alt="icon" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
+                    <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", lineHeight: 1 }}>
+                            {editAppName.trim() || appName}
+                        </div>
+                        <div style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 2, textTransform: "uppercase", marginTop: 3 }}>
+                            {editAppTagline.trim() || appTagline}
+                        </div>
+                    </div>
+                </div>
+                <button style={primaryBtn(false)} onClick={handleSaveAppName}>
+                    Simpan
+                </button>
+                {(appName !== "Karaya" || appTagline !== "Wealth Ledger") && (
+                    <button onClick={() => {
+                        setAppName("Karaya"); setAppTagline("Wealth Ledger");
+                        localStorage.removeItem("karaya_app_name");
+                        localStorage.removeItem("karaya_app_tagline");
+                        document.title = "Karaya — Duit Lu, Kendali Lu";
+                        setProfileView("menu");
+                    }} style={{ marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                        ↺ Reset ke Default
+                    </button>
+                )}
+            </div>
+        );
+
         /* ── Main Menu ── */
         const menuItems = [
             { icon: "✏️", label: "Ganti Nama",      sub: user.name,        action: () => { setNewName(user.name); setProfileView("name"); } },
             { icon: "🔑", label: "Ganti Password",  sub: "••••••••",       action: () => setProfileView("password") },
             { icon: "🎨", label: "Warna Avatar",    sub: "Personalisasi",  action: () => setProfileView("color") },
+            { icon: "📱", label: "Nama Aplikasi",   sub: appName,          action: () => { setEditAppName(appName); setEditAppTagline(appTagline); setProfileView("appname"); } },
             { icon: "📤", label: "Export Data CSV", sub: "Unduh transaksi",action: () => { onExportCSV(); closeProfile(); } },
             { icon: "☰",  label: "Kelola Menu",     sub: `${hiddenMenus.length} tersembunyi`, action: () => setProfileView("menus") },
         ];
@@ -382,10 +457,10 @@ const Sidebar = ({
         }}>
             {/* Logo */}
             <div style={{ padding: "24px 24px 20px", display: "flex", alignItems: "center", gap: 8 }}>
-                <img src="/favicon.svg" alt="Karaya" style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0 }} />
-                <div>
-                    <h1 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1 }}>Karaya</h1>
-                    <p style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 3, textTransform: "uppercase", margin: "3px 0 0" }}>Wealth Ledger</p>
+                <img src="/favicon.svg" alt={appName} style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                    <h1 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appName}</h1>
+                    <p style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 3, textTransform: "uppercase", margin: "3px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appTagline}</p>
                 </div>
             </div>
 
