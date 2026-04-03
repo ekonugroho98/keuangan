@@ -450,7 +450,6 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                             <div>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
                                     {t("inv.currentValueInput")}
-                                    <span style={{ fontWeight: 400, color: "var(--color-subtle)", marginLeft: 4 }}>(opsional)</span>
                                 </label>
                                 <input type="number" value={form.current_value}
                                     onChange={e => setForm(p => ({ ...p, current_value: e.target.value }))}
