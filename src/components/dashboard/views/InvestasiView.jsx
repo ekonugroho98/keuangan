@@ -2,6 +2,105 @@ import { useState } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 
+// ── Nama kategori emas untuk UI ──
+const GOLD_CAT_LABELS = {
+  emas_batangan:  "Emas Batangan",
+  gift_series:    "Gift Series",
+  batik:          "Batik",
+  idul_fitri:     "Idul Fitri",
+  imlek:          "Imlek",
+  liontin_batik:  "Liontin Batik",
+  perak_murni:    "Perak Murni",
+  perak_heritage: "Perak Heritage",
+};
+
+// ── Panel harga emas Antam ──
+function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
+  const [open,    setOpen]    = useState(true);
+  const [selCat,  setSelCat]  = useState("emas_batangan");
+
+  if (!goldPrices) return null;
+
+  const { items = [], date, scraped_at, brand } = goldPrices;
+  const categories = [...new Set(items.map(i => i.category))].filter(c => items.some(i => i.category === c));
+  const filtered   = items.filter(i => i.category === selCat);
+
+  const lastUpdate = scraped_at
+    ? new Date(scraped_at).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "-";
+
+  return (
+    <div style={{ background: "rgba(245,158,11,.06)", border: "1px solid rgba(245,158,11,.25)", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }} onClick={() => setOpen(p => !p)}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🥇</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>
+              Harga Emas Antam Hari Ini
+              <span style={{ marginLeft: 8, fontSize: 11, color: "var(--color-muted)", fontWeight: 400 }}>
+                {date ? new Date(date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : ""}
+              </span>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--color-muted)" }}>Update: {lastUpdate} · Sumber: logammulia.com</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={e => { e.stopPropagation(); onRefresh(); }}
+            disabled={refreshing}
+            style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(245,158,11,.3)", background: "transparent", color: "#f59e0b", cursor: refreshing ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: refreshing ? 0.6 : 1 }}>
+            {refreshing ? "⏳ Memperbarui..." : "🔄 Perbarui"}
+          </button>
+          <span style={{ color: "var(--color-muted)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+        </div>
+      </div>
+
+      {open && (
+        <div style={{ padding: "0 18px 16px" }}>
+          {/* Category tabs */}
+          {categories.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {categories.map(cat => (
+                <button key={cat} onClick={() => setSelCat(cat)}
+                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
+                    background: selCat === cat ? "#f59e0b" : "rgba(245,158,11,.12)",
+                    color: selCat === cat ? "#fff" : "#f59e0b" }}>
+                  {GOLD_CAT_LABELS[cat] || cat}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Price table */}
+          {filtered.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--color-muted)", textAlign: "center", padding: "16px 0" }}>Tidak ada data untuk kategori ini</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8 }}>
+              {filtered.map((item, i) => (
+                <button key={i} onClick={() => onSelectPrice(item)}
+                  style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "background .15s" }}
+                  onMouseOver={e => e.currentTarget.style.background = "rgba(245,158,11,.18)"}
+                  onMouseOut={e  => e.currentTarget.style.background = "rgba(245,158,11,.08)"}>
+                  <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginBottom: 4 }}>{item.weight}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)" }}>{fmtRp(item.buy_price)}</div>
+                  {item.weight_grams > 0 && (
+                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>{fmtRp(item.price_per_gram)}/gram</div>
+                  )}
+                  {item.sell_price && (
+                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 1 }}>Jual: {fmtRp(item.sell_price)}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 10 }}>💡 Klik harga untuk otomatis isi form · Update setiap hari 08:30 WIB</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TYPE_KEYS = ["reksa_dana","saham","emas","crypto","deposito","properti","obligasi","lainnya"];
 const TYPE_ICONS  = { reksa_dana:"📊", saham:"📈", emas:"🥇", crypto:"₿", deposito:"🏦", properti:"🏠", obligasi:"📜", lainnya:"💼" };
 const TYPE_COLORS = { reksa_dana:"var(--color-primary)", saham:"var(--color-primary)", emas:"#f59e0b", crypto:"#f97316", deposito:"#4FC3F7", properti:"var(--color-primary)", obligasi:"#ec4899", lainnya:"var(--color-subtle)" };
@@ -15,12 +114,28 @@ const emptyForm = () => ({
     buy_date: "", notes: "",
 });
 
-const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
+const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, onRefreshGold, refreshingGold }) => {
     const { t } = useLanguage();
     const [showModal, setShowModal] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm());
     const [confirmDelete, setConfirmDelete] = useState(null);
+
+    // Auto-isi form dari harga emas yang diklik
+    const handleSelectGoldPrice = (item) => {
+        setForm(p => ({
+            ...p,
+            type:          "emas",
+            icon:          "🥇",
+            color:         "#f59e0b",
+            buy_price:     String(item.buy_price),
+            current_value: String(item.buy_price), // nilai sekarang = harga beli (bisa diupdate manual)
+            quantity:      item.weight_grams > 0 ? String(item.weight_grams) : p.quantity,
+            unit:          item.weight_grams > 0 ? "gram" : p.unit,
+        }));
+        setEditTarget(null);
+        setShowModal(true);
+    };
 
     const TYPES = TYPE_KEYS.map(v => ({
         v, l: t(`inv.type.${v}`), icon: TYPE_ICONS[v], color: TYPE_COLORS[v],
@@ -85,6 +200,14 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                     {t("inv.addNew")}
                 </button>
             </div>
+
+            {/* Gold price panel — selalu tampil jika ada data */}
+            <GoldPricePanel
+                goldPrices={goldPrices}
+                onRefresh={onRefreshGold}
+                refreshing={refreshingGold}
+                onSelectPrice={handleSelectGoldPrice}
+            />
 
             {/* Summary cards */}
             {investments.length > 0 && (

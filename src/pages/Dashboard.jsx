@@ -63,9 +63,44 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [aiTyping, setAiTyping] = useState(false);
 
     // ── USER SETTINGS (synced to DB) ────────────────────────
-    const [userSettings, setUserSettings] = useState(null);
+    const [userSettings,   setUserSettings]   = useState(null);
+    const [goldPrices,     setGoldPrices]     = useState(null);
+    const [refreshingGold, setRefreshingGold] = useState(false);
 
-    useEffect(() => { fetchSettings(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { fetchSettings(); fetchGoldPrices(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const fetchGoldPrices = async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data } = await supabase
+            .from("gold_prices")
+            .select("*")
+            .eq("brand", "antam")
+            .eq("date", today)
+            .order("category")
+            .order("weight_grams");
+        if (data?.length) {
+            setGoldPrices({
+                items:      data,
+                date:       today,
+                scraped_at: data[0]?.scraped_at,
+                brand:      "antam",
+            });
+        }
+    };
+
+    const refreshGoldPrices = async () => {
+        if (refreshingGold) return;
+        setRefreshingGold(true);
+        try {
+            const res = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-gold-prices`,
+                { method: "POST", headers: { "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` } }
+            );
+            if (res.ok) { await fetchGoldPrices(); showToast("✅ Harga emas berhasil diperbarui"); }
+            else showToast("Gagal memperbarui harga emas", "error");
+        } catch { showToast("Gagal memperbarui harga emas", "error"); }
+        setRefreshingGold(false);
+    };
 
     const fetchSettings = async () => {
         const { data } = await supabase
@@ -966,7 +1001,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
                     {activeMenu === "goals" && <GoalsView goals={goals} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} />}
                     {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={payDebt} accounts={accounts} />}
-                    {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} />}
+                    {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
                     {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} />}
