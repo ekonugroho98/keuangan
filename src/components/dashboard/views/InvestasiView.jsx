@@ -188,12 +188,15 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     };
 
     const handleSubmit = () => {
-        if (!form.name.trim() || !form.buy_price || !form.current_value) return;
+        if (!form.name.trim() || !form.buy_price) return;
+        const buyPrice = parseInt(form.buy_price);
+        // Nilai sekarang opsional — default ke harga beli jika tidak diisi
+        const currentValue = form.current_value ? parseInt(form.current_value) : buyPrice;
         const payload = {
             name: form.name.trim(), type: form.type, icon: form.icon, color: form.color,
             brand: form.type === "emas" ? (form.brand || null) : null,
-            buy_price: parseInt(form.buy_price),
-            current_value: parseInt(form.current_value),
+            buy_price: buyPrice,
+            current_value: currentValue,
             quantity: form.quantity ? parseFloat(form.quantity) : null,
             unit: form.unit || "unit",
             buy_date: form.buy_date || null,
@@ -204,7 +207,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         setShowModal(false);
     };
 
-    const canSubmit = form.name.trim() && form.buy_price && form.current_value;
+    const canSubmit = form.name.trim() && form.buy_price;
 
     const totalModal   = investments.reduce((a, i) => a + i.buy_price, 0);
     const totalNilai   = investments.reduce((a, i) => a + i.current_value, 0);
@@ -407,9 +410,24 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                     style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.currentValueInput")}</label>
-                                <input type="number" value={form.current_value} onChange={e => setForm(p => ({ ...p, current_value: e.target.value }))} placeholder="5500000"
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
+                                    {t("inv.currentValueInput")}
+                                    <span style={{ fontWeight: 400, color: "var(--color-subtle)", marginLeft: 4 }}>(opsional)</span>
+                                </label>
+                                <input type="number" value={form.current_value}
+                                    onChange={e => setForm(p => ({ ...p, current_value: e.target.value }))}
+                                    placeholder={form.buy_price || "Default: sama dengan modal"}
                                     style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                                {form.type === "emas" && !form.current_value && (
+                                    <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
+                                        💡 Kosongkan untuk pakai harga beli sebagai nilai sekarang
+                                    </div>
+                                )}
+                                {form.type !== "emas" && !form.current_value && (
+                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 4 }}>
+                                        Jika kosong, nilai sekarang = modal
+                                    </div>
+                                )}
                             </div>
                         </div>
 
