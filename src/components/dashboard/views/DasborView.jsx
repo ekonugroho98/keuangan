@@ -10,7 +10,7 @@ const card = {
     overflow: "hidden",
 };
 
-const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, totalExpense, netBalance, savingRate, expenseRate, sortedCats, setActiveMenu, setShowAddAccount, setShowAddTx, customCategories = [] }) => {
+const DasborView = ({ accounts, transactions, goals, investments = [], totalBalance, totalIncome, totalExpense, netBalance, savingRate, expenseRate, sortedCats, setActiveMenu, setShowAddAccount, setShowAddTx, customCategories = [] }) => {
     const { t } = useLanguage();
 
     const now = new Date();
@@ -37,6 +37,15 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
     const thisNetBalance = thisIncome - thisExpense;
     const thisSavingRate = thisIncome > 0 ? Math.round((1 - thisExpense / thisIncome) * 100) : 0;
     const totalCats = 15 + (customCategories?.length || 0);
+
+    // Tabungan Aktual = modal investasi yang ditambahkan bulan ini
+    const actualSavingAmt = investments
+        .filter(inv => {
+            const d = new Date(inv.created_at);
+            return d.getMonth() === m && d.getFullYear() === y;
+        })
+        .reduce((sum, inv) => sum + (inv.buy_price || 0), 0);
+    const actualSavingRate = thisIncome > 0 ? Math.round((actualSavingAmt / thisIncome) * 100) : 0;
 
     const acctBorderColor = (a) => {
         if (a.type === "bank")    return "var(--color-primary)";
@@ -102,9 +111,17 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                 </div>
                 <div>
                     <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>{t("dash.savingRate")}</p>
-                    <div style={{ background: "rgba(0,200,150,.1)", color: "var(--color-primary)", padding: "3px 10px", borderRadius: 99, fontSize: 10, fontWeight: 700, display: "inline-block" }}>
+                    <div style={{ background: "rgba(0,200,150,.1)", color: "var(--color-primary)", padding: "3px 10px", borderRadius: 99, fontSize: 10, fontWeight: 700, display: "inline-block", marginBottom: 6 }}>
                         {thisSavingRate > 20 ? `${t("dash.goodRate")} 👍` : t("dash.needImprove")}
                     </div>
+                    {actualSavingAmt > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4FC3F7", flexShrink: 0 }} />
+                            <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>
+                                {t("dash.actualSaving")}: <strong style={{ color: "#4FC3F7" }}>{actualSavingRate}%</strong>
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -196,6 +213,8 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={card}>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 14 }}>{t("dash.financialHealth")}</h3>
+
+                    {/* Sisa Pendapatan */}
                     {[
                         { label: t("dash.savingRate"),   val: savingRate,  color: savingRate > 20  ? "var(--color-primary)" : "#f59e0b", note: savingRate > 20  ? t("dash.goodRate")   : t("dash.needImprove") },
                         { label: t("dash.expenseRatio"), val: expenseRate, color: expenseRate < 70 ? "var(--color-primary)" : "#ff716c", note: expenseRate < 70 ? t("dash.veryGood")  : t("dash.tooHigh") },
@@ -211,6 +230,27 @@ const DasborView = ({ accounts, transactions, goals, totalBalance, totalIncome, 
                             <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 3 }}>{h.note}</div>
                         </div>
                     ))}
+
+                    {/* Tabungan Aktual */}
+                    <div style={{ borderTop: "1px solid var(--color-border-soft)", paddingTop: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                            <div>
+                                <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>{t("dash.actualSaving")}</span>
+                                <span style={{ fontSize: 10, color: "var(--color-muted)", marginLeft: 6 }}>💡 {t("dash.fromInvestment")}</span>
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: actualSavingRate > 0 ? "#4FC3F7" : "var(--color-subtle)" }}>
+                                {actualSavingRate}%
+                            </span>
+                        </div>
+                        <div style={{ height: 5, borderRadius: 99, background: "var(--bg-surface-low)" }}>
+                            <div style={{ height: "100%", borderRadius: 99, background: "#4FC3F7", width: `${Math.min(actualSavingRate, 100)}%`, transition: "width 1s" }} />
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 3 }}>
+                            {actualSavingAmt > 0
+                                ? `${fmtRp(actualSavingAmt)} ${t("dash.fromInvestment")}`
+                                : "Belum ada investasi yang ditambahkan bulan ini"}
+                        </div>
+                    </div>
                 </div>
 
                 <div style={card}>
