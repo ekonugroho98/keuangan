@@ -443,9 +443,19 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.modalLabel")}</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
+                                    {t("inv.modalLabel")}
+                                    <span style={{ fontSize: 10, fontWeight: 400, color: "var(--color-subtle)", marginLeft: 4 }}>
+                                        {form.type === "emas" ? "(total keseluruhan)" : "(total modal)"}
+                                    </span>
+                                </label>
                                 <input type="number" value={form.buy_price} onChange={e => setForm(p => ({ ...p, buy_price: e.target.value }))} placeholder="5000000"
                                     style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                                {form.type === "emas" && form.buy_price && form.quantity && parseFloat(form.quantity) > 0 && (
+                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 4 }}>
+                                        = {fmtRp(Math.round(parseInt(form.buy_price) / parseFloat(form.quantity)))}/gram
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
