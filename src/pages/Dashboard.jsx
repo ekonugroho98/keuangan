@@ -33,7 +33,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const { t, lang } = useLanguage();
     const isMobile = useIsMobile();
     const user = session.user;
-    const userName = user.user_metadata?.full_name || user.email.split("@")[0];
+    const [userName, setUserName] = useState(user.user_metadata?.full_name || user.email.split("@")[0]);
 
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
     const [activeMenu, setActiveMenu] = useState("dasbor");
@@ -61,6 +61,54 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [aiChat, setAiChat] = useState([{ role: "ai", text: `Halo ${userName.split(" ")[0]}! 👋 Gue Karaya AI. Mau analisis keuangan atau tanya apa?` }]);
     const [aiInput, setAiInput] = useState("");
     const [aiTyping, setAiTyping] = useState(false);
+
+    // ── PROFILE HANDLERS ────────────────────────────────────
+    const updateName = async (newName) => {
+        const { error } = await supabase.auth.updateUser({ data: { full_name: newName } });
+        if (!error) { setUserName(newName); showToast("✅ Nama berhasil diperbarui"); }
+        else showToast("Gagal memperbarui nama", "error");
+    };
+
+    const updatePassword = async (newPass) => {
+        const { error } = await supabase.auth.updateUser({ password: newPass });
+        if (!error) showToast("✅ Password berhasil diperbarui");
+        else showToast(error.message || "Gagal memperbarui password", "error");
+    };
+
+    const exportCSV = () => {
+        const headers = ["Tanggal","Tipe","Kategori","Jumlah","Akun","Catatan"];
+        const rows = transactions.map(tx => [
+            tx.date, tx.type, tx.category, tx.amount,
+            tx.account_name || "", (tx.note || "").replace(/"/g, '""'),
+        ]);
+        const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href = url;
+        a.download = `karaya-export-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(`✅ ${transactions.length} transaksi berhasil diekspor`);
+    };
+
+    const deleteAccount = async () => {
+        showToast("Menghapus akun...", "info");
+        // Hapus semua data user dari tabel-tabel
+        await Promise.allSettled([
+            supabase.from("transactions").delete().eq("user_id", user.id),
+            supabase.from("accounts").delete().eq("user_id", user.id),
+            supabase.from("goals").delete().eq("user_id", user.id),
+            supabase.from("debts").delete().eq("user_id", user.id),
+            supabase.from("budgets").delete().eq("user_id", user.id),
+            supabase.from("investments").delete().eq("user_id", user.id),
+            supabase.from("categories").delete().eq("user_id", user.id),
+            supabase.from("recurring_transactions").delete().eq("user_id", user.id),
+            supabase.from("subscriptions").delete().eq("user_id", user.id),
+        ]);
+        await supabase.auth.signOut();
+        onLogout();
+    };
 
     // ── FETCH DATA ──────────────────────────────────────────
     useEffect(() => {
@@ -690,7 +738,19 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
             <PricingModal open={showPricing} onClose={() => setShowPricing(false)} currentPlan={subscription?.plan} />
 
-            <Sidebar open={sidebarOpen} activeMenu={activeMenu} setActiveMenu={(m) => { setActiveMenu(m); if (isMobile) setSidebarOpen(false); }} user={{ name: userName, plan: subscription?.plan, expiresAt: subscription?.expires_at }} onAddTx={() => setShowAddTx(true)} />
+            <Sidebar
+                open={sidebarOpen}
+                activeMenu={activeMenu}
+                setActiveMenu={(m) => { setActiveMenu(m); if (isMobile) setSidebarOpen(false); }}
+                user={{ name: userName, plan: subscription?.plan, expiresAt: subscription?.expires_at }}
+                onAddTx={() => setShowAddTx(true)}
+                onToggleSidebar={() => setSidebarOpen(p => !p)}
+                onLogout={onLogout}
+                onUpdateName={updateName}
+                onUpdatePassword={updatePassword}
+                onExportCSV={exportCSV}
+                onDeleteAccount={deleteAccount}
+            />
 
             {/* Mobile overlay backdrop */}
             {isMobile && sidebarOpen && (
