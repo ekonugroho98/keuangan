@@ -12,6 +12,7 @@ const Sidebar = ({
     open, activeMenu, setActiveMenu, user, onAddTx,
     onToggleSidebar, onLogout,
     onUpdateName, onUpdatePassword, onExportCSV, onDeleteAccount,
+    userSettings, onSaveSettings,
 }) => {
     const { t, lang, setLang, languages } = useLanguage();
     const { themeId, toggleTheme } = useTheme();
@@ -42,6 +43,15 @@ const Sidebar = ({
 
     const isDark = themeId === "dark";
 
+    /* sync state from DB when userSettings loads (overrides localStorage cache) */
+    useEffect(() => {
+        if (!userSettings) return;
+        if (userSettings.avatar_color) setAvatarColor(userSettings.avatar_color);
+        if (userSettings.hidden_menus) setHiddenMenus(userSettings.hidden_menus);
+        if (userSettings.app_name)    { setAppName(userSettings.app_name);    localStorage.setItem("karaya_app_name", userSettings.app_name); }
+        if (userSettings.app_tagline) { setAppTagline(userSettings.app_tagline); localStorage.setItem("karaya_app_tagline", userSettings.app_tagline); }
+    }, [userSettings]);
+
     /* sync browser tab title with custom app name on mount */
     useEffect(() => {
         if (appName !== "Karaya") document.title = `${appName} — Duit Lu, Kendali Lu`;
@@ -71,6 +81,7 @@ const Sidebar = ({
     const handleAvatarColor = (c) => {
         setAvatarColor(c);
         localStorage.setItem("karaya_avatar_color", c);
+        onSaveSettings?.({ avatar_color: c });
     };
 
     const handleSaveAppName = () => {
@@ -81,6 +92,7 @@ const Sidebar = ({
         localStorage.setItem("karaya_app_name",    name);
         localStorage.setItem("karaya_app_tagline", tagline);
         document.title = `${name} — Duit Lu, Kendali Lu`;
+        onSaveSettings?.({ app_name: name, app_tagline: tagline });
         setProfileView("menu");
     };
 
@@ -90,6 +102,7 @@ const Sidebar = ({
         setHiddenMenus(prev => {
             const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
             localStorage.setItem("karaya_hidden_menus", JSON.stringify(next));
+            onSaveSettings?.({ hidden_menus: next });
             return next;
         });
     };
@@ -263,7 +276,7 @@ const Sidebar = ({
                     })}
                 </div>
                 {hiddenMenus.length > 0 && (
-                    <button onClick={() => { setHiddenMenus([]); localStorage.removeItem("karaya_hidden_menus"); }}
+                    <button onClick={() => { setHiddenMenus([]); localStorage.removeItem("karaya_hidden_menus"); onSaveSettings?.({ hidden_menus: [] }); }}
                         style={{ marginTop: 14, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                         ↺ Reset — Tampilkan Semua
                     </button>
@@ -333,6 +346,7 @@ const Sidebar = ({
                         localStorage.removeItem("karaya_app_name");
                         localStorage.removeItem("karaya_app_tagline");
                         document.title = "Karaya — Duit Lu, Kendali Lu";
+                        onSaveSettings?.({ app_name: "Karaya", app_tagline: "Wealth Ledger" });
                         setProfileView("menu");
                     }} style={{ marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                         ↺ Reset ke Default

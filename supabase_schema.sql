@@ -118,3 +118,21 @@ CREATE POLICY "debts: user can update own" ON debts
 
 CREATE POLICY "debts: user can delete own" ON debts
   FOR DELETE USING (auth.uid() = user_id);
+
+-- =============================================
+-- TABEL USER_SETTINGS (preferensi UI per-user)
+-- =============================================
+CREATE TABLE user_settings (
+  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  avatar_color TEXT    DEFAULT '#60fcc6',
+  hidden_menus JSONB   DEFAULT '[]',
+  app_name     TEXT    DEFAULT 'Karaya',
+  app_tagline  TEXT    DEFAULT 'Wealth Ledger',
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "settings: user own" ON user_settings
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
