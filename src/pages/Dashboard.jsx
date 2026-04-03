@@ -62,6 +62,43 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [aiInput, setAiInput] = useState("");
     const [aiTyping, setAiTyping] = useState(false);
 
+    // ── USER SETTINGS (synced to DB) ────────────────────────
+    const [userSettings, setUserSettings] = useState(null);
+
+    useEffect(() => { fetchSettings(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const fetchSettings = async () => {
+        const { data } = await supabase
+            .from("user_settings")
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle();
+        if (data) {
+            setUserSettings(data);
+            // sync ke localStorage sebagai cache cepat
+            if (data.avatar_color) localStorage.setItem("karaya_avatar_color", data.avatar_color);
+            if (data.hidden_menus) localStorage.setItem("karaya_hidden_menus", JSON.stringify(data.hidden_menus));
+            if (data.app_name)    localStorage.setItem("karaya_app_name",    data.app_name);
+            if (data.app_tagline) localStorage.setItem("karaya_app_tagline", data.app_tagline);
+        }
+    };
+
+    const saveSettings = async (patch) => {
+        // optimistic update state
+        setUserSettings(prev => ({ ...(prev || {}), ...patch }));
+        // sync localStorage cache
+        Object.entries(patch).forEach(([k, v]) => {
+            const key = { avatar_color: "karaya_avatar_color", hidden_menus: "karaya_hidden_menus", app_name: "karaya_app_name", app_tagline: "karaya_app_tagline" }[k];
+            if (key) localStorage.setItem(key, typeof v === "object" ? JSON.stringify(v) : v);
+        });
+        // upsert ke database
+        await supabase.from("user_settings").upsert({
+            user_id: user.id,
+            ...(patch),
+            updated_at: new Date().toISOString(),
+        });
+    };
+
     // ── PROFILE HANDLERS ────────────────────────────────────
     const updateName = async (newName) => {
         const { error } = await supabase.auth.updateUser({ data: { full_name: newName } });
@@ -750,6 +787,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 onUpdatePassword={updatePassword}
                 onExportCSV={exportCSV}
                 onDeleteAccount={deleteAccount}
+                userSettings={userSettings}
+                onSaveSettings={saveSettings}
             />
 
             {/* Mobile overlay backdrop */}
