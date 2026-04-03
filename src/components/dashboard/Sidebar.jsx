@@ -382,7 +382,7 @@ const Sidebar = ({
         }}>
             {/* Logo */}
             <div style={{ padding: "24px 24px 20px", display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 18, color: "var(--color-on-primary)" }}>K</div>
+                <img src="/favicon.svg" alt="Karaya" style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0 }} />
                 <div>
                     <h1 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1 }}>Karaya</h1>
                     <p style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 3, textTransform: "uppercase", margin: "3px 0 0" }}>Wealth Ledger</p>
