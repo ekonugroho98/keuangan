@@ -1,6 +1,97 @@
 import { useState } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
+import { CATEGORY_LABELS, CATEGORY_ORDER } from "../../../services/goldPrice";
+
+// ── Gold Price Panel ──────────────────────────────────────────────────────
+function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
+    const [open,   setOpen]   = useState(true);
+    const [selCat, setSelCat] = useState("emas_batangan");
+
+    if (!goldPrices) return null;
+
+    const { categories = {}, tanggal, scraped_at } = goldPrices;
+    const availCats  = CATEGORY_ORDER.filter(c => categories[c]?.length > 0);
+    const activeCat  = availCats.includes(selCat) ? selCat : availCats[0];
+    const items      = categories[activeCat] || [];
+
+    const lastUpdate = scraped_at
+        ? new Date(scraped_at).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "-";
+
+    return (
+        <div style={{ background: "rgba(245,158,11,.06)", border: "1px solid rgba(245,158,11,.25)", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }}
+                onClick={() => setOpen(p => !p)}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 20 }}>🥇</span>
+                    <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>
+                            Harga Emas Antam Hari Ini
+                            {tanggal && (
+                                <span style={{ marginLeft: 8, fontSize: 11, color: "var(--color-muted)", fontWeight: 400 }}>
+                                    · {tanggal.replace("Harga Emas Hari Ini, ", "")}
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
+                            Diperbarui: {lastUpdate} · Sumber: logammulia.com
+                        </div>
+                    </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button onClick={e => { e.stopPropagation(); onRefresh(); }} disabled={refreshing}
+                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(245,158,11,.35)", background: "transparent", color: "#f59e0b", cursor: refreshing ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: refreshing ? 0.6 : 1 }}>
+                        {refreshing ? "⏳ Memuat..." : "🔄 Perbarui"}
+                    </button>
+                    <span style={{ color: "var(--color-muted)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+                </div>
+            </div>
+
+            {open && (
+                <div style={{ padding: "0 18px 16px" }}>
+                    {/* Category tabs */}
+                    {availCats.length > 1 && (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                            {availCats.map(cat => (
+                                <button key={cat} onClick={() => setSelCat(cat)}
+                                    style={{ fontSize: 11, padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, transition: "background .15s",
+                                        background: activeCat === cat ? "#f59e0b" : "rgba(245,158,11,.12)",
+                                        color:      activeCat === cat ? "#fff"    : "#f59e0b" }}>
+                                    {CATEGORY_LABELS[cat] || cat}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Price grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+                        {items.map((item, i) => (
+                            <button key={i} onClick={() => onSelectPrice(item, activeCat)}
+                                style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "background .15s" }}
+                                onMouseOver={e => e.currentTarget.style.background = "rgba(245,158,11,.2)"}
+                                onMouseOut={e  => e.currentTarget.style.background = "rgba(245,158,11,.08)"}>
+                                <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginBottom: 4 }}>{item.weight}</div>
+                                <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)" }}>{fmtRp(item.buy_price)}</div>
+                                {item.weight_grams > 0 && (
+                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>{fmtRp(item.price_per_gram)}/gram</div>
+                                )}
+                                {item.sell_price && (
+                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 1 }}>+Pajak: {fmtRp(item.sell_price)}</div>
+                                )}
+                                <div style={{ fontSize: 9, color: "rgba(245,158,11,.6)", marginTop: 4, fontWeight: 600 }}>Klik untuk isi form →</div>
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 10 }}>
+                        💡 Klik harga untuk otomatis mengisi form · Harga diperbarui setiap hari
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 const TYPE_KEYS = ["reksa_dana","saham","emas","crypto","deposito","properti","obligasi","lainnya"];
 const TYPE_ICONS  = { reksa_dana:"📊", saham:"📈", emas:"🥇", crypto:"₿", deposito:"🏦", properti:"🏠", obligasi:"📜", lainnya:"💼" };
@@ -15,12 +106,29 @@ const emptyForm = () => ({
     buy_date: "", notes: "",
 });
 
-const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
+const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, onRefreshGold, refreshingGold }) => {
     const { t } = useLanguage();
     const [showModal, setShowModal] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm());
     const [confirmDelete, setConfirmDelete] = useState(null);
+
+    // Klik kartu harga → auto-isi form tambah investasi
+    const handleSelectGoldPrice = (item, category) => {
+        const isPerak = category?.includes("perak");
+        setEditTarget(null);
+        setForm(p => ({
+            ...p,
+            type:          isPerak ? "lainnya" : "emas",
+            icon:          isPerak ? "🥈" : "🥇",
+            color:         isPerak ? "#94a3b8" : "#f59e0b",
+            buy_price:     String(item.buy_price),
+            current_value: String(item.buy_price),
+            quantity:      item.weight_grams > 0 ? String(item.weight_grams) : p.quantity,
+            unit:          item.weight_grams > 0 ? "gram" : p.unit,
+        }));
+        setShowModal(true);
+    };
 
     const TYPES = TYPE_KEYS.map(v => ({
         v, l: t(`inv.type.${v}`), icon: TYPE_ICONS[v], color: TYPE_COLORS[v],
@@ -85,6 +193,14 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete }) => {
                     {t("inv.addNew")}
                 </button>
             </div>
+
+            {/* Gold Price Panel */}
+            <GoldPricePanel
+                goldPrices={goldPrices}
+                onRefresh={onRefreshGold}
+                refreshing={refreshingGold}
+                onSelectPrice={handleSelectGoldPrice}
+            />
 
             {/* Summary cards */}
             {investments.length > 0 && (

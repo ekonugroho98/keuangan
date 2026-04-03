@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchGoldPrices } from "../services/goldPrice";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -63,9 +64,36 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [aiTyping, setAiTyping] = useState(false);
 
     // ── USER SETTINGS (synced to DB) ────────────────────────
-    const [userSettings, setUserSettings] = useState(null);
+    const [userSettings,   setUserSettings]   = useState(null);
+    const [goldPrices,     setGoldPrices]     = useState(null);
+    const [refreshingGold, setRefreshingGold] = useState(false);
 
-    useEffect(() => { fetchSettings(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        fetchSettings();
+        loadGoldPrices();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const loadGoldPrices = async () => {
+        try {
+            const data = await fetchGoldPrices("antam");
+            setGoldPrices(data);
+        } catch (err) {
+            console.warn("Gagal load harga emas:", err.message);
+        }
+    };
+
+    const refreshGoldPrices = async () => {
+        if (refreshingGold) return;
+        setRefreshingGold(true);
+        try {
+            const data = await fetchGoldPrices("antam");
+            setGoldPrices(data);
+            showToast("✅ Harga emas berhasil diperbarui");
+        } catch {
+            showToast("Gagal memperbarui harga emas", "error");
+        }
+        setRefreshingGold(false);
+    };
 
     const fetchSettings = async () => {
         const { data } = await supabase
@@ -966,7 +994,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
                     {activeMenu === "goals" && <GoalsView goals={goals} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} />}
                     {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={payDebt} accounts={accounts} />}
-                    {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} />}
+                    {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
                     {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} />}
