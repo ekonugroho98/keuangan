@@ -136,3 +136,8 @@ ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "settings: user own" ON user_settings
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- =============================================
+-- AI CONFIG — tambah kolom ai_config ke user_settings
+-- =============================================
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ai_config JSONB DEFAULT '{}';

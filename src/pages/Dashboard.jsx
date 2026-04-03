@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchGoldPrices } from "../services/goldPrice";
+import { sendAiMessage, buildFinanceSystemPrompt } from "../services/aiService";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -67,6 +68,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [userSettings,   setUserSettings]   = useState(null);
     const [goldPrices,     setGoldPrices]     = useState(null);
     const [refreshingGold, setRefreshingGold] = useState(false);
+    const [aiConfig,       setAiConfig]       = useState(null); // { provider, model, apiKey }
 
     useEffect(() => {
         fetchSettings();
@@ -108,6 +110,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             if (data.hidden_menus) localStorage.setItem("karaya_hidden_menus", JSON.stringify(data.hidden_menus));
             if (data.app_name)    localStorage.setItem("karaya_app_name",    data.app_name);
             if (data.app_tagline) localStorage.setItem("karaya_app_tagline", data.app_tagline);
+            if (data.ai_config)   setAiConfig(data.ai_config);
         }
     };
 
@@ -765,21 +768,39 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     };
 
     // ── AI HANDLER ───────────────────────────────────────────
-    const handleAi = () => {
-        if (!aiInput.trim()) return;
-        setAiChat(p => [...p, { role: "user", text: aiInput.trim() }]);
+    const saveAiConfig = async (cfg) => {
+        setAiConfig(cfg);
+        setUserSettings(prev => ({ ...(prev || {}), ai_config: cfg }));
+        await supabase.from("user_settings").upsert({
+            user_id: user.id,
+            ai_config: cfg,
+            updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+    };
+
+    const handleAi = async () => {
+        if (!aiInput.trim() || aiTyping) return;
+        if (!aiConfig?.apiKey) {
+            setAiChat(p => [...p, { role: "error", text: "⚙️ API key belum diatur. Buka Settings → AI Coach untuk mengatur." }]);
+            return;
+        }
+        const userMsg = aiInput.trim();
+        const updatedChat = [...aiChat, { role: "user", text: userMsg }];
+        setAiChat(updatedChat);
         setAiInput("");
         setAiTyping(true);
-        setTimeout(() => {
-            const responses = [
-                `Pengeluaran terbesar bulan ini: Kos/Sewa (Rp ${(catTotals["Kos/Sewa"] || 0).toLocaleString()}) dan Makanan (Rp ${(catTotals["Makanan"] || 0).toLocaleString()}). Saving rate ${savingRate}% — ${savingRate > 20 ? "bagus!" : "coba naikin ke 20%."}`,
-                `Berdasarkan pattern, bisa hemat ~Rp 200rb/bulan dari Makanan dengan meal prep.`,
-                `Total hutang Rp ${debts.reduce((a, d) => a + d.remaining, 0).toLocaleString()}. Prioritaskan yang bunga tertinggi dulu.`,
-                `Kalau konsisten nabung Rp ${Math.round(netBalance * 0.2).toLocaleString()}/bulan, emergency fund bisa tercapai lebih cepat.`,
-            ];
-            setAiChat(p => [...p, { role: "ai", text: responses[Math.floor(Math.random() * responses.length)] }]);
+        try {
+            const systemPrompt = buildFinanceSystemPrompt({
+                userName: userName.split(" ")[0],
+                accounts, transactions, goals, debts, investments,
+            });
+            const reply = await sendAiMessage({ aiConfig, messages: updatedChat, systemPrompt });
+            setAiChat(p => [...p, { role: "ai", text: reply }]);
+        } catch (err) {
+            setAiChat(p => [...p, { role: "error", text: `❌ ${err.message}` }]);
+        } finally {
             setAiTyping(false);
-        }, 1500);
+        }
     };
 
     const activeLabel = t(NAV_LABELS[activeMenu] || "nav.dashboard");
@@ -817,6 +838,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 onDeleteAccount={deleteAccount}
                 userSettings={userSettings}
                 onSaveSettings={saveSettings}
+                aiConfig={aiConfig}
+                onSaveAiConfig={saveAiConfig}
             />
 
             {/* Mobile overlay backdrop */}
@@ -997,7 +1020,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
-                    {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} />}
+                    {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} aiConfig={aiConfig} onOpenAiSettings={() => { /* trigger sidebar profile AI panel */ }} />}
                     {activeMenu === "splitbill" && <SplitBillView splitBills={splitBills} onAdd={addSplitBill} onDelete={deleteSplitBill} onTogglePaid={toggleMemberPaid} />}
                     {activeMenu === "prediksi" && <PrediksiView transactions={transactions} budgets={budgets} accounts={accounts} />}
                 </div>
