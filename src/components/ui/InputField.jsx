@@ -1,4 +1,4 @@
-const InputField = ({ label, type = "text", value, onChange, error, placeholder, icon }) => (
+const InputField = ({ label, type = "text", value, onChange, error, placeholder, icon, ...rest }) => (
     <div style={{ marginBottom: 16 }}>
         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block", letterSpacing: 0.5 }}>{label}</label>
         <div style={{ position: "relative" }}>
@@ -8,6 +8,7 @@ const InputField = ({ label, type = "text", value, onChange, error, placeholder,
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
+                {...rest}
                 style={{
                     width: "100%", padding: "12px 16px 12px 40px", borderRadius: 12,
                     border: `1px solid ${error ? "rgba(255,113,108,0.5)" : "var(--color-border)"}`,
