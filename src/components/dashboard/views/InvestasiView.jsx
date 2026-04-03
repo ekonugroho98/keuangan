@@ -100,8 +100,18 @@ const TYPE_COLORS = { reksa_dana:"var(--color-primary)", saham:"var(--color-prim
 const EMOJI_OPTIONS = ["📊","📈","🥇","₿","🏦","🏠","📜","💼","💎","🚀","⚡","🌿","🎯","💰","🔮","🏆","📱","🖥️","🚗","✈️"];
 const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899","#f97316","#14b8a6","var(--color-subtle)","#a855f7","#22c55e"];
 
+// ── Merek emas yang didukung ──
+const GOLD_BRANDS = [
+    { id: "antam",      label: "Antam",      icon: "🏅", note: "Logam Mulia" },
+    { id: "ubs",        label: "UBS",         icon: "🥇", note: "UBS Gold" },
+    { id: "pegadaian",  label: "Pegadaian",   icon: "🏪", note: "Galeri 24" },
+    { id: "lotus",      label: "Lotus Archi", icon: "🌸", note: "Lotus Gold" },
+    { id: "lainnya",    label: "Lainnya",     icon: "✨", note: "Merek lain" },
+];
+
 const emptyForm = () => ({
     name: "", type: "reksa_dana", icon: "📊", color: "var(--color-primary)",
+    brand: null,
     buy_price: "", current_value: "", quantity: "", unit: "unit",
     buy_date: "", notes: "",
 });
@@ -122,6 +132,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             type:          isPerak ? "lainnya" : "emas",
             icon:          isPerak ? "🥈" : "🥇",
             color:         isPerak ? "#94a3b8" : "#f59e0b",
+            brand:         isPerak ? null : "antam",
             buy_price:     String(item.buy_price),
             current_value: String(item.buy_price),
             quantity:      item.weight_grams > 0 ? String(item.weight_grams) : p.quantity,
@@ -144,6 +155,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         setEditTarget(inv);
         setForm({
             name: inv.name, type: inv.type, icon: inv.icon, color: inv.color,
+            brand: inv.brand || null,
             buy_price: String(inv.buy_price), current_value: String(inv.current_value),
             quantity: inv.quantity ? String(inv.quantity) : "",
             unit: inv.unit || "unit",
@@ -160,6 +172,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         if (!form.name.trim() || !form.buy_price || !form.current_value) return;
         const payload = {
             name: form.name.trim(), type: form.type, icon: form.icon, color: form.color,
+            brand: form.type === "emas" ? (form.brand || null) : null,
             buy_price: parseInt(form.buy_price),
             current_value: parseInt(form.current_value),
             quantity: form.quantity ? parseFloat(form.quantity) : null,
@@ -249,7 +262,17 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                     {inv.icon}
                                 </div>
                                 <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.name}</div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.name}</div>
+                                        {inv.brand && (() => {
+                                            const b = GOLD_BRANDS.find(x => x.id === inv.brand);
+                                            return b ? (
+                                                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: "rgba(245,158,11,.15)", color: "#f59e0b", border: "1px solid rgba(245,158,11,.3)", whiteSpace: "nowrap" }}>
+                                                    {b.icon} {b.label}
+                                                </span>
+                                            ) : null;
+                                        })()}
+                                    </div>
                                     <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
                                         {inv.quantity ? `${inv.quantity} ${inv.unit}` : ""}
                                         {inv.buy_date ? ` · ${t("inv.buy")} ${new Date(inv.buy_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}` : ""}
@@ -326,6 +349,33 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 </button>
                             ))}
                         </div>
+
+                        {/* Brand picker — hanya tampil saat tipe Emas */}
+                        {form.type === "emas" && (
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "#f59e0b", display: "block", marginBottom: 8 }}>🏅 MEREK EMAS</label>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                    {GOLD_BRANDS.map(b => {
+                                        const isActive = form.brand === b.id;
+                                        return (
+                                            <button key={b.id}
+                                                onClick={() => setForm(p => ({ ...p, brand: isActive ? null : b.id }))}
+                                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 9, border: `1px solid ${isActive ? "#f59e0b" : "var(--color-border-soft)"}`, background: isActive ? "rgba(245,158,11,.15)" : "transparent", color: isActive ? "#f59e0b" : "var(--color-muted)", fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
+                                                <span>{b.icon}</span>
+                                                <div style={{ textAlign: "left" }}>
+                                                    <div style={{ lineHeight: 1.2 }}>{b.label}</div>
+                                                    <div style={{ fontSize: 9, opacity: 0.7 }}>{b.note}</div>
+                                                </div>
+                                                {isActive && <span style={{ marginLeft: 2, fontSize: 10 }}>✓</span>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {!form.brand && (
+                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 6 }}>Opsional — pilih merek jika ingin tracking per brand</div>
+                                )}
+                            </div>
+                        )}
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.nameLabel")}</label>
                         <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t("inv.namePlaceholder")} maxLength={50}
