@@ -38,13 +38,25 @@ const DasborView = ({ accounts, transactions, goals, investments = [], totalBala
     const thisSavingRate = thisIncome > 0 ? Math.round((1 - thisExpense / thisIncome) * 100) : 0;
     const totalCats = 15 + (customCategories?.length || 0);
 
-    // Tabungan Aktual = modal investasi yang ditambahkan bulan ini
-    const actualSavingAmt = investments
+    // Tabungan Aktual = investasi bulan ini + transfer masuk ke akun tabungan bulan ini
+    const tabunganAccountNames = new Set(
+        accounts.filter(a => a.type === "tabungan").map(a => a.name)
+    );
+
+    // Investasi baru bulan ini (buy_price saat created_at = bulan ini)
+    const investmentSaving = investments
         .filter(inv => {
             const d = new Date(inv.created_at);
             return d.getMonth() === m && d.getFullYear() === y;
         })
         .reduce((sum, inv) => sum + (inv.buy_price || 0), 0);
+
+    // Transfer/setoran masuk ke akun bertipe "tabungan" bulan ini
+    const tabunganSaving = txThis
+        .filter(tx => tx.type === "income" && tabunganAccountNames.has(tx.account_name))
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const actualSavingAmt  = investmentSaving + tabunganSaving;
     const actualSavingRate = thisIncome > 0 ? Math.round((actualSavingAmt / thisIncome) * 100) : 0;
 
     const acctBorderColor = (a) => {
@@ -246,9 +258,20 @@ const DasborView = ({ accounts, transactions, goals, investments = [], totalBala
                             <div style={{ height: "100%", borderRadius: 99, background: "#4FC3F7", width: `${Math.min(actualSavingRate, 100)}%`, transition: "width 1s" }} />
                         </div>
                         <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 3 }}>
-                            {actualSavingAmt > 0
-                                ? `${fmtRp(actualSavingAmt)} ${t("dash.fromInvestment")}`
-                                : "Belum ada investasi yang ditambahkan bulan ini"}
+                            {actualSavingAmt > 0 ? (
+                                <span>
+                                    {fmtRp(actualSavingAmt)}
+                                    {investmentSaving > 0 && tabunganSaving > 0 && (
+                                        <span> · 📈 {fmtRp(investmentSaving)} investasi + 🪙 {fmtRp(tabunganSaving)} tabungan</span>
+                                    )}
+                                    {investmentSaving > 0 && tabunganSaving === 0 && (
+                                        <span> · dari investasi bulan ini</span>
+                                    )}
+                                    {tabunganSaving > 0 && investmentSaving === 0 && (
+                                        <span> · dari akun tabungan bulan ini</span>
+                                    )}
+                                </span>
+                            ) : "Belum ada tabungan/investasi bulan ini"}
                         </div>
                     </div>
                 </div>

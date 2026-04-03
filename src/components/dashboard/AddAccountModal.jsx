@@ -13,7 +13,7 @@ const AddAccountModal = ({ open, onClose, accForm, setAccForm, onSubmit }) => (
 
             <label style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 6, display: "block" }}>TIPE</label>
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-                {[{ v: "bank", l: "🏦 Bank" }, { v: "ewallet", l: "📱 E-Wallet" }, { v: "cash", l: "💵 Cash" }, { v: "crypto", l: "₿ Crypto" }].map(t => (
+                {[{ v: "bank", l: "🏦 Bank" }, { v: "ewallet", l: "📱 E-Wallet" }, { v: "cash", l: "💵 Cash" }, { v: "tabungan", l: "🪙 Tabungan" }, { v: "crypto", l: "₿ Crypto" }].map(t => (
                     <button
                         key={t.v}
                         onClick={() => setAccForm(p => ({ ...p, type: t.v }))}
