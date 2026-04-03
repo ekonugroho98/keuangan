@@ -278,14 +278,6 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                 </button>
             </div>
 
-            {/* Gold Price Panel */}
-            <GoldPricePanel
-                goldPrices={goldPrices}
-                onRefresh={onRefreshGold}
-                refreshing={refreshingGold}
-                onSelectPrice={handleSelectGoldPrice}
-            />
-
             {/* Summary cards */}
             {investments.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
@@ -458,6 +450,15 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 </div>
                                 {!form.brand && (
                                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 6 }}>Opsional — pilih merek jika ingin tracking per brand</div>
+                                )}
+                                {/* Harga referensi — hanya muncul saat pilih Antam */}
+                                {form.brand === "antam" && goldPrices && (
+                                    <GoldPricePanel
+                                        goldPrices={goldPrices}
+                                        onRefresh={onRefreshGold}
+                                        refreshing={refreshingGold}
+                                        onSelectPrice={handleSelectGoldPrice}
+                                    />
                                 )}
                             </div>
                         )}
