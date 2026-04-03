@@ -128,6 +128,24 @@ const emptyForm = (type = "reksa_dana") => ({
     buy_date: "", notes: "",
 });
 
+// ── Cari harga emas dari API berdasarkan brand + berat (gram) ──
+function lookupGoldPrice(goldPrices, brand, quantityGrams) {
+    if (!goldPrices?.categories || !quantityGrams || quantityGrams <= 0) return null;
+    // Hanya support Antam untuk sekarang
+    if (brand && brand !== "antam") return null;
+    const batangan = goldPrices.categories["emas_batangan"] || [];
+    // Cari exact match berat gram, lalu fallback ke closest
+    const exact = batangan.find(i => Math.abs(i.weight_grams - quantityGrams) < 0.01);
+    if (exact) return exact.buy_price;
+    // Closest match (untuk berat custom)
+    if (batangan.length === 0) return null;
+    const byDiff = [...batangan].sort((a, b) => Math.abs(a.weight_grams - quantityGrams) - Math.abs(b.weight_grams - quantityGrams));
+    const closest = byDiff[0];
+    // Interpolate: harga per gram × quantity
+    if (closest.price_per_gram > 0) return Math.round(closest.price_per_gram * quantityGrams);
+    return null;
+}
+
 const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, onRefreshGold, refreshingGold }) => {
     const { t } = useLanguage();
     const [showModal, setShowModal] = useState(false);
@@ -209,9 +227,15 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
 
     const canSubmit = form.name.trim() && form.buy_price;
 
-    const totalModal   = investments.reduce((a, i) => a + i.buy_price, 0);
-    const totalNilai   = investments.reduce((a, i) => a + i.current_value, 0);
-    const totalGain    = totalNilai - totalModal;
+    const totalModal = investments.reduce((a, i) => a + i.buy_price, 0);
+    // Untuk emas: pakai live price dari API jika ada, fallback ke DB
+    const totalNilai = investments.reduce((a, i) => {
+        const live = i.type === "emas" && i.quantity
+            ? lookupGoldPrice(goldPrices, i.brand, i.quantity)
+            : null;
+        return a + (live ?? i.current_value);
+    }, 0);
+    const totalGain      = totalNilai - totalModal;
     const totalReturnPct = totalModal > 0 ? ((totalGain / totalModal) * 100).toFixed(2) : 0;
 
     return (
@@ -269,7 +293,14 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             {/* Investment cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
                 {investments.map(inv => {
-                    const gain = inv.current_value - inv.buy_price;
+                    // Untuk emas: coba ambil nilai live dari API, fallback ke DB
+                    const livePrice  = inv.type === "emas" && inv.quantity
+                        ? lookupGoldPrice(goldPrices, inv.brand, inv.quantity)
+                        : null;
+                    const currentVal = livePrice ?? inv.current_value;
+                    const isLive     = livePrice !== null;
+
+                    const gain = currentVal - inv.buy_price;
                     const returnPct = inv.buy_price > 0 ? ((gain / inv.buy_price) * 100).toFixed(2) : 0;
                     const isProfit = gain >= 0;
                     const typeInfo = TYPES.find(tp => tp.v === inv.type) || TYPES[7];
@@ -308,8 +339,15 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-muted)" }}>{fmtRp(inv.buy_price)}</div>
                                 </div>
                                 <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 12px" }}>
-                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 3 }}>{t("inv.currentValueLabel").toUpperCase()}</div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{fmtRp(inv.current_value)}</div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 3 }}>
+                                        <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>{t("inv.currentValueLabel").toUpperCase()}</span>
+                                        {isLive && (
+                                            <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 4, padding: "1px 5px" }}>
+                                                ⚡ LIVE
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: isLive ? "var(--color-primary)" : "var(--color-text)" }}>{fmtRp(currentVal)}</div>
                                 </div>
                             </div>
 
@@ -434,7 +472,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 16 }}>
                             <div>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.qtyLabel")}</label>
-                                <input type="number" value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} placeholder="10"
+                                <input type="number" value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} placeholder="10" min="0"
                                     style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                             <div>
