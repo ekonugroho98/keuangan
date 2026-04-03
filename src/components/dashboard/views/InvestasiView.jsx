@@ -206,7 +206,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     };
 
     const handleSubmit = () => {
-        if (!form.name.trim() || !form.buy_price) return;
+        if (!form.name.trim() || !form.buy_price || !form.quantity) return;
         const buyPrice = parseInt(form.buy_price);
         // Nilai sekarang opsional — default ke harga beli jika tidak diisi
         const currentValue = form.current_value ? parseInt(form.current_value) : buyPrice;
@@ -215,7 +215,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             brand: form.type === "emas" ? (form.brand || null) : null,
             buy_price: buyPrice,
             current_value: currentValue,
-            quantity: form.quantity ? parseFloat(form.quantity) : null,
+            quantity: parseFloat(form.quantity),
             unit: form.unit || "unit",
             buy_date: form.buy_date || null,
             notes: form.notes.trim(),
@@ -225,7 +225,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         setShowModal(false);
     };
 
-    const canSubmit = form.name.trim() && form.buy_price;
+    const canSubmit = form.name.trim() && form.buy_price && form.quantity;
 
     const totalModal = investments.reduce((a, i) => a + i.buy_price, 0);
     // Untuk emas: pakai live price dari API jika ada, fallback ke DB
@@ -471,9 +471,11 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
 
                         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 16 }}>
                             <div>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.qtyLabel")}</label>
-                                <input type="number" value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} placeholder="10" min="0"
-                                    style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
+                                    {t("inv.qtyLabel")} <span style={{ color: "#ff716c" }}>*</span>
+                                </label>
+                                <input type="number" value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} placeholder="10" min="0" required
+                                    style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: `1px solid ${!form.quantity ? "rgba(255,113,108,.4)" : "var(--color-border-soft)"}`, borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                             <div>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.unitLabel")}</label>
