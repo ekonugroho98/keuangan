@@ -1,5 +1,5 @@
 // ─── AI Service — Multi-Provider ──────────────────────────────────────────
-// Mendukung: OpenAI, Anthropic, Google Gemini, Groq, Mistral
+// Mendukung: OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, DeepSeek, Kimi
 // Semua via fetch langsung — tidak perlu library tambahan
 
 export const AI_PROVIDERS = {
@@ -74,9 +74,51 @@ export const AI_PROVIDERS = {
     keyPrefix: "",
     keyHint:  "...",
   },
+  xai: {
+    label: "xAI (Grok)",
+    icon: "𝕏",
+    badge: "",
+    models: [
+      { id: "grok-3",            label: "Grok 3",            note: "Terbaik" },
+      { id: "grok-3-fast",       label: "Grok 3 Fast",       note: "Cepat ✨" },
+      { id: "grok-3-mini",       label: "Grok 3 Mini",       note: "Hemat" },
+      { id: "grok-3-mini-fast",  label: "Grok 3 Mini Fast",  note: "Ultra hemat" },
+    ],
+    docsUrl:  "https://console.x.ai/",
+    docsLabel: "console.x.ai",
+    keyPrefix: "xai-",
+    keyHint:  "xai-...",
+  },
+  deepseek: {
+    label: "DeepSeek",
+    icon: "🐋",
+    badge: "MURAH",
+    models: [
+      { id: "deepseek-chat",     label: "DeepSeek V3",       note: "Terbaik ✨" },
+      { id: "deepseek-reasoner", label: "DeepSeek R1",       note: "Reasoning model" },
+    ],
+    docsUrl:  "https://platform.deepseek.com/api_keys",
+    docsLabel: "platform.deepseek.com",
+    keyPrefix: "sk-",
+    keyHint:  "sk-...",
+  },
+  kimi: {
+    label: "Kimi (Moonshot)",
+    icon: "🌙",
+    badge: "",
+    models: [
+      { id: "moonshot-v1-8k",    label: "Moonshot v1 8K",    note: "Hemat" },
+      { id: "moonshot-v1-32k",   label: "Moonshot v1 32K",   note: "Context panjang ✨" },
+      { id: "moonshot-v1-128k",  label: "Moonshot v1 128K",  note: "Sangat panjang" },
+    ],
+    docsUrl:  "https://platform.moonshot.cn/console/api-keys",
+    docsLabel: "platform.moonshot.cn",
+    keyPrefix: "sk-",
+    keyHint:  "sk-...",
+  },
 };
 
-export const PROVIDER_ORDER = ["groq", "openai", "anthropic", "google", "mistral"];
+export const PROVIDER_ORDER = ["groq", "deepseek", "openai", "anthropic", "google", "mistral", "xai", "kimi"];
 
 // ── Default model per provider ──
 export const DEFAULT_MODEL = {
@@ -85,6 +127,9 @@ export const DEFAULT_MODEL = {
   google:    "gemini-1.5-flash",
   groq:      "llama-3.3-70b-versatile",
   mistral:   "mistral-small-latest",
+  xai:       "grok-3-fast",
+  deepseek:  "deepseek-chat",
+  kimi:      "moonshot-v1-32k",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,6 +258,12 @@ export async function sendAiMessage({ aiConfig, messages, systemPrompt }) {
       return callOpenAICompatible({ apiKey, model, messages, systemPrompt, baseUrl: "https://api.groq.com/openai/v1" });
     case "mistral":
       return callOpenAICompatible({ apiKey, model, messages, systemPrompt, baseUrl: "https://api.mistral.ai/v1" });
+    case "xai":
+      return callOpenAICompatible({ apiKey, model, messages, systemPrompt, baseUrl: "https://api.x.ai/v1" });
+    case "deepseek":
+      return callOpenAICompatible({ apiKey, model, messages, systemPrompt, baseUrl: "https://api.deepseek.com/v1" });
+    case "kimi":
+      return callOpenAICompatible({ apiKey, model, messages, systemPrompt, baseUrl: "https://api.moonshot.cn/v1" });
     default:
       throw new Error(`Provider tidak dikenal: ${provider}`);
   }
