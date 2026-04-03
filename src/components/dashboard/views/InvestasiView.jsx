@@ -118,6 +118,54 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
     );
 }
 
+// ── Panduan harga per tipe aset ──────────────────────────────────────────
+const PRICE_GUIDE = {
+    emas: {
+        antam:     null, // handled by GoldPricePanel
+        ubs:       { label: "UBS Gold", icon: "🥇", links: [{ name: "unitedtractors.com", url: "https://www.unitedtractors.com/ubsgold/" }], note: "Cek harga terbaru di situs resmi UBS Gold" },
+        pegadaian: { label: "Pegadaian", icon: "🏪", links: [{ name: "pegadaian.co.id", url: "https://www.pegadaian.co.id/produk/galeri-24" }], note: "Cek harga Galeri 24 di website Pegadaian" },
+        lotus:     { label: "Lotus Archi", icon: "🌸", links: [{ name: "lotusarchi.com", url: "https://lotusarchi.com" }], note: "Cek harga di situs resmi Lotus Archi" },
+        lainnya:   { label: "Emas Lainnya", icon: "✨", links: [], note: "Cek harga di toko / platform tempat kamu beli" },
+    },
+    saham: { label: "Saham", icon: "📈", links: [{ name: "IDX (idx.co.id)", url: "https://idx.co.id" }, { name: "Yahoo Finance", url: "https://finance.yahoo.com" }], note: "Cek harga di aplikasi broker kamu (Ajaib, IPOT, Stockbit)" },
+    reksa_dana: { label: "Reksa Dana", icon: "📊", links: [{ name: "Bibit", url: "https://bibit.id" }, { name: "Bareksa", url: "https://www.bareksa.com" }], note: "NAB diperbarui setiap hari kerja pukul 16.00" },
+    crypto: { label: "Crypto", icon: "₿", links: [{ name: "Indodax", url: "https://indodax.com" }, { name: "CoinGecko", url: "https://www.coingecko.com" }], note: "Harga crypto bergerak 24/7" },
+    deposito: { label: "Deposito", icon: "🏦", links: [], note: "Deposito memiliki bunga tetap, perbarui nilai secara manual saat jatuh tempo" },
+    properti: { label: "Properti", icon: "🏠", links: [{ name: "Rumah123", url: "https://www.rumah123.com" }, { name: "99.co", url: "https://www.99.co/id" }], note: "Nilai properti berubah lambat, perbarui manual setiap tahun" },
+    obligasi: { label: "Obligasi", icon: "📜", links: [{ name: "DJPPR Kemenkeu", url: "https://www.djppr.kemenkeu.go.id" }], note: "Cek harga obligasi di portal DJPPR atau platform sekuritas" },
+    lainnya:  { label: "Aset Lainnya", icon: "💼", links: [], note: "Perbarui nilai aset secara manual melalui tombol Edit" },
+};
+
+function PriceGuide({ type, brand }) {
+    const guide = type === "emas" && brand
+        ? PRICE_GUIDE.emas?.[brand]
+        : PRICE_GUIDE[type];
+
+    if (!guide) return null;
+
+    return (
+        <div style={{ background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.18)", borderRadius: 14, padding: "18px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 20 }}>{guide.icon}</span>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{guide.label}</div>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: guide.links?.length ? 14 : 0, lineHeight: 1.5 }}>
+                💡 {guide.note}
+            </div>
+            {guide.links?.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {guide.links.map((l, i) => (
+                        <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(99,102,241,.3)", background: "rgba(99,102,241,.1)", color: "#818cf8", textDecoration: "none", cursor: "pointer" }}>
+                            🔗 {l.name}
+                        </a>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 const TYPE_KEYS = ["reksa_dana","saham","emas","crypto","deposito","properti","obligasi","lainnya"];
 const TYPE_ICONS  = { reksa_dana:"📊", saham:"📈", emas:"🥇", crypto:"₿", deposito:"🏦", properti:"🏠", obligasi:"📜", lainnya:"💼" };
 const TYPE_COLORS = { reksa_dana:"var(--color-primary)", saham:"var(--color-primary)", emas:"#f59e0b", crypto:"#f97316", deposito:"#4FC3F7", properti:"var(--color-primary)", obligasi:"#ec4899", lainnya:"var(--color-subtle)" };
@@ -612,7 +660,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 );
                             })()}
 
-                            {/* Panel harga Antam jika relevan */}
+                            {/* Panel harga — tergantung tipe & merek */}
                             {priceTarget.type === "emas" && priceTarget.brand === "antam" && goldPrices ? (
                                 <GoldPricePanel
                                     goldPrices={goldPrices}
@@ -621,11 +669,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                     onSelectPrice={(item, cat) => { handleSelectGoldPrice(item, cat); setPriceTarget(null); }}
                                 />
                             ) : (
-                                <div style={{ textAlign: "center", padding: "24px 0", color: "var(--color-subtle)", fontSize: 13 }}>
-                                    <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-                                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Harga live belum tersedia</div>
-                                    <div style={{ fontSize: 11, color: "#48474f" }}>untuk {TYPES.find(tp => tp.v === priceTarget.type)?.l || priceTarget.type}{priceTarget.brand ? ` (${priceTarget.brand})` : ""}</div>
-                                </div>
+                                <PriceGuide type={priceTarget.type} brand={priceTarget.brand} />
                             )}
                         </div>
                     </div>
