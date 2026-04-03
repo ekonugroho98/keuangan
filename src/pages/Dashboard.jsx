@@ -692,7 +692,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     // ── ADD ACCOUNT ──────────────────────────────────────────
     const addAccount = async () => {
         if (!accForm.name || !accForm.balance) return;
-        const icons = { bank: "🏦", ewallet: "📱", cash: "💵", crypto: "₿", investasi: "📈" };
+        const icons = { bank: "🏦", ewallet: "📱", cash: "💵", crypto: "₿", investasi: "📈", tabungan: "🪙" };
         const colors = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
         const newAcc = {
             user_id: user.id,

@@ -8,7 +8,7 @@ CREATE TABLE accounts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
-  type TEXT CHECK (type IN ('bank','ewallet','cash','crypto','investasi')) NOT NULL,
+  type TEXT CHECK (type IN ('bank','ewallet','cash','crypto','investasi','tabungan')) NOT NULL,
   balance BIGINT DEFAULT 0 NOT NULL,
   icon TEXT DEFAULT '💰',
   color TEXT DEFAULT '#6366f1',

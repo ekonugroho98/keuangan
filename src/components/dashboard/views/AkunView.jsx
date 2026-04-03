@@ -4,16 +4,20 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 
 /* ── helpers ── */
 const accentColor = (type) => {
-    if (type === "bank")    return "var(--color-primary)";
-    if (type === "ewallet") return "#a78bfa";
-    if (type === "cash")    return "#f59e0b";
+    if (type === "bank")     return "var(--color-primary)";
+    if (type === "ewallet")  return "#a78bfa";
+    if (type === "cash")     return "#f59e0b";
+    if (type === "tabungan") return "#38bdf8";
+    if (type === "crypto")   return "#fb923c";
     return "var(--color-primary)";
 };
 
 const typeLabel = (type) => {
-    if (type === "bank")    return "BANK";
-    if (type === "ewallet") return "E-WALLET";
-    if (type === "cash")    return "CASH";
+    if (type === "bank")     return "BANK";
+    if (type === "ewallet")  return "E-WALLET";
+    if (type === "cash")     return "CASH";
+    if (type === "tabungan") return "TABUNGAN";
+    if (type === "crypto")   return "CRYPTO";
     return type?.toUpperCase() || "AKUN";
 };
 
@@ -49,10 +53,12 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
     const [editBalanceAcc, setEditBalanceAcc] = useState(null); // account being edited
     const [newBalanceInput, setNewBalanceInput] = useState("");
 
-    const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-    const bankCount    = accounts.filter(a => a.type === "bank").length;
-    const ewalletCount = accounts.filter(a => a.type === "ewallet").length;
-    const cashCount    = accounts.filter(a => a.type === "cash").length;
+    const totalBalance    = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const bankCount       = accounts.filter(a => a.type === "bank").length;
+    const ewalletCount    = accounts.filter(a => a.type === "ewallet").length;
+    const cashCount       = accounts.filter(a => a.type === "cash").length;
+    const tabunganCount   = accounts.filter(a => a.type === "tabungan").length;
+    const tabunganBalance = accounts.filter(a => a.type === "tabungan").reduce((s, a) => s + a.balance, 0);
 
     const activeAccount = accounts.find(a => a.id === activeTab) || accounts[0];
     const recentTx = activeAccount
@@ -129,6 +135,14 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                         {fmtRp(accounts.filter(a => a.type === "cash").reduce((s, a) => s + a.balance, 0))}
                     </p>
                 </div>
+                {/* Tabungan — hanya tampil jika ada */}
+                {tabunganCount > 0 && (
+                    <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #38bdf8" }}>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>🪙 Tabungan</p>
+                        <h3 style={{ fontSize: 32, fontWeight: 800, color: "#38bdf8", margin: "0 0 4px", lineHeight: 1 }}>{tabunganCount}</h3>
+                        <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>{fmtRp(tabunganBalance)}</p>
+                    </div>
+                )}
             </div>
 
             {/* ── Account Cards Grid ── */}
