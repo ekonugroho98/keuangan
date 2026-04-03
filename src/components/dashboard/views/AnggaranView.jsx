@@ -3,6 +3,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import { expenseCategories } from "../../../constants/categories";
 import Modal from "../../ui/Modal";
 import InputField from "../../ui/InputField";
+import AmountInput from "../../ui/AmountInput";
 
 const statusColor = (pct) => {
     if (pct >= 100) return "#ff716c";
@@ -262,7 +263,7 @@ const AnggaranView = ({ budgets, transactions, onAdd, onEdit, onDelete, onCopyMo
                     ))}
                 </select>
 
-                <InputField label="BATAS ANGGARAN (Rp)" icon="💰" type="number" placeholder="500000" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+                <AmountInput label="BATAS ANGGARAN (Rp)" icon="💰" placeholder="500.000" value={form.amount} onChange={v => setForm(p => ({ ...p, amount: v }))} />
 
                 <button
                     onClick={handleSubmit}

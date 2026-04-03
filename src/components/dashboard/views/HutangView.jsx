@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
+import AmountInput from "../../ui/AmountInput";
 
 const EMOJI_OPTIONS = ["🏦","🏠","🚗","💳","📱","💻","🎓","💍","🏪","🛒","💰","🔧","🏋️","🎮","📚","⚡","🌍","✈️","🍕","☕"];
 const COLOR_OPTIONS = ["#ff716c","#f97316","#f59e0b","var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#ec4899","#14b8a6","var(--color-subtle)","#a855f7","#22c55e"];
@@ -174,16 +175,13 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete, onPayDebt, accounts = [] }
                             style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("debt.totalLabel")}</label>
-                        <input type="number" value={form.total} onChange={e => setForm(p => ({ ...p, total: e.target.value }))} placeholder="50000000"
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
+                        <AmountInput value={form.total} onChange={v => setForm(p => ({ ...p, total: v }))} placeholder="50.000.000" inputStyle={{ marginBottom: 16 }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("debt.remainingLabel")}</label>
-                        <input type="number" value={form.remaining} onChange={e => setForm(p => ({ ...p, remaining: e.target.value }))} placeholder="35000000"
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
+                        <AmountInput value={form.remaining} onChange={v => setForm(p => ({ ...p, remaining: v }))} placeholder="35.000.000" inputStyle={{ marginBottom: 16 }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("debt.monthlyLabel")}</label>
-                        <input type="number" value={form.monthly} onChange={e => setForm(p => ({ ...p, monthly: e.target.value }))} placeholder="1500000"
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }} />
+                        <AmountInput value={form.monthly} onChange={v => setForm(p => ({ ...p, monthly: v }))} placeholder="1.500.000" inputStyle={{ marginBottom: 16 }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("debt.dueDateLabel")}</label>
                         <input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))}
@@ -230,8 +228,7 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete, onPayDebt, accounts = [] }
                             Sisa hutang: <strong style={{ color: "#fbbf24" }}>{fmtRp(payTarget.remaining)}</strong>
                         </div>
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>JUMLAH BAYAR (Rp)</label>
-                        <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder={String(payTarget.monthly || payTarget.remaining)}
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 14, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box", fontWeight: 700 }} />
+                        <AmountInput value={payAmount} onChange={v => setPayAmount(v)} placeholder={String(payTarget.monthly || payTarget.remaining)} inputStyle={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", fontSize: 14, fontWeight: 700, marginBottom: 16 }} />
                         {accounts.length > 0 && (
                             <>
                             <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>DARI AKUN</label>

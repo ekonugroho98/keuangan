@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { categoryIcons, allCategories } from "../../../constants/categories";
 import { useLanguage } from "../../../i18n/LanguageContext";
+import AmountInput from "../../ui/AmountInput";
 
 const EMOJI_OPTIONS = ["🔄","🏠","🎬","🎵","⚡","💊","📚","🚗","🍔","📱","🛍️","💰","📊","🏋️","☕","🌿","🐾","🎮","🔧","🎁"];
 const INCOME_CATS   = ["Gaji","Freelance","Bisnis","Investasi","Transfer"];
@@ -209,7 +210,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         </div>
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("rec.amountLabel")}</label>
-                        <input value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="150000" type="number" style={{ ...inputStyle, marginBottom: 16 }} />
+                        <AmountInput value={form.amount} onChange={v => setForm(p => ({ ...p, amount: v }))} placeholder="150.000" inputStyle={{ ...inputStyle, marginBottom: 16 }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("rec.accountLabel")}</label>
                         {accounts.length === 0 ? (

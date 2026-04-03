@@ -1,5 +1,6 @@
 import Modal from "../ui/Modal";
 import InputField from "../ui/InputField";
+import AmountInput from "../ui/AmountInput";
 import { expenseCategories, incomeCategories } from "../../constants/categories";
 import { useLanguage } from "../../i18n/LanguageContext";
 
@@ -48,18 +49,6 @@ const AddTransactionModal = ({
     isSaving = false,
 }) => {
     const { t } = useLanguage();
-
-    /* ── Format angka dengan titik (1000000 → "1.000.000") ── */
-    const fmtDisplay = (raw) => {
-        if (!raw) return "";
-        const n = parseInt(String(raw).replace(/\D/g, ""), 10);
-        if (isNaN(n)) return "";
-        return n.toLocaleString("id-ID");
-    };
-    const handleAmountChange = (e) => {
-        const raw = e.target.value.replace(/\D/g, "");
-        setTxForm(p => ({ ...p, amount: raw }));
-    };
 
     /* Terjemahkan nama kategori default, custom tetap nama asli */
     const DEFAULT_CATS = new Set([...expenseCategories, ...incomeCategories]);
@@ -137,7 +126,7 @@ const AddTransactionModal = ({
             ) : isTransfer ? (
                 /* ── Mode Transfer (tambah baru) ── */
                 <>
-                    <InputField label="JUMLAH (Rp)" icon="💰" type="text" inputMode="numeric" placeholder="150.000" value={fmtDisplay(txForm.amount)} onChange={handleAmountChange} />
+                    <AmountInput label="JUMLAH (Rp)" icon="💰" placeholder="150.000" value={txForm.amount} onChange={v => setTxForm(p => ({ ...p, amount: v }))} />
 
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>DARI AKUN</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
@@ -194,7 +183,7 @@ const AddTransactionModal = ({
             ) : (
                 /* ── Mode Normal (expense / income) ── */
                 <>
-                    <InputField label="JUMLAH (Rp)" icon="💰" type="text" inputMode="numeric" placeholder="150.000" value={fmtDisplay(txForm.amount)} onChange={handleAmountChange} />
+                    <AmountInput label="JUMLAH (Rp)" icon="💰" placeholder="150.000" value={txForm.amount} onChange={v => setTxForm(p => ({ ...p, amount: v }))} />
 
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>{t("addTx.category") || "KATEGORI"}</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
