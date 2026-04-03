@@ -100,6 +100,18 @@ const TYPE_COLORS = { reksa_dana:"var(--color-primary)", saham:"var(--color-prim
 const EMOJI_OPTIONS = ["📊","📈","🥇","₿","🏦","🏠","📜","💼","💎","🚀","⚡","🌿","🎯","💰","🔮","🏆","📱","🖥️","🚗","✈️"];
 const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899","#f97316","#14b8a6","var(--color-subtle)","#a855f7","#22c55e"];
 
+// ── Default satuan per tipe aset ──
+const DEFAULT_UNITS = {
+    reksa_dana: "unit",
+    saham:      "lot",
+    emas:       "gram",
+    crypto:     "koin",
+    deposito:   "bulan",
+    properti:   "unit",
+    obligasi:   "lembar",
+    lainnya:    "unit",
+};
+
 // ── Merek emas yang didukung ──
 const GOLD_BRANDS = [
     { id: "antam",      label: "Antam",      icon: "🏅", note: "Logam Mulia" },
@@ -109,10 +121,10 @@ const GOLD_BRANDS = [
     { id: "lainnya",    label: "Lainnya",     icon: "✨", note: "Merek lain" },
 ];
 
-const emptyForm = () => ({
-    name: "", type: "reksa_dana", icon: "📊", color: "var(--color-primary)",
+const emptyForm = (type = "reksa_dana") => ({
+    name: "", type, icon: TYPE_ICONS[type] || "📊", color: TYPE_COLORS[type] || "var(--color-primary)",
     brand: null,
-    buy_price: "", current_value: "", quantity: "", unit: "unit",
+    buy_price: "", current_value: "", quantity: "", unit: DEFAULT_UNITS[type] || "unit",
     buy_date: "", notes: "",
 });
 
@@ -145,9 +157,9 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         v, l: t(`inv.type.${v}`), icon: TYPE_ICONS[v], color: TYPE_COLORS[v],
     }));
 
-    const openAdd = () => {
+    const openAdd = (type = "reksa_dana") => {
         setEditTarget(null);
-        setForm(emptyForm());
+        setForm(emptyForm(type));
         setShowModal(true);
     };
 
@@ -165,7 +177,14 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     };
 
     const handleTypeChange = (type) => {
-        setForm(p => ({ ...p, type, icon: TYPE_ICONS[type] || "📊", color: TYPE_COLORS[type] || "var(--color-primary)" }));
+        setForm(p => ({
+            ...p,
+            type,
+            icon:  TYPE_ICONS[type]  || "📊",
+            color: TYPE_COLORS[type] || "var(--color-primary)",
+            unit:  DEFAULT_UNITS[type] || "unit",
+            brand: type === "emas" ? p.brand : null, // reset brand kalau bukan emas
+        }));
     };
 
     const handleSubmit = () => {
@@ -402,14 +421,16 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                             </div>
                             <div>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.unitLabel")}</label>
-                                <input value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} placeholder="unit / lot / gram"
+                                <input value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} placeholder={DEFAULT_UNITS[form.type] || "unit"}
                                     style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             </div>
                         </div>
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.buyDateLabel")}</label>
-                        <input type="date" value={form.buy_date} onChange={e => setForm(p => ({ ...p, buy_date: e.target.value }))}
-                            style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box", colorScheme: "normal" }} />
+                        <input type="date" value={form.buy_date}
+                            onChange={e => setForm(p => ({ ...p, buy_date: e.target.value }))}
+                            max={new Date().toISOString().slice(0, 10)}
+                            style={{ width: "100%", padding: "10px 14px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: form.buy_date ? "var(--color-text)" : "var(--color-subtle)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box", colorScheme: "dark" }} />
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("inv.iconLabel")}</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
