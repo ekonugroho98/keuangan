@@ -16,7 +16,10 @@ const Sidebar = ({
     const { themeId, toggleTheme } = useTheme();
     const [showLangPicker,   setShowLangPicker]   = useState(false);
     const [showProfileMenu,  setShowProfileMenu]  = useState(false);
-    const [profileView,      setProfileView]      = useState("menu"); // "menu"|"name"|"password"|"color"|"delete"
+    const [profileView,      setProfileView]      = useState("menu"); // "menu"|"name"|"password"|"color"|"menus"|"delete"
+    const [hiddenMenus,      setHiddenMenus]      = useState(
+        () => JSON.parse(localStorage.getItem("karaya_hidden_menus") || "[]")
+    );
     const [newName,          setNewName]          = useState(user.name);
     const [newPass,          setNewPass]          = useState("");
     const [confirmPass,      setConfirmPass]      = useState("");
@@ -56,8 +59,16 @@ const Sidebar = ({
 
     const closeProfile = () => { setShowProfileMenu(false); setProfileView("menu"); };
 
-    /* ── nav items ── */
-    const sidebarItems = [
+    const toggleHideMenu = (id) => {
+        setHiddenMenus(prev => {
+            const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+            localStorage.setItem("karaya_hidden_menus", JSON.stringify(next));
+            return next;
+        });
+    };
+
+    /* ── nav items (semua menu, sebelum difilter) ── */
+    const allSidebarItems = [
         { group: t("nav.summary"),  items: [{ id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" }] },
         { group: t("nav.transactions"), items: [
             { id: "transaksi", label: t("nav.transaction"), icon: "💳" },
@@ -78,6 +89,12 @@ const Sidebar = ({
             { id: "prediksi",  label: t("nav.prediksi"),    icon: "🔮" },
         ]},
     ];
+
+    /* Filter hidden menus (dasbor tidak bisa disembunyikan) */
+    const sidebarItems = allSidebarItems.map(g => ({
+        ...g,
+        items: g.items.filter(item => item.id === "dasbor" || !hiddenMenus.includes(item.id)),
+    })).filter(g => g.items.length > 0);
 
     const planLabel = (plan, expiresAt) => {
         const expired = expiresAt ? new Date() > new Date(expiresAt) : false;
@@ -151,6 +168,38 @@ const Sidebar = ({
             </div>
         );
 
+        /* Kelola Menu */
+        if (profileView === "menus") return (
+            <div style={{ padding: "4px 4px 0" }}>
+                <button onClick={() => setProfileView("menu")} style={{ ...menuBtn(), marginBottom: 8, color: "var(--color-subtle)", fontSize: 11 }}>← Kembali</button>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-subtle)", marginBottom: 10 }}>TAMPILKAN / SEMBUNYIKAN MENU</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 280, overflowY: "auto" }}>
+                    {allSidebarItems.flatMap(g => g.items).filter(item => item.id !== "dasbor").map(item => {
+                        const isHidden = hiddenMenus.includes(item.id);
+                        return (
+                            <button key={item.id} onClick={() => toggleHideMenu(item.id)}
+                                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "background .15s" }}
+                                onMouseOver={e => e.currentTarget.style.background = "var(--color-border-soft)"}
+                                onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                                <span style={{ fontSize: 14, width: 20, textAlign: "center" }}>{item.icon}</span>
+                                <span style={{ flex: 1, fontSize: 12, color: isHidden ? "var(--color-subtle)" : "var(--color-text)", textDecoration: isHidden ? "line-through" : "none" }}>{item.label}</span>
+                                {/* Toggle pill */}
+                                <div style={{ width: 32, height: 17, borderRadius: 9, background: isHidden ? "var(--color-border-soft)" : "var(--color-primary)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
+                                    <div style={{ position: "absolute", top: 2, left: isHidden ? 2 : 15, width: 13, height: 13, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+                {hiddenMenus.length > 0 && (
+                    <button onClick={() => { setHiddenMenus([]); localStorage.removeItem("karaya_hidden_menus"); }}
+                        style={{ marginTop: 10, width: "100%", padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-subtle)", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
+                        Reset — Tampilkan Semua
+                    </button>
+                )}
+            </div>
+        );
+
         /* Delete confirm */
         if (profileView === "delete") return (
             <div style={{ padding: "4px 4px 0" }}>
@@ -186,7 +235,7 @@ const Sidebar = ({
                     { icon: "🔑", label: "Ganti Password",   action: () => setProfileView("password") },
                     { icon: "🎨", label: "Warna Avatar",     action: () => setProfileView("color") },
                     { icon: "📤", label: "Export Data CSV",  action: () => { onExportCSV(); closeProfile(); } },
-                    { icon: open ? "◀ " : "▶ ", label: open ? "Sembunyikan Menu" : "Tampilkan Menu", action: () => { onToggleSidebar(); closeProfile(); } },
+                    { icon: "☰",  label: "Kelola Menu",      action: () => setProfileView("menus") },
                 ].map(item => (
                     <button key={item.label} onClick={item.action} style={menuBtn()}
                         onMouseOver={e => e.currentTarget.style.background = "var(--color-border-soft)"}
