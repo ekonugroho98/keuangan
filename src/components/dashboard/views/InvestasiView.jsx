@@ -177,6 +177,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm());
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [priceTarget, setPriceTarget] = useState(null); // aset yg sedang dilihat harganya
 
     // Klik kartu harga → auto-isi form tambah investasi
     const handleSelectGoldPrice = (item, category) => {
@@ -386,7 +387,8 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
 
                             <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={() => openEdit(inv)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.08)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("inv.editBtn")}</button>
-                                <button onClick={() => setConfirmDelete(inv)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
+                                <button onClick={() => setPriceTarget(inv)} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid rgba(99,102,241,.2)", background: "rgba(99,102,241,.07)", color: "#818cf8", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }} title="Lihat harga">💹</button>
+                                <button onClick={() => setConfirmDelete(inv)} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
                             </div>
                         </div>
                     );
@@ -550,6 +552,86 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             )}
 
             {/* Confirm Delete */}
+            {/* ── Modal Harga Aset ─────────────────────────────────── */}
+            {priceTarget && (
+                <div onClick={() => setPriceTarget(null)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 0 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid var(--color-border-soft)", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 560, maxHeight: "85vh", overflowY: "auto" }}>
+                        {/* Handle bar */}
+                        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
+                            <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--color-border-soft)" }} />
+                        </div>
+
+                        {/* Header */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px 16px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 40, height: 40, borderRadius: 12, background: priceTarget.color + "20", border: `1px solid ${priceTarget.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                                    {priceTarget.icon}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{priceTarget.name}</div>
+                                    <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
+                                        {priceTarget.quantity} {priceTarget.unit} · {TYPES.find(tp => tp.v === priceTarget.type)?.l}
+                                        {priceTarget.brand && (() => { const b = GOLD_BRANDS.find(x => x.id === priceTarget.brand); return b ? ` · ${b.icon} ${b.label}` : ""; })()}
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setPriceTarget(null)} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 30, height: 30, borderRadius: 8, cursor: "pointer", fontSize: 14 }}>✕</button>
+                        </div>
+
+                        <div style={{ padding: "0 20px 28px" }}>
+                            {/* Nilai live saat ini */}
+                            {(() => {
+                                const live = priceTarget.type === "emas" && priceTarget.quantity
+                                    ? lookupGoldPrice(goldPrices, priceTarget.brand, priceTarget.quantity)
+                                    : null;
+                                const cur = live ?? priceTarget.current_value;
+                                const gain = cur - priceTarget.buy_price;
+                                const pct = priceTarget.buy_price > 0 ? ((gain / priceTarget.buy_price) * 100).toFixed(2) : 0;
+                                const isProfit = gain >= 0;
+                                return (
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+                                        <div style={{ background: "var(--bg-surface-low)", borderRadius: 12, padding: "12px 14px" }}>
+                                            <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 4 }}>MODAL</div>
+                                            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-muted)" }}>{fmtRp(priceTarget.buy_price)}</div>
+                                        </div>
+                                        <div style={{ background: "var(--bg-surface-low)", borderRadius: 12, padding: "12px 14px" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                                                <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>NILAI SEKARANG</span>
+                                                {live && <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 4, padding: "1px 5px" }}>⚡ LIVE</span>}
+                                            </div>
+                                            <div style={{ fontSize: 15, fontWeight: 700, color: live ? "var(--color-primary)" : "var(--color-text)" }}>{fmtRp(cur)}</div>
+                                        </div>
+                                        <div style={{ gridColumn: "1/-1", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.15)" : "rgba(255,113,108,.15)"}`, borderRadius: 12, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <span style={{ fontSize: 12, color: "var(--color-subtle)" }}>Gain / Loss</span>
+                                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                                <span style={{ fontSize: 14, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c" }}>{isProfit ? "+" : ""}{fmtRp(gain)}</span>
+                                                <span style={{ fontSize: 11, fontWeight: 700, background: isProfit ? "rgba(96,252,198,.12)" : "rgba(255,113,108,.12)", color: isProfit ? "var(--color-primary)" : "#ff716c", padding: "2px 8px", borderRadius: 6 }}>{isProfit ? "▲" : "▼"} {Math.abs(pct)}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Panel harga Antam jika relevan */}
+                            {priceTarget.type === "emas" && priceTarget.brand === "antam" && goldPrices ? (
+                                <GoldPricePanel
+                                    goldPrices={goldPrices}
+                                    onRefresh={onRefreshGold}
+                                    refreshing={refreshingGold}
+                                    onSelectPrice={(item, cat) => { handleSelectGoldPrice(item, cat); setPriceTarget(null); }}
+                                />
+                            ) : (
+                                <div style={{ textAlign: "center", padding: "24px 0", color: "var(--color-subtle)", fontSize: 13 }}>
+                                    <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+                                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Harga live belum tersedia</div>
+                                    <div style={{ fontSize: 11, color: "#48474f" }}>untuk {TYPES.find(tp => tp.v === priceTarget.type)?.l || priceTarget.type}{priceTarget.brand ? ` (${priceTarget.brand})` : ""}</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {confirmDelete && (
                 <div onClick={() => setConfirmDelete(null)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
                     <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center" }}>
