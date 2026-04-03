@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../i18n/ThemeContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { AI_PROVIDERS, PROVIDER_ORDER, DEFAULT_MODEL } from "../../services/aiService";
 
 const AVATAR_COLORS = [
     "#60fcc6","#4FC3F7","#f59e0b","#ff716c",
@@ -13,6 +14,7 @@ const Sidebar = ({
     onToggleSidebar, onLogout,
     onUpdateName, onUpdatePassword, onExportCSV, onDeleteAccount,
     userSettings, onSaveSettings,
+    aiConfig, onSaveAiConfig,
 }) => {
     const { t, lang, setLang, languages } = useLanguage();
     const { themeId, toggleTheme } = useTheme();
@@ -41,6 +43,14 @@ const Sidebar = ({
     const [editAppName,    setEditAppName]    = useState("");
     const [editAppTagline, setEditAppTagline] = useState("");
 
+    // AI Config state
+    const [aiProvider, setAiProvider] = useState(() => aiConfig?.provider || "groq");
+    const [aiModel,    setAiModel]    = useState(() => aiConfig?.model    || DEFAULT_MODEL["groq"]);
+    const [aiKey,      setAiKey]      = useState(() => aiConfig?.apiKey   || "");
+    const [aiKeyShow,  setAiKeyShow]  = useState(false);
+    const [aiSaving,   setAiSaving]   = useState(false);
+    const [aiTestMsg,  setAiTestMsg]  = useState("");
+
     const isDark = themeId === "dark";
 
     /* sync state from DB when userSettings loads (overrides localStorage cache) */
@@ -50,6 +60,8 @@ const Sidebar = ({
         if (userSettings.hidden_menus) setHiddenMenus(userSettings.hidden_menus);
         if (userSettings.app_name)    { setAppName(userSettings.app_name);    localStorage.setItem("karaya_app_name", userSettings.app_name); }
         if (userSettings.app_tagline) { setAppTagline(userSettings.app_tagline); localStorage.setItem("karaya_app_tagline", userSettings.app_tagline); }
+        if (userSettings.ai_config?.provider) { setAiProvider(userSettings.ai_config.provider); setAiModel(userSettings.ai_config.model || DEFAULT_MODEL[userSettings.ai_config.provider]); }
+        if (userSettings.ai_config?.apiKey)   setAiKey(userSettings.ai_config.apiKey);
     }, [userSettings]);
 
     /* sync browser tab title with custom app name on mount */
@@ -355,11 +367,93 @@ const Sidebar = ({
             </div>
         );
 
+        /* ── AI Settings Panel ── */
+        if (profileView === "ai") {
+            const currentProvider = AI_PROVIDERS[aiProvider];
+            const handleSaveAi = async () => {
+                if (!aiKey.trim()) { setAiTestMsg("❌ API key tidak boleh kosong"); return; }
+                setAiSaving(true); setAiTestMsg("");
+                const cfg = { provider: aiProvider, model: aiModel, apiKey: aiKey.trim() };
+                await onSaveAiConfig(cfg);
+                setAiTestMsg("✅ Tersimpan!");
+                setAiSaving(false);
+                setTimeout(() => { setAiTestMsg(""); setProfileView("menu"); }, 1200);
+            };
+            const inputSt = { width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+            return (
+                <div>
+                    <button style={backBtn} onClick={() => { setAiTestMsg(""); setProfileView("menu"); }}>← Kembali</button>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>🤖 AI Coach Settings</div>
+
+                    {/* Provider */}
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8 }}>PROVIDER</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                        {PROVIDER_ORDER.map(id => {
+                            const p = AI_PROVIDERS[id];
+                            const active = aiProvider === id;
+                            return (
+                                <button key={id} onClick={() => { setAiProvider(id); setAiModel(DEFAULT_MODEL[id]); setAiTestMsg(""); }}
+                                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: active ? "rgba(96,252,198,.1)" : "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                                    <span style={{ fontSize: 18 }}>{p.icon}</span>
+                                    <div style={{ flex: 1 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: active ? "var(--color-primary)" : "var(--color-text)" }}>{p.label}</span>
+                                        {p.badge && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 4, padding: "1px 5px" }}>{p.badge}</span>}
+                                    </div>
+                                    {active && <span style={{ color: "var(--color-primary)", fontSize: 14 }}>✓</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Model */}
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>MODEL</div>
+                    <select value={aiModel} onChange={e => setAiModel(e.target.value)} style={{ ...inputSt, marginBottom: 16, cursor: "pointer" }}>
+                        {currentProvider?.models.map(m => (
+                            <option key={m.id} value={m.id}>{m.label} — {m.note}</option>
+                        ))}
+                    </select>
+
+                    {/* API Key */}
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>
+                        API KEY
+                        <a href={currentProvider?.docsUrl} target="_blank" rel="noopener noreferrer"
+                            style={{ marginLeft: 8, fontSize: 10, color: "var(--color-primary)", textDecoration: "none" }}>
+                            Dapatkan key →
+                        </a>
+                    </div>
+                    <div style={{ position: "relative", marginBottom: 6 }}>
+                        <input type={aiKeyShow ? "text" : "password"} value={aiKey} onChange={e => setAiKey(e.target.value)} placeholder={currentProvider?.keyHint || "sk-..."} style={{ ...inputSt, paddingRight: 44 }} />
+                        <button onClick={() => setAiKeyShow(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--color-muted)" }}>
+                            {aiKeyShow ? "🙈" : "👁️"}
+                        </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 16 }}>🔒 Disimpan terenkripsi di database, hanya kamu yang bisa akses.</div>
+
+                    {aiTestMsg && (
+                        <div style={{ fontSize: 12, color: aiTestMsg.startsWith("✅") ? "var(--color-primary)" : "#ff716c", marginBottom: 10, fontWeight: 600 }}>{aiTestMsg}</div>
+                    )}
+
+                    <button onClick={handleSaveAi} disabled={aiSaving || !aiKey.trim()}
+                        style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: (!aiKey.trim() || aiSaving) ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: (!aiKey.trim() || aiSaving) ? "var(--color-muted)" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: (!aiKey.trim() || aiSaving) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: (!aiKey.trim() || aiSaving) ? 0.5 : 1 }}>
+                        {aiSaving ? "Menyimpan..." : "Simpan"}
+                    </button>
+                    {aiKey.trim() && (
+                        <button onClick={() => { setAiKey(""); onSaveAiConfig({ provider: aiProvider, model: aiModel, apiKey: "" }); setAiTestMsg(""); setProfileView("menu"); }}
+                            style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 10, border: "1px solid rgba(255,113,108,.2)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                            Hapus API Key
+                        </button>
+                    )}
+                </div>
+            );
+        }
+
         /* ── Main Menu ── */
+        const aiStatus = aiConfig?.apiKey ? `${AI_PROVIDERS[aiConfig.provider]?.label || ""} · Aktif` : "Belum diatur";
         const menuItems = [
             { icon: "✏️", label: "Ganti Nama",      sub: user.name,        action: () => { setNewName(user.name); setProfileView("name"); } },
             { icon: "🔑", label: "Ganti Password",  sub: "••••••••",       action: () => setProfileView("password") },
             { icon: "🎨", label: "Warna Avatar",    sub: "Personalisasi",  action: () => setProfileView("color") },
+            { icon: "🤖", label: "AI Coach",        sub: aiStatus,         action: () => { setAiProvider(aiConfig?.provider || "groq"); setAiModel(aiConfig?.model || DEFAULT_MODEL[aiConfig?.provider || "groq"]); setAiKey(aiConfig?.apiKey || ""); setProfileView("ai"); } },
             { icon: "📱", label: "Nama Aplikasi",   sub: appName,          action: () => { setEditAppName(appName); setEditAppTagline(appTagline); setProfileView("appname"); } },
             { icon: "📤", label: "Export Data CSV", sub: "Unduh transaksi",action: () => { onExportCSV(); closeProfile(); } },
             { icon: "☰",  label: "Kelola Menu",     sub: `${hiddenMenus.length} tersembunyi`, action: () => setProfileView("menus") },
