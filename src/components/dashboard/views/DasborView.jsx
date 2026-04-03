@@ -190,13 +190,15 @@ const DasborView = ({ accounts, transactions, goals, investments = [], totalBala
                 {transactions.slice(0, 5).map(tx => (
                     <div key={tx.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderTop: "1px solid var(--color-border-soft)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                            <div style={{ width: 30, height: 30, borderRadius: 8, background: tx.type === "income" ? "rgba(96,252,198,.1)" : "rgba(255,113,108,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{tx.icon}</div>
+                            <div style={{ width: 30, height: 30, borderRadius: 8, background: tx.type === "income" ? "rgba(96,252,198,.1)" : tx.type === "transfer" ? "rgba(79,195,247,.1)" : "rgba(255,113,108,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{tx.icon}</div>
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.note}</div>
                                 <div style={{ fontSize: 10, color: "var(--color-muted)" }}>{fmtDate(tx.date)}</div>
                             </div>
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: tx.type === "income" ? "var(--color-primary)" : "#ff716c", flexShrink: 0, marginLeft: 8 }}>{tx.type === "income" ? "+" : "-"}{fmtRp(tx.amount)}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: tx.type === "income" ? "var(--color-primary)" : tx.type === "transfer" ? "#4FC3F7" : "#ff716c", flexShrink: 0, marginLeft: 8 }}>
+                            {tx.type === "income" ? "+" : tx.type === "transfer" ? "↔ " : "-"}{fmtRp(tx.amount)}
+                        </div>
                     </div>
                 ))}
                 <button onClick={() => setShowAddTx(true)} style={{ width: "100%", marginTop: 10, padding: 8, borderRadius: 10, border: "1px dashed rgba(96,252,198,.25)", background: "transparent", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("dash.addTx")}</button>
