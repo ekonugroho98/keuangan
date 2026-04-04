@@ -141,3 +141,47 @@ CREATE POLICY "settings: user own" ON user_settings
 -- AI CONFIG — tambah kolom ai_config ke user_settings
 -- =============================================
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ai_config JSONB DEFAULT '{}';
+
+-- =============================================
+-- TABEL INVESTMENTS (portofolio investasi)
+-- =============================================
+CREATE TABLE IF NOT EXISTS investments (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name          TEXT NOT NULL,
+  type          TEXT NOT NULL,
+  icon          TEXT,
+  color         TEXT,
+  brand         TEXT,
+  buy_price     BIGINT NOT NULL DEFAULT 0,
+  current_value BIGINT NOT NULL DEFAULT 0,
+  quantity      NUMERIC,
+  unit          TEXT DEFAULT 'unit',
+  kode_saham    TEXT,
+  buy_date      DATE,
+  notes         TEXT DEFAULT '',
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE investments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "investments: user can select own" ON investments
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "investments: user can insert own" ON investments
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "investments: user can update own" ON investments
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "investments: user can delete own" ON investments
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Jika tabel sudah ada tapi kolom belum ada, jalankan ini:
+ALTER TABLE investments
+  ADD COLUMN IF NOT EXISTS quantity   NUMERIC,
+  ADD COLUMN IF NOT EXISTS unit       TEXT DEFAULT 'unit',
+  ADD COLUMN IF NOT EXISTS brand      TEXT,
+  ADD COLUMN IF NOT EXISTS kode_saham TEXT,
+  ADD COLUMN IF NOT EXISTS buy_date   DATE,
+  ADD COLUMN IF NOT EXISTS notes      TEXT DEFAULT '';

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { CATEGORY_LABELS, CATEGORY_ORDER, lookupPrice, getHargaPerGram, fetchGoldPrices } from "../../../services/goldPrice";
+import { fetchStockPrice, calcStockValue, formatChangePct } from "../../../services/stockPrice";
 import AmountInput from "../../ui/AmountInput";
 
 // ── Gold Price Panel ──────────────────────────────────────────────────────
@@ -204,6 +205,7 @@ const emptyForm = (type = "reksa_dana") => ({
     brand: null,
     buy_price: "", current_value: "", quantity: "", unit: DEFAULT_UNITS[type] || "unit",
     buy_date: "", notes: "",
+    kode_saham: "",   // hanya relevan untuk tipe "saham"
 });
 
 // ── Cari harga emas dari API berdasarkan brand + berat (gram) ──
@@ -225,9 +227,13 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [priceTarget, setPriceTarget] = useState(null);
 
-    // Cache harga per brand — fetch lazy saat brand dipilih
+    // Cache harga per brand emas — fetch lazy saat brand dipilih
     const [brandPrices, setBrandPrices] = useState({});
     const fetchingRef = useRef({});
+
+    // Cache harga saham per ticker — fetch saat mount
+    const [stockPrices, setStockPrices] = useState({});   // { BBCA: { price, change_pct, ... } }
+    const stockFetchingRef = useRef({});
 
     const loadBrandPrices = async (brand) => {
         if (!brand || brand === "lainnya") return;
@@ -251,6 +257,31 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                 .map(inv => inv.brand)
         )];
         brands.forEach(loadBrandPrices);
+    }, [investments]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Fetch harga live saham untuk semua investasi dengan kode_saham
+    const loadStockPrice = async (ticker) => {
+        if (!ticker) return;
+        const key = ticker.toUpperCase();
+        if (stockPrices[key] || stockFetchingRef.current[key]) return;
+        stockFetchingRef.current[key] = true;
+        try {
+            const data = await fetchStockPrice(key);
+            setStockPrices(p => ({ ...p, [key]: data }));
+        } catch (_) {
+            // silent fail — fallback ke current_value manual
+        } finally {
+            stockFetchingRef.current[key] = false;
+        }
+    };
+
+    useEffect(() => {
+        const tickers = [...new Set(
+            investments
+                .filter(inv => inv.type === "saham" && inv.kode_saham)
+                .map(inv => inv.kode_saham.toUpperCase())
+        )];
+        tickers.forEach(loadStockPrice);
     }, [investments]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch harga saat brand form berubah
@@ -307,6 +338,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             quantity: inv.quantity ? String(inv.quantity) : "",
             unit: inv.unit || "unit",
             buy_date: inv.buy_date || "", notes: inv.notes || "",
+            kode_saham: inv.kode_saham || "",
         });
         setShowModal(true);
     };
@@ -315,10 +347,11 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         setForm(p => ({
             ...p,
             type,
-            icon:  TYPE_ICONS[type]  || "📊",
-            color: TYPE_COLORS[type] || "var(--color-primary)",
-            unit:  DEFAULT_UNITS[type] || "unit",
-            brand: type === "emas" ? p.brand : null, // reset brand kalau bukan emas
+            icon:       TYPE_ICONS[type]  || "📊",
+            color:      TYPE_COLORS[type] || "var(--color-primary)",
+            unit:       DEFAULT_UNITS[type] || "unit",
+            brand:      type === "emas"  ? p.brand  : null,  // reset brand kalau bukan emas
+            kode_saham: type === "saham" ? p.kode_saham : "", // reset kode kalau bukan saham
         }));
     };
 
@@ -329,7 +362,8 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
         const currentValue = form.current_value ? parseInt(form.current_value) : buyPrice;
         const payload = {
             name: form.name.trim(), type: form.type, icon: form.icon, color: form.color,
-            brand: form.type === "emas" ? (form.brand || null) : null,
+            brand:      form.type === "emas"  ? (form.brand || null) : null,
+            kode_saham: form.type === "saham" ? (form.kode_saham.trim().toUpperCase() || null) : null,
             buy_price: buyPrice,
             current_value: currentValue,
             quantity: parseFloat(form.quantity),
@@ -345,12 +379,18 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const canSubmit = form.name.trim() && form.buy_price && form.quantity;
 
     const totalModal = investments.reduce((a, i) => a + i.buy_price, 0);
-    // Untuk emas: pakai live price dari API jika ada, fallback ke DB
+    // Pakai live price dari API jika ada (emas & saham), fallback ke DB
     const totalNilai = investments.reduce((a, i) => {
-        const live = i.type === "emas" && i.quantity
+        const goldLive = i.type === "emas" && i.quantity
             ? lookupGoldPrice(getGoldPrices(i.brand), i.brand, i.quantity)
             : null;
-        return a + (live ?? i.current_value);
+        const stockD    = i.type === "saham" && i.kode_saham
+            ? stockPrices[i.kode_saham.toUpperCase()]
+            : null;
+        const stockLive = stockD && i.quantity
+            ? calcStockValue(stockD.price, i.quantity)
+            : null;
+        return a + (goldLive ?? stockLive ?? i.current_value);
     }, 0);
     const totalGain      = totalNilai - totalModal;
     const totalReturnPct = totalModal > 0 ? ((totalGain / totalModal) * 100).toFixed(2) : 0;
@@ -402,15 +442,24 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             {/* Investment cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
                 {investments.map(inv => {
-                    // Untuk emas: live price HANYA jika ada quantity tersimpan
-                    // Jangan estimasi quantity dari harga — harga historis ≠ harga sekarang
-                    const goldData = inv.type === "emas" ? getGoldPrices(inv.brand) : null;
+                    // Emas: live price HANYA jika ada quantity tersimpan
+                    const goldData  = inv.type === "emas" ? getGoldPrices(inv.brand) : null;
                     const livePrice = inv.type === "emas" && inv.quantity
                         ? lookupGoldPrice(goldData, inv.brand, inv.quantity)
                         : null;
                     const missingQty = inv.type === "emas" && !inv.quantity;
-                    const currentVal = livePrice ?? inv.current_value;
-                    const isLive     = livePrice !== null;
+
+                    // Saham: live price dari Yahoo Finance via karaya-api
+                    const stockData   = inv.type === "saham" && inv.kode_saham
+                        ? stockPrices[inv.kode_saham.toUpperCase()]
+                        : null;
+                    const liveStock   = stockData && inv.quantity
+                        ? calcStockValue(stockData.price, inv.quantity)
+                        : null;
+                    const missingCode = inv.type === "saham" && !inv.kode_saham;
+
+                    const currentVal = livePrice ?? liveStock ?? inv.current_value;
+                    const isLive     = livePrice !== null || liveStock !== null;
 
                     const gain = currentVal - inv.buy_price;
                     const returnPct = inv.buy_price > 0 ? ((gain / inv.buy_price) * 100).toFixed(2) : 0;
@@ -466,6 +515,17 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                             {missingQty && (
                                 <div style={{ fontSize: 11, color: "#f59e0b", background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
                                     ⚠️ Tambahkan jumlah (gram) untuk harga live otomatis
+                                </div>
+                            )}
+                            {missingCode && (
+                                <div style={{ fontSize: 11, color: "#818cf8", background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+                                    💡 Tambahkan kode saham (misal: BBCA) untuk harga live otomatis
+                                </div>
+                            )}
+                            {stockData && (
+                                <div style={{ fontSize: 11, color: stockData.change_pct >= 0 ? "var(--color-primary)" : "#ff716c", background: stockData.change_pct >= 0 ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${stockData.change_pct >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)"}`, borderRadius: 8, padding: "5px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
+                                    <span>📈 {inv.kode_saham} · {fmtRp(stockData.price)}/saham</span>
+                                    <span style={{ fontWeight: 700 }}>{formatChangePct(stockData.change_pct)}</span>
                                 </div>
                             )}
 
@@ -562,6 +622,25 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                         onSelectPrice={handleSelectGoldPrice}
                                     />
                                 )}
+                            </div>
+                        )}
+
+                        {/* Kode Saham — hanya tampil saat tipe Saham */}
+                        {form.type === "saham" && (
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "#818cf8", display: "block", marginBottom: 6 }}>
+                                    📈 KODE SAHAM <span style={{ fontWeight: 400, color: "var(--color-subtle)" }}>(opsional)</span>
+                                </label>
+                                <input
+                                    value={form.kode_saham}
+                                    onChange={e => setForm(p => ({ ...p, kode_saham: e.target.value.toUpperCase() }))}
+                                    placeholder="Contoh: BBCA, TLKM, GOTO"
+                                    maxLength={10}
+                                    style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid rgba(99,102,241,.35)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 4, boxSizing: "border-box", letterSpacing: 1 }}
+                                />
+                                <div style={{ fontSize: 10, color: "var(--color-subtle)" }}>
+                                    Isi untuk harga live otomatis dari IDX · Biarkan kosong jika update manual
+                                </div>
                             </div>
                         )}
 
@@ -684,9 +763,16 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                         <div style={{ padding: "0 20px 28px" }}>
                             {/* Nilai live saat ini */}
                             {(() => {
-                                const live = priceTarget.type === "emas" && priceTarget.quantity
+                                const goldLive = priceTarget.type === "emas" && priceTarget.quantity
                                     ? lookupGoldPrice(getGoldPrices(priceTarget.brand), priceTarget.brand, priceTarget.quantity)
                                     : null;
+                                const stockD    = priceTarget.type === "saham" && priceTarget.kode_saham
+                                    ? stockPrices[priceTarget.kode_saham.toUpperCase()]
+                                    : null;
+                                const stockLive = stockD && priceTarget.quantity
+                                    ? calcStockValue(stockD.price, priceTarget.quantity)
+                                    : null;
+                                const live = goldLive ?? stockLive;
                                 const cur = live ?? priceTarget.current_value;
                                 const gain = cur - priceTarget.buy_price;
                                 const pct = priceTarget.buy_price > 0 ? ((gain / priceTarget.buy_price) * 100).toFixed(2) : 0;
@@ -710,6 +796,39 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                                 <span style={{ fontSize: 14, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c" }}>{isProfit ? "+" : ""}{fmtRp(gain)}</span>
                                                 <span style={{ fontSize: 11, fontWeight: 700, background: isProfit ? "rgba(96,252,198,.12)" : "rgba(255,113,108,.12)", color: isProfit ? "var(--color-primary)" : "#ff716c", padding: "2px 8px", borderRadius: 6 }}>{isProfit ? "▲" : "▼"} {Math.abs(pct)}%</span>
                                             </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Detail harga saham live */}
+                            {priceTarget.type === "saham" && priceTarget.kode_saham && (() => {
+                                const sd = stockPrices[priceTarget.kode_saham.toUpperCase()];
+                                if (!sd) return null;
+                                return (
+                                    <div style={{ background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.2)", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--color-text)" }}>📈 {sd.ticker} · {sd.exchange}</div>
+                                            <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>{sd.market_state === "REGULAR" ? "🟢 Market buka" : "🔴 Market tutup"}</span>
+                                        </div>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                                            <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "8px 10px" }}>
+                                                <div style={{ fontSize: 9, color: "var(--color-subtle)", marginBottom: 2 }}>HARGA/SAHAM</div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{fmtRp(sd.price)}</div>
+                                            </div>
+                                            <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "8px 10px" }}>
+                                                <div style={{ fontSize: 9, color: "var(--color-subtle)", marginBottom: 2 }}>PERUBAHAN</div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: sd.change_pct >= 0 ? "var(--color-primary)" : "#ff716c" }}>
+                                                    {formatChangePct(sd.change_pct)}
+                                                </div>
+                                            </div>
+                                            <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "8px 10px" }}>
+                                                <div style={{ fontSize: 9, color: "var(--color-subtle)", marginBottom: 2 }}>TOTAL LOT</div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{priceTarget.quantity} lot</div>
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 8 }}>
+                                            💡 1 lot = 100 saham · Diperbarui: {new Date(sd.timestamp).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · Sumber: {sd.source}
                                         </div>
                                     </div>
                                 );
