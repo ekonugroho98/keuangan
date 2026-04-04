@@ -232,7 +232,9 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const fetchingRef = useRef({});
 
     // Cache harga saham per ticker — fetch saat mount
-    const [stockPrices, setStockPrices] = useState({});   // { BBCA: { price, change_pct, ... } }
+    const [stockPrices,  setStockPrices]  = useState({});  // { BBCA: { price, change_pct, ... } }
+    const [stockErrors,  setStockErrors]  = useState({});  // { XXXX: true } — ticker tidak ditemukan
+    const [stockLoading, setStockLoading] = useState({});  // { BBCA: true } — sedang fetch
     const stockFetchingRef = useRef({});
 
     const loadBrandPrices = async (brand) => {
@@ -263,15 +265,18 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const loadStockPrice = async (ticker) => {
         if (!ticker) return;
         const key = ticker.toUpperCase();
-        if (stockPrices[key] || stockFetchingRef.current[key]) return;
+        if (stockPrices[key] || stockErrors[key] || stockFetchingRef.current[key]) return;
         stockFetchingRef.current[key] = true;
+        setStockLoading(p => ({ ...p, [key]: true }));
         try {
             const data = await fetchStockPrice(key);
             setStockPrices(p => ({ ...p, [key]: data }));
+            setStockErrors(p => { const n = { ...p }; delete n[key]; return n; }); // clear error jika sebelumnya error
         } catch (_) {
-            // silent fail — fallback ke current_value manual
+            setStockErrors(p => ({ ...p, [key]: true }));
         } finally {
             stockFetchingRef.current[key] = false;
+            setStockLoading(p => { const n = { ...p }; delete n[key]; return n; });
         }
     };
 
@@ -520,6 +525,16 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                             {missingCode && (
                                 <div style={{ fontSize: 11, color: "#818cf8", background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
                                     💡 Tambahkan kode saham (misal: BBCA) untuk harga live otomatis
+                                </div>
+                            )}
+                            {inv.type === "saham" && inv.kode_saham && stockLoading[inv.kode_saham.toUpperCase()] && (
+                                <div style={{ fontSize: 11, color: "var(--color-subtle)", background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+                                    ⏳ Memuat harga {inv.kode_saham}...
+                                </div>
+                            )}
+                            {inv.type === "saham" && inv.kode_saham && stockErrors[inv.kode_saham.toUpperCase()] && (
+                                <div style={{ fontSize: 11, color: "#ff716c", background: "rgba(255,113,108,.06)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+                                    ❌ Kode "{inv.kode_saham}" tidak ditemukan di IDX — cek kembali & edit aset
                                 </div>
                             )}
                             {stockData && (
