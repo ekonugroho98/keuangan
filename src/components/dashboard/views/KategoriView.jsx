@@ -3,7 +3,21 @@ import { fmtRp } from "../../../utils/formatters";
 import { categoryIcons, categoryColors } from "../../../constants/categories";
 import { useLanguage } from "../../../i18n/LanguageContext";
 
-const EMOJI_OPTIONS = ["📦","🍔","🚗","🏠","🎬","🛍️","⚡","💊","📚","❤️","💰","💼","📊","📈","🔄","✈️","🎮","🐾","🌿","☕","🍕","🏋️","💇","🎵","📱","🖥️","🏦","🎁","🚀","🌟","🔧","🏪"];
+const EMOJI_GROUPS = [
+    { label: "Umum",         emojis: ["📦","💰","💳","🪙","🤑","💼","📊","📈","🔄","💸","🧾","🏧"] },
+    { label: "Makanan",      emojis: ["🍔","🍕","☕","🧋","🍜","🍣","🍗","🍱","🥗","🍰","🧁","🍩","🥤","🍞","🥑","🍎","🍛","🍖","🫕","🍦","🥩","🧇","🥐","🍟","🥡","🫖"] },
+    { label: "Anak",         emojis: ["👶","🧒","🍼","🎒","🧸","🎨","🖍️","🧩","🎯","🪀","🏫","🎠","🪁","🎪","🧒‍♂️","🪆","🎡","🧃","🩲","🪅"] },
+    { label: "Kesehatan",    emojis: ["💊","🏥","🩺","🦷","👓","💉","🩹","🧬","🧴","🩻","🏃","🧘","💆","🛁","🪥","🧼","😷"] },
+    { label: "Transportasi", emojis: ["🚗","✈️","🚌","🛵","⛽","🚕","🚢","🚲","🏍️","🚂","🛺","🚁","🛻","🚐","⚓","🛞"] },
+    { label: "Rumah",        emojis: ["🏠","💡","💧","🔑","🛋️","🧹","🪴","🔌","🧺","🪟","🛏️","🚿","🧰","🔨","🪑","🏡","🛗"] },
+    { label: "Pendidikan",   emojis: ["📚","🎓","✏️","📝","📐","🔬","🖊️","📖","🗒️","🖋️","🔭","📓","🗂️"] },
+    { label: "Hiburan",      emojis: ["🎬","🎮","🎵","🎭","🎤","🎧","🎸","🎹","🎲","🎡","🎢","🎪","📺","🎙️","🃏","🎻"] },
+    { label: "Fashion",      emojis: ["👗","👠","👒","💄","💅","💇","🪞","👜","👛","🧥","👟","🧢","💍","💎","🕶️","🧣","👔"] },
+    { label: "Olahraga",     emojis: ["🏋️","⚽","🏀","🎾","🏊","🚴","⛳","🤸","🏌️","🏸","🤽","🧗","🥊","🛹","🏄","⛷️","🤾"] },
+    { label: "Travel",       emojis: ["🏖️","🏔️","⛺","🗺️","🧳","🌍","🏕️","🗼","🏯","🌋","🎑","🌅","🏝️"] },
+    { label: "Hewan",        emojis: ["🐾","🐶","🐱","🐠","🐰","🐦","🦮","🐹","🐢","🦜","🐠","🐇"] },
+    { label: "Lainnya",      emojis: ["🌟","⚡","🔧","🚀","🌿","🎁","🏪","🏦","🌸","🔑","📱","🖥️","🌈","🎀","💌","🧿","☀️","🌙","❄️","🔥","🎗️"] },
+];
 const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","#a78bfa","#f59e0b","#ff716c","#ec4899","#14b8a6","#f97316","var(--color-subtle)","#a855f7","#22c55e"];
 
 /* ─── sub-components ─── */
@@ -137,12 +151,21 @@ const KategoriView = ({ catTotals, customCategories, onAddCategory, onEditCatego
                         </div>
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("cat.iconLabel")}</label>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                            {EMOJI_OPTIONS.map(e => (
-                                <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
-                                    {e}
-                                </button>
+                        <div style={{ marginBottom: 16, maxHeight: 260, overflowY: "auto", paddingRight: 4 }}>
+                            {EMOJI_GROUPS.map(group => (
+                                <div key={group.label} style={{ marginBottom: 10 }}>
+                                    <div style={{ fontSize: 9, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1, marginBottom: 5, textTransform: "uppercase" }}>
+                                        {group.label}
+                                    </div>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                                        {group.emojis.map(e => (
+                                            <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
+                                                style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 17, cursor: "pointer", flexShrink: 0 }}>
+                                                {e}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
 
