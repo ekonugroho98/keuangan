@@ -792,7 +792,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         try {
             const systemPrompt = buildFinanceSystemPrompt({
                 userName: userName.split(" ")[0],
-                accounts, transactions, goals, debts, investments,
+                accounts, transactions, goals, debts, investments, recurrings,
             });
             const reply = await sendAiMessage({ aiConfig, messages: updatedChat, systemPrompt });
             setAiChat(p => [...p, { role: "ai", text: reply }]);

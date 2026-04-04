@@ -272,7 +272,7 @@ export async function sendAiMessage({ aiConfig, messages, systemPrompt }) {
 /**
  * Buat system prompt berdasarkan data keuangan user.
  */
-export function buildFinanceSystemPrompt({ userName, accounts, transactions, goals, debts, investments }) {
+export function buildFinanceSystemPrompt({ userName, accounts, transactions, goals, debts, investments, recurrings = [] }) {
   const totalBalance = accounts.reduce((a, acc) => a + acc.balance, 0);
   const fmtRp = n => `Rp ${Number(n).toLocaleString("id-ID")}`;
   const fmtDate = d => {
@@ -316,7 +316,7 @@ export function buildFinanceSystemPrompt({ userName, accounts, transactions, goa
   // Format daftar transaksi
   const fmtTxList = (txs) => {
     if (!txs.length) return "  (tidak ada transaksi)";
-    return txs.slice(0, 30).map(t =>
+    return txs.map(t =>
       `  - ${fmtDate(t.date)} | ${t.type === "income" ? "➕" : t.type === "transfer" ? "↔️" : "➖"} ${fmtRp(t.amount)} | ${t.category} | ${t.note || "-"} | ${t.account_name}`
     ).join("\n");
   };
@@ -337,8 +337,8 @@ export function buildFinanceSystemPrompt({ userName, accounts, transactions, goa
     ? debts.map(d => `  - ${d.icon} ${d.name}: sisa ${fmtRp(d.remaining)} | cicilan ${fmtRp(d.monthly)}/bln | jatuh tempo ${d.due_date}`).join("\n")
     : "  (tidak ada hutang)";
 
-  // Recent 30 transaksi
-  const recent30 = [...transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 30);
+  // Semua transaksi sorted terbaru, max 200 (hindari token overflow)
+  const recent30 = [...transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 200);
 
   return `Kamu adalah Karaya AI, asisten keuangan pribadi yang ramah, cerdas, dan berbahasa Indonesia.
 Bantu user bernama ${userName} menganalisis keuangan mereka secara personal dan spesifik.
@@ -371,6 +371,10 @@ ${debtsDetail}
 Total hutang: ${fmtRp(totalDebt)}
 
 Investasi: ${fmtRp(totalInvest)} (${investments.length} aset)
+${investments.length ? investments.map(i => `  - ${i.icon||""} ${i.name} (${i.type}${i.brand ? ` · ${i.brand}` : ""}): modal ${fmtRp(i.buy_price)}, nilai ${fmtRp(i.current_value)}, jumlah ${i.quantity||"-"} ${i.unit||""}`).join("\n") : "  (belum ada)"}
+
+Transaksi berulang:
+${recurrings.length ? recurrings.map(r => `  - ${r.icon||""} ${r.name}: ${fmtRp(r.amount)}/bln | ${r.category} | akun ${r.account_name||"-"}`).join("\n") : "  (tidak ada)"}
 
 Target finansial:
 ${goalsDetail}
