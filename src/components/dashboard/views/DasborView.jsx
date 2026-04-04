@@ -12,27 +12,29 @@ const card = {
 
 // ── Trend Chart (6 bulan terakhir) ────────────────────────────────────────
 function TrendChart({ transactions }) {
-    const now   = new Date();
-    const m     = now.getMonth();
-    const y     = now.getFullYear();
+    const now = new Date();
+    const m   = now.getMonth();
+    const y   = now.getFullYear();
 
     const data = Array.from({ length: 6 }, (_, i) => {
-        const d  = new Date(y, m - (5 - i), 1);
-        const mo = d.getMonth(), yr = d.getFullYear();
-        const txM = transactions.filter(t => {
-            const td = new Date(t.date);
-            return td.getMonth() === mo && td.getFullYear() === yr;
+        const date = new Date(y, m - (5 - i), 1);
+        const mo = date.getMonth(), yr = date.getFullYear();
+        const txM = transactions.filter(tx => {
+            // Avoid UTC offset bug: parse date string directly (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+            const dateStr = (tx.date || "").slice(0, 10); // "2026-04-04"
+            const [txY, txM2] = dateStr.split("-").map(Number);
+            return txM2 - 1 === mo && txY === yr;
         });
         return {
-            label:   d.toLocaleString("id-ID", { month: "short" }),
-            income:  txM.filter(t => t.type === "income").reduce((a, t) => a + t.amount, 0),
-            expense: txM.filter(t => t.type === "expense").reduce((a, t) => a + t.amount, 0),
+            label:   date.toLocaleString("id-ID", { month: "short" }),
+            income:  txM.filter(tx => tx.type === "income" ).reduce((s, tx) => s + tx.amount, 0),
+            expense: txM.filter(tx => tx.type === "expense").reduce((s, tx) => s + tx.amount, 0),
         };
     });
 
-    const maxVal = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
-    const barH   = 90;
+    const maxVal     = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
     const hasAnyData = data.some(d => d.income > 0 || d.expense > 0);
+    const BAR_H      = 80;
 
     return (
         <div style={card}>
@@ -48,40 +50,43 @@ function TrendChart({ transactions }) {
             </div>
 
             {!hasAnyData ? (
-                <div style={{ height: barH + 28, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 12 }}>
+                <div style={{ height: BAR_H + 28, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 12 }}>
                     Belum ada data transaksi
                 </div>
             ) : (
-                <div style={{ position: "relative" }}>
-                    {/* Grid lines */}
-                    {[0.25, 0.5, 0.75, 1].map(f => (
-                        <div key={f} style={{ position: "absolute", top: Math.round(barH * (1 - f)), left: 0, right: 0, height: 1, background: "var(--color-border-soft)", zIndex: 0 }} />
-                    ))}
-                    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: barH + 28, position: "relative", zIndex: 1 }}>
-                        {data.map((d, i) => {
-                            const iH = d.income  > 0 ? Math.max(6, Math.round((d.income  / maxVal) * barH)) : 0;
-                            const eH = d.expense > 0 ? Math.max(6, Math.round((d.expense / maxVal) * barH)) : 0;
-                            const isCurrentMonth = i === 5;
-                            const isEmpty = d.income === 0 && d.expense === 0;
-                            return (
-                                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                                    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: barH }}>
-                                        {isEmpty ? (
-                                            <div style={{ width: "88%", height: 2, background: "var(--color-border-soft)", borderRadius: 2, alignSelf: "flex-end" }} />
-                                        ) : (
-                                            <>
-                                                <div title={`Masuk: ${fmtRp(d.income)}`}
-                                                    style={{ width: "44%", height: iH, background: isCurrentMonth ? "var(--color-primary)" : "rgba(96,252,198,.4)", borderRadius: "4px 4px 0 0", transition: "height .8s ease", cursor: "default" }} />
-                                                <div title={`Keluar: ${fmtRp(d.expense)}`}
-                                                    style={{ width: "44%", height: eH, background: isCurrentMonth ? "#ff716c" : "rgba(255,113,108,.4)", borderRadius: "4px 4px 0 0", transition: "height .8s ease", cursor: "default" }} />
-                                            </>
-                                        )}
-                                    </div>
-                                    <div style={{ fontSize: 9, color: isCurrentMonth ? "var(--color-text)" : "var(--color-subtle)", fontWeight: isCurrentMonth ? 700 : 400, textTransform: "capitalize" }}>{d.label}</div>
+                <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+                    {data.map((d, i) => {
+                        const iH = d.income  > 0 ? Math.max(8, Math.round((d.income  / maxVal) * BAR_H)) : 0;
+                        const eH = d.expense > 0 ? Math.max(8, Math.round((d.expense / maxVal) * BAR_H)) : 0;
+                        const isCurrent = i === 5;
+                        return (
+                            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                                {/* Bar area */}
+                                <div style={{ width: "100%", height: `${BAR_H}px`, display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "10%" }}>
+                                    <div style={{
+                                        width: "38%", height: `${iH}px`,
+                                        minHeight: iH > 0 ? "8px" : "0px",
+                                        background: isCurrent ? "#60fcc6" : "rgba(96,252,198,.45)",
+                                        borderRadius: "3px 3px 0 0",
+                                        transition: "height .6s ease",
+                                    }} />
+                                    <div style={{
+                                        width: "38%", height: `${eH}px`,
+                                        minHeight: eH > 0 ? "8px" : "0px",
+                                        background: isCurrent ? "#ff716c" : "rgba(255,113,108,.45)",
+                                        borderRadius: "3px 3px 0 0",
+                                        transition: "height .6s ease",
+                                    }} />
                                 </div>
-                            );
-                        })}
-                    </div>
+                                {/* Baseline */}
+                                <div style={{ width: "100%", height: "1px", background: "var(--color-border-soft)", marginBottom: 6 }} />
+                                {/* Label */}
+                                <div style={{ fontSize: 9, color: isCurrent ? "var(--color-text)" : "var(--color-subtle)", fontWeight: isCurrent ? 700 : 400, textTransform: "capitalize" }}>
+                                    {d.label}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
