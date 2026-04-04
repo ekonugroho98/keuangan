@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchGoldPrices } from "../services/goldPrice";
-import { sendAiMessage, buildFinanceSystemPrompt } from "../services/aiService";
+import { sendAiMessage, buildSystemPrompt } from "../services/aiService";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -69,6 +69,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [goldPrices,     setGoldPrices]     = useState(null);
     const [refreshingGold, setRefreshingGold] = useState(false);
     const [aiConfig,       setAiConfig]       = useState(null); // { provider, model, apiKey }
+    const [aiSettingsTrigger, setAiSettingsTrigger] = useState(0); // bumped to open Sidebar AI panel
 
     useEffect(() => {
         fetchSettings();
@@ -790,14 +791,21 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         setAiInput("");
         setAiTyping(true);
         try {
-            const systemPrompt = buildFinanceSystemPrompt({
-                userName: userName.split(" ")[0],
-                accounts, transactions, goals, debts, investments, recurrings,
+            const systemPrompt = buildSystemPrompt(userName.split(" ")[0]);
+            const reply = await sendAiMessage({
+                aiConfig,
+                messages: updatedChat,
+                systemPrompt,
+                financialData: { accounts, transactions, goals, debts, investments, recurrings },
+                onThinking: (msg) => setAiChat(p => {
+                    const last = p[p.length - 1];
+                    if (last?.role === "thinking") return [...p.slice(0, -1), { role: "thinking", text: msg }];
+                    return [...p, { role: "thinking", text: msg }];
+                }),
             });
-            const reply = await sendAiMessage({ aiConfig, messages: updatedChat, systemPrompt });
-            setAiChat(p => [...p, { role: "ai", text: reply }]);
+            setAiChat(p => p.filter(m => m.role !== "thinking").concat({ role: "ai", text: reply }));
         } catch (err) {
-            setAiChat(p => [...p, { role: "error", text: `❌ ${err.message}` }]);
+            setAiChat(p => p.filter(m => m.role !== "thinking").concat({ role: "error", text: `❌ ${err.message}` }));
         } finally {
             setAiTyping(false);
         }
@@ -840,6 +848,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 onSaveSettings={saveSettings}
                 aiConfig={aiConfig}
                 onSaveAiConfig={saveAiConfig}
+                aiSettingsTrigger={aiSettingsTrigger}
             />
 
             {/* Mobile overlay backdrop */}
@@ -1020,7 +1029,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
-                    {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} aiConfig={aiConfig} onOpenAiSettings={() => { /* trigger sidebar profile AI panel */ }} />}
+                    {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} aiConfig={aiConfig} onOpenAiSettings={() => { setSidebarOpen(true); setAiSettingsTrigger(p => p + 1); }} />}
                     {activeMenu === "splitbill" && <SplitBillView splitBills={splitBills} onAdd={addSplitBill} onDelete={deleteSplitBill} onTogglePaid={toggleMemberPaid} />}
                     {activeMenu === "prediksi" && <PrediksiView transactions={transactions} budgets={budgets} accounts={accounts} />}
                 </div>
