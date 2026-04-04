@@ -589,13 +589,26 @@ export async function sendAiMessage({ aiConfig, messages, systemPrompt, financia
     : systemPrompt;
   const tools = useEnrichedFallback ? [] : (provSupportsTools ? TOOL_DEFS : []);
 
-  // Convert chat history ke format API
-  const apiMessages = messages
+  // Batas history per model (token budget: enriched prompt ~3K, response ~1K, sisanya untuk history)
+  // Gemma 2 9B: 8K total → hanya 4K sisa → max 4 pesan history
+  // Groq lainnya 128K tapi rate limit token/menit → max 10 pesan
+  // Provider tool-calling: context window besar, tapi tetap jaga 20 pesan
+  const historyLimit = model === "gemma2-9b-it" ? 4
+    : useEnrichedFallback ? 10   // Groq enriched: hemat token
+    : 20;                        // Tool-calling providers: lebih bebas
+
+  // Convert + trim chat history ke format API (ambil N pesan TERBARU saja)
+  const allApiMessages = messages
     .filter(m => m.role !== "thinking") // strip thinking bubbles
     .map(m => ({
       role: m.role === "ai" ? "assistant" : m.role === "error" ? "assistant" : "user",
       content: m.text,
     }));
+  // Selalu include pesan pertama (greeting AI) agar model tahu konteks awal
+  // Lalu ambil N pesan terakhir
+  const apiMessages = allApiMessages.length > historyLimit
+    ? allApiMessages.slice(-historyLimit)
+    : allApiMessages;
 
   const MAX_ITER = 6;
 
