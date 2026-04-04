@@ -402,17 +402,13 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             {/* Investment cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
                 {investments.map(inv => {
-                    // Untuk emas: coba ambil nilai live dari API, fallback ke DB
-                    // Jika tidak ada quantity, estimasi dari buy_price ÷ harga_per_gram
+                    // Untuk emas: live price HANYA jika ada quantity tersimpan
+                    // Jangan estimasi quantity dari harga — harga historis ≠ harga sekarang
                     const goldData = inv.type === "emas" ? getGoldPrices(inv.brand) : null;
-                    let effectiveQty = inv.quantity;
-                    if (inv.type === "emas" && !effectiveQty && goldData) {
-                        const hpg = getHargaPerGram(goldData);
-                        if (hpg > 0 && inv.buy_price > 0) effectiveQty = inv.buy_price / hpg;
-                    }
-                    const livePrice = inv.type === "emas" && effectiveQty
-                        ? lookupGoldPrice(goldData, inv.brand, effectiveQty)
+                    const livePrice = inv.type === "emas" && inv.quantity
+                        ? lookupGoldPrice(goldData, inv.brand, inv.quantity)
                         : null;
+                    const missingQty = inv.type === "emas" && !inv.quantity;
                     const currentVal = livePrice ?? inv.current_value;
                     const isLive     = livePrice !== null;
 
@@ -466,6 +462,12 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                     <div style={{ fontSize: 13, fontWeight: 700, color: isLive ? "var(--color-primary)" : "var(--color-text)" }}>{fmtRp(currentVal)}</div>
                                 </div>
                             </div>
+
+                            {missingQty && (
+                                <div style={{ fontSize: 11, color: "#f59e0b", background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+                                    ⚠️ Tambahkan jumlah (gram) untuk harga live otomatis
+                                </div>
+                            )}
 
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.15)" : "rgba(255,113,108,.15)"}`, borderRadius: 10, padding: "8px 12px", marginBottom: 14 }}>
                                 <div style={{ fontSize: 12, color: "var(--color-subtle)" }}>{t("inv.gainLoss")}</div>
