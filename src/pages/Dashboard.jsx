@@ -68,7 +68,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [userSettings,   setUserSettings]   = useState(null);
     const [goldPrices,     setGoldPrices]     = useState(null);
     const [refreshingGold, setRefreshingGold] = useState(false);
-    const [aiConfig,       setAiConfig]       = useState(null); // { provider, model, apiKey }
+    const [aiConfig,       setAiConfig]       = useState(() => {
+        // Load dari localStorage sebagai cache awal (supaya tidak hilang saat refresh sebelum DB load)
+        try { const c = localStorage.getItem("karaya_ai_config"); return c ? JSON.parse(c) : null; } catch { return null; }
+    });
     const [aiSettingsTrigger, setAiSettingsTrigger] = useState(0); // bumped to open Sidebar AI panel
 
     useEffect(() => {
@@ -111,7 +114,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             if (data.hidden_menus) localStorage.setItem("karaya_hidden_menus", JSON.stringify(data.hidden_menus));
             if (data.app_name)    localStorage.setItem("karaya_app_name",    data.app_name);
             if (data.app_tagline) localStorage.setItem("karaya_app_tagline", data.app_tagline);
-            if (data.ai_config)   setAiConfig(data.ai_config);
+            if (data.ai_config?.apiKey) {
+                setAiConfig(data.ai_config);
+                localStorage.setItem("karaya_ai_config", JSON.stringify(data.ai_config));
+            }
         }
     };
 
@@ -772,6 +778,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const saveAiConfig = async (cfg) => {
         setAiConfig(cfg);
         setUserSettings(prev => ({ ...(prev || {}), ai_config: cfg }));
+        // Simpan ke localStorage sebagai cache (bertahan saat refresh)
+        if (cfg?.apiKey) {
+            localStorage.setItem("karaya_ai_config", JSON.stringify(cfg));
+        } else {
+            localStorage.removeItem("karaya_ai_config");
+        }
+        // Simpan ke Supabase DB
         await supabase.from("user_settings").upsert({
             user_id: user.id,
             ai_config: cfg,
@@ -797,6 +810,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 messages: updatedChat,
                 systemPrompt,
                 financialData: { accounts, transactions, goals, debts, investments, recurrings },
+                userName: userName.split(" ")[0],
                 onThinking: (msg) => setAiChat(p => {
                     const last = p[p.length - 1];
                     if (last?.role === "thinking") return [...p.slice(0, -1), { role: "thinking", text: msg }];
