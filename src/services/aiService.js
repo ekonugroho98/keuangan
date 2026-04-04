@@ -274,34 +274,125 @@ export async function sendAiMessage({ aiConfig, messages, systemPrompt }) {
  */
 export function buildFinanceSystemPrompt({ userName, accounts, transactions, goals, debts, investments }) {
   const totalBalance = accounts.reduce((a, acc) => a + acc.balance, 0);
+  const fmtRp = n => `Rp ${Number(n).toLocaleString("id-ID")}`;
+  const fmtDate = d => {
+    const dt = new Date(d);
+    return dt.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  };
+
   const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+
+  // Filter per periode
   const thisMonth = transactions.filter(tx => {
     const d = new Date(tx.date);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
+  const lastMonth = transactions.filter(tx => {
+    const d = new Date(tx.date);
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+  });
+  const thisWeek  = transactions.filter(tx => new Date(tx.date) >= weekAgo);
+  const todayTxs  = transactions.filter(tx => tx.date === todayStr);
+  const yesTxs    = transactions.filter(tx => tx.date === yesterdayStr);
+
   const income  = thisMonth.filter(t => t.type === "income").reduce((a, t) => a + t.amount, 0);
   const expense = thisMonth.filter(t => t.type === "expense").reduce((a, t) => a + t.amount, 0);
   const savingRate = income > 0 ? Math.round(((income - expense) / income) * 100) : 0;
+
+  const lmIncome  = lastMonth.filter(t => t.type === "income").reduce((a, t) => a + t.amount, 0);
+  const lmExpense = lastMonth.filter(t => t.type === "expense").reduce((a, t) => a + t.amount, 0);
 
   const topCats = Object.entries(
     thisMonth.filter(t => t.type === "expense").reduce((a, t) => {
       a[t.category] = (a[t.category] || 0) + t.amount; return a;
     }, {})
-  ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  ).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  // Format daftar transaksi
+  const fmtTxList = (txs) => {
+    if (!txs.length) return "  (tidak ada transaksi)";
+    return txs.slice(0, 30).map(t =>
+      `  - ${fmtDate(t.date)} | ${t.type === "income" ? "➕" : t.type === "transfer" ? "↔️" : "➖"} ${fmtRp(t.amount)} | ${t.category} | ${t.note || "-"} | ${t.account_name}`
+    ).join("\n");
+  };
 
   const totalDebt = debts.reduce((a, d) => a + d.remaining, 0);
   const totalInvest = investments.reduce((a, i) => a + i.current_value, 0);
 
+  // Akun detail
+  const accountsDetail = accounts.map(a => `  - ${a.icon} ${a.name} (${a.type}): ${fmtRp(a.balance)}`).join("\n");
+
+  // Goals detail
+  const goalsDetail = goals.length
+    ? goals.map(g => `  - ${g.icon} ${g.name}: ${fmtRp(g.current)} / ${fmtRp(g.target)} (${g.target > 0 ? Math.round((g.current/g.target)*100) : 0}%)`).join("\n")
+    : "  (belum ada goal)";
+
+  // Debts detail
+  const debtsDetail = debts.length
+    ? debts.map(d => `  - ${d.icon} ${d.name}: sisa ${fmtRp(d.remaining)} | cicilan ${fmtRp(d.monthly)}/bln | jatuh tempo ${d.due_date}`).join("\n")
+    : "  (tidak ada hutang)";
+
+  // Recent 30 transaksi
+  const recent30 = [...transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 30);
+
   return `Kamu adalah Karaya AI, asisten keuangan pribadi yang ramah, cerdas, dan berbahasa Indonesia.
-Bantu user bernama ${userName} menganalisis keuangan mereka. Jawab singkat, padat, dan actionable (max 3-4 kalimat kecuali diminta detail).
+Bantu user bernama ${userName} menganalisis keuangan mereka secara personal dan spesifik.
+Jawab berdasarkan data nyata di bawah. Jika data tersedia, selalu gunakan angka konkret.
+Jika diminta ringkasan, jawab ringkas (3-4 kalimat). Jika diminta detail, jelaskan lengkap.
+Hari ini: ${fmtDate(todayStr)}
 
-DATA KEUANGAN USER (real-time):
-- Total saldo semua rekening: Rp ${totalBalance.toLocaleString("id-ID")}
-- Bulan ini: Pemasukan Rp ${income.toLocaleString("id-ID")} | Pengeluaran Rp ${expense.toLocaleString("id-ID")} | Saving rate ${savingRate}%
-- Top pengeluaran: ${topCats.map(([c, v]) => `${c} Rp ${v.toLocaleString("id-ID")}`).join(", ") || "belum ada data"}
-- Total hutang: Rp ${totalDebt.toLocaleString("id-ID")} (${debts.length} cicilan)
-- Total investasi: Rp ${totalInvest.toLocaleString("id-ID")} (${investments.length} aset)
-- Target finansial: ${goals.length} goal aktif
+══════════════════════════════════════
+RINGKASAN KEUANGAN
+══════════════════════════════════════
+Total saldo: ${fmtRp(totalBalance)}
+Akun:
+${accountsDetail}
 
-Berikan saran yang personal, spesifik, dan motivatif. Gunakan angka nyata dari data di atas.`;
+Bulan ini (${now.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}):
+  Pemasukan : ${fmtRp(income)}
+  Pengeluaran: ${fmtRp(expense)}
+  Sisa       : ${fmtRp(income - expense)}
+  Saving rate: ${savingRate}%
+
+Bulan lalu:
+  Pemasukan : ${fmtRp(lmIncome)}
+  Pengeluaran: ${fmtRp(lmExpense)}
+
+Top pengeluaran bulan ini:
+${topCats.map(([c, v]) => `  - ${c}: ${fmtRp(v)}`).join("\n") || "  (belum ada)"}
+
+Hutang:
+${debtsDetail}
+Total hutang: ${fmtRp(totalDebt)}
+
+Investasi: ${fmtRp(totalInvest)} (${investments.length} aset)
+
+Target finansial:
+${goalsDetail}
+
+══════════════════════════════════════
+TRANSAKSI HARI INI (${fmtDate(todayStr)})
+══════════════════════════════════════
+${fmtTxList(todayTxs)}
+
+══════════════════════════════════════
+TRANSAKSI KEMARIN (${fmtDate(yesterdayStr)})
+══════════════════════════════════════
+${fmtTxList(yesTxs)}
+
+══════════════════════════════════════
+TRANSAKSI 7 HARI TERAKHIR
+══════════════════════════════════════
+${fmtTxList(thisWeek)}
+
+══════════════════════════════════════
+30 TRANSAKSI TERBARU
+══════════════════════════════════════
+${fmtTxList(recent30)}
+`;
 }
