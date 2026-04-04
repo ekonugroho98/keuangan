@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
-import { CATEGORY_LABELS, CATEGORY_ORDER } from "../../../services/goldPrice";
+import { CATEGORY_LABELS, CATEGORY_ORDER, lookupPrice, getHargaPerGram, fetchGoldPrices } from "../../../services/goldPrice";
 import AmountInput from "../../ui/AmountInput";
 
 // ── Gold Price Panel ──────────────────────────────────────────────────────
@@ -29,7 +29,9 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
                     style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", borderRadius: 12, border: "1px solid rgba(245,158,11,.25)", background: "rgba(245,158,11,.06)", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                     <span style={{ fontSize: 18 }}>🥇</span>
                     <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b" }}>Lihat Harga Emas Antam</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b" }}>
+                            Lihat Harga Emas {goldPrices.brand?.toUpperCase()}
+                        </span>
                         {spot1gr && (
                             <span style={{ fontSize: 11, color: "var(--color-muted)", marginLeft: 8 }}>
                                 1gr = {fmtRp(spot1gr.buy_price)}
@@ -53,7 +55,7 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
                             <span style={{ fontSize: 20 }}>🥇</span>
                             <div>
                                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>
-                                    Harga Emas Antam Hari Ini
+                                    Harga Emas {goldPrices.brand?.toUpperCase()} Hari Ini
                                     {tanggal && (
                                         <span style={{ marginLeft: 8, fontSize: 11, color: "var(--color-muted)", fontWeight: 400 }}>
                                             · {tanggal.replace("Harga Emas Hari Ini, ", "")}
@@ -61,7 +63,7 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
                                     )}
                                 </div>
                                 <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
-                                    Diperbarui: {lastUpdate} · Sumber: logammulia.com
+                                    Diperbarui: {lastUpdate} · Sumber: {goldPrices.source || "-"}
                                 </div>
                             </div>
                         </div>
@@ -102,7 +104,10 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
                                         <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>{fmtRp(item.price_per_gram)}/gram</div>
                                     )}
                                     {item.sell_price && (
-                                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 1 }}>+Pajak: {fmtRp(item.sell_price)}</div>
+                                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 1 }}>+PPh: {fmtRp(item.sell_price)}</div>
+                                    )}
+                                    {item.buyback_price && (
+                                        <div style={{ fontSize: 10, color: "#34d399", marginTop: 1 }}>Buyback: {fmtRp(item.buyback_price)}</div>
                                     )}
                                     <div style={{ fontSize: 9, color: "rgba(245,158,11,.6)", marginTop: 4, fontWeight: 600 }}>Klik untuk isi form →</div>
                                 </button>
@@ -122,9 +127,9 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
 const PRICE_GUIDE = {
     emas: {
         antam:     null, // handled by GoldPricePanel
-        ubs:       { label: "UBS Gold", icon: "🥇", links: [{ name: "unitedtractors.com", url: "https://www.unitedtractors.com/ubsgold/" }], note: "Cek harga terbaru di situs resmi UBS Gold" },
-        pegadaian: { label: "Pegadaian", icon: "🏪", links: [{ name: "pegadaian.co.id", url: "https://www.pegadaian.co.id/produk/galeri-24" }], note: "Cek harga Galeri 24 di website Pegadaian" },
-        lotus:     { label: "Lotus Archi", icon: "🌸", links: [{ name: "lotusarchi.com", url: "https://lotusarchi.com" }], note: "Cek harga di situs resmi Lotus Archi" },
+        ubs:      { label: "UBS Gold",     icon: "🥇", links: [{ name: "ubslifestyle.com", url: "https://ubslifestyle.com/fine-gold/logam-mulia-ubs/" }], note: "Harga diperbarui otomatis setiap hari dari UBS Lifestyle" },
+        galeri24: { label: "Pegadaian",    icon: "🏪", links: [{ name: "galeri24.co.id",  url: "https://galeri24.co.id/harga-emas" }], note: "Harga diperbarui otomatis setiap hari dari Galeri 24" },
+        lotus:    { label: "Lotus Archi",  icon: "🌸", links: [{ name: "lotusarchi.com",  url: "https://lotusarchi.com/pricing/" }], note: "Harga diperbarui otomatis setiap hari dari Lotus Archi" },
         lainnya:   { label: "Emas Lainnya", icon: "✨", links: [], note: "Cek harga di toko / platform tempat kamu beli" },
     },
     saham: { label: "Saham", icon: "📈", links: [{ name: "IDX (idx.co.id)", url: "https://idx.co.id" }, { name: "Yahoo Finance", url: "https://finance.yahoo.com" }], note: "Cek harga di aplikasi broker kamu (Ajaib, IPOT, Stockbit)" },
@@ -187,11 +192,11 @@ const DEFAULT_UNITS = {
 
 // ── Merek emas yang didukung ──
 const GOLD_BRANDS = [
-    { id: "antam",      label: "Antam",      icon: "🏅", note: "Logam Mulia" },
-    { id: "ubs",        label: "UBS",         icon: "🥇", note: "UBS Gold" },
-    { id: "pegadaian",  label: "Pegadaian",   icon: "🏪", note: "Galeri 24" },
-    { id: "lotus",      label: "Lotus Archi", icon: "🌸", note: "Lotus Gold" },
-    { id: "lainnya",    label: "Lainnya",     icon: "✨", note: "Merek lain" },
+    { id: "antam",    label: "Antam",      icon: "🏅", note: "Logam Mulia" },
+    { id: "ubs",      label: "UBS",         icon: "🥇", note: "UBS Gold" },
+    { id: "galeri24", label: "Pegadaian",   icon: "🏪", note: "Galeri 24" },
+    { id: "lotus",    label: "Lotus Archi", icon: "🌸", note: "Lotus Gold" },
+    { id: "lainnya",  label: "Lainnya",     icon: "✨", note: "Merek lain" },
 ];
 
 const emptyForm = (type = "reksa_dana") => ({
@@ -204,19 +209,12 @@ const emptyForm = (type = "reksa_dana") => ({
 // ── Cari harga emas dari API berdasarkan brand + berat (gram) ──
 function lookupGoldPrice(goldPrices, brand, quantityGrams) {
     if (!goldPrices?.categories || !quantityGrams || quantityGrams <= 0) return null;
-    // Hanya support Antam untuk sekarang
-    if (brand && brand !== "antam") return null;
-    const batangan = goldPrices.categories["emas_batangan"] || [];
-    // Cari exact match berat gram, lalu fallback ke closest
-    const exact = batangan.find(i => Math.abs(i.weight_grams - quantityGrams) < 0.01);
-    if (exact) return exact.buy_price;
-    // Closest match (untuk berat custom)
-    if (batangan.length === 0) return null;
-    const byDiff = [...batangan].sort((a, b) => Math.abs(a.weight_grams - quantityGrams) - Math.abs(b.weight_grams - quantityGrams));
-    const closest = byDiff[0];
-    // Interpolate: harga per gram × quantity
-    if (closest.price_per_gram > 0) return Math.round(closest.price_per_gram * quantityGrams);
-    return null;
+    if (brand === "lainnya") {
+        // Pakai harga per gram Antam sebagai referensi
+        const hargaPerGram = getHargaPerGram(goldPrices);
+        return hargaPerGram > 0 ? Math.round(hargaPerGram * quantityGrams) : null;
+    }
+    return lookupPrice(goldPrices, brand, quantityGrams);
 }
 
 const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, onRefreshGold, refreshingGold }) => {
@@ -225,18 +223,63 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const [editTarget, setEditTarget] = useState(null);
     const [form, setForm] = useState(emptyForm());
     const [confirmDelete, setConfirmDelete] = useState(null);
-    const [priceTarget, setPriceTarget] = useState(null); // aset yg sedang dilihat harganya
+    const [priceTarget, setPriceTarget] = useState(null);
+
+    // Cache harga per brand — fetch lazy saat brand dipilih
+    const [brandPrices, setBrandPrices] = useState({});
+    const fetchingRef = useRef({});
+
+    const loadBrandPrices = async (brand) => {
+        if (!brand || brand === "lainnya") return;
+        if (brandPrices[brand] || fetchingRef.current[brand]) return;
+        fetchingRef.current[brand] = true;
+        try {
+            const data = await fetchGoldPrices(brand);
+            setBrandPrices(p => ({ ...p, [brand]: data }));
+        } catch (_) {
+            // silent fail — fallback ke Antam
+        } finally {
+            fetchingRef.current[brand] = false;
+        }
+    };
+
+    // Auto-fetch harga semua brand emas yang ada di portfolio saat mount
+    useEffect(() => {
+        const brands = [...new Set(
+            investments
+                .filter(inv => inv.type === "emas" && inv.brand && inv.brand !== "lainnya" && inv.brand !== "antam")
+                .map(inv => inv.brand)
+        )];
+        brands.forEach(loadBrandPrices);
+    }, [investments]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Fetch harga saat brand form berubah
+    useEffect(() => {
+        if (form.type === "emas" && form.brand) loadBrandPrices(form.brand);
+    }, [form.brand, form.type]);
+
+    // Fetch harga saat buka detail aset
+    useEffect(() => {
+        if (priceTarget?.type === "emas" && priceTarget?.brand) loadBrandPrices(priceTarget.brand);
+    }, [priceTarget]);
+
+    // Ambil goldPrices yang relevan: cached brand, atau Antam untuk "lainnya"/antam/null
+    const getGoldPrices = (brand) => {
+        if (!brand || brand === "lainnya" || brand === "antam") return goldPrices;
+        return brandPrices[brand] ?? goldPrices; // fallback ke Antam jika brand belum di-fetch
+    };
 
     // Klik kartu harga → auto-isi form tambah investasi
     const handleSelectGoldPrice = (item, category) => {
         const isPerak = category?.includes("perak");
+        const brand = isPerak ? null : (goldPrices?.brand || "antam");
         setEditTarget(null);
         setForm(p => ({
             ...p,
             type:          isPerak ? "lainnya" : "emas",
             icon:          isPerak ? "🥈" : "🥇",
             color:         isPerak ? "#94a3b8" : "#f59e0b",
-            brand:         isPerak ? null : "antam",
+            brand,
             buy_price:     String(item.buy_price),
             current_value: String(item.buy_price),
             quantity:      item.weight_grams > 0 ? String(item.weight_grams) : p.quantity,
@@ -305,7 +348,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     // Untuk emas: pakai live price dari API jika ada, fallback ke DB
     const totalNilai = investments.reduce((a, i) => {
         const live = i.type === "emas" && i.quantity
-            ? lookupGoldPrice(goldPrices, i.brand, i.quantity)
+            ? lookupGoldPrice(getGoldPrices(i.brand), i.brand, i.quantity)
             : null;
         return a + (live ?? i.current_value);
     }, 0);
@@ -360,8 +403,15 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
                 {investments.map(inv => {
                     // Untuk emas: coba ambil nilai live dari API, fallback ke DB
-                    const livePrice  = inv.type === "emas" && inv.quantity
-                        ? lookupGoldPrice(goldPrices, inv.brand, inv.quantity)
+                    // Jika tidak ada quantity, estimasi dari buy_price ÷ harga_per_gram
+                    const goldData = inv.type === "emas" ? getGoldPrices(inv.brand) : null;
+                    let effectiveQty = inv.quantity;
+                    if (inv.type === "emas" && !effectiveQty && goldData) {
+                        const hpg = getHargaPerGram(goldData);
+                        if (hpg > 0 && inv.buy_price > 0) effectiveQty = inv.buy_price / hpg;
+                    }
+                    const livePrice = inv.type === "emas" && effectiveQty
+                        ? lookupGoldPrice(goldData, inv.brand, effectiveQty)
                         : null;
                     const currentVal = livePrice ?? inv.current_value;
                     const isLive     = livePrice !== null;
@@ -502,11 +552,11 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 6 }}>Opsional — pilih merek jika ingin tracking per brand</div>
                                 )}
                                 {/* Harga referensi — hanya muncul saat pilih Antam */}
-                                {form.brand === "antam" && goldPrices && (
+                                {form.type === "emas" && form.brand && form.brand !== "lainnya" && getGoldPrices(form.brand) && (
                                     <GoldPricePanel
-                                        goldPrices={goldPrices}
-                                        onRefresh={onRefreshGold}
-                                        refreshing={refreshingGold}
+                                        goldPrices={getGoldPrices(form.brand)}
+                                        onRefresh={form.brand === "antam" ? onRefreshGold : undefined}
+                                        refreshing={form.brand === "antam" ? refreshingGold : false}
                                         onSelectPrice={handleSelectGoldPrice}
                                     />
                                 )}
@@ -630,7 +680,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                             {/* Nilai live saat ini */}
                             {(() => {
                                 const live = priceTarget.type === "emas" && priceTarget.quantity
-                                    ? lookupGoldPrice(goldPrices, priceTarget.brand, priceTarget.quantity)
+                                    ? lookupGoldPrice(getGoldPrices(priceTarget.brand), priceTarget.brand, priceTarget.quantity)
                                     : null;
                                 const cur = live ?? priceTarget.current_value;
                                 const gain = cur - priceTarget.buy_price;
@@ -661,11 +711,11 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                             })()}
 
                             {/* Panel harga — tergantung tipe & merek */}
-                            {priceTarget.type === "emas" && priceTarget.brand === "antam" && goldPrices ? (
+                            {priceTarget.type === "emas" && priceTarget.brand && priceTarget.brand !== "lainnya" && getGoldPrices(priceTarget.brand) ? (
                                 <GoldPricePanel
-                                    goldPrices={goldPrices}
-                                    onRefresh={onRefreshGold}
-                                    refreshing={refreshingGold}
+                                    goldPrices={getGoldPrices(priceTarget.brand)}
+                                    onRefresh={priceTarget.brand === "antam" ? onRefreshGold : undefined}
+                                    refreshing={priceTarget.brand === "antam" ? refreshingGold : false}
                                     onSelectPrice={(item, cat) => { handleSelectGoldPrice(item, cat); setPriceTarget(null); }}
                                 />
                             ) : (
