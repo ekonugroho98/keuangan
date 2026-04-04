@@ -432,6 +432,45 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         showToast("Target dihapus");
     };
 
+    // Topup goal — opsional catat sebagai transaksi + kurangi saldo akun
+    const topupGoal = async (goalId, goal, amount, accountName) => {
+        // 1. Update goal current
+        const newCurrent = goal.current + amount;
+        const { data: updGoal, error: gErr } = await supabase
+            .from("goals").update({ current: newCurrent }).eq("id", goalId).select().single();
+        if (gErr) { showToast("Gagal memperbarui target", "error"); return; }
+        setGoals(p => p.map(g => g.id === goalId ? updGoal : g));
+
+        // 2. Jika pilih akun → catat transaksi expense + kurangi saldo
+        if (accountName) {
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+            const tx = {
+                user_id: user.id, type: "expense", amount,
+                category: "Tabungan & Goal",
+                note: `Tabungan: ${goal.name}`,
+                date: dateStr,
+                account_name: accountName,
+                icon: "🎯",
+            };
+            const { data: newTx } = await supabase.from("transactions").insert(tx).select().single();
+            if (newTx) setTransactions(p => [newTx, ...p]);
+
+            // Kurangi saldo akun
+            const acc = accounts.find(a => a.name === accountName);
+            if (acc) {
+                const newBal = Math.max(0, acc.balance - amount);
+                const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
+                if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
+            }
+            showToast(`💰 +Rp ${amount.toLocaleString("id-ID")} ditabung dari ${accountName}`);
+        } else {
+            showToast(`💰 Dana bertambah Rp ${amount.toLocaleString("id-ID")}!`);
+        }
+
+        if (newCurrent >= goal.target) showToast(`🎉 Target "${goal.name}" tercapai!`);
+    };
+
     // ── DEBTS CRUD ───────────────────────────────────────────
     const addDebt = async (payload) => {
         const { data, error } = await supabase.from("debts").insert({ user_id: user.id, ...payload }).select().single();
@@ -1038,7 +1077,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} />}
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
-                    {activeMenu === "goals" && <GoalsView goals={goals} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} />}
+                    {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={topupGoal} />}
                     {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={payDebt} accounts={accounts} />}
                     {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
