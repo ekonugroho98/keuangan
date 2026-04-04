@@ -15,6 +15,7 @@ const Sidebar = ({
     onUpdateName, onUpdatePassword, onExportCSV, onDeleteAccount,
     userSettings, onSaveSettings,
     aiConfig, onSaveAiConfig,
+    aiSettingsTrigger,
 }) => {
     const { t, lang, setLang, languages } = useLanguage();
     const { themeId, toggleTheme } = useTheme();
@@ -68,6 +69,13 @@ const Sidebar = ({
     useEffect(() => {
         if (appName !== "Karaya") document.title = `${appName} — Duit Lu, Kendali Lu`;
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /* open AI settings panel when triggered externally (from AiView "⚙️ Ganti" button) */
+    useEffect(() => {
+        if (!aiSettingsTrigger) return;
+        setShowProfileMenu(true);
+        setProfileView("ai");
+    }, [aiSettingsTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ── handlers ── */
     const handleUpdateName = async () => {

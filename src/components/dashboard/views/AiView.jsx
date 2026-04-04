@@ -94,7 +94,25 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
 
                 {/* Chat */}
                 <div style={{ height: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                    {aiChat.map((m, i) => (
+                    {aiChat.map((m, i) => {
+                        if (m.role === "thinking") return (
+                            <div key={i} style={{
+                                alignSelf: "flex-start", maxWidth: "82%",
+                                padding: "8px 14px", borderRadius: "12px 12px 12px 4px",
+                                background: "rgba(96,252,198,.05)",
+                                border: "1px dashed rgba(96,252,198,.3)",
+                                color: "var(--color-primary)", fontSize: 12, lineHeight: 1.5,
+                                animation: "slideUp .3s", display: "flex", alignItems: "center", gap: 8,
+                            }}>
+                                <span style={{ display: "inline-flex", gap: 3 }}>
+                                    {[0,1,2].map(j => (
+                                        <span key={j} style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--color-primary)", display: "inline-block", animation: `bounce .9s ${j * 0.15}s ease-in-out infinite` }} />
+                                    ))}
+                                </span>
+                                <span style={{ opacity: 0.8 }}>{m.text}</span>
+                            </div>
+                        );
+                        return (
                         <div key={i} style={{
                             alignSelf: m.role === "user" ? "flex-end" : "flex-start",
                             maxWidth: "82%", padding: "12px 16px",
@@ -113,7 +131,8 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                             fontSize: 14, lineHeight: 1.7, animation: "slideUp .3s",
                             whiteSpace: "pre-wrap",
                         }}>{m.text}</div>
-                    ))}
+                        );
+                    })}
                     {aiTyping && (
                         <div style={{ alignSelf: "flex-start", padding: "12px 16px", borderRadius: "16px 16px 16px 4px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)" }}>
                             <span style={{ display: "inline-flex", gap: 4 }}>
