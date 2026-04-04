@@ -50,7 +50,7 @@ function DeadlineBadge({ deadline, done }) {
     );
 }
 
-const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
+const GoalsView = ({ goals, accounts = [], onAdd, onEdit, onDelete, onTopup }) => {
     const { t } = useLanguage();
     const [showModal,    setShowModal]    = useState(false);
     const [editTarget,   setEditTarget]   = useState(null);
@@ -58,9 +58,11 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
     const [confirmDelete, setConfirmDelete] = useState(null);
 
     // Topup state
-    const [topupTarget, setTopupTarget] = useState(null);   // goal yg sedang di-topup
-    const [topupAmount, setTopupAmount] = useState("");
+    const [topupTarget,  setTopupTarget]  = useState(null);   // goal yg sedang di-topup
+    const [topupAmount,  setTopupAmount]  = useState("");
     const [topupLoading, setTopupLoading] = useState(false);
+    const [topupRecord,  setTopupRecord]  = useState(false);  // toggle "catat sebagai transaksi"
+    const [topupAccount, setTopupAccount] = useState("");
 
     const openAdd = () => {
         setEditTarget(null);
@@ -91,12 +93,15 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
 
     const handleTopup = async () => {
         if (!topupAmount || parseInt(topupAmount) <= 0 || !topupTarget) return;
+        if (topupRecord && !topupAccount) return; // akun wajib jika toggle aktif
         setTopupLoading(true);
-        const added   = parseInt(topupAmount);
-        const newVal  = topupTarget.current + added;
-        await onEdit(topupTarget.id, { ...topupTarget, current: newVal });
+        const amount      = parseInt(topupAmount);
+        const accountName = topupRecord ? topupAccount : null;
+        await onTopup(topupTarget.id, topupTarget, amount, accountName);
         setTopupTarget(null);
         setTopupAmount("");
+        setTopupRecord(false);
+        setTopupAccount("");
         setTopupLoading(false);
     };
 
@@ -178,7 +183,7 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
                             <div style={{ display: "flex", gap: 8 }}>
                                 {!done && (
                                     <button
-                                        onClick={() => { setTopupTarget(g); setTopupAmount(""); }}
+                                        onClick={() => { setTopupTarget(g); setTopupAmount(""); setTopupRecord(false); setTopupAccount(accounts[0]?.name || ""); }}
                                         style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: g.color + "20", color: g.color, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
                                     >
                                         💰 Tambah Dana
@@ -252,10 +257,49 @@ const GoalsView = ({ goals, onAdd, onEdit, onDelete }) => {
                             </div>
                         )}
 
+                        {/* Toggle: catat sebagai transaksi */}
+                        <div
+                            onClick={() => setTopupRecord(p => !p)}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: topupRecord ? "rgba(96,252,198,.06)" : "var(--bg-surface-low)", border: `1px solid ${topupRecord ? "rgba(96,252,198,.25)" : "var(--color-border-soft)"}`, borderRadius: 10, padding: "11px 14px", marginBottom: topupRecord ? 10 : 18, cursor: "pointer", transition: "all .15s" }}
+                        >
+                            <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>Catat sebagai pengeluaran</div>
+                                <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 2 }}>Kurangi saldo akun secara otomatis</div>
+                            </div>
+                            <div style={{ width: 36, height: 20, borderRadius: 10, background: topupRecord ? "var(--color-primary)" : "var(--color-border-soft)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
+                                <div style={{ position: "absolute", top: 2, left: topupRecord ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,.3)" }} />
+                            </div>
+                        </div>
+
+                        {/* Account selector — muncul jika toggle aktif */}
+                        {topupRecord && (
+                            <div style={{ marginBottom: 18 }}>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>DARI AKUN</label>
+                                {accounts.length === 0 ? (
+                                    <div style={{ fontSize: 12, color: "#f59e0b", background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 8, padding: "8px 12px" }}>
+                                        ⚠️ Belum ada akun — tambah akun terlebih dahulu
+                                    </div>
+                                ) : (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                        {accounts.map(acc => (
+                                            <button
+                                                key={acc.id}
+                                                onClick={() => setTopupAccount(acc.name)}
+                                                style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${topupAccount === acc.name ? topupTarget.color : "var(--color-border-soft)"}`, background: topupAccount === acc.name ? topupTarget.color + "18" : "transparent", color: topupAccount === acc.name ? topupTarget.color : "var(--color-subtle)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                            >
+                                                {acc.name}
+                                                <span style={{ marginLeft: 5, fontSize: 10, opacity: .7 }}>Rp {acc.balance?.toLocaleString("id-ID")}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <button
                             onClick={handleTopup}
-                            disabled={!topupAmount || parseInt(topupAmount) <= 0 || topupLoading}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !topupAmount || parseInt(topupAmount) <= 0 ? "var(--color-border-soft)" : `linear-gradient(135deg,${topupTarget.color},${topupTarget.color}cc)`, color: !topupAmount || parseInt(topupAmount) <= 0 ? "var(--color-muted)" : "#fff", fontWeight: 700, fontSize: 13, cursor: !topupAmount || parseInt(topupAmount) <= 0 ? "not-allowed" : "pointer", opacity: topupLoading ? .7 : 1, fontFamily: "inherit" }}
+                            disabled={!topupAmount || parseInt(topupAmount) <= 0 || topupLoading || (topupRecord && !topupAccount)}
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: (!topupAmount || parseInt(topupAmount) <= 0 || (topupRecord && !topupAccount)) ? "var(--color-border-soft)" : `linear-gradient(135deg,${topupTarget.color},${topupTarget.color}cc)`, color: (!topupAmount || parseInt(topupAmount) <= 0 || (topupRecord && !topupAccount)) ? "var(--color-muted)" : "#fff", fontWeight: 700, fontSize: 13, cursor: (!topupAmount || parseInt(topupAmount) <= 0 || (topupRecord && !topupAccount)) ? "not-allowed" : "pointer", opacity: topupLoading ? .7 : 1, fontFamily: "inherit" }}
                         >
                             {topupLoading ? "⏳ Menyimpan..." : "💰 Tambah Dana"}
                         </button>
