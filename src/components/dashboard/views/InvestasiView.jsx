@@ -607,6 +607,9 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 </label>
                                 <input type="number" value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} placeholder="10" min="0" required
                                     style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: `1px solid ${!form.quantity ? "rgba(255,113,108,.4)" : "var(--color-border-soft)"}`, borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                                {!form.quantity && (
+                                    <div style={{ fontSize: 10, color: "#ff716c", marginTop: 4 }}>Wajib diisi — diperlukan untuk harga live</div>
+                                )}
                             </div>
                             <div>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("inv.unitLabel")}</label>
