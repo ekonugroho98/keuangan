@@ -1,4 +1,6 @@
-const API_BASE = "https://karaya-api-jec2.vercel.app/api/stock";
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api/stock`
+  : "https://karaya-api-jec2.vercel.app/api/stock";
 
 /**
  * Fetch harga live saham IDX dari karaya-api (proxy Yahoo Finance)

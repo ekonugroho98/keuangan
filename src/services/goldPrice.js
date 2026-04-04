@@ -1,7 +1,9 @@
 // ─── Gold Price Service ────────────────────────────────────────────────────
 // Mengambil harga emas dari Karaya API (Vercel BE)
 
-const API_BASE = "https://karaya-api-jec2.vercel.app/api/gold";
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api/gold`
+  : "https://karaya-api-jec2.vercel.app/api/gold";
 
 // ── Label kategori Antam untuk UI ──
 export const CATEGORY_LABELS = {
