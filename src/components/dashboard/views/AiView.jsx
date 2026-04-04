@@ -63,11 +63,13 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
     const provider = AI_PROVIDERS[aiConfig.provider];
     const modelLabel = provider?.models.find(m => m.id === aiConfig.model)?.label || aiConfig.model;
 
+    // t() returns the key itself when translation not found → fallback ke string default
+    const tq = (key, fallback) => { const v = t(key); return v === key ? fallback : v; };
     const quickQuestions = [
-        t("ai.q1") || "Analisis pengeluaran bulan ini",
-        t("ai.q2") || "Tips hemat bulan ini",
-        t("ai.q3") || "Cek kondisi hutangku",
-        t("ai.q4") || "Gimana saving rate-ku?",
+        tq("ai.q1", "Analisis pengeluaran bulan ini"),
+        tq("ai.q2", "Tips hemat bulan ini"),
+        tq("ai.q3", "Cek kondisi hutangku"),
+        tq("ai.q4", "Gimana saving rate-ku?"),
     ];
 
     return (
