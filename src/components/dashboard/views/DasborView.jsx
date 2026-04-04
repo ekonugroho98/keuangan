@@ -31,7 +31,8 @@ function TrendChart({ transactions }) {
     });
 
     const maxVal = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
-    const barH   = 80; // max bar height px
+    const barH   = 90;
+    const hasAnyData = data.some(d => d.income > 0 || d.expense > 0);
 
     return (
         <div style={card}>
@@ -45,24 +46,44 @@ function TrendChart({ transactions }) {
                     <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#ff716c", marginRight: 4 }} />Keluar</span>
                 </div>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: barH + 28 }}>
-                {data.map((d, i) => {
-                    const iH = Math.round((d.income  / maxVal) * barH);
-                    const eH = Math.round((d.expense / maxVal) * barH);
-                    const isCurrentMonth = i === 5;
-                    return (
-                        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                            <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: barH }}>
-                                <div title={`Masuk: ${fmtRp(d.income)}`}
-                                    style={{ width: "44%", height: iH || 2, background: isCurrentMonth ? "var(--color-primary)" : "rgba(96,252,198,.35)", borderRadius: "3px 3px 0 0", transition: "height .6s", cursor: "default" }} />
-                                <div title={`Keluar: ${fmtRp(d.expense)}`}
-                                    style={{ width: "44%", height: eH || 2, background: isCurrentMonth ? "#ff716c" : "rgba(255,113,108,.35)", borderRadius: "3px 3px 0 0", transition: "height .6s", cursor: "default" }} />
-                            </div>
-                            <div style={{ fontSize: 9, color: isCurrentMonth ? "var(--color-text)" : "var(--color-subtle)", fontWeight: isCurrentMonth ? 700 : 400, textTransform: "capitalize" }}>{d.label}</div>
-                        </div>
-                    );
-                })}
-            </div>
+
+            {!hasAnyData ? (
+                <div style={{ height: barH + 28, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 12 }}>
+                    Belum ada data transaksi
+                </div>
+            ) : (
+                <div style={{ position: "relative" }}>
+                    {/* Grid lines */}
+                    {[0.25, 0.5, 0.75, 1].map(f => (
+                        <div key={f} style={{ position: "absolute", top: Math.round(barH * (1 - f)), left: 0, right: 0, height: 1, background: "var(--color-border-soft)", zIndex: 0 }} />
+                    ))}
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: barH + 28, position: "relative", zIndex: 1 }}>
+                        {data.map((d, i) => {
+                            const iH = d.income  > 0 ? Math.max(6, Math.round((d.income  / maxVal) * barH)) : 0;
+                            const eH = d.expense > 0 ? Math.max(6, Math.round((d.expense / maxVal) * barH)) : 0;
+                            const isCurrentMonth = i === 5;
+                            const isEmpty = d.income === 0 && d.expense === 0;
+                            return (
+                                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: barH }}>
+                                        {isEmpty ? (
+                                            <div style={{ width: "88%", height: 2, background: "var(--color-border-soft)", borderRadius: 2, alignSelf: "flex-end" }} />
+                                        ) : (
+                                            <>
+                                                <div title={`Masuk: ${fmtRp(d.income)}`}
+                                                    style={{ width: "44%", height: iH, background: isCurrentMonth ? "var(--color-primary)" : "rgba(96,252,198,.4)", borderRadius: "4px 4px 0 0", transition: "height .8s ease", cursor: "default" }} />
+                                                <div title={`Keluar: ${fmtRp(d.expense)}`}
+                                                    style={{ width: "44%", height: eH, background: isCurrentMonth ? "#ff716c" : "rgba(255,113,108,.4)", borderRadius: "4px 4px 0 0", transition: "height .8s ease", cursor: "default" }} />
+                                            </>
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: 9, color: isCurrentMonth ? "var(--color-text)" : "var(--color-subtle)", fontWeight: isCurrentMonth ? 700 : 400, textTransform: "capitalize" }}>{d.label}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
