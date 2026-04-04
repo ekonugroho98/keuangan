@@ -301,19 +301,22 @@ ATURAN PENTING:
 function buildEnrichedSystemPrompt(userName, financialData) {
   const { accounts = [], transactions = [], goals = [], debts = [], investments = [] } = financialData || {};
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
   const todayLabel = today.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  // Gunakan local date string (bukan toISOString) agar tidak kena timezone shift UTC
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
   const fmtRp = n => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 
-  // Helpers
-  const dateStr = (d) => d.toISOString().slice(0, 10);
+  // Helpers — gunakan local date (bukan ISO/UTC) agar tidak kena timezone shift
+  const localDate = (d) => {
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), dd = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${dd}`;
+  };
   const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-  const yesterday   = dateStr(addDays(today, -1));
-  const weekAgoStr  = dateStr(addDays(today, -6));
-  const thisMonthStart = dateStr(new Date(today.getFullYear(), today.getMonth(), 1));
-  const lastMonthStart = dateStr(new Date(today.getFullYear(), today.getMonth()-1, 1));
-  const lastMonthEnd   = dateStr(new Date(today.getFullYear(), today.getMonth(), 0));
-  const threeMonthsAgo = dateStr(new Date(today.getFullYear(), today.getMonth()-3, 1));
+  const yesterday      = localDate(addDays(today, -1));
+  const weekAgoStr     = localDate(addDays(today, -6));
+  const thisMonthStart = localDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  const lastMonthStart = localDate(new Date(today.getFullYear(), today.getMonth()-1, 1));
+  const lastMonthEnd   = localDate(new Date(today.getFullYear(), today.getMonth(), 0));
 
   const sumType = (list, type) => list.filter(t => t.type === type).reduce((a, t) => a + t.amount, 0);
   const savingRate = (inc, exp) => inc > 0 ? Math.round(((inc - exp) / inc) * 100) : 0;
@@ -343,7 +346,7 @@ function buildEnrichedSystemPrompt(userName, financialData) {
   const weekDaySummary = () => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
-      const d = dateStr(addDays(today, -i));
+      const d = localDate(addDays(today, -i));
       const dayTx = transactions.filter(t => t.date === d);
       if (!dayTx.length) continue;
       const inc = sumType(dayTx, "income");
@@ -365,8 +368,8 @@ function buildEnrichedSystemPrompt(userName, financialData) {
   const monthlyHistory = () => {
     const months = [];
     for (let i = 2; i >= 1; i--) {
-      const ms = dateStr(new Date(today.getFullYear(), today.getMonth()-i, 1));
-      const me = dateStr(new Date(today.getFullYear(), today.getMonth()-i+1, 0));
+      const ms = localDate(new Date(today.getFullYear(), today.getMonth()-i, 1));
+      const me = localDate(new Date(today.getFullYear(), today.getMonth()-i+1, 0));
       const mTx = transactions.filter(t => t.date >= ms && t.date <= me);
       if (!mTx.length) continue;
       const mLabel = new Date(ms).toLocaleDateString("id-ID", { month:"long", year:"numeric" });
