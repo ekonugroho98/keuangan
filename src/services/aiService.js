@@ -291,98 +291,177 @@ ATURAN PENTING:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENRICHED SYSTEM PROMPT — Embed semua data langsung (fallback tanpa tools)
+// ENRICHED SYSTEM PROMPT — Smart & ringkas (aman untuk 1000+ transaksi)
+// Strategi:
+//   • Hanya embed RINGKASAN per periode (bukan raw list semua transaksi)
+//   • Raw transaksi HANYA untuk hari ini + kemarin, max 25 item masing-masing
+//   • 7 hari terakhir: per-hari summary + top kategori (bukan per-transaksi)
+//   • Total context dijaga < ~3000 token (~12.000 karakter)
 // ─────────────────────────────────────────────────────────────────────────────
 function buildEnrichedSystemPrompt(userName, financialData) {
-  const { accounts = [], transactions = [], goals = [], debts = [], investments = [], recurrings = [] } = financialData || {};
+  const { accounts = [], transactions = [], goals = [], debts = [], investments = [] } = financialData || {};
   const today = new Date();
-  const todayStr = today.toISOString().slice(0,10);
+  const todayStr = today.toISOString().slice(0, 10);
   const todayLabel = today.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
   const fmtRp = n => `Rp ${Number(n||0).toLocaleString("id-ID")}`;
 
-  // Hitung periode
-  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
-  const lastMonthStart = new Date(today.getFullYear(), today.getMonth()-1, 1).toISOString().slice(0,10);
-  const lastMonthEnd   = new Date(today.getFullYear(), today.getMonth(), 0).toISOString().slice(0,10);
-  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
-  const yesterdayStr = yesterday.toISOString().slice(0,10);
-  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate()-6);
-  const weekAgoStr = weekAgo.toISOString().slice(0,10);
+  // Helpers
+  const dateStr = (d) => d.toISOString().slice(0, 10);
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const yesterday   = dateStr(addDays(today, -1));
+  const weekAgoStr  = dateStr(addDays(today, -6));
+  const thisMonthStart = dateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+  const lastMonthStart = dateStr(new Date(today.getFullYear(), today.getMonth()-1, 1));
+  const lastMonthEnd   = dateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+  const threeMonthsAgo = dateStr(new Date(today.getFullYear(), today.getMonth()-3, 1));
 
-  const txMonth    = transactions.filter(t => t.date >= thisMonthStart && t.date <= todayStr);
-  const txLastMonth= transactions.filter(t => t.date >= lastMonthStart && t.date <= lastMonthEnd);
-  const txToday    = transactions.filter(t => t.date === todayStr);
-  const txYesterday= transactions.filter(t => t.date === yesterdayStr);
-  const txWeek     = transactions.filter(t => t.date >= weekAgoStr && t.date <= todayStr);
+  const sumType = (list, type) => list.filter(t => t.type === type).reduce((a, t) => a + t.amount, 0);
+  const savingRate = (inc, exp) => inc > 0 ? Math.round(((inc - exp) / inc) * 100) : 0;
 
-  const sumTx = (list, type) => list.filter(t => t.type === type).reduce((a,t) => a+t.amount, 0);
-  const fmtTxList = (list) => list.length
-    ? list.map(t => `  ${t.date} | ${t.type==="income"?"Masuk":t.type==="transfer"?"Transfer":"Keluar"} | ${fmtRp(t.amount)} | ${t.category} | ${t.note||"-"}`).join("\n")
-    : "  (tidak ada)";
+  // Top kategori pengeluaran dari list
+  const topCategories = (list, limit = 8) => {
+    const cats = Object.entries(
+      list.filter(t => t.type === "expense")
+        .reduce((a, t) => { a[t.category] = (a[t.category] || 0) + t.amount; return a; }, {})
+    ).sort((a, b) => b[1] - a[1]).slice(0, limit);
+    return cats.length ? cats.map(([c, v]) => `  ${c}: ${fmtRp(v)}`).join("\n") : "  (tidak ada)";
+  };
 
-  const topCats = (list) => {
-    const cats = Object.entries(list.filter(t=>t.type==="expense").reduce((a,t)=>{a[t.category]=(a[t.category]||0)+t.amount;return a;},{}))
-      .sort((a,b)=>b[1]-a[1]).slice(0,8);
-    return cats.length ? cats.map(([c,v])=>`  ${c}: ${fmtRp(v)}`).join("\n") : "  (tidak ada)";
+  // Format list transaksi singkat (max N item)
+  const fmtTxList = (list, maxRows = 25) => {
+    if (!list.length) return "  (tidak ada transaksi)";
+    const sorted = [...list].sort((a, b) => b.date.localeCompare(a.date));
+    const typeIcon = t => t.type === "income" ? "➕" : t.type === "transfer" ? "↔️" : "➖";
+    const rows = sorted.slice(0, maxRows).map(t =>
+      `  ${typeIcon(t)} ${fmtRp(t.amount)} | ${t.category} | ${t.note || "-"}`
+    );
+    if (sorted.length > maxRows) rows.push(`  ... dan ${sorted.length - maxRows} transaksi lainnya`);
+    return rows.join("\n");
+  };
+
+  // Per-hari summary untuk 7 hari terakhir
+  const weekDaySummary = () => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = dateStr(addDays(today, -i));
+      const dayTx = transactions.filter(t => t.date === d);
+      if (!dayTx.length) continue;
+      const inc = sumType(dayTx, "income");
+      const exp = sumType(dayTx, "expense");
+      const label = i === 0 ? "Hari ini" : i === 1 ? "Kemarin" : new Date(d).toLocaleDateString("id-ID", { weekday:"short", day:"numeric" });
+      days.push(`  ${label} (${d}): ${dayTx.length} tx | masuk ${fmtRp(inc)} | keluar ${fmtRp(exp)}`);
+    }
+    return days.length ? days.join("\n") : "  (tidak ada transaksi 7 hari terakhir)";
+  };
+
+  // Filter per periode
+  const txToday     = transactions.filter(t => t.date === todayStr);
+  const txYesterday = transactions.filter(t => t.date === yesterday);
+  const txWeek      = transactions.filter(t => t.date >= weekAgoStr && t.date <= todayStr);
+  const txMonth     = transactions.filter(t => t.date >= thisMonthStart && t.date <= todayStr);
+  const txLastMonth = transactions.filter(t => t.date >= lastMonthStart && t.date <= lastMonthEnd);
+
+  // Ringkasan 3 bulan terakhir per bulan (tanpa raw tx)
+  const monthlyHistory = () => {
+    const months = [];
+    for (let i = 2; i >= 1; i--) {
+      const ms = dateStr(new Date(today.getFullYear(), today.getMonth()-i, 1));
+      const me = dateStr(new Date(today.getFullYear(), today.getMonth()-i+1, 0));
+      const mTx = transactions.filter(t => t.date >= ms && t.date <= me);
+      if (!mTx.length) continue;
+      const mLabel = new Date(ms).toLocaleDateString("id-ID", { month:"long", year:"numeric" });
+      const inc = sumType(mTx, "income"), exp = sumType(mTx, "expense");
+      months.push(`  ${mLabel}: masuk ${fmtRp(inc)}, keluar ${fmtRp(exp)}, saving ${savingRate(inc,exp)}%`);
+    }
+    return months.join("\n") || "  (tidak ada data)";
   };
 
   const sections = [];
 
-  // Akun
-  const totalSaldo = accounts.reduce((a,acc)=>a+acc.balance,0);
-  sections.push(`## AKUN (total: ${fmtRp(totalSaldo)})
-${accounts.map(a=>`  ${a.icon||"💳"} ${a.name} (${a.type}): ${fmtRp(a.balance)}`).join("\n")||"  (belum ada)"}`);
+  // 1. Akun & saldo
+  const totalSaldo = accounts.reduce((a, acc) => a + acc.balance, 0);
+  sections.push(`## AKUN & SALDO (total: ${fmtRp(totalSaldo)})
+${accounts.map(a => `  ${a.icon||"💳"} ${a.name} (${a.type}): ${fmtRp(a.balance)}`).join("\n") || "  (belum ada akun)"}`);
 
-  // Bulan ini
-  sections.push(`## BULAN INI (${thisMonthStart} s/d ${todayStr})
-Pemasukan : ${fmtRp(sumTx(txMonth,"income"))}
-Pengeluaran: ${fmtRp(sumTx(txMonth,"expense"))}
-Saving rate: ${sumTx(txMonth,"income")>0?Math.round(((sumTx(txMonth,"income")-sumTx(txMonth,"expense"))/sumTx(txMonth,"income"))*100):0}%
+  // 2. Bulan ini — ringkasan + top kategori
+  const incMonth = sumType(txMonth, "income"), expMonth = sumType(txMonth, "expense");
+  sections.push(`## BULAN INI (${thisMonthStart} s/d ${todayStr}) — ${txMonth.length} transaksi
+Pemasukan : ${fmtRp(incMonth)}
+Pengeluaran: ${fmtRp(expMonth)}
+Sisa/Nabung: ${fmtRp(incMonth - expMonth)}
+Saving rate: ${savingRate(incMonth, expMonth)}%
 Top pengeluaran:
-${topCats(txMonth)}`);
+${topCategories(txMonth)}`);
 
-  // Bulan lalu
-  sections.push(`## BULAN LALU (${lastMonthStart} s/d ${lastMonthEnd})
-Pemasukan : ${fmtRp(sumTx(txLastMonth,"income"))}
-Pengeluaran: ${fmtRp(sumTx(txLastMonth,"expense"))}`);
+  // 3. Bulan lalu — ringkasan + top kategori
+  const incLast = sumType(txLastMonth, "income"), expLast = sumType(txLastMonth, "expense");
+  sections.push(`## BULAN LALU (${lastMonthStart} s/d ${lastMonthEnd}) — ${txLastMonth.length} transaksi
+Pemasukan : ${fmtRp(incLast)}
+Pengeluaran: ${fmtRp(expLast)}
+Saving rate: ${savingRate(incLast, expLast)}%
+Top pengeluaran:
+${topCategories(txLastMonth)}`);
 
-  // Hari ini & kemarin
-  sections.push(`## HARI INI (${todayStr})
-${fmtTxList(txToday)}
+  // 4. Riwayat 2 bulan sebelumnya (ringkasan saja)
+  const hist = monthlyHistory();
+  if (hist !== "  (tidak ada data)") sections.push(`## RIWAYAT 2 BULAN SEBELUMNYA\n${hist}`);
 
-## KEMARIN (${yesterdayStr})
-${fmtTxList(txYesterday)}
+  // 5. 7 hari terakhir — per-hari summary + top kategori
+  const incWeek = sumType(txWeek, "income"), expWeek = sumType(txWeek, "expense");
+  sections.push(`## 7 HARI TERAKHIR (${weekAgoStr} s/d ${todayStr})
+Total: masuk ${fmtRp(incWeek)}, keluar ${fmtRp(expWeek)}
+Per hari:
+${weekDaySummary()}
+Top pengeluaran 7 hari:
+${topCategories(txWeek, 6)}`);
 
-## 7 HARI TERAKHIR (${weekAgoStr} s/d ${todayStr})
-Pengeluaran: ${fmtRp(sumTx(txWeek,"expense"))} | Pemasukan: ${fmtRp(sumTx(txWeek,"income"))}
-${fmtTxList(txWeek)}`);
+  // 6. Hari ini — raw list (max 25)
+  sections.push(`## HARI INI (${todayStr}) — ${txToday.length} transaksi
+${fmtTxList(txToday, 25)}`);
 
-  // Hutang
+  // 7. Kemarin — raw list (max 25)
+  sections.push(`## KEMARIN (${yesterday}) — ${txYesterday.length} transaksi
+${fmtTxList(txYesterday, 25)}`);
+
+  // 8. Hutang
   if (debts.length) {
-    const totalHutang = debts.reduce((a,d)=>a+d.remaining,0);
+    const totalHutang = debts.reduce((a, d) => a + (d.remaining || 0), 0);
     sections.push(`## HUTANG & CICILAN (total sisa: ${fmtRp(totalHutang)})
-${debts.map(d=>`  ${d.name}: sisa ${fmtRp(d.remaining)} dari ${fmtRp(d.total)} | cicilan ${fmtRp(d.monthly)}/bln`).join("\n")}`);
+${debts.map(d => `  ${d.name}: sisa ${fmtRp(d.remaining)} dari ${fmtRp(d.total)} | cicilan ${fmtRp(d.monthly)}/bln | jatuh tempo: ${d.due_date||"-"}`).join("\n")}`);
   }
 
-  // Goals
+  // 9. Goals
   if (goals.length) {
-    sections.push(`## TARGET FINANSIAL
-${goals.map(g=>{const pct=g.target>0?Math.round((g.current/g.target)*100):0;return `  ${g.icon||"🎯"} ${g.name}: ${fmtRp(g.current)} / ${fmtRp(g.target)} (${pct}%)`;}).join("\n")}`);
+    sections.push(`## TARGET FINANSIAL (${goals.length} goal)
+${goals.map(g => {
+  const pct = g.target > 0 ? Math.round((g.current / g.target) * 100) : 0;
+  return `  ${g.icon||"🎯"} ${g.name}: ${fmtRp(g.current)} / ${fmtRp(g.target)} (${pct}%) | deadline: ${g.deadline||"-"}`;
+}).join("\n")}`);
   }
 
-  // Investasi
+  // 10. Investasi
   if (investments.length) {
-    const totalModal = investments.reduce((a,i)=>a+i.buy_price,0);
-    const totalNilai = investments.reduce((a,i)=>a+i.current_value,0);
-    sections.push(`## INVESTASI & ASET
-Total modal: ${fmtRp(totalModal)} | Total nilai: ${fmtRp(totalNilai)}
-${investments.map(i=>{const g=i.current_value-i.buy_price;return `  ${i.name} (${i.type}): modal ${fmtRp(i.buy_price)}, nilai ${fmtRp(i.current_value)}, ${g>=0?"+":""}${fmtRp(g)}`;}).join("\n")}`);
+    const totalModal = investments.reduce((a, i) => a + (i.buy_price || 0), 0);
+    const totalNilai = investments.reduce((a, i) => a + (i.current_value || 0), 0);
+    const totalGain  = totalNilai - totalModal;
+    sections.push(`## INVESTASI & ASET (${investments.length} aset)
+Total modal: ${fmtRp(totalModal)} | Total nilai: ${fmtRp(totalNilai)} | ${totalGain >= 0 ? "+" : ""}${fmtRp(totalGain)}
+${investments.map(i => {
+  const g = (i.current_value || 0) - (i.buy_price || 0);
+  const pct = i.buy_price > 0 ? ((g / i.buy_price) * 100).toFixed(1) : 0;
+  return `  ${i.name} (${i.type}): modal ${fmtRp(i.buy_price)}, nilai ${fmtRp(i.current_value)}, ${g >= 0 ? "+" : ""}${fmtRp(g)} (${pct}%)`;
+}).join("\n")}`);
   }
+
+  // Statistik data (transparansi ke AI)
+  const totalTx = transactions.length;
+  const oldestTx = totalTx ? transactions.reduce((a, t) => t.date < a ? t.date : a, transactions[0].date) : "-";
 
   return `Kamu adalah Karaya AI, asisten keuangan pribadi untuk ${userName}. Hari ini: ${todayLabel}.
+Total data tersedia: ${totalTx} transaksi (tertua: ${oldestTx}).
+Catatan: untuk detail transaksi di luar 7 hari terakhir, sampaikan ke user bahwa kamu punya ringkasan bulanan saja.
 
-ATURAN: Jawab dalam Bahasa Indonesia, gunakan HANYA data di bawah ini, jangan mengarang angka.
-Jika data tidak ada, katakan jujur belum ada data yang tercatat.
+ATURAN: Jawab Bahasa Indonesia. Gunakan HANYA angka dari data di bawah. Jangan mengarang.
 
 ${sections.join("\n\n")}`;
 }
