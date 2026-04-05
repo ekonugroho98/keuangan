@@ -31,7 +31,7 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                 <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     {/* Logo */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false); }}>
-                        <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#005e44" }}>K</div>
+                        <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#005e44" }}>{APP_NAME[0]}</div>
                         <span style={{ fontWeight: 800, fontSize: 18, color: "#fff" }}>{APP_NAME}</span>
                     </div>
 

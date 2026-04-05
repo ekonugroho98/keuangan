@@ -9,7 +9,7 @@ const Footer = () => {
             <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 20 }}>
                 <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                        <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: "#fff" }}>K</div>
+                        <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: "#fff" }}>{APP_NAME[0]}</div>
                         <span style={{ fontWeight: 800, fontSize: 15, color: "#fff" }}>{APP_NAME}</span>
                     </div>
                     <p style={{ color: "#64748b", fontSize: 12 }}>{t("lp.footer.rights")}</p>
