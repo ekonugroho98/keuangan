@@ -1,6 +1,7 @@
 import FadeIn from "../ui/FadeIn";
 import GlowCard from "../ui/GlowCard";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { APP_AI_NAME } from "../../config/app";
 
 const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat }) => {
     const { t } = useLanguage();
@@ -35,7 +36,7 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                                 <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🤖</div>
                                 <div>
-                                    <div style={{ fontWeight: 700, fontSize: 13, color: "#fff" }}>Karaya AI</div>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: "#fff" }}>{APP_AI_NAME}</div>
                                     <div style={{ fontSize: 10, color: "#60fcc6" }}>{t("lp.ai.online")}</div>
                                 </div>
                             </div>

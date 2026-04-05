@@ -1,6 +1,7 @@
 // ─── AI Service — Multi-Provider + Tool Calling ───────────────────────────
 // Flow: AI minta data yang dibutuhkan via tools → sistem fetch → AI jawab
 // Tidak dump semua data sekaligus. Data selalu akurat, tidak ngaco.
+import { APP_AI_NAME } from "../config/app";
 
 export const AI_PROVIDERS = {
   openai: {
@@ -280,7 +281,7 @@ ${cats || "  (tidak ada pengeluaran)"}`;
 // ─────────────────────────────────────────────────────────────────────────────
 export function buildSystemPrompt(userName) {
   const today = new Date().toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
-  return `Kamu adalah Karaya AI, asisten keuangan pribadi untuk ${userName}. Hari ini: ${today}.
+  return `Kamu adalah ${APP_AI_NAME}, asisten keuangan pribadi untuk ${userName}. Hari ini: ${today}.
 
 ATURAN PENTING:
 1. SELALU gunakan tools untuk mengambil data sebelum menjawab pertanyaan tentang keuangan.
@@ -463,7 +464,7 @@ ${investments.map(i => {
   const totalTx = transactions.length;
   const oldestTx = totalTx ? transactions.reduce((a, t) => t.date < a ? t.date : a, transactions[0].date) : "-";
 
-  return `Kamu adalah Karaya AI, asisten keuangan pribadi untuk ${userName}. Hari ini: ${todayLabel}.
+  return `Kamu adalah ${APP_AI_NAME}, asisten keuangan pribadi untuk ${userName}. Hari ini: ${todayLabel}.
 Total data tersedia: ${totalTx} transaksi (tertua: ${oldestTx}).
 Catatan: untuk detail transaksi di luar 7 hari terakhir, sampaikan ke user bahwa kamu punya ringkasan bulanan saja.
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { APP_AI_NAME } from "../config/app";
 import Navbar from "../components/landing/Navbar";
 import HeroSection from "../components/landing/HeroSection";
 import FeaturesSection from "../components/landing/FeaturesSection";
@@ -23,7 +24,7 @@ const LandingPage = ({ showToast }) => {
     const [formErrors, setFormErrors] = useState({});
     const [formStep, setFormStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    const [chatMessages, setChatMessages] = useState([{ role: "ai", text: "Halo! Gue Karaya AI 👋 Tanya apa aja soal keuangan lu!" }]);
+    const [chatMessages, setChatMessages] = useState([{ role: "ai", text: `Halo! Gue ${APP_AI_NAME} 👋 Tanya apa aja soal keuangan lu!` }]);
     const [chatInput, setChatInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
 

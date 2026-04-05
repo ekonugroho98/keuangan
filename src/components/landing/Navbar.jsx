@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { APP_NAME } from "../../config/app";
 
 const Navbar = ({ scrollY, onLogin, onSignup }) => {
     const { t, lang, setLang, languages } = useLanguage();
@@ -31,7 +32,7 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                     {/* Logo */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false); }}>
                         <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#005e44" }}>K</div>
-                        <span style={{ fontWeight: 800, fontSize: 18, color: "#fff" }}>Karaya</span>
+                        <span style={{ fontWeight: 800, fontSize: 18, color: "#fff" }}>{APP_NAME}</span>
                     </div>
 
                     {/* Desktop Nav */}

@@ -3,6 +3,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../i18n/ThemeContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { AI_PROVIDERS, PROVIDER_ORDER, DEFAULT_MODEL } from "../../services/aiService";
+import { APP_NAME, APP_TAGLINE } from "../../config/app";
 
 const AVATAR_COLORS = [
     "#60fcc6","#4FC3F7","#f59e0b","#ff716c",
@@ -36,10 +37,10 @@ const Sidebar = ({
         () => localStorage.getItem("karaya_avatar_color") || "var(--color-primary)"
     );
     const [appName,    setAppName]    = useState(
-        () => localStorage.getItem("karaya_app_name")    || "Karaya"
+        () => localStorage.getItem("karaya_app_name")    || APP_NAME
     );
     const [appTagline, setAppTagline] = useState(
-        () => localStorage.getItem("karaya_app_tagline") || "Wealth Ledger"
+        () => localStorage.getItem("karaya_app_tagline") || APP_TAGLINE
     );
     const [editAppName,    setEditAppName]    = useState("");
     const [editAppTagline, setEditAppTagline] = useState("");
@@ -67,7 +68,7 @@ const Sidebar = ({
 
     /* sync browser tab title with custom app name on mount */
     useEffect(() => {
-        if (appName !== "Karaya") document.title = `${appName} — Duit Lu, Kendali Lu`;
+        if (appName !== APP_NAME) document.title = `${appName} — Duit Lu, Kendali Lu`;
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* open AI settings panel when triggered externally (from AiView "⚙️ Ganti" button) */
@@ -105,8 +106,8 @@ const Sidebar = ({
     };
 
     const handleSaveAppName = () => {
-        const name    = editAppName.trim()    || "Karaya";
-        const tagline = editAppTagline.trim() || "Wealth Ledger";
+        const name    = editAppName.trim()    || APP_NAME;
+        const tagline = editAppTagline.trim() || APP_TAGLINE;
         setAppName(name);
         setAppTagline(tagline);
         localStorage.setItem("karaya_app_name",    name);
@@ -333,7 +334,7 @@ const Sidebar = ({
                     value={editAppName}
                     onChange={e => setEditAppName(e.target.value)}
                     style={{ ...inputSt, marginBottom: 10 }}
-                    placeholder={`Nama aplikasi (default: Karaya)`}
+                    placeholder={`Nama aplikasi (default: ${APP_NAME})`}
                     maxLength={24}
                 />
                 <div style={sectionLabel}>TAGLINE / SUBTITLE</div>
@@ -360,13 +361,13 @@ const Sidebar = ({
                 <button style={primaryBtn(false)} onClick={handleSaveAppName}>
                     Simpan
                 </button>
-                {(appName !== "Karaya" || appTagline !== "Wealth Ledger") && (
+                {(appName !== APP_NAME || appTagline !== APP_TAGLINE) && (
                     <button onClick={() => {
-                        setAppName("Karaya"); setAppTagline("Wealth Ledger");
+                        setAppName(APP_NAME); setAppTagline(APP_TAGLINE);
                         localStorage.removeItem("karaya_app_name");
                         localStorage.removeItem("karaya_app_tagline");
                         document.title = "Karaya — Duit Lu, Kendali Lu";
-                        onSaveSettings?.({ app_name: "Karaya", app_tagline: "Wealth Ledger" });
+                        onSaveSettings?.({ app_name: APP_NAME, app_tagline: APP_TAGLINE });
                         setProfileView("menu");
                     }} style={{ marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                         ↺ Reset ke Default

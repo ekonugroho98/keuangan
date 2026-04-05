@@ -1,4 +1,5 @@
 import { useLanguage } from "../../i18n/LanguageContext";
+import { APP_NAME } from "../../config/app";
 
 const Footer = () => {
     const { t } = useLanguage();
@@ -9,7 +10,7 @@ const Footer = () => {
                 <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                         <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: "#fff" }}>K</div>
-                        <span style={{ fontWeight: 800, fontSize: 15, color: "#fff" }}>Karaya</span>
+                        <span style={{ fontWeight: 800, fontSize: 15, color: "#fff" }}>{APP_NAME}</span>
                     </div>
                     <p style={{ color: "#64748b", fontSize: 12 }}>{t("lp.footer.rights")}</p>
                 </div>
