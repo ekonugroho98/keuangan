@@ -336,10 +336,23 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
 
     const openEdit = (inv) => {
         setEditTarget(inv);
+
+        // Hitung harga live jika tersedia, gunakan sebagai nilai sekarang di form
+        const liveGold = inv.type === "emas" && inv.quantity
+            ? lookupGoldPrice(getGoldPrices(inv.brand), inv.brand, inv.quantity)
+            : null;
+        const stockD   = inv.type === "saham" && inv.kode_saham
+            ? stockPrices[inv.kode_saham.toUpperCase()]
+            : null;
+        const liveStock = stockD && inv.quantity
+            ? calcStockValue(stockD.price, inv.quantity)
+            : null;
+        const liveCurrentValue = liveGold ?? liveStock ?? inv.current_value;
+
         setForm({
             name: inv.name, type: inv.type, icon: inv.icon, color: inv.color,
             brand: inv.brand || null,
-            buy_price: String(inv.buy_price), current_value: String(inv.current_value),
+            buy_price: String(inv.buy_price), current_value: String(liveCurrentValue),
             quantity: inv.quantity ? String(inv.quantity) : "",
             unit: inv.unit || "unit",
             buy_date: inv.buy_date || "", notes: inv.notes || "",
