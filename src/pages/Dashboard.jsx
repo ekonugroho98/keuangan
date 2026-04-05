@@ -14,6 +14,7 @@ import KategoriView from "../components/dashboard/views/KategoriView";
 import BerulangView from "../components/dashboard/views/BerulangView";
 import GoalsView from "../components/dashboard/views/GoalsView";
 import HutangView from "../components/dashboard/views/HutangView";
+import PiutangView from "../components/dashboard/views/PiutangView";
 import InvestasiView from "../components/dashboard/views/InvestasiView";
 import LaporanView from "../components/dashboard/views/LaporanView";
 import AiView from "../components/dashboard/views/AiView";
@@ -52,6 +53,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [transactions, setTransactions] = useState([]);
     const [goals, setGoals] = useState([]);
     const [debts, setDebts] = useState([]);
+    const [piutang, setPiutang] = useState([]);
     const [recurrings, setRecurrings] = useState([]);
     const [customCategories, setCustomCategories] = useState([]);
     const [investments, setInvestments] = useState([]);
@@ -194,7 +196,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const fetchAll = async () => {
         setLoading(true);
         try {
-        const [accs, txs, gls, dbs, sub, cats, recs, invs, buds, splits] = await Promise.all([
+        const [accs, txs, gls, dbs, sub, cats, recs, invs, buds, splits, piu] = await Promise.all([
             supabase.from("accounts").select("*").order("created_at"),
             supabase.from("transactions").select("*").order("date", { ascending: false }),
             supabase.from("goals").select("*").order("created_at"),
@@ -205,6 +207,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             supabase.from("investments").select("*").order("created_at"),
             supabase.from("budgets").select("*").order("created_at"),
             supabase.from("split_bills").select("*, split_bill_members(*)").order("created_at", { ascending: false }),
+            supabase.from("piutang").select("*").order("created_at"),
         ]);
 
         // Buat trial subscription jika belum ada
@@ -316,6 +319,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         if (invs.data) setInvestments(invs.data);
         if (buds.data) setBudgets(buds.data);
         if (splits.data) setSplitBills(splits.data);
+        if (piu.data) setPiutang(piu.data);
         setLoading(false);
         } catch (err) {
             console.error("fetchAll error:", err);
@@ -523,6 +527,60 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         if (updDebt) setDebts(p => p.map(d => d.id === debt.id ? updDebt : d));
 
         showToast(`✅ Cicilan ${debt.name} Rp ${amount.toLocaleString("id-ID")} berhasil dicatat!`);
+    };
+
+    // ── PIUTANG CRUD ─────────────────────────────────────────
+    const addPiutang = async (payload) => {
+        const { data, error } = await supabase.from("piutang").insert({ user_id: user.id, ...payload }).select().single();
+        if (error) { showToast("Gagal menyimpan piutang", "error"); return; }
+        setPiutang(p => [...p, data]);
+        showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
+    };
+
+    const editPiutang = async (id, payload) => {
+        const { data, error } = await supabase.from("piutang").update(payload).eq("id", id).select().single();
+        if (error) { showToast("Gagal mengubah piutang", "error"); return; }
+        setPiutang(p => p.map(d => d.id === id ? data : d));
+        showToast(`✅ Piutang "${data.borrower_name}" diperbarui!`);
+    };
+
+    const deletePiutang = async (id) => {
+        const { error } = await supabase.from("piutang").delete().eq("id", id);
+        if (error) { showToast("Gagal menghapus piutang", "error"); return; }
+        setPiutang(p => p.filter(d => d.id !== id));
+        showToast("Piutang dihapus");
+    };
+
+    // ── TERIMA KEMBALI PIUTANG ───────────────────────────────
+    const terimaPiutang = async (item, amount, accountName) => {
+        const today = new Date().toISOString().slice(0, 10);
+
+        // 1. Catat transaksi pemasukan
+        const tx = {
+            user_id: user.id, type: "income", amount,
+            category: "Piutang",
+            note: `Pembayaran piutang dari ${item.borrower_name}`,
+            date: today,
+            account_name: accountName,
+            icon: "🤝",
+        };
+        const { data: newTx } = await supabase.from("transactions").insert(tx).select().single();
+        if (newTx) setTransactions(p => [newTx, ...p]);
+
+        // 2. Tambah saldo akun
+        const acc = accounts.find(a => a.name === accountName);
+        if (acc) {
+            const newBal = acc.balance + amount;
+            const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
+            if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
+        }
+
+        // 3. Kurangi sisa piutang
+        const newRemaining = Math.max(0, item.remaining - amount);
+        const { data: updPiu } = await supabase.from("piutang").update({ remaining: newRemaining }).eq("id", item.id).select().single();
+        if (updPiu) setPiutang(p => p.map(d => d.id === item.id ? updPiu : d));
+
+        showToast(`✅ Terima Rp ${amount.toLocaleString("id-ID")} dari ${item.borrower_name} berhasil dicatat!`);
     };
 
     // ── RECURRING TRANSACTIONS ───────────────────────────────
@@ -1080,6 +1138,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
                     {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={topupGoal} />}
                     {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={payDebt} accounts={accounts} />}
+                    {activeMenu === "piutang" && <PiutangView piutang={piutang} onAdd={addPiutang} onEdit={editPiutang} onDelete={deletePiutang} onTerima={terimaPiutang} accounts={accounts} />}
                     {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}

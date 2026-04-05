@@ -253,7 +253,7 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 ## 7. Aplikasi Siap Dipakai
 
-Kamu akan diarahkan ke halaman login aplikasi Karaya Finance.
+Kamu akan diarahkan ke halaman login aplikasi.
 
 **Daftar akun pertama kali:**
 
@@ -262,12 +262,28 @@ Kamu akan diarahkan ke halaman login aplikasi Karaya Finance.
 3. Cek email → klik link konfirmasi dari Supabase
 4. Login → aplikasi siap digunakan ✅
 
-> 📸 _[SS: halaman login Karaya Finance]_
+> 📸 _[SS: halaman login aplikasi]_
 
 > 📸 _[SS: tampilan dasbor setelah berhasil login]_
 
 > 💡 URL aplikasimu bisa ditemukan di dashboard Vercel, contoh:
 > `https://keuangan-namakamu.vercel.app`
+
+### Fitur yang Tersedia
+
+| Menu | Fitur |
+|------|-------|
+| 💳 **Transaksi** | Catat pemasukan & pengeluaran harian |
+| 🏦 **Akun** | Kelola saldo rekening, dompet, e-wallet |
+| 🔄 **Transaksi Berulang** | Otomasi tagihan rutin (listrik, sewa, dll) |
+| 🧾 **Split Bill** | Bagi tagihan dengan teman |
+| 🎯 **Target Finansial** | Tabung untuk tujuan tertentu |
+| 📋 **Hutang & Cicilan** | Pantau cicilan KPR, motor, dll |
+| 🤝 **Piutang** | Catat uang yang dipinjamkan ke orang lain |
+| 📈 **Investasi & Aset** | Reksa dana, saham (harga live IDX), emas, crypto |
+| 💰 **Anggaran** | Batas pengeluaran per kategori per bulan |
+| 📉 **Laporan** | Grafik tren & analitik keuangan |
+| 🤖 **AI Coach** | Analisis & saran keuangan personal (butuh API key sendiri) |
 
 ---
 
