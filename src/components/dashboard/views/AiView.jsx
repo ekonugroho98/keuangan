@@ -6,7 +6,7 @@ import { APP_AI_NAME } from "../../../config/app";
 // ── Setup screen ketika belum ada AI config ───────────────────────────────
 function AiSetupScreen({ onOpenSettings }) {
     return (
-        <div style={{ animation: "fadeIn .4s", maxWidth: 700 }}>
+        <div style={{ animation: "fadeIn .4s", maxWidth: 960 }}>
             <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: 32, textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 16 }}>🤖</div>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>AI Coach Belum Aktif</h2>
@@ -74,7 +74,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
     ];
 
     return (
-        <div style={{ animation: "fadeIn .4s", maxWidth: 700 }}>
+        <div style={{ animation: "fadeIn .4s", maxWidth: 960 }}>
             <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: 24 }}>
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--color-border-soft)" }}>
@@ -96,11 +96,11 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                 </div>
 
                 {/* Chat */}
-                <div style={{ height: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+                <div style={{ height: 500, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
                     {aiChat.map((m, i) => {
                         if (m.role === "thinking") return (
                             <div key={i} style={{
-                                alignSelf: "flex-start", maxWidth: "82%",
+                                alignSelf: "flex-start", maxWidth: "75%",
                                 padding: "8px 14px", borderRadius: "12px 12px 12px 4px",
                                 background: "rgba(96,252,198,.05)",
                                 border: "1px dashed rgba(96,252,198,.3)",
@@ -118,7 +118,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                         return (
                         <div key={i} style={{
                             alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                            maxWidth: "82%", padding: "12px 16px",
+                            maxWidth: "75%", padding: "12px 16px",
                             borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                             background: m.role === "user"
                                 ? "linear-gradient(135deg,#60fcc6,#19ce9b)"
