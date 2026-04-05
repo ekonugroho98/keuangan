@@ -143,6 +143,7 @@ const Sidebar = ({
         { group: t("nav.planning"), items: [
             { id: "goals",     label: t("nav.goals"),        icon: "🎯" },
             { id: "hutang",    label: t("nav.debts"),        icon: "📋" },
+            { id: "piutang",   label: t("nav.piutang"),      icon: "🤝" },
             { id: "investasi", label: t("nav.investments"),  icon: "📈" },
             { id: "anggaran",  label: t("nav.budgets"),      icon: "💰" },
         ]},
