@@ -1,3 +1,5 @@
+import { APP_NAME } from "../../config/app";
+
 const plans = [
     {
         id: "trial",
@@ -99,7 +101,7 @@ const PricingModal = ({ open, onClose, currentPlan }) => {
                         Pilih Paket Langganan
                     </h2>
                     <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
-                        Akses semua fitur Karaya dan kelola keuangan lebih cerdas
+                        Akses semua fitur {APP_NAME} dan kelola keuangan lebih cerdas
                     </p>
                 </div>
 

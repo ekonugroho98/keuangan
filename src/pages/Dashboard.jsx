@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchGoldPrices } from "../services/goldPrice";
 import { sendAiMessage, buildSystemPrompt } from "../services/aiService";
+import { APP_AI_NAME } from "../config/app";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -60,7 +61,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [loading, setLoading] = useState(true);
     const [showPricing, setShowPricing] = useState(false);
 
-    const [aiChat, setAiChat] = useState([{ role: "ai", text: `Halo ${userName.split(" ")[0]}! 👋 Gue Karaya AI. Mau analisis keuangan atau tanya apa?` }]);
+    const [aiChat, setAiChat] = useState([{ role: "ai", text: `Halo ${userName.split(" ")[0]}! 👋 Gue ${APP_AI_NAME}. Mau analisis keuangan atau tanya apa?` }]);
     const [aiInput, setAiInput] = useState("");
     const [aiTyping, setAiTyping] = useState(false);
 

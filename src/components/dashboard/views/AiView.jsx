@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { AI_PROVIDERS, PROVIDER_ORDER } from "../../../services/aiService";
+import { APP_AI_NAME } from "../../../config/app";
 
 // ── Setup screen ketika belum ada AI config ───────────────────────────────
 function AiSetupScreen({ onOpenSettings }) {
@@ -82,7 +83,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                             {provider?.icon || "🤖"}
                         </div>
                         <div>
-                            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>Karaya AI Financial Coach</div>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>{APP_AI_NAME} Financial Coach</div>
                             <div style={{ fontSize: 11, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 4 }}>
                                 ● {provider?.label} · {modelLabel}
                             </div>
