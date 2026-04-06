@@ -17,6 +17,7 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
 {
   "merchant": "Nama Toko",
   "date": "2026-04-06",
+  "subtotal": 200000,
   "items": [
     { "note": "Nama Produk 1", "amount": 15000, "category": "Makanan & Minuman" },
     { "note": "Nama Produk 2", "amount": 8500, "category": "Belanja" }
@@ -26,6 +27,7 @@ Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
 - note: nama produk singkat dan jelas
 - amount: harga total untuk item itu (qty × harga satuan), angka bulat tanpa titik/koma
+- subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - category: pilih salah satu: "Makanan & Minuman", "Transportasi", "Belanja", "Hiburan", "Kesehatan", "Pendidikan", "Tagihan", "Lainnya"
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
 - Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
@@ -172,6 +174,13 @@ const AddTransactionModal = ({
     const handleSaveMultiple = () => {
         const selected = scanItems.filter(i => i.selected);
         if (!selected.length) return;
+        // Validasi: tidak boleh ada item dengan amount 0
+        const zeroItems = selected.filter(i => !i.amount || i.amount <= 0);
+        if (zeroItems.length) {
+            setScanError(`❌ ${zeroItems.length} item memiliki jumlah Rp 0. Isi jumlahnya dulu.`);
+            return;
+        }
+        setScanError("");
         onSubmitMultiple && onSubmitMultiple(selected, scanAccount, scanResults?.date);
         resetScan();
     };
@@ -342,15 +351,39 @@ const AddTransactionModal = ({
                         ))}
                     </div>
 
-                    {/* Total */}
-                    {scanItems.filter(i => i.selected).length > 0 && (
-                        <div style={{ padding: "10px 14px", background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.15)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>Total {scanItems.filter(i => i.selected).length} item</span>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-expense)" }}>
-                                {fmtRpLocal(scanItems.filter(i => i.selected).reduce((s, i) => s + i.amount, 0))}
-                            </span>
-                        </div>
-                    )}
+                    {/* Total + validasi vs subtotal struk */}
+                    {(() => {
+                        const selected = scanItems.filter(i => i.selected);
+                        if (!selected.length) return null;
+                        const totalSelected = selected.reduce((s, i) => s + i.amount, 0);
+                        const subtotal = scanResults?.subtotal;
+                        const mismatch = subtotal && Math.abs(totalSelected - subtotal) > 0;
+                        const hasZero = selected.some(i => !i.amount || i.amount <= 0);
+                        return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                <div style={{ padding: "10px 14px", background: "rgba(220,38,38,.06)", border: `1px solid ${mismatch ? "rgba(234,179,8,.4)" : "rgba(220,38,38,.15)"}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span style={{ fontSize: 12, color: "var(--color-muted)" }}>Total {selected.length} item dipilih</span>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-expense)" }}>{fmtRpLocal(totalSelected)}</span>
+                                </div>
+                                {subtotal && (
+                                    <div style={{ padding: "8px 14px", background: mismatch ? "rgba(234,179,8,.08)" : "rgba(5,150,105,.06)", border: `1px solid ${mismatch ? "rgba(234,179,8,.3)" : "rgba(5,150,105,.2)"}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ fontSize: 11, color: "var(--color-muted)" }}>{mismatch ? "⚠️" : "✅"} Subtotal di struk</span>
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: mismatch ? "#eab308" : "var(--color-primary)" }}>{fmtRpLocal(subtotal)}</span>
+                                    </div>
+                                )}
+                                {mismatch && (
+                                    <div style={{ fontSize: 11, color: "#eab308", padding: "0 4px" }}>
+                                        Selisih {fmtRpLocal(Math.abs(totalSelected - subtotal))} — mungkin ada item yang di-uncheck atau jumlah yang perlu dicek.
+                                    </div>
+                                )}
+                                {hasZero && (
+                                    <div style={{ fontSize: 11, color: "var(--color-expense)", padding: "0 4px" }}>
+                                        ❌ Ada item dengan jumlah Rp 0, isi dulu sebelum simpan.
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Tombol aksi */}
                     <div style={{ display: "flex", gap: 10 }}>
