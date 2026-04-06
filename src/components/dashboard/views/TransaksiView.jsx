@@ -74,10 +74,18 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
         return true;
     });
 
-    const sumIn       = byDate.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
-    const sumOut      = byDate.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0); // transfer TIDAK dihitung keluar
-    const sumTransfer = byDate.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
-    const net         = sumIn - sumOut; // bersih = pemasukan - pengeluaran saja (transfer netral)
+    // Terapkan filter akun ke summary juga (bukan hanya ke list)
+    const byDateAndAccount = filterAccount
+        ? byDate.filter(tx => tx.account_name === filterAccount)
+        : byDate;
+
+    const sumIn       = byDateAndAccount.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
+    const sumOut      = byDateAndAccount.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
+    const sumTransfer = byDateAndAccount.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
+    const net         = sumIn - sumOut;
+
+    // Data akun yang sedang difilter
+    const activeAccount = filterAccount ? accounts.find(a => a.name === filterAccount) : null;
 
     /* --- further filtered by type + account + search --- */
     const filtered = byDate.filter(tx => {
@@ -180,6 +188,50 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
             {/* ── Summary Cards ── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
 
+                {/* Card Saldo Akun — hanya tampil saat filter akun aktif */}
+                {activeAccount && (
+                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: `4px solid ${activeAccount.color || "var(--color-primary)"}`, transition: "transform .3s", gridColumn: "1 / -1" }}
+                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.01)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 12, background: (activeAccount.color || "var(--color-primary)") + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                                    {activeAccount.icon}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 500, marginBottom: 2 }}>
+                                        {t("acc.balance") || "Saldo"} · {activeAccount.name}
+                                    </div>
+                                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)" }}>
+                                        {fmtRp(activeAccount.balance)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↑ {t("tx.income") || "Masuk"}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-primary)" }}>+{fmtRp(sumIn)}</div>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↓ {t("tx.expense") || "Keluar"}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#ff716c" }}>-{fmtRp(sumOut)}</div>
+                                </div>
+                                {sumTransfer > 0 && (
+                                    <div style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↔ {t("tx.transfer") || "Transfer"}</div>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#4FC3F7" }}>{fmtRp(sumTransfer)}</div>
+                                    </div>
+                                )}
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>{t("tx.net") || "Bersih"}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: net >= 0 ? "var(--color-text)" : "#ff716c" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Pemasukan */}
                 <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
                     onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
@@ -188,7 +240,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                            {byDate.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
+                            {byDateAndAccount.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
                         </span>
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
@@ -204,7 +256,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(255,113,108,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📉</div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#ff716c", background: "rgba(255,113,108,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                            {byDate.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
+                            {byDateAndAccount.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
                         </span>
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
@@ -220,7 +272,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(79,195,247,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                            {byDate.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
+                            {byDateAndAccount.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
                         </span>
                     </div>
                     <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
