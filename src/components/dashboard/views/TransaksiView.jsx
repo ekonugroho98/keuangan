@@ -63,6 +63,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const [search,        setSearch]        = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [page,          setPage]          = useState(1);
+    const PAGE_SIZE = 50;
 
     const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
 
@@ -131,7 +133,12 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
         setSearch("");
         setFilterType("all");
         setFilterAccount("");
+        setPage(1);
     };
+
+    // Reset ke halaman 1 jika filter berubah (via inline handler di setiap filter)
+    const totalPages   = Math.ceil(filtered.length / PAGE_SIZE);
+    const pagedFiltered = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     /* periode label */
     const monthNames = MONTH_NAMES_MAP[lang] || MONTH_NAMES_ID;
@@ -323,7 +330,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setFilterType(tab.id)}
+                                    onClick={() => { setFilterType(tab.id); setPage(1); }}
                                     style={{
                                         padding: "6px 14px", borderRadius: 9,
                                         border: "none",
@@ -348,7 +355,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <select
                             value={filterYear}
-                            onChange={e => { setFilterYear(e.target.value); setFilterMonth(""); setFilterDate(""); }}
+                            onChange={e => { setFilterYear(e.target.value); setFilterMonth(""); setFilterDate(""); setPage(1); }}
                             style={{ background: "transparent", border: "none", color: "var(--color-primary)", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", outline: "none" }}
                         >
                             <option value="" style={{ background: "var(--bg-surface)" }}>{t("tx.allYears")}</option>
@@ -356,7 +363,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                         </select>
                         <select
                             value={filterMonth}
-                            onChange={e => { setFilterMonth(e.target.value); setFilterDate(""); }}
+                            onChange={e => { setFilterMonth(e.target.value); setFilterDate(""); setPage(1); }}
                             disabled={!filterYear}
                             style={{ background: "transparent", border: "none", color: filterYear ? "var(--color-primary)" : "var(--color-muted)", fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: filterYear ? "pointer" : "not-allowed", outline: "none", opacity: filterYear ? 1 : .5 }}
                         >
@@ -371,7 +378,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                             <div style={{ width: 1, height: 24, background: "rgba(72,71,79,.3)" }} />
                             <select
                                 value={filterAccount}
-                                onChange={e => setFilterAccount(e.target.value)}
+                                onChange={e => { setFilterAccount(e.target.value); setPage(1); }}
                                 style={{
                                     background: filterAccount ? "rgba(96,252,198,.1)" : "transparent",
                                     border: filterAccount ? "1px solid rgba(96,252,198,.3)" : "none",
@@ -404,7 +411,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                         <input
                             type="text"
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => { setSearch(e.target.value); setPage(1); }}
                             placeholder={t("tx.search") || "Cari transaksi..."}
                             style={{
                                 background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12,
@@ -418,7 +425,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     <input
                         type="date"
                         value={filterDate}
-                        onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); }}
+                        onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); setPage(1); }}
                         style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12, color: "var(--color-muted)", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "normal", cursor: "pointer" }}
                     />
 
@@ -459,7 +466,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                         <p style={{ fontSize: 13, margin: 0, color: "var(--color-muted)" }}>{t("tx.noTxPeriod")}</p>
                     </div>
                 ) : (
-                    filtered.map((tx, idx) => {
+                    pagedFiltered.map((tx, idx) => {
                         const meta = typeMeta(tx.type);
                         const isHovered = hoveredId === tx.id;
                         /* alternating row: even = #13131a, odd = rgba(37,37,47,.3) */
@@ -548,6 +555,51 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     })
                 )}
             </div>
+
+            {/* ── Pagination — hanya muncul jika > PAGE_SIZE transaksi ── */}
+            {totalPages > 1 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+                    {/* Prev */}
+                    <button
+                        onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        disabled={page === 1}
+                        style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--color-border)", background: "transparent", color: page === 1 ? "var(--color-subtle)" : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: page === 1 ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: page === 1 ? .4 : 1 }}>
+                        ← Prev
+                    </button>
+
+                    {/* Page numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                        .reduce((acc, p, i, arr) => {
+                            if (i > 0 && p - arr[i - 1] > 1) acc.push("...");
+                            acc.push(p);
+                            return acc;
+                        }, [])
+                        .map((p, i) => p === "..." ? (
+                            <span key={`dots-${i}`} style={{ color: "var(--color-subtle)", fontSize: 12, padding: "0 4px" }}>…</span>
+                        ) : (
+                            <button
+                                key={p}
+                                onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                                style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${p === page ? "var(--color-primary)" : "var(--color-border)"}`, background: p === page ? "rgba(96,252,198,.15)" : "transparent", color: p === page ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: p === page ? 700 : 500, cursor: "pointer", fontFamily: "inherit" }}>
+                                {p}
+                            </button>
+                        ))
+                    }
+
+                    {/* Next */}
+                    <button
+                        onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        disabled={page === totalPages}
+                        style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--color-border)", background: "transparent", color: page === totalPages ? "var(--color-subtle)" : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: page === totalPages ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: page === totalPages ? .4 : 1 }}>
+                        Next →
+                    </button>
+
+                    <span style={{ fontSize: 11, color: "var(--color-subtle)", marginLeft: 4 }}>
+                        {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} dari {filtered.length}
+                    </span>
+                </div>
+            )}
         </div>
     );
 };
