@@ -90,7 +90,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const sumIn       = byDateAndAccount.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
     const sumOut      = byDateAndAccount.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
     const sumTransfer = byDateAndAccount.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
-    // Transfer masuk ke akun ini (jadi sumber penerimaan)
+    // Transfer masuk ke akun ini
     const sumTransferIn  = filterAccount
         ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.to_account === filterAccount).reduce((a, tx) => a + tx.amount, 0)
         : 0;
@@ -98,7 +98,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const sumTransferOut = filterAccount
         ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
         : 0;
-    const net         = sumIn - sumOut;
+    // Bersih = pemasukan − pengeluaran saja. Transfer TIDAK dihitung (uang cuma pindah akun, bukan untung/rugi)
+    const net = sumIn - sumOut;
 
     // Data akun yang sedang difilter
     const activeAccount = filterAccount ? accounts.find(a => a.name === filterAccount) : null;
