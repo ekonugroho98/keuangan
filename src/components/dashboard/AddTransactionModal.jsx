@@ -129,7 +129,8 @@ const AddTransactionModal = ({
                                 width: "100%", padding: "10px 14px", boxSizing: "border-box",
                                 background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
                                 borderRadius: 10, color: "var(--color-text)", fontSize: 13,
-                                fontFamily: "inherit", outline: "none",
+                                fontFamily: "inherit", outline: "none", cursor: "pointer",
+                                colorScheme: "dark",
                             }}
                         />
                     </div>
