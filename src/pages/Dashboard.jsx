@@ -792,13 +792,28 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     // ── DELETE TRANSAKSI ─────────────────────────────────────
     const deleteTx = async (tx) => {
         // Reverse saldo akun
-        const acc = accounts.find(a => a.name === tx.account_name);
-        if (acc && tx.type !== "transfer") {
-            const revertedBalance = tx.type === "income"
-                ? acc.balance - tx.amount
-                : acc.balance + tx.amount;
-            await supabase.from("accounts").update({ balance: revertedBalance }).eq("id", acc.id);
-            setAccounts(p => p.map(a => a.id === acc.id ? { ...a, balance: revertedBalance } : a));
+        if (tx.type === "transfer") {
+            // Transfer: kembalikan saldo ke akun asal + kurangi dari akun tujuan
+            const fromAcc = accounts.find(a => a.name === tx.account_name);
+            const toAcc   = tx.to_account ? accounts.find(a => a.name === tx.to_account) : null;
+            const updates = [];
+            if (fromAcc) updates.push(supabase.from("accounts").update({ balance: fromAcc.balance + tx.amount }).eq("id", fromAcc.id));
+            if (toAcc)   updates.push(supabase.from("accounts").update({ balance: toAcc.balance   - tx.amount }).eq("id", toAcc.id));
+            await Promise.all(updates);
+            setAccounts(p => p.map(a => {
+                if (fromAcc && a.id === fromAcc.id) return { ...a, balance: fromAcc.balance + tx.amount };
+                if (toAcc   && a.id === toAcc.id)   return { ...a, balance: toAcc.balance   - tx.amount };
+                return a;
+            }));
+        } else {
+            const acc = accounts.find(a => a.name === tx.account_name);
+            if (acc) {
+                const revertedBalance = tx.type === "income"
+                    ? acc.balance - tx.amount
+                    : acc.balance + tx.amount;
+                await supabase.from("accounts").update({ balance: revertedBalance }).eq("id", acc.id);
+                setAccounts(p => p.map(a => a.id === acc.id ? { ...a, balance: revertedBalance } : a));
+            }
         }
         // Delete dari DB
         const { error } = await supabase.from("transactions").delete().eq("id", tx.id);
