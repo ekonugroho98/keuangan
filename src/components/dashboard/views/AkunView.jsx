@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmtRp, fmtDate } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
+import AmountInput from "../../ui/AmountInput";
 
 /* ── helpers ── */
 const accentColor = (type) => {
@@ -366,17 +367,15 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                     <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>
                         Saldo Baru
                     </label>
-                    <input
-                        type="number"
+                    <AmountInput
                         value={newBalanceInput}
-                        onChange={e => setNewBalanceInput(e.target.value)}
+                        onChange={v => setNewBalanceInput(v)}
                         placeholder="Masukkan saldo baru..."
                         autoFocus
-                        style={{
-                            width: "100%", padding: "12px 14px",
+                        inputStyle={{
+                            padding: "12px 14px",
                             background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
-                            borderRadius: 12, color: "var(--color-text)", fontSize: 16,
-                            fontWeight: 700, outline: "none", fontFamily: "inherit",
+                            borderRadius: 12, fontSize: 16, fontWeight: 700,
                             marginBottom: 8,
                         }}
                     />
