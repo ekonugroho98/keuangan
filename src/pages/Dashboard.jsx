@@ -709,6 +709,37 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         showToast("Transaksi berhasil ditambahkan!");
     };
 
+    // ── TAMBAH BANYAK TRANSAKSI (scan struk multi-item) ─────
+    const addMultipleTx = async (items, accountName, date) => {
+        if (!items.length || isSavingTx) return;
+        setIsSavingTx(true);
+        const today = new Date().toISOString().slice(0, 10);
+        const acc = accounts.find(a => a.name === accountName);
+        const txsToInsert = items.map(item => ({
+            user_id: user.id,
+            type: "expense",
+            amount: item.amount,
+            category: item.category,
+            note: item.note,
+            date: date || today,
+            account_name: accountName,
+            icon: categoryIcons[item.category] || "📦",
+        }));
+        const { data, error } = await supabase.from("transactions").insert(txsToInsert).select();
+        if (error) { showToast("Gagal menyimpan transaksi", "error"); setIsSavingTx(false); return; }
+        // Update saldo akun sekali (total semua item)
+        if (acc) {
+            const total = items.reduce((s, i) => s + i.amount, 0);
+            const { data: updatedAcc } = await supabase.from("accounts")
+                .update({ balance: acc.balance - total }).eq("id", acc.id).select().single();
+            if (updatedAcc) setAccounts(p => p.map(a => a.id === acc.id ? updatedAcc : a));
+        }
+        setTransactions(p => [...[...data].reverse(), ...p]);
+        setIsSavingTx(false);
+        setShowAddTx(false);
+        showToast(`${data.length} transaksi berhasil disimpan! ✅`);
+    };
+
     // ── EDIT TRANSAKSI ───────────────────────────────────────
     const openEditTx = (tx) => {
         setEditingTx(tx);
@@ -970,7 +1001,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     return (
         <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-app)", color: "var(--color-text)", fontFamily: "'Plus Jakarta Sans',-apple-system,sans-serif" }}>
-            <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} aiConfig={aiConfig} />
+            <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} aiConfig={aiConfig} onSubmitMultiple={addMultipleTx} />
             <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} isSaving={isSavingTx} aiConfig={aiConfig} />
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
             <PricingModal open={showPricing} onClose={() => setShowPricing(false)} currentPlan={subscription?.plan} />
