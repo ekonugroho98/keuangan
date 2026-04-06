@@ -5,12 +5,13 @@ import AmountInput from "../../ui/AmountInput";
 const EMOJI_OPTIONS = ["🤝","👤","👫","🧑‍💼","👨‍👩‍👧","🏠","🚗","💼","📱","💻","🎓","🏪","🛒","💰","🎮","📚","☕","🍕","✈️","🎯"];
 const COLOR_OPTIONS = ["var(--color-primary)","#4FC3F7","#14b8a6","#22c55e","#f59e0b","#f97316","#ff716c","#ec4899","#a855f7","var(--color-subtle)"];
 
-const emptyForm = () => ({
+const emptyForm = (defaultAccount = "") => ({
     borrower_name: "",
     icon: "🤝",
     color: "var(--color-primary)",
     total: "",
     remaining: "",
+    from_account: defaultAccount,
     due_date: "",
     notes: "",
 });
@@ -28,7 +29,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
     const openAdd = () => {
         setEditTarget(null);
-        setForm(emptyForm());
+        setForm(emptyForm(accounts[0]?.name || ""));
         setShowModal(true);
     };
 
@@ -40,6 +41,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
             color: p.color,
             total: p.total,
             remaining: p.remaining,
+            from_account: p.from_account || accounts[0]?.name || "",
             due_date: p.due_date || "",
             notes: p.notes || "",
         });
@@ -54,6 +56,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
             color:         form.color,
             total:         parseInt(form.total),
             remaining:     parseInt(form.remaining),
+            from_account:  form.from_account || null,
             due_date:      form.due_date || null,
             notes:         form.notes.trim() || null,
         };
@@ -62,7 +65,9 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
         setShowModal(false);
     };
 
-    const canSubmit = form.borrower_name.trim() && form.total && form.remaining;
+    // Untuk piutang baru wajib pilih akun; edit tidak wajib (akun sudah dipotong sebelumnya)
+    const canSubmit = form.borrower_name.trim() && form.total && form.remaining &&
+        (editTarget || form.from_account);
 
     const totalDipinjamkan = piutang.reduce((a, p) => a + p.total, 0);
     const totalSisa        = piutang.reduce((a, p) => a + p.remaining, 0);
@@ -263,6 +268,24 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>SISA BELUM DIKEMBALIKAN (Rp)</label>
                         <AmountInput value={form.remaining} onChange={v => setForm(p => ({ ...p, remaining: v }))} placeholder="500.000" inputStyle={{ marginBottom: 16 }} />
+
+                        {/* Akun sumber — hanya wajib saat tambah baru */}
+                        {accounts.length > 0 && (
+                            <>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
+                                    {editTarget ? "AKUN ASAL" : "POTONG DARI AKUN"}{" "}
+                                    {editTarget && <span style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 400 }}>— saldo tidak akan berubah saat edit</span>}
+                                </label>
+                                <select
+                                    value={form.from_account}
+                                    onChange={e => setForm(p => ({ ...p, from_account: e.target.value }))}
+                                    style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }}>
+                                    {accounts.map(a => (
+                                        <option key={a.id} value={a.name}>{a.icon} {a.name} — {fmtRp(a.balance)}</option>
+                                    ))}
+                                </select>
+                            </>
+                        )}
 
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>JATUH TEMPO — Opsional</label>
                         <input

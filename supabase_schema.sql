@@ -62,6 +62,7 @@ CREATE TABLE piutang (
   borrower_name TEXT NOT NULL,
   total         BIGINT NOT NULL,
   remaining     BIGINT NOT NULL,
+  from_account  TEXT,
   due_date      TEXT,
   notes         TEXT,
   icon          TEXT DEFAULT '🤝',

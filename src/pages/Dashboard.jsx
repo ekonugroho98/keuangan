@@ -534,6 +534,17 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         const { data, error } = await supabase.from("piutang").insert({ user_id: user.id, ...payload }).select().single();
         if (error) { showToast("Gagal menyimpan piutang", "error"); return; }
         setPiutang(p => [...p, data]);
+
+        // Potong saldo akun sumber
+        if (payload.from_account) {
+            const acc = accounts.find(a => a.name === payload.from_account);
+            if (acc) {
+                const newBal = Math.max(0, acc.balance - payload.total);
+                const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
+                if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
+            }
+        }
+
         showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
     };
 
@@ -553,21 +564,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     // ── TERIMA KEMBALI PIUTANG ───────────────────────────────
     const terimaPiutang = async (item, amount, accountName) => {
-        const today = new Date().toISOString().slice(0, 10);
-
-        // 1. Catat transaksi pemasukan
-        const tx = {
-            user_id: user.id, type: "income", amount,
-            category: "Piutang",
-            note: `Pembayaran piutang dari ${item.borrower_name}`,
-            date: today,
-            account_name: accountName,
-            icon: "🤝",
-        };
-        const { data: newTx } = await supabase.from("transactions").insert(tx).select().single();
-        if (newTx) setTransactions(p => [newTx, ...p]);
-
-        // 2. Tambah saldo akun
+        // 1. Tambah saldo akun (uang kembali) — tidak dicatat sebagai income
+        //    agar tidak mendistorsi laporan pemasukan bulanan
         const acc = accounts.find(a => a.name === accountName);
         if (acc) {
             const newBal = acc.balance + amount;
@@ -575,7 +573,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
         }
 
-        // 3. Kurangi sisa piutang
+        // 2. Kurangi sisa piutang
         const newRemaining = Math.max(0, item.remaining - amount);
         const { data: updPiu } = await supabase.from("piutang").update({ remaining: newRemaining }).eq("id", item.id).select().single();
         if (updPiu) setPiutang(p => p.map(d => d.id === item.id ? updPiu : d));
