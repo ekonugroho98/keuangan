@@ -207,121 +207,104 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                 </div>
             </div>
 
-            {/* ── Summary Cards ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-
-                {/* Card Saldo Akun — hanya tampil saat filter akun aktif */}
-                {activeAccount && (
-                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: `4px solid ${activeAccount.color || "var(--color-primary)"}`, transition: "transform .3s", gridColumn: "1 / -1" }}
-                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.01)"}
-                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                <div style={{ width: 44, height: 44, borderRadius: 12, background: (activeAccount.color || "var(--color-primary)") + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-                                    {activeAccount.icon}
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 500, marginBottom: 2 }}>
-                                        {t("acc.balance") || "Saldo"} · {activeAccount.name}
-                                    </div>
-                                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)" }}>
-                                        {fmtRp(activeAccount.balance)}
-                                    </div>
-                                </div>
+            {/* ── Summary: Account Banner (filter akun aktif) ATAU 4 Cards (semua akun) ── */}
+            {activeAccount ? (
+                /* ── MODE FILTER AKUN: 1 banner compact ── */
+                <div style={{ background: "var(--bg-surface)", borderRadius: 16, borderLeft: `4px solid ${activeAccount.color || "var(--color-primary)"}` }}>
+                    {/* Baris atas: ikon + nama + saldo */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "16px 20px", borderBottom: "1px solid var(--color-border-soft)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ width: 42, height: 42, borderRadius: 12, background: (activeAccount.color || "var(--color-primary)") + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                                {activeAccount.icon}
                             </div>
-                            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-                                <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↑ {t("tx.income") || "Masuk"}</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-primary)" }}>+{fmtRp(sumIn)}</div>
-                                </div>
-                                <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↓ {t("tx.expense") || "Keluar"}</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#ff716c" }}>-{fmtRp(sumOut)}</div>
-                                </div>
-                                {sumTransferIn > 0 && (
-                                    <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>→ Transfer Masuk</div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#4FC3F7" }}>+{fmtRp(sumTransferIn)}</div>
-                                    </div>
-                                )}
-                                {sumTransferOut > 0 && (
-                                    <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>← Transfer Keluar</div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#93c5fd" }}>-{fmtRp(sumTransferOut)}</div>
-                                    </div>
-                                )}
-                                <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>{t("tx.net") || "Bersih"}</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: net >= 0 ? "var(--color-text)" : "#ff716c" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</div>
-                                </div>
+                            <div>
+                                <div style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500 }}>{t("acc.balance") || "Saldo"} · {activeAccount.name}</div>
+                                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)", lineHeight: 1.2 }}>{fmtRp(activeAccount.balance)}</div>
                             </div>
                         </div>
+                        <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
+                            {byDateAndAccount.length} {t("tx.summary") || "transaksi"} · {periodLabel}
+                        </div>
                     </div>
-                )}
-
-                {/* Pemasukan */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
-                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                            {byDateAndAccount.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
-                        </span>
+                    {/* Baris bawah: stat grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 0 }}>
+                        {[
+                            { label: `↑ ${t("tx.income") || "Masuk"}`,   value: `+${fmtRp(sumIn)}`,   color: "var(--color-primary)", show: true },
+                            { label: `↓ ${t("tx.expense") || "Keluar"}`, value: `-${fmtRp(sumOut)}`,  color: "#ff716c",              show: true },
+                            { label: "→ Transfer Masuk",                  value: `+${fmtRp(sumTransferIn)}`,  color: "#4FC3F7", show: sumTransferIn > 0 },
+                            { label: "← Transfer Keluar",                 value: `-${fmtRp(sumTransferOut)}`, color: "#93c5fd", show: sumTransferOut > 0 },
+                            { label: t("tx.net") || "Bersih",             value: `${net >= 0 ? "+" : ""}${fmtRp(net)}`, color: net >= 0 ? "var(--color-text)" : "#ff716c", show: true },
+                        ].filter(s => s.show).map((s, i, arr) => (
+                            <div key={i} style={{ padding: "12px 20px", borderRight: i < arr.length - 1 ? "1px solid var(--color-border-soft)" : "none" }}>
+                                <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 4 }}>{s.label}</div>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: s.color }}>{s.value}</div>
+                            </div>
+                        ))}
                     </div>
-                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                 </div>
-
-                {/* Pengeluaran — transfer TIDAK termasuk */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #ff716c", transition: "transform .3s" }}
-                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(255,113,108,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📉</div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#ff716c", background: "rgba(255,113,108,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                            {byDateAndAccount.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
-                        </span>
+            ) : (
+                /* ── MODE SEMUA AKUN: 4 cards biasa ── */
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+                    {/* Pemasukan */}
+                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
+                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                                {byDateAndAccount.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
+                            </span>
+                        </div>
+                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
+                        <h3 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
+                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                     </div>
-                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "#ff716c", margin: "0 0 3px" }}>-{fmtRp(sumOut)}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
-                </div>
-
-                {/* Transfer antar akun — NETRAL, tidak mempengaruhi kekayaan */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #4FC3F7", transition: "transform .3s" }}
-                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(79,195,247,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                            {byDateAndAccount.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
-                        </span>
+                    {/* Pengeluaran */}
+                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #ff716c", transition: "transform .3s" }}
+                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(255,113,108,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📉</div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#ff716c", background: "rgba(255,113,108,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                                {byDateAndAccount.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
+                            </span>
+                        </div>
+                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
+                        <h3 style={{ fontSize: 20, fontWeight: 800, color: "#ff716c", margin: "0 0 3px" }}>-{fmtRp(sumOut)}</h3>
+                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
                     </div>
-                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "#4FC3F7", margin: "0 0 3px" }}>↔ {fmtRp(sumTransfer)}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
-                </div>
-
-                {/* Saldo Bersih = income - expense (transfer diabaikan) */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: `4px solid ${net >= 0 ? "#a78bfa" : "#ff716c"}`, transition: "transform .3s" }}
-                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(167,139,250,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💰</div>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid rgba(167,139,250,.25)` }} />
+                    {/* Transfer */}
+                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #4FC3F7", transition: "transform .3s" }}
+                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(79,195,247,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.08)", padding: "3px 8px", borderRadius: 6 }}>
+                                {byDateAndAccount.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
+                            </span>
+                        </div>
+                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
+                        <h3 style={{ fontSize: 20, fontWeight: 800, color: "#4FC3F7", margin: "0 0 3px" }}>↔ {fmtRp(sumTransfer)}</h3>
+                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
                     </div>
-                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "var(--color-text)" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
+                    {/* Bersih */}
+                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: `4px solid ${net >= 0 ? "#a78bfa" : "#ff716c"}`, transition: "transform .3s" }}
+                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(167,139,250,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💰</div>
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid rgba(167,139,250,.25)` }} />
+                        </div>
+                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
+                        <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "var(--color-text)" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
+                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── Filter Bar (glass) ── */}
             <div style={{
