@@ -100,20 +100,29 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
             }
         });
 
-        /* alert terhadap budget */
+        /* alert terhadap budget
+           - Variabel : alert jika prediksi > 70% budget (bisa membengkak sisa bulan)
+           - Tetap    : alert hanya jika prediksi > 100% budget (melebihi, bukan pas)
+             karena biaya tetap yang pas = budget adalah hal NORMAL, bukan bahaya
+        */
         const alertCategories = [];
         if (budgets?.length > 0) {
             budgets.filter(b => !b.month || b.month === monthStr).forEach(b => {
                 const predicted = predictedByCategory[b.category] || 0;
                 const spent     = spentByCategory[b.category]     || 0;
                 const pct       = b.amount > 0 ? (predicted / b.amount) * 100 : 0;
-                if (pct > 70) {
+                const isFixed   = fixedSet.has(b.category);
+
+                // Threshold berbeda: tetap harus > 100%, variabel cukup > 70%
+                const threshold = isFixed ? 100 : 70;
+                if (pct > threshold) {
                     alertCategories.push({
                         category: b.category,
                         budget: b.amount, spent, predicted,
                         pct: Math.round(pct),
                         spentPct: Math.round(b.amount > 0 ? (spent / b.amount) * 100 : 0),
                         status: pct >= 100 ? "danger" : "warning",
+                        isFixed,
                     });
                 }
             });
