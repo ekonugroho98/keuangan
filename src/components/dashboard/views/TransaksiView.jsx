@@ -98,8 +98,13 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const sumTransferOut = filterAccount
         ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
         : 0;
-    // Bersih = pemasukan − pengeluaran saja. Transfer TIDAK dihitung (uang cuma pindah akun, bukan untung/rugi)
-    const net = sumIn - sumOut;
+    // Bersih:
+    // - Tanpa filter akun → income − expense (transfer netral di level portfolio)
+    // - Dengan filter akun → income − expense + transferIn − transferOut
+    //   (transfer nyata mempengaruhi saldo akun tersebut)
+    const net = filterAccount
+        ? sumIn - sumOut + sumTransferIn - sumTransferOut
+        : sumIn - sumOut;
 
     // Data akun yang sedang difilter
     const activeAccount = filterAccount ? accounts.find(a => a.name === filterAccount) : null;
