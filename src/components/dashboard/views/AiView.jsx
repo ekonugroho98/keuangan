@@ -154,7 +154,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                         value={aiInput}
                         onChange={e => setAiInput(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleAi()}
-                        placeholder="Tanya tentang keuanganmu..."
+                        placeholder={t("ai.placeholder")}
                         disabled={aiTyping}
                         style={{ flex: 1, background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12, padding: "12px 16px", color: "var(--color-text)", fontSize: 14, outline: "none", fontFamily: "inherit", opacity: aiTyping ? 0.6 : 1 }}
                     />
