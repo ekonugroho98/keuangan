@@ -306,36 +306,42 @@ const AddTransactionModal = ({
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
                             {scanItems.map((item, idx) => (
                                 <div key={item.id} style={{
-                                    display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
+                                    padding: "10px 12px",
                                     background: item.selected ? "var(--bg-surface-low)" : "transparent",
                                     border: `1px solid ${item.selected ? "var(--color-border)" : "var(--color-border-soft)"}`,
                                     borderRadius: 10, opacity: item.selected ? 1 : 0.45,
                                 }}>
-                                    {/* Checkbox */}
-                                    <input type="checkbox" checked={item.selected}
-                                        onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, selected: e.target.checked} : it))}
-                                        style={{ marginTop: 3, accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0 }} />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        {/* Nama item */}
-                                        <input value={item.note} onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, note: e.target.value} : it))}
-                                            style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--color-text)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 4 }} />
+                                    {/* Row atas: checkbox + nama + jumlah */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                        <input type="checkbox" checked={item.selected}
+                                            onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, selected: e.target.checked} : it))}
+                                            style={{ accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
+                                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>{item.note}</span>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-expense)", flexShrink: 0 }}>
+                                            {fmtRpLocal(item.amount)}
+                                        </span>
+                                    </div>
+                                    {/* Row bawah: edit nama + kategori + edit jumlah */}
+                                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                        {/* Edit nama */}
+                                        <input value={item.note}
+                                            onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, note: e.target.value} : it))}
+                                            placeholder="Nama item"
+                                            style={{ flex: 1, padding: "5px 8px", borderRadius: 7, border: "1px solid var(--color-border-soft)", background: "var(--bg-app)", color: "var(--color-text)", fontSize: 11, fontFamily: "inherit", outline: "none" }} />
                                         {/* Kategori */}
-                                        <select value={item.category} onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, category: e.target.value} : it))}
-                                            style={{ fontSize: 10, padding: "2px 6px", borderRadius: 6, border: "1px solid var(--color-border-soft)", background: "var(--bg-surface-low)", color: "var(--color-muted)", fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
+                                        <select value={item.category}
+                                            onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, category: e.target.value} : it))}
+                                            style={{ padding: "5px 6px", borderRadius: 7, border: "1px solid var(--color-border-soft)", background: "var(--bg-app)", color: "var(--color-muted)", fontFamily: "inherit", cursor: "pointer", outline: "none", fontSize: 10 }}>
                                             {SCAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
-                                    </div>
-                                    {/* Jumlah — editable */}
-                                    <div style={{ flexShrink: 0, textAlign: "right" }}>
-                                        <input
-                                            type="text" inputMode="numeric"
+                                        {/* Edit jumlah */}
+                                        <input type="text" inputMode="numeric"
                                             value={Number(item.amount).toLocaleString("id-ID")}
                                             onChange={e => {
                                                 const raw = parseInt(e.target.value.replace(/\D/g, "")) || 0;
                                                 setScanItems(p => p.map((it, i) => i === idx ? { ...it, amount: raw } : it));
                                             }}
-                                            style={{ width: 90, textAlign: "right", background: "transparent", border: "none", borderBottom: "1px dashed var(--color-border)", outline: "none", color: "var(--color-expense)", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "0 2px" }}
-                                        />
+                                            style={{ width: 80, textAlign: "right", padding: "5px 8px", borderRadius: 7, border: "1px solid var(--color-border-soft)", background: "var(--bg-app)", color: "var(--color-expense)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", outline: "none" }} />
                                     </div>
                                 </div>
                             ))}
