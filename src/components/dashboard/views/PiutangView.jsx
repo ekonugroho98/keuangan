@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import AmountInput from "../../ui/AmountInput";
+import { useLanguage } from "../../../i18n/LanguageContext";
 
 const EMOJI_OPTIONS = ["🤝","👤","👫","🧑‍💼","👨‍👩‍👧","🏠","🚗","💼","📱","💻","🎓","🏪","🛒","💰","🎮","📚","☕","🍕","✈️","🎯"];
 const COLOR_OPTIONS = ["var(--color-primary)","#4FC3F7","#14b8a6","#22c55e","#f59e0b","#f97316","#ff716c","#ec4899","#a855f7","var(--color-subtle)"];
@@ -17,6 +18,7 @@ const emptyForm = (defaultAccount = "") => ({
 });
 
 const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts = [] }) => {
+    const { t } = useLanguage();
     const [showModal, setShowModal]     = useState(false);
     const [editTarget, setEditTarget]   = useState(null);
     const [form, setForm]               = useState(emptyForm());
@@ -79,15 +81,15 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
                     <h1 style={{ fontSize: "clamp(22px,4vw,32px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-                        Piutang
+                        {t("piu.title")}
                     </h1>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
-                        {piutang.length} piutang · Sisa tagihan {fmtRp(totalSisa)}
+                        {piutang.length} {t("piu.countLabel")} · {t("piu.outstanding")} {fmtRp(totalSisa)}
                     </p>
                 </div>
                 <button onClick={openAdd}
                     style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#0a2e22", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                    + Catat Piutang
+                    {t("piu.addBtn")}
                 </button>
             </div>
 
@@ -95,15 +97,15 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
             {piutang.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
                     <div style={{ background: "rgba(96,252,198,.08)", border: "1px solid rgba(96,252,198,.2)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>TOTAL DIPINJAMKAN</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("piu.totalLent")}</div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)" }}>{fmtRp(totalDipinjamkan)}</div>
                     </div>
                     <div style={{ background: "rgba(96,252,198,.06)", border: "1px solid rgba(96,252,198,.15)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>SUDAH KEMBALI</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("piu.totalReturned")}</div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: "#22c55e" }}>{fmtRp(totalKembali)}</div>
                     </div>
                     <div style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>BELUM KEMBALI</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("piu.totalOutstanding")}</div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>{fmtRp(totalSisa)}</div>
                     </div>
                 </div>
@@ -113,11 +115,11 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
             {piutang.length === 0 && (
                 <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>🤝</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>Belum ada piutang tercatat</div>
-                    <div style={{ fontSize: 13, color: "var(--color-subtle)", marginBottom: 20 }}>Catat uang yang kamu pinjamkan ke orang lain agar tidak lupa</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("piu.noData")}</div>
+                    <div style={{ fontSize: 13, color: "var(--color-subtle)", marginBottom: 20 }}>{t("piu.noDataSub")}</div>
                     <button onClick={openAdd}
                         style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#0a2e22", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        + Catat Piutang Pertama
+                        {t("piu.addFirst")}
                     </button>
                 </div>
             )}
@@ -143,17 +145,17 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                             {/* Badge status */}
                             {lunas && (
                                 <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "var(--color-primary)" }}>
-                                    ✓ LUNAS
+                                    {t("piu.badgePaid")}
                                 </div>
                             )}
                             {overdue && (
                                 <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,113,108,.12)", border: "1px solid rgba(255,113,108,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "#ff716c" }}>
-                                    ⚠️ JATUH TEMPO
+                                    {t("piu.badgeOverdue")}
                                 </div>
                             )}
                             {nearDue && !overdue && (
                                 <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "#f59e0b" }}>
-                                    ⏰ HAMPIR JATUH TEMPO
+                                    {t("piu.badgeNearDue")}
                                 </div>
                             )}
 
@@ -168,7 +170,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                     </div>
                                     {p.due_date && (
                                         <div style={{ fontSize: 11, color: overdue ? "#ff716c" : "var(--color-muted)" }}>
-                                            Jatuh tempo: {new Date(p.due_date + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                            {t("piu.dueDate")} {new Date(p.due_date + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                                         </div>
                                     )}
                                     {p.notes && (
@@ -181,7 +183,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
                             {/* Progress */}
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                                <span style={{ fontSize: 12, color: "var(--color-muted)" }}>Dikembalikan {pct}%</span>
+                                <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{t("piu.returnedPct")} {pct}%</span>
                                 <span style={{ fontSize: 12, color: lunas ? "var(--color-primary)" : p.color, fontWeight: 600 }}>
                                     {fmtRp(returned)} / {fmtRp(p.total)}
                                 </span>
@@ -190,9 +192,9 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                 <div style={{ height: "100%", borderRadius: 4, background: lunas ? "var(--color-primary)" : p.color, width: `${pct}%`, transition: "width 1s" }} />
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 16 }}>
-                                <span style={{ color: "var(--color-subtle)" }}>Dipinjamkan: {fmtRp(p.total)}</span>
+                                <span style={{ color: "var(--color-subtle)" }}>{t("piu.lent")} {fmtRp(p.total)}</span>
                                 <span style={{ color: lunas ? "var(--color-primary)" : "#f59e0b", fontWeight: 700 }}>
-                                    Sisa: {fmtRp(p.remaining)}
+                                    {t("piu.remaining")} {fmtRp(p.remaining)}
                                 </span>
                             </div>
 
@@ -206,12 +208,12 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                             setTerimaAccount(accounts[0]?.name || "");
                                         }}
                                         style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#0a2e22", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                                        💰 Terima Kembali
+                                        {t("piu.receiveBtn")}
                                     </button>
                                 )}
                                 <button onClick={() => openEdit(p)}
                                     style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.06)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                    ✏️ Edit
+                                    {t("piu.editBtn")}
                                 </button>
                                 <button onClick={() => setConfirmDelete(p)}
                                     style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
@@ -232,7 +234,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
                             <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 17, margin: 0 }}>
-                                {editTarget ? "Edit Piutang" : "Catat Piutang"}
+                                {editTarget ? t("piu.editTitle") : t("piu.addTitle")}
                             </h3>
                             <button onClick={() => setShowModal(false)}
                                 style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
@@ -245,36 +247,36 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                             </div>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>
-                                    {form.borrower_name || "Nama Peminjam"}
+                                    {form.borrower_name || t("piu.borrowerPreview")}
                                 </div>
                                 <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                                    Sisa: {form.remaining ? fmtRp(parseInt(form.remaining)) : "Rp 0"}
+                                    {t("piu.remaining")} {form.remaining ? fmtRp(parseInt(form.remaining)) : "Rp 0"}
                                 </div>
                             </div>
                         </div>
 
                         {/* Form fields */}
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>NAMA PEMINJAM</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.borrowerLabel")}</label>
                         <input
                             value={form.borrower_name}
                             onChange={e => setForm(p => ({ ...p, borrower_name: e.target.value }))}
-                            placeholder="Contoh: Budi, Pak Anton, Adik..."
+                            placeholder={t("piu.borrowerPlaceholder")}
                             maxLength={50}
                             style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }}
                         />
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>JUMLAH DIPINJAMKAN (Rp)</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.totalLabel")}</label>
                         <AmountInput value={form.total} onChange={v => setForm(p => ({ ...p, total: v }))} placeholder="500.000" inputStyle={{ marginBottom: 16 }} />
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>SISA BELUM DIKEMBALIKAN (Rp)</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.remainingLabel")}</label>
                         <AmountInput value={form.remaining} onChange={v => setForm(p => ({ ...p, remaining: v }))} placeholder="500.000" inputStyle={{ marginBottom: 16 }} />
 
                         {/* Akun sumber — hanya wajib saat tambah baru */}
                         {accounts.length > 0 && (
                             <>
                                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>
-                                    {editTarget ? "AKUN ASAL" : "POTONG DARI AKUN"}{" "}
-                                    {editTarget && <span style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 400 }}>— saldo tidak akan berubah saat edit</span>}
+                                    {editTarget ? t("piu.fromAccountLabelEdit") : t("piu.fromAccountLabel")}{" "}
+                                    {editTarget && <span style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 400 }}>{t("piu.fromAccountNote")}</span>}
                                 </label>
                                 <select
                                     value={form.from_account}
@@ -287,7 +289,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                             </>
                         )}
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>JATUH TEMPO — Opsional</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.dueDateLabel")}</label>
                         <input
                             type="date"
                             value={form.due_date}
@@ -295,17 +297,17 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                             style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box", colorScheme: "normal" }}
                         />
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>CATATAN — Opsional</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.notesLabel")}</label>
                         <input
                             value={form.notes}
                             onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                            placeholder="Contoh: untuk uang makan, beli HP..."
+                            placeholder={t("piu.notesPlaceholder")}
                             maxLength={100}
                             style={{ width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", marginBottom: 16, boxSizing: "border-box" }}
                         />
 
                         {/* Icon picker */}
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>IKON</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("piu.iconLabel")}</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
@@ -316,7 +318,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                         </div>
 
                         {/* Color picker */}
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>WARNA</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("piu.colorLabel")}</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
                             {COLOR_OPTIONS.map(c => (
                                 <button key={c} onClick={() => setForm(p => ({ ...p, color: c }))}
@@ -326,7 +328,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
                         <button onClick={handleSubmit} disabled={!canSubmit}
                             style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: !canSubmit ? "var(--color-muted)" : "#0a2e22", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .5 : 1, fontFamily: "inherit" }}>
-                            {editTarget ? "Simpan Perubahan" : "Catat Piutang"}
+                            {editTarget ? t("piu.submitEdit") : t("piu.submitAdd")}
                         </button>
                     </div>
                 </div>
@@ -341,18 +343,18 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                             <div>
-                                <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: 0 }}>💰 Terima Pembayaran</h3>
-                                <p style={{ color: "var(--color-muted)", fontSize: 12, margin: "4px 0 0" }}>dari {terimaTarget.borrower_name}</p>
+                                <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: 0 }}>{t("piu.receiveTitle")}</h3>
+                                <p style={{ color: "var(--color-muted)", fontSize: 12, margin: "4px 0 0" }}>{t("piu.receiveFrom")} {terimaTarget.borrower_name}</p>
                             </div>
                             <button onClick={() => setTerimaTarget(null)}
                                 style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                         </div>
 
                         <div style={{ background: "rgba(96,252,198,.06)", border: "1px solid rgba(96,252,198,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)" }}>
-                            Sisa piutang: <strong style={{ color: "var(--color-primary)" }}>{fmtRp(terimaTarget.remaining)}</strong>
+                            {t("piu.remainingDebt")} <strong style={{ color: "var(--color-primary)" }}>{fmtRp(terimaTarget.remaining)}</strong>
                         </div>
 
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>JUMLAH DITERIMA (Rp)</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.amountLabel")}</label>
                         <AmountInput
                             value={terimaAmount}
                             onChange={v => setTerimaAmount(v)}
@@ -362,7 +364,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
 
                         {accounts.length > 0 && (
                             <>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>MASUK KE AKUN</label>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>{t("piu.toAccountLabel")}</label>
                                 <select
                                     value={terimaAccount}
                                     onChange={e => setTerimaAccount(e.target.value)}
@@ -377,7 +379,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                         <div style={{ display: "flex", gap: 10 }}>
                             <button onClick={() => setTerimaTarget(null)}
                                 style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                Batal
+                                {t("common.cancel")}
                             </button>
                             <button
                                 disabled={!terimaAmount || parseInt(terimaAmount) <= 0}
@@ -388,7 +390,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                     setTerimaAmount("");
                                 }}
                                 style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: !terimaAmount ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: !terimaAmount ? "var(--color-muted)" : "#0a2e22", fontSize: 13, fontWeight: 700, cursor: !terimaAmount ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                                ✅ Catat Penerimaan
+                                {t("piu.confirmBtn")}
                             </button>
                         </div>
                     </div>
@@ -402,18 +404,18 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                     <div onClick={e => e.stopPropagation()}
                         style={{ background: "var(--bg-deep)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center" }}>
                         <div style={{ fontSize: 36, marginBottom: 12 }}>{confirmDelete.icon}</div>
-                        <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>Hapus Piutang?</h3>
-                        <p style={{ color: "var(--color-subtle)", fontSize: 13, margin: "0 0 24px" }}>
-                            Piutang ke <strong style={{ color: "#ff716c" }}>{confirmDelete.borrower_name}</strong> akan dihapus permanen.
-                        </p>
+                        <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("piu.deleteTitle")}</h3>
+                        <p style={{ color: "var(--color-subtle)", fontSize: 13, margin: "0 0 24px" }}
+                            dangerouslySetInnerHTML={{ __html: t("piu.deleteMsg").replace("{name}", `<strong style="color:#ff716c">${confirmDelete.borrower_name}</strong>`) }}
+                        />
                         <div style={{ display: "flex", gap: 10 }}>
                             <button onClick={() => setConfirmDelete(null)}
                                 style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                Batal
+                                {t("common.cancel")}
                             </button>
                             <button onClick={() => { onDelete(confirmDelete.id); setConfirmDelete(null); }}
                                 style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                                Hapus
+                                {t("common.delete")}
                             </button>
                         </div>
                     </div>
