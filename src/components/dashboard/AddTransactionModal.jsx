@@ -279,10 +279,19 @@ const AddTransactionModal = ({
             {/* ── Hasil Scan Multi-Item ── */}
             {scanResults && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {/* Header merchant */}
+                    {/* Header merchant + edit tanggal */}
                     <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</div>
-                        {scanResults.date && <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>📅 {scanResults.date}</div>}
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)", marginBottom: 8 }}>🧾 {scanResults.merchant || "Struk"}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 11, color: "var(--color-muted)", flexShrink: 0 }}>📅 Tanggal</span>
+                            <input
+                                type="date"
+                                value={scanResults.date || ""}
+                                onChange={e => setScanResults(p => ({ ...p, date: e.target.value }))}
+                                onClick={e => e.target.showPicker?.()}
+                                style={{ flex: 1, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(5,150,105,.3)", background: "rgba(5,150,105,.08)", color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" }}
+                            />
+                        </div>
                     </div>
 
                     {/* Pilih Akun */}
