@@ -501,7 +501,11 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                                             </span>
                                         </div>
                                         <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0 }}>
-                                            {fmtDate(tx.date)} · {tCat(tx.category)} · {tx.account_name}
+                                            {fmtDate(tx.date)} · {tCat(tx.category)} ·{" "}
+                                            {tx.type === "transfer" && tx.to_account
+                                                ? <span style={{ color: "#4FC3F7", fontWeight: 600 }}>{tx.account_name} → {tx.to_account}</span>
+                                                : tx.account_name
+                                            }
                                         </p>
                                     </div>
                                 </div>
