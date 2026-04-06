@@ -74,14 +74,30 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
         return true;
     });
 
-    // Terapkan filter akun ke summary juga (bukan hanya ke list)
+    // Helper: apakah transaksi melibatkan akun ini (baik sebagai sumber maupun tujuan transfer)
+    const involvesAccount = (tx, acc) => {
+        if (!acc) return true;
+        if (tx.account_name === acc) return true;
+        if (tx.type === "transfer" && tx.to_account === acc) return true;
+        return false;
+    };
+
+    // Terapkan filter akun ke summary (termasuk transfer masuk ke akun)
     const byDateAndAccount = filterAccount
-        ? byDate.filter(tx => tx.account_name === filterAccount)
+        ? byDate.filter(tx => involvesAccount(tx, filterAccount))
         : byDate;
 
     const sumIn       = byDateAndAccount.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
     const sumOut      = byDateAndAccount.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
     const sumTransfer = byDateAndAccount.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
+    // Transfer masuk ke akun ini (jadi sumber penerimaan)
+    const sumTransferIn  = filterAccount
+        ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.to_account === filterAccount).reduce((a, tx) => a + tx.amount, 0)
+        : 0;
+    // Transfer keluar dari akun ini
+    const sumTransferOut = filterAccount
+        ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
+        : 0;
     const net         = sumIn - sumOut;
 
     // Data akun yang sedang difilter
@@ -90,7 +106,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     /* --- further filtered by type + account + search --- */
     const filtered = byDate.filter(tx => {
         if (filterType !== "all" && tx.type !== filterType) return false;
-        if (filterAccount && tx.account_name !== filterAccount) return false;
+        if (filterAccount && !involvesAccount(tx, filterAccount)) return false;
         if (search) {
             const q = search.toLowerCase();
             return (
@@ -217,10 +233,16 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                                     <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↓ {t("tx.expense") || "Keluar"}</div>
                                     <div style={{ fontSize: 14, fontWeight: 700, color: "#ff716c" }}>-{fmtRp(sumOut)}</div>
                                 </div>
-                                {sumTransfer > 0 && (
+                                {sumTransferIn > 0 && (
                                     <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>↔ {t("tx.transfer") || "Transfer"}</div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#4FC3F7" }}>{fmtRp(sumTransfer)}</div>
+                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>→ Transfer Masuk</div>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#4FC3F7" }}>+{fmtRp(sumTransferIn)}</div>
+                                    </div>
+                                )}
+                                {sumTransferOut > 0 && (
+                                    <div style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 2 }}>← Transfer Keluar</div>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#93c5fd" }}>-{fmtRp(sumTransferOut)}</div>
                                     </div>
                                 )}
                                 <div style={{ textAlign: "right" }}>
