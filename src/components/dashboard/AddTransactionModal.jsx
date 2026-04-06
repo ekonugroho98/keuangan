@@ -269,83 +269,82 @@ const AddTransactionModal = ({
 
             {/* ── Hasil Scan Multi-Item ── */}
             {scanResults && (
-                <div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {/* Header merchant */}
-                    <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10, marginBottom: 14 }}>
+                    <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</div>
                         {scanResults.date && <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>📅 {scanResults.date}</div>}
                     </div>
 
                     {/* Pilih Akun */}
-                    <div style={{ marginBottom: 14 }}>
+                    <div>
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6, letterSpacing: 0.5 }}>AKUN (semua item)</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {accounts.map(a => (
                                 <button key={a.name} onClick={() => setScanAccount(a.name)}
-                                    style={{ padding: "6px 12px", borderRadius: 8, fontFamily: "inherit", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                    style={{
+                                        padding: "7px 12px", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer",
                                         border: `1px solid ${scanAccount === a.name ? "rgba(5,150,105,.4)" : "var(--color-border-soft)"}`,
                                         background: scanAccount === a.name ? "rgba(5,150,105,.15)" : "transparent",
-                                        color: scanAccount === a.name ? "var(--color-primary)" : "var(--color-muted)" }}>
+                                        color: scanAccount === a.name ? "var(--color-primary)" : "var(--color-muted)",
+                                    }}>
                                     {a.icon} {a.name}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Daftar Item */}
-                    <div style={{ marginBottom: 12 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", letterSpacing: 0.5 }}>
-                                ITEM ({scanItems.filter(i => i.selected).length}/{scanItems.length} dipilih)
-                            </label>
-                            <button onClick={() => setScanItems(p => p.every(i => i.selected) ? p.map(i => ({...i, selected: false})) : p.map(i => ({...i, selected: true})))}
-                                style={{ fontSize: 11, color: "var(--color-primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
-                                {scanItems.every(i => i.selected) ? "Batal semua" : "Pilih semua"}
-                            </button>
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 6, fontStyle: "italic" }}>
-                            ✏️ Ketuk nama, jumlah, atau kategori untuk mengedit
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
-                            {scanItems.map((item, idx) => (
-                                <div key={item.id} style={{
-                                    padding: "12px",
-                                    background: item.selected ? "var(--bg-surface-low)" : "transparent",
-                                    border: `1px solid ${item.selected ? "var(--color-border)" : "var(--color-border-soft)"}`,
-                                    borderRadius: 10, opacity: item.selected ? 1 : 0.45,
-                                }}>
-                                    {/* Baris 1: checkbox + nama */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                        <input type="checkbox" checked={item.selected}
-                                            onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, selected: e.target.checked} : it))}
-                                            style={{ accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
-                                        <input value={item.note}
-                                            onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, note: e.target.value} : it))}
-                                            style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "1.5px solid var(--color-border)", background: "var(--bg-app)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none", minWidth: 0 }} />
-                                    </div>
-                                    {/* Baris 2: kategori + jumlah */}
-                                    <div style={{ display: "flex", gap: 6, paddingLeft: 24 }}>
-                                        <select value={item.category}
-                                            onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, category: e.target.value} : it))}
-                                            style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "1.5px solid var(--color-border)", background: "var(--bg-app)", color: "var(--color-muted)", fontFamily: "inherit", cursor: "pointer", outline: "none", fontSize: 11, minWidth: 0 }}>
-                                            {SCAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                        <input type="text" inputMode="numeric"
-                                            value={Number(item.amount).toLocaleString("id-ID")}
-                                            onChange={e => {
-                                                const raw = parseInt(e.target.value.replace(/\D/g, "")) || 0;
-                                                setScanItems(p => p.map((it, i) => i === idx ? { ...it, amount: raw } : it));
-                                            }}
-                                            style={{ width: 110, textAlign: "right", padding: "6px 10px", borderRadius: 8, border: "1.5px solid rgba(220,38,38,.3)", background: "rgba(220,38,38,.05)", color: "var(--color-expense)", fontSize: 12, fontWeight: 700, fontFamily: "inherit", outline: "none", flexShrink: 0 }} />
-                                    </div>
+                    {/* Header daftar item */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", letterSpacing: 0.5 }}>
+                            ITEM ({scanItems.filter(i => i.selected).length}/{scanItems.length} dipilih) · ✏️ ketuk untuk edit
+                        </span>
+                        <button onClick={() => setScanItems(p => p.every(i => i.selected) ? p.map(i => ({...i, selected: false})) : p.map(i => ({...i, selected: true})))}
+                            style={{ fontSize: 11, color: "var(--color-primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, flexShrink: 0 }}>
+                            {scanItems.every(i => i.selected) ? "Batal semua" : "Pilih semua"}
+                        </button>
+                    </div>
+
+                    {/* Daftar item */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "45vH", overflowY: "auto" }}>
+                        {scanItems.map((item, idx) => (
+                            <div key={item.id} style={{
+                                padding: "10px",
+                                background: item.selected ? "var(--bg-surface-low)" : "transparent",
+                                border: `1px solid ${item.selected ? "var(--color-border)" : "var(--color-border-soft)"}`,
+                                borderRadius: 10, opacity: item.selected ? 1 : 0.45,
+                            }}>
+                                {/* Baris 1: checkbox + nama */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                    <input type="checkbox" checked={item.selected}
+                                        onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, selected: e.target.checked} : it))}
+                                        style={{ accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0, width: 18, height: 18 }} />
+                                    <input value={item.note}
+                                        onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, note: e.target.value} : it))}
+                                        style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1.5px solid var(--color-border)", background: "var(--bg-app)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none", minWidth: 0, boxSizing: "border-box" }} />
                                 </div>
-                            ))}
-                        </div>
+                                {/* Baris 2: kategori | jumlah — full width, no padding offset */}
+                                <div style={{ display: "flex", gap: 6 }}>
+                                    <select value={item.category}
+                                        onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, category: e.target.value} : it))}
+                                        style={{ flex: 1, padding: "7px 8px", borderRadius: 8, border: "1.5px solid var(--color-border)", background: "var(--bg-app)", color: "var(--color-muted)", fontFamily: "inherit", cursor: "pointer", outline: "none", fontSize: 11, minWidth: 0, boxSizing: "border-box" }}>
+                                        {SCAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    <input type="text" inputMode="numeric"
+                                        value={Number(item.amount).toLocaleString("id-ID")}
+                                        onChange={e => {
+                                            const raw = parseInt(e.target.value.replace(/\D/g, "")) || 0;
+                                            setScanItems(p => p.map((it, i) => i === idx ? { ...it, amount: raw } : it));
+                                        }}
+                                        style={{ width: "35%", maxWidth: 120, textAlign: "right", padding: "7px 10px", borderRadius: 8, border: "1.5px solid rgba(220,38,38,.35)", background: "rgba(220,38,38,.05)", color: "var(--color-expense)", fontSize: 12, fontWeight: 700, fontFamily: "inherit", outline: "none", flexShrink: 0, boxSizing: "border-box" }} />
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Total */}
                     {scanItems.filter(i => i.selected).length > 0 && (
-                        <div style={{ padding: "8px 14px", background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.15)", borderRadius: 10, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ padding: "10px 14px", background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.15)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span style={{ fontSize: 12, color: "var(--color-muted)" }}>Total {scanItems.filter(i => i.selected).length} item</span>
                             <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-expense)" }}>
                                 {fmtRpLocal(scanItems.filter(i => i.selected).reduce((s, i) => s + i.amount, 0))}
@@ -356,11 +355,11 @@ const AddTransactionModal = ({
                     {/* Tombol aksi */}
                     <div style={{ display: "flex", gap: 10 }}>
                         <button onClick={resetScan}
-                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            style={{ flex: 1, padding: "13px 10px", borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                             ← Kembali
                         </button>
                         <button onClick={handleSaveMultiple} disabled={isSaving || !scanItems.filter(i => i.selected).length || !scanAccount}
-                            style={{ flex: 2, padding: 12, borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                            style={{ flex: 2, padding: "13px 10px", borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
                                 opacity: (isSaving || !scanItems.filter(i => i.selected).length || !scanAccount) ? 0.5 : 1 }}>
                             {isSaving ? "Menyimpan..." : `✅ Simpan ${scanItems.filter(i => i.selected).length} Transaksi`}
                         </button>
