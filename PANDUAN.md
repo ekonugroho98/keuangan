@@ -154,22 +154,6 @@ Langkah ini membuat semua tabel yang dibutuhkan aplikasi di database kamu.
 
 ✅ Database siap.
 
-> ⚠️ **Sudah pernah install sebelumnya?**
-> Jika kamu sudah menjalankan script lama, jalankan query tambahan berikut di SQL Editor untuk menambahkan kolom baru:
->
-> ```sql
-> -- Kolom tujuan transfer antar rekening
-> ALTER TABLE transactions ADD COLUMN IF NOT EXISTS to_account TEXT;
->
-> -- Kolom kode saham IDX untuk harga live otomatis
-> ALTER TABLE investments ADD COLUMN IF NOT EXISTS kode_saham TEXT;
->
-> -- Kolom akun sumber piutang
-> ALTER TABLE piutang ADD COLUMN IF NOT EXISTS from_account TEXT;
-> ```
->
-> Installer baru **tidak perlu** menjalankan ini — semua kolom sudah ada di script utama.
-
 ### Salin Kredensial Supabase
 
 Kamu perlu 2 data ini untuk langkah berikutnya:
