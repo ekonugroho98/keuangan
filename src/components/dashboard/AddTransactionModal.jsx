@@ -325,9 +325,17 @@ const AddTransactionModal = ({
                                             {SCAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
-                                    {/* Jumlah */}
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-expense)", flexShrink: 0, whiteSpace: "nowrap" }}>
-                                        {fmtRpLocal(item.amount)}
+                                    {/* Jumlah — editable */}
+                                    <div style={{ flexShrink: 0, textAlign: "right" }}>
+                                        <input
+                                            type="text" inputMode="numeric"
+                                            value={Number(item.amount).toLocaleString("id-ID")}
+                                            onChange={e => {
+                                                const raw = parseInt(e.target.value.replace(/\D/g, "")) || 0;
+                                                setScanItems(p => p.map((it, i) => i === idx ? { ...it, amount: raw } : it));
+                                            }}
+                                            style={{ width: 90, textAlign: "right", background: "transparent", border: "none", borderBottom: "1px dashed var(--color-border)", outline: "none", color: "var(--color-expense)", fontSize: 13, fontWeight: 700, fontFamily: "inherit", padding: "0 2px" }}
+                                        />
                                     </div>
                                 </div>
                             ))}
