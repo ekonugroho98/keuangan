@@ -25,6 +25,7 @@ CREATE TABLE transactions (
   note         TEXT DEFAULT '',
   date         DATE NOT NULL,
   account_name TEXT NOT NULL,
+  to_account   TEXT,                        -- akun tujuan (hanya untuk type='transfer')
   icon         TEXT DEFAULT '📦',
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );

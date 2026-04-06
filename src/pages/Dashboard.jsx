@@ -819,7 +819,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         const note = txForm.note || `Transfer ${fromAcc.name} → ${toAcc.name}`;
 
         const { data: txData, error: txError } = await supabase.from("transactions").insert([
-            { user_id: user.id, type: "transfer", amount, category: "Transfer", note, date, account_name: fromAcc.name, icon: "🔄" },
+            { user_id: user.id, type: "transfer", amount, category: "Transfer", note, date, account_name: fromAcc.name, to_account: toAcc.name, icon: "🔄" },
         ]).select();
         if (txError) { showToast("Gagal menyimpan transfer", "error"); setIsSavingTx(false); return; }
 
