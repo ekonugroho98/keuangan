@@ -1,8 +1,83 @@
+import { useRef, useState } from "react";
 import Modal from "../ui/Modal";
 import InputField from "../ui/InputField";
 import AmountInput from "../ui/AmountInput";
 import { expenseCategories, incomeCategories } from "../../constants/categories";
 import { useLanguage } from "../../i18n/LanguageContext";
+
+/* ── Scan Struk: kirim gambar ke AI, ekstrak data transaksi ── */
+async function scanReceiptWithAI(base64, mimeType, aiConfig) {
+    const { provider, apiKey } = aiConfig || {};
+    if (!apiKey) throw new Error("API key belum diset");
+
+    const prompt = `Kamu adalah asisten keuangan Indonesia. Baca struk/nota/receipt ini dan ekstrak datanya.
+Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
+{
+  "type": "expense",
+  "amount": 150000,
+  "note": "Indomaret Sudirman",
+  "category": "Belanja",
+  "date": "2026-04-06"
+}
+Aturan:
+- type: selalu "expense" untuk belanja/pembelian, "income" untuk penerimaan uang
+- amount: angka bulat tanpa titik/koma (total yang dibayar)
+- note: nama merchant/toko singkat
+- category: pilih salah satu: "Makanan & Minuman", "Transportasi", "Belanja", "Hiburan", "Kesehatan", "Pendidikan", "Tagihan", "Lainnya"
+- date: format YYYY-MM-DD, jika tidak ada di struk tulis null
+Jika gambar bukan struk, kembalikan: {"error": "bukan struk"}`;
+
+    let url, headers, body;
+
+    if (provider === "groq") {
+        url = "https://api.groq.com/openai/v1/chat/completions";
+        headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+        body = { model: "meta-llama/llama-4-scout-17b-16e-instruct", max_tokens: 300,
+            messages: [{ role: "user", content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+            ]}]};
+    } else if (provider === "openai") {
+        url = "https://api.openai.com/v1/chat/completions";
+        headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+        body = { model: "gpt-4o-mini", max_tokens: 300,
+            messages: [{ role: "user", content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+            ]}]};
+    } else if (provider === "anthropic") {
+        url = "https://api.anthropic.com/v1/messages";
+        headers = { "Content-Type": "application/json", "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01", "anthropic-dangerous-allow-browser": "true" };
+        body = { model: "claude-3-5-haiku-20241022", max_tokens: 300,
+            messages: [{ role: "user", content: [
+                { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } },
+                { type: "text", text: prompt },
+            ]}]};
+    } else if (provider === "google") {
+        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        headers = { "Content-Type": "application/json" };
+        body = { contents: [{ parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: base64 } },
+        ]}]};
+    } else {
+        throw new Error("Provider tidak mendukung scan gambar");
+    }
+
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || "Gagal scan");
+
+    let text = "";
+    if (provider === "anthropic") text = data.content?.[0]?.text || "";
+    else if (provider === "google") text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    else text = data.choices?.[0]?.message?.content || "";
+
+    const match = text.match(/\{[\s\S]*?\}/);
+    if (!match) throw new Error("Format respons tidak valid");
+    return JSON.parse(match[0]);
+}
 
 /* ── DatePicker: 3 selects (day/month/year) — works in all browsers/mobile ── */
 const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
@@ -47,8 +122,43 @@ const AddTransactionModal = ({
     editMode = false, onUpdate,
     // Loading state
     isSaving = false,
+    // AI config for scan struk
+    aiConfig = null,
 }) => {
     const { t } = useLanguage();
+    const fileRef = useRef(null);
+    const [scanLoading, setScanLoading] = useState(false);
+    const [scanError, setScanError]     = useState("");
+
+    const handleScanFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = "";
+        setScanError("");
+        setScanLoading(true);
+        try {
+            const base64 = await new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res(r.result.split(",")[1]);
+                r.onerror = rej;
+                r.readAsDataURL(file);
+            });
+            const result = await scanReceiptWithAI(base64, file.type, aiConfig);
+            if (result.error) { setScanError("⚠️ " + result.error); return; }
+            setTxForm(p => ({
+                ...p,
+                type:     result.type || p.type,
+                amount:   result.amount ? String(result.amount) : p.amount,
+                note:     result.note  || p.note,
+                category: result.category || p.category,
+                date:     result.date  || p.date,
+            }));
+        } catch (err) {
+            setScanError("❌ " + (err.message || "Gagal membaca struk"));
+        } finally {
+            setScanLoading(false);
+        }
+    };
 
     /* Terjemahkan nama kategori default, custom tetap nama asli */
     const DEFAULT_CATS = new Set([...expenseCategories, ...incomeCategories]);
@@ -111,6 +221,35 @@ const AddTransactionModal = ({
                     );
                 })}
             </div>
+
+            {/* Scan Struk — hanya saat tambah baru, bukan transfer, ada API key */}
+            {!editMode && !isTransfer && aiConfig?.apiKey && (
+                <div style={{ marginBottom: 16 }}>
+                    <input ref={fileRef} type="file" accept="image/*" capture="environment"
+                        style={{ display: "none" }} onChange={handleScanFile} />
+                    <button
+                        onClick={() => { setScanError(""); fileRef.current?.click(); }}
+                        disabled={scanLoading}
+                        style={{
+                            width: "100%", padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+                            border: "1px dashed var(--color-primary)", fontFamily: "inherit",
+                            background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
+                            fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
+                            justifyContent: "center", gap: 8, opacity: scanLoading ? 0.6 : 1,
+                        }}
+                    >
+                        {scanLoading
+                            ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span> Membaca struk...</>
+                            : <>📷 Scan Struk / Nota</>
+                        }
+                    </button>
+                    {scanError && (
+                        <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(220,38,38,.08)", border: "1px solid rgba(220,38,38,.2)", borderRadius: 8, fontSize: 12, color: "var(--color-expense)" }}>
+                            {scanError}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Transfer edit: only note editable */}
             {editMode && isTransfer ? (
