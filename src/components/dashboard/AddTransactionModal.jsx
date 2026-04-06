@@ -5,34 +5,38 @@ import AmountInput from "../ui/AmountInput";
 import { expenseCategories, incomeCategories } from "../../constants/categories";
 import { useLanguage } from "../../i18n/LanguageContext";
 
-/* ── Scan Struk: kirim gambar ke AI, ekstrak data transaksi ── */
+/* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ── */
+const SCAN_CATEGORIES = ["Makanan & Minuman","Transportasi","Belanja","Hiburan","Kesehatan","Pendidikan","Tagihan","Lainnya"];
+
 async function scanReceiptWithAI(base64, mimeType, aiConfig) {
     const { provider, apiKey } = aiConfig || {};
     if (!apiKey) throw new Error("API key belum diset");
 
-    const prompt = `Kamu adalah asisten keuangan Indonesia. Baca struk/nota/receipt ini dan ekstrak datanya.
+    const prompt = `Kamu adalah asisten keuangan Indonesia. Baca struk/nota/receipt ini dan ekstrak SEMUA item produk/layanan yang dibeli secara terpisah.
 Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
 {
-  "type": "expense",
-  "amount": 150000,
-  "note": "Indomaret Sudirman",
-  "category": "Belanja",
-  "date": "2026-04-06"
+  "merchant": "Nama Toko",
+  "date": "2026-04-06",
+  "items": [
+    { "note": "Nama Produk 1", "amount": 15000, "category": "Makanan & Minuman" },
+    { "note": "Nama Produk 2", "amount": 8500, "category": "Belanja" }
+  ]
 }
-Aturan:
-- type: selalu "expense" untuk belanja/pembelian, "income" untuk penerimaan uang
-- amount: angka bulat tanpa titik/koma (total yang dibayar)
-- note: nama merchant/toko singkat
+Aturan penting:
+- items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
+- note: nama produk singkat dan jelas
+- amount: harga total untuk item itu (qty × harga satuan), angka bulat tanpa titik/koma
 - category: pilih salah satu: "Makanan & Minuman", "Transportasi", "Belanja", "Hiburan", "Kesehatan", "Pendidikan", "Tagihan", "Lainnya"
-- date: format YYYY-MM-DD, jika tidak ada di struk tulis null
-Jika gambar bukan struk, kembalikan: {"error": "bukan struk"}`;
+- date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
+- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
+Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`;
 
     let url, headers, body;
 
     if (provider === "groq") {
         url = "https://api.groq.com/openai/v1/chat/completions";
         headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
-        body = { model: "meta-llama/llama-4-scout-17b-16e-instruct", max_tokens: 300,
+        body = { model: "meta-llama/llama-4-scout-17b-16e-instruct", max_tokens: 1000,
             messages: [{ role: "user", content: [
                 { type: "text", text: prompt },
                 { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
@@ -40,7 +44,7 @@ Jika gambar bukan struk, kembalikan: {"error": "bukan struk"}`;
     } else if (provider === "openai") {
         url = "https://api.openai.com/v1/chat/completions";
         headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
-        body = { model: "gpt-4o-mini", max_tokens: 300,
+        body = { model: "gpt-4o-mini", max_tokens: 1000,
             messages: [{ role: "user", content: [
                 { type: "text", text: prompt },
                 { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
@@ -49,7 +53,7 @@ Jika gambar bukan struk, kembalikan: {"error": "bukan struk"}`;
         url = "https://api.anthropic.com/v1/messages";
         headers = { "Content-Type": "application/json", "x-api-key": apiKey,
             "anthropic-version": "2023-06-01", "anthropic-dangerous-allow-browser": "true" };
-        body = { model: "claude-3-5-haiku-20241022", max_tokens: 300,
+        body = { model: "claude-3-5-haiku-20241022", max_tokens: 1000,
             messages: [{ role: "user", content: [
                 { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } },
                 { type: "text", text: prompt },
@@ -74,10 +78,12 @@ Jika gambar bukan struk, kembalikan: {"error": "bukan struk"}`;
     else if (provider === "google") text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     else text = data.choices?.[0]?.message?.content || "";
 
-    const match = text.match(/\{[\s\S]*?\}/);
+    const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("Format respons tidak valid");
     return JSON.parse(match[0]);
 }
+
+const fmtRpLocal = (n) => "Rp " + Number(n).toLocaleString("id-ID");
 
 /* ── DatePicker: 3 selects (day/month/year) — works in all browsers/mobile ── */
 const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
@@ -124,11 +130,18 @@ const AddTransactionModal = ({
     isSaving = false,
     // AI config for scan struk
     aiConfig = null,
+    // Multi-item save
+    onSubmitMultiple,
 }) => {
     const { t } = useLanguage();
     const fileRef = useRef(null);
-    const [scanLoading, setScanLoading] = useState(false);
-    const [scanError, setScanError]     = useState("");
+    const [scanLoading, setScanLoading]   = useState(false);
+    const [scanError, setScanError]       = useState("");
+    const [scanResults, setScanResults]   = useState(null); // { merchant, date, items }
+    const [scanItems, setScanItems]       = useState([]);   // editable items dengan .selected
+    const [scanAccount, setScanAccount]   = useState("");
+
+    const resetScan = () => { setScanResults(null); setScanItems([]); setScanError(""); };
 
     const handleScanFile = async (e) => {
         const file = e.target.files?.[0];
@@ -145,19 +158,22 @@ const AddTransactionModal = ({
             });
             const result = await scanReceiptWithAI(base64, file.type, aiConfig);
             if (result.error) { setScanError("⚠️ " + result.error); return; }
-            setTxForm(p => ({
-                ...p,
-                type:     result.type || p.type,
-                amount:   result.amount ? String(result.amount) : p.amount,
-                note:     result.note  || p.note,
-                category: result.category || p.category,
-                date:     result.date  || p.date,
-            }));
+            if (!result.items?.length) { setScanError("⚠️ Tidak ada item yang terdeteksi"); return; }
+            setScanResults(result);
+            setScanItems(result.items.map((item, i) => ({ ...item, id: i, selected: true })));
+            setScanAccount(txForm.account || accounts[0]?.name || "");
         } catch (err) {
             setScanError("❌ " + (err.message || "Gagal membaca struk"));
         } finally {
             setScanLoading(false);
         }
+    };
+
+    const handleSaveMultiple = () => {
+        const selected = scanItems.filter(i => i.selected);
+        if (!selected.length) return;
+        onSubmitMultiple && onSubmitMultiple(selected, scanAccount, scanResults?.date);
+        resetScan();
     };
 
     /* Terjemahkan nama kategori default, custom tetap nama asli */
@@ -251,8 +267,101 @@ const AddTransactionModal = ({
                 </div>
             )}
 
+            {/* ── Hasil Scan Multi-Item ── */}
+            {scanResults && (
+                <div>
+                    {/* Header merchant */}
+                    <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10, marginBottom: 14 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</div>
+                        {scanResults.date && <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>📅 {scanResults.date}</div>}
+                    </div>
+
+                    {/* Pilih Akun */}
+                    <div style={{ marginBottom: 14 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6, letterSpacing: 0.5 }}>AKUN (semua item)</label>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {accounts.map(a => (
+                                <button key={a.name} onClick={() => setScanAccount(a.name)}
+                                    style={{ padding: "6px 12px", borderRadius: 8, fontFamily: "inherit", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                        border: `1px solid ${scanAccount === a.name ? "rgba(5,150,105,.4)" : "var(--color-border-soft)"}`,
+                                        background: scanAccount === a.name ? "rgba(5,150,105,.15)" : "transparent",
+                                        color: scanAccount === a.name ? "var(--color-primary)" : "var(--color-muted)" }}>
+                                    {a.icon} {a.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Daftar Item */}
+                    <div style={{ marginBottom: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", letterSpacing: 0.5 }}>
+                                ITEM ({scanItems.filter(i => i.selected).length}/{scanItems.length} dipilih)
+                            </label>
+                            <button onClick={() => setScanItems(p => p.every(i => i.selected) ? p.map(i => ({...i, selected: false})) : p.map(i => ({...i, selected: true})))}
+                                style={{ fontSize: 11, color: "var(--color-primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                                {scanItems.every(i => i.selected) ? "Batal semua" : "Pilih semua"}
+                            </button>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
+                            {scanItems.map((item, idx) => (
+                                <div key={item.id} style={{
+                                    display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
+                                    background: item.selected ? "var(--bg-surface-low)" : "transparent",
+                                    border: `1px solid ${item.selected ? "var(--color-border)" : "var(--color-border-soft)"}`,
+                                    borderRadius: 10, opacity: item.selected ? 1 : 0.45,
+                                }}>
+                                    {/* Checkbox */}
+                                    <input type="checkbox" checked={item.selected}
+                                        onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, selected: e.target.checked} : it))}
+                                        style={{ marginTop: 3, accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        {/* Nama item */}
+                                        <input value={item.note} onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, note: e.target.value} : it))}
+                                            style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--color-text)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: 4 }} />
+                                        {/* Kategori */}
+                                        <select value={item.category} onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, category: e.target.value} : it))}
+                                            style={{ fontSize: 10, padding: "2px 6px", borderRadius: 6, border: "1px solid var(--color-border-soft)", background: "var(--bg-surface-low)", color: "var(--color-muted)", fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
+                                            {SCAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    {/* Jumlah */}
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-expense)", flexShrink: 0, whiteSpace: "nowrap" }}>
+                                        {fmtRpLocal(item.amount)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Total */}
+                    {scanItems.filter(i => i.selected).length > 0 && (
+                        <div style={{ padding: "8px 14px", background: "rgba(220,38,38,.06)", border: "1px solid rgba(220,38,38,.15)", borderRadius: 10, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>Total {scanItems.filter(i => i.selected).length} item</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-expense)" }}>
+                                {fmtRpLocal(scanItems.filter(i => i.selected).reduce((s, i) => s + i.amount, 0))}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Tombol aksi */}
+                    <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={resetScan}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            ← Kembali
+                        </button>
+                        <button onClick={handleSaveMultiple} disabled={isSaving || !scanItems.filter(i => i.selected).length || !scanAccount}
+                            style={{ flex: 2, padding: 12, borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                                opacity: (isSaving || !scanItems.filter(i => i.selected).length || !scanAccount) ? 0.5 : 1 }}>
+                            {isSaving ? "Menyimpan..." : `✅ Simpan ${scanItems.filter(i => i.selected).length} Transaksi`}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Form normal — sembunyikan jika scan results aktif */}
             {/* Transfer edit: only note editable */}
-            {editMode && isTransfer ? (
+            {!scanResults && editMode && isTransfer ? (
                 <>
                     <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
                         ℹ️ Transfer hanya bisa diubah catatan &amp; tanggalnya. Untuk mengubah akun / jumlah, <strong style={{ color: "#ff716c" }}>hapus dan buat ulang</strong>.
@@ -275,7 +384,7 @@ const AddTransactionModal = ({
                         />
                     </div>
                 </>
-            ) : isTransfer ? (
+            ) : !scanResults && isTransfer ? (
                 /* ── Mode Transfer (tambah baru) ── */
                 <>
                     <AmountInput label="JUMLAH (Rp)" icon="💰" placeholder="150.000" value={txForm.amount} onChange={v => setTxForm(p => ({ ...p, amount: v }))} />
@@ -332,7 +441,7 @@ const AddTransactionModal = ({
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>📅 TANGGAL</label>
                     <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
                 </>
-            ) : (
+            ) : !scanResults ? (
                 /* ── Mode Normal (expense / income) ── */
                 <>
                     <AmountInput label="JUMLAH (Rp)" icon="💰" placeholder="150.000" value={txForm.amount} onChange={v => setTxForm(p => ({ ...p, amount: v }))} />
@@ -360,9 +469,9 @@ const AddTransactionModal = ({
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>📅 TANGGAL</label>
                     <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
                 </>
-            )}
+            ) : null}
 
-            <button onClick={handleSubmit} disabled={(!canSubmit && !editMode) || isSaving}
+            {!scanResults && <button onClick={handleSubmit} disabled={(!canSubmit && !editMode) || isSaving}
                 style={{
                     width: "100%", padding: 13, borderRadius: 12, border: "none",
                     background: ((!canSubmit && !editMode) || isSaving)
@@ -384,7 +493,7 @@ const AddTransactionModal = ({
                     <span style={{ width: 15, height: 15, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />
                 )}
                 {submitLabel}
-            </button>
+            </button>}
         </div>
     </Modal>
     );
