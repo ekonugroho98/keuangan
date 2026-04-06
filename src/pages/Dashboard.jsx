@@ -1148,7 +1148,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     })()}
 
                     {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} investments={investments} debts={debts} budgets={budgets} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
-                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} />}
+                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} accounts={accounts} />}
                     {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} />}
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}

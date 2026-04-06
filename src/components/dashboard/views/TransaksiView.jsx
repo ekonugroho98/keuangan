@@ -48,7 +48,7 @@ const MONTH_NAMES_ID  = ["","Januari","Februari","Maret","April","Mei","Juni","J
 const MONTH_NAMES_EN  = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 
-const TransaksiView = ({ transactions, onEdit, onDelete }) => {
+const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const { t, lang } = useLanguage();
     const isMobile = useIsMobile();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
@@ -59,6 +59,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
     const [filterMonth,   setFilterMonth]   = useState(String(now.getMonth() + 1).padStart(2, "0"));
     const [filterDate,    setFilterDate]    = useState("");
     const [filterType,    setFilterType]    = useState("all");
+    const [filterAccount, setFilterAccount] = useState("");
     const [search,        setSearch]        = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -78,9 +79,10 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
     const sumTransfer = byDate.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
     const net         = sumIn - sumOut; // bersih = pemasukan - pengeluaran saja (transfer netral)
 
-    /* --- further filtered by type + search --- */
+    /* --- further filtered by type + account + search --- */
     const filtered = byDate.filter(tx => {
         if (filterType !== "all" && tx.type !== filterType) return false;
+        if (filterAccount && tx.account_name !== filterAccount) return false;
         if (search) {
             const q = search.toLowerCase();
             return (
@@ -98,6 +100,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
         setFilterDate("");
         setSearch("");
         setFilterType("all");
+        setFilterAccount("");
     };
 
     /* periode label */
@@ -298,6 +301,36 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                             {MONTHS.map(m => <option key={m.v} value={m.v} style={{ background: "var(--bg-surface)" }}>{m.l}</option>)}
                         </select>
                     </div>
+
+                    {/* Account filter — hanya tampil jika ada data akun */}
+                    {accounts.length > 0 && (
+                        <>
+                            <div style={{ width: 1, height: 24, background: "rgba(72,71,79,.3)" }} />
+                            <select
+                                value={filterAccount}
+                                onChange={e => setFilterAccount(e.target.value)}
+                                style={{
+                                    background: filterAccount ? "rgba(96,252,198,.1)" : "transparent",
+                                    border: filterAccount ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    borderRadius: 8,
+                                    color: filterAccount ? "var(--color-primary)" : "var(--color-muted)",
+                                    fontSize: 12, fontWeight: filterAccount ? 700 : 500,
+                                    fontFamily: "inherit", cursor: "pointer", outline: "none",
+                                    padding: filterAccount ? "4px 8px" : "0",
+                                    transition: "all .2s",
+                                }}
+                            >
+                                <option value="" style={{ background: "var(--bg-surface)" }}>
+                                    {t("acc.allAccounts") || "Semua Rekening"}
+                                </option>
+                                {accounts.map(a => (
+                                    <option key={a.id} value={a.name} style={{ background: "var(--bg-surface)" }}>
+                                        {a.icon} {a.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    )}
                 </div>
 
                 {/* Right: search + date + reset */}
@@ -327,7 +360,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete }) => {
                     />
 
                     {/* Reset */}
-                    {(filterDate || search || filterType !== "all") && (
+                    {(filterDate || search || filterType !== "all" || filterAccount) && (
                         <button onClick={handleReset}
                             style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid rgba(255,113,108,.2)", background: "rgba(255,113,108,.08)", color: "#ff716c", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
                             ✕ {t("common.reset")}
