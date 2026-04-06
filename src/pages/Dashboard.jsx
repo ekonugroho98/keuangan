@@ -830,7 +830,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         if (!amount || !fromAcc || !toAcc || fromAcc.id === toAcc.id || isSavingTx) return;
 
         setIsSavingTx(true);
-        const date = new Date().toISOString().slice(0, 10);
+        const date = txForm.date || new Date().toISOString().slice(0, 10);
         const note = txForm.note || `Transfer ${fromAcc.name} → ${toAcc.name}`;
 
         const { data: txData, error: txError } = await supabase.from("transactions").insert([
