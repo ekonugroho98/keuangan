@@ -171,7 +171,7 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                 <div style={{ ...cardStyle, textAlign: "center", padding: "48px 24px" }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>🔮</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("pred.noData")}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-subtle)" }}>Tambahkan transaksi untuk melihat prediksi keuangan.</div>
+                    <div style={{ fontSize: 13, color: "var(--color-subtle)" }}>{t("pred.noDataSub")}</div>
                 </div>
             </div>
         );
@@ -191,15 +191,15 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "rgba(96,252,198,.06)", border: "1px solid rgba(96,252,198,.15)", borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
                 <span style={{ fontSize: 16, flexShrink: 0 }}>🧮</span>
                 <div style={{ fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                    <strong style={{ color: "var(--color-primary)" }}>Metode Smart Prediction</strong>
-                    {" "}— Pengeluaran dipisah menjadi{" "}
-                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>Tetap</span> (bayar sekali/bulan, tidak diekstrapolasi)
-                    {" "}dan{" "}
-                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>Variabel</span> (diekstrapolasi dari laju harian).
-                    {" "}Tetap: <strong style={{ color: "#4FC3F7" }}>{fmtRp(fixedTotal)}</strong> ·
-                    Variabel/hari: <strong style={{ color: "#f59e0b" }}>{fmtRp(variableDailyRate)}</strong>
+                    <strong style={{ color: "var(--color-primary)" }}>{t("pred.methodTitle")}</strong>
+                    {" "}— {t("pred.methodDesc")}{" "}
+                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{t("pred.fixed")}</span> {t("pred.methodFixedDesc")}
+                    {" "}{t("pred.methodAnd")}{" "}
+                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{t("pred.variable")}</span> {t("pred.methodVariableDesc")}.
+                    {" "}{t("pred.fixedLabel")} <strong style={{ color: "#4FC3F7" }}>{fmtRp(fixedTotal)}</strong> ·
+                    {t("pred.variablePerDay")} <strong style={{ color: "#f59e0b" }}>{fmtRp(variableDailyRate)}</strong>
                     <span style={{ display: "block", marginTop: 4, color: "var(--color-subtle)" }}>
-                        💡 Untuk analisis mendalam berbasis AI, gunakan fitur <strong>AI Coach</strong>.
+                        💡 {t("pred.aiTip")} <strong>AI Coach</strong>.
                     </span>
                 </div>
             </div>
@@ -213,10 +213,10 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
 
                     {/* Label + konteks */}
                     <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1, marginBottom: 2 }}>
-                        ESTIMASI TOTAL PENGELUARAN
+                        {t("pred.estTotalExpense")}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 10 }}>
-                        📅 Akhir {monthName} (hari ke-{todayDay} dari {daysInMonth})
+                        📅 {t("pred.endOf")} {monthName} ({t("pred.dayOf")}{todayDay} {t("pred.dari")} {daysInMonth})
                     </div>
 
                     <div style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", marginBottom: 12 }}>
@@ -226,25 +226,25 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                     {/* Rumus prediksi yang transparan */}
                     <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                            <span style={{ color: "var(--color-muted)" }}>✅ Sudah dikeluarkan</span>
+                            <span style={{ color: "var(--color-muted)" }}>✅ {t("pred.alreadySpent")}</span>
                             <strong style={{ color: "var(--color-text)" }}>{fmtRp(spentThisMonth)}</strong>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                            <span style={{ color: "var(--color-muted)" }}>📈 + Proyeksi {remainingDays} hari sisa</span>
+                            <span style={{ color: "var(--color-muted)" }}>📈 + {t("pred.projRemaining")} {remainingDays} {t("pred.daysLeft")}</span>
                             <strong style={{ color: "#f59e0b" }}>+{fmtRp(remainingPredicted)}</strong>
                         </div>
                         <div style={{ borderTop: "1px solid var(--color-border-soft)", paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                            <span style={{ color: "var(--color-muted)", fontWeight: 600 }}>= Total prediksi akhir bulan</span>
+                            <span style={{ color: "var(--color-muted)", fontWeight: 600 }}>= {t("pred.totalMonthEnd")}</span>
                             <strong style={{ color: "var(--color-primary)" }}>{fmtRp(predictedTotal)}</strong>
                         </div>
                     </div>
 
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                            🔒 Tetap: <strong style={{ color: "#4FC3F7" }}>{fmtRp(fixedTotal)}</strong>
+                            🔒 {t("pred.fixedLabel")} <strong style={{ color: "#4FC3F7" }}>{fmtRp(fixedTotal)}</strong>
                         </span>
                         <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                            📈 Variabel/hari: <strong style={{ color: "#f59e0b" }}>{fmtRp(variableDailyRate)}</strong>
+                            📈 {t("pred.variablePerDay")} <strong style={{ color: "#f59e0b" }}>{fmtRp(variableDailyRate)}</strong>
                         </span>
                     </div>
 
@@ -253,7 +253,7 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                             <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: trendUp ? "rgba(255,113,108,.12)" : "rgba(96,252,198,.12)", color: trendUp ? "#ff716c" : "var(--color-primary)" }}>
                                 {trendUp ? "▲" : "▼"} {Math.abs(trendPct)}%
                             </span>
-                            <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>vs rata-rata 3 bln lalu</span>
+                            <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>{t("pred.vsLastMonth")}</span>
                         </div>
                     )}
 
@@ -261,7 +261,7 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                         <div style={{ height: "100%", borderRadius: 2, background: "linear-gradient(90deg,#60fcc6,#4FC3F7)", width: `${Math.min(100, (todayDay / daysInMonth) * 100)}%` }} />
                     </div>
                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 4 }}>
-                        Progress bulan: {todayDay}/{daysInMonth} hari ({Math.round((todayDay/daysInMonth)*100)}%)
+                        {t("pred.monthProgress")}: {todayDay}/{daysInMonth} {t("pred.days")} ({Math.round((todayDay/daysInMonth)*100)}%)
                     </div>
                 </div>
 
@@ -275,13 +275,13 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                         {fmtRp(estimatedEndBalance)}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
-                        Saldo sekarang: <strong style={{ color: "var(--color-text)" }}>{fmtRp(totalBalance)}</strong>
+                        {t("pred.currentBalance")}: <strong style={{ color: "var(--color-text)" }}>{fmtRp(totalBalance)}</strong>
                     </div>
                     <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
-                        Proyeksi pengeluaran variabel sisa bulan: <strong style={{ color: "#ff716c" }}>−{fmtRp(remainingPredicted)}</strong>
+                        {t("pred.projVariableRem")}: <strong style={{ color: "#ff716c" }}>−{fmtRp(remainingPredicted)}</strong>
                     </div>
                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 10 }}>
-                        {remainingDays} hari tersisa @ {fmtRp(variableDailyRate)}/hari (variabel)
+                        {remainingDays} {t("pred.daysRemaining")} @ {fmtRp(variableDailyRate)}{t("pred.perDayVar")}
                     </div>
                 </div>
             </div>
@@ -308,9 +308,9 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                                     <div style={{ height: "100%", borderRadius: 3, background: a.status === "danger" ? "#ff716c" : "#f59e0b", width: `${Math.min(100, a.pct)}%`, transition: "width .5s" }} />
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-subtle)" }}>
-                                    <span>Terpakai: {fmtRp(a.spent)}</span>
-                                    <span>Prediksi: {fmtRp(a.predicted)}</span>
-                                    <span>Budget: {fmtRp(a.budget)}</span>
+                                    <span>{t("pred.labelSpent")}: {fmtRp(a.spent)}</span>
+                                    <span>{t("pred.labelPredicted")}: {fmtRp(a.predicted)}</span>
+                                    <span>{t("pred.labelBudget")}: {fmtRp(a.budget)}</span>
                                 </div>
                             </div>
                         ))}
@@ -328,15 +328,15 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                         <thead>
                             <tr style={{ borderBottom: "1px solid var(--color-border-soft)" }}>
                                 {[
-                                    { l: "KATEGORI",  align: "left"  },
-                                    { l: "TIPE",      align: "left"  },
-                                    { l: "BULAN INI", align: "right" },
-                                    { l: "AVG 3 BLN", align: "right" },
-                                    { l: "PREDIKSI",  align: "right" },
-                                    { l: "STATUS",    align: "right" },
+                                    { k: "pred.colCategory",  align: "left"  },
+                                    { k: "pred.colType",      align: "left"  },
+                                    { k: "pred.colThisMonth", align: "right" },
+                                    { k: "pred.colAvg3m",     align: "right" },
+                                    { k: "pred.colPrediction",align: "right" },
+                                    { k: "pred.colStatus",    align: "right" },
                                 ].map(h => (
-                                    <th key={h.l} style={{ padding: "8px 10px", textAlign: h.align, color: "var(--color-subtle)", fontWeight: 700, fontSize: 10, letterSpacing: .5, whiteSpace: "nowrap" }}>
-                                        {h.l}
+                                    <th key={h.k} style={{ padding: "8px 10px", textAlign: h.align, color: "var(--color-subtle)", fontWeight: 700, fontSize: 10, letterSpacing: .5, whiteSpace: "nowrap" }}>
+                                        {t(h.k)}
                                     </th>
                                 ))}
                             </tr>
@@ -355,7 +355,7 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                                     const statusClr = statusStr === "fixed"   ? "#4FC3F7"
                                         : statusStr === "safe"    ? "var(--color-primary)"
                                         : statusStr === "warning" ? "#f59e0b" : "#ff716c";
-                                    const statusLbl = statusStr === "fixed"   ? "🔒 Tetap"
+                                    const statusLbl = statusStr === "fixed"   ? t("pred.statusFixed")
                                         : statusStr === "safe"    ? t("pred.safe")
                                         : statusStr === "warning" ? t("pred.warning") : t("pred.danger");
 
@@ -364,14 +364,14 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                                             <td style={{ padding: "10px 10px", color: "var(--color-text)", fontWeight: 600 }}>{cat}</td>
                                             <td style={{ padding: "10px 10px" }}>
                                                 <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: isFixed ? "rgba(79,195,247,.12)" : "rgba(245,158,11,.1)", color: isFixed ? "#4FC3F7" : "#f59e0b" }}>
-                                                    {isFixed ? "Tetap" : "Variabel"}
+                                                    {isFixed ? t("pred.typeFixed") : t("pred.typeVariable")}
                                                 </span>
                                             </td>
                                             <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--color-text)" }}>{fmtRp(spent)}</td>
                                             <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--color-muted)" }}>{avg > 0 ? fmtRp(avg) : "—"}</td>
                                             <td style={{ padding: "10px 10px", textAlign: "right", fontWeight: 600, color: isFixed ? "var(--color-muted)" : (predicted > avg * 1.2 && avg > 0 ? "#ff716c" : "var(--color-text)") }}>
                                                 {fmtRp(predicted)}
-                                                {isFixed && <span style={{ fontSize: 9, color: "var(--color-subtle)", display: "block" }}>aktual</span>}
+                                                {isFixed && <span style={{ fontSize: 9, color: "var(--color-subtle)", display: "block" }}>{t("pred.labelActual")}</span>}
                                             </td>
                                             <td style={{ padding: "10px 10px", textAlign: "right" }}>
                                                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${statusClr}18`, color: statusClr, whiteSpace: "nowrap" }}>
