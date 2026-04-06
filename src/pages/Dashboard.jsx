@@ -63,9 +63,27 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [loading, setLoading] = useState(true);
     const [showPricing, setShowPricing] = useState(false);
 
-    const [aiChat, setAiChat] = useState([{ role: "ai", text: `Halo ${userName.split(" ")[0]}! 👋 Gue ${APP_AI_NAME}. Mau analisis keuangan atau tanya apa?` }]);
+    const makeGreeting = () => {
+        const name = userName.split(" ")[0];
+        const raw  = t("ai.greeting");
+        // Jika key belum ada di translations, fallback ke Indonesian
+        const tmpl = raw === "ai.greeting"
+            ? `Halo ${name}! 👋 Gue ${APP_AI_NAME}. Mau analisis keuangan atau tanya apa?`
+            : raw.replace("{name}", name).replace("{ai}", APP_AI_NAME);
+        return [{ role: "ai", text: tmpl }];
+    };
+    const [aiChat, setAiChat] = useState(makeGreeting);
     const [aiInput, setAiInput] = useState("");
     const [aiTyping, setAiTyping] = useState(false);
+
+    // Update greeting saat bahasa berubah (hanya jika chat masih di pesan pertama)
+    useEffect(() => {
+        setAiChat(prev => {
+            if (prev.length === 1) return makeGreeting();
+            // Sudah ada percakapan — hanya update pesan pertama (greeting)
+            return [makeGreeting()[0], ...prev.slice(1)];
+        });
+    }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── USER SETTINGS (synced to DB) ────────────────────────
     const [userSettings,   setUserSettings]   = useState(null);
