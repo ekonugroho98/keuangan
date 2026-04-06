@@ -125,6 +125,7 @@ const AddTransactionModal = ({
                             type="date"
                             value={txForm.date || ""}
                             onChange={e => setTxForm(p => ({ ...p, date: e.target.value }))}
+                            onClick={e => e.target.showPicker?.()}
                             style={{
                                 width: "100%", padding: "10px 14px", boxSizing: "border-box",
                                 background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
