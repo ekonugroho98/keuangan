@@ -732,16 +732,16 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         setIsSavingTx(true);
         const oldAcc = accounts.find(a => a.name === editingTx.account_name);
 
-        // Untuk transfer: hanya update note
+        // Untuk transfer: update note + date
         if (editingTx.type === "transfer") {
             const { data, error } = await supabase.from("transactions")
-                .update({ note: txForm.note })
+                .update({ note: txForm.note, date: txForm.date || editingTx.date })
                 .eq("id", editingTx.id).select().single();
             setIsSavingTx(false);
             if (error) { showToast("Gagal mengubah transaksi", "error"); return; }
             setTransactions(p => p.map(t => t.id === editingTx.id ? data : t));
             setShowEditTx(false); setEditingTx(null);
-            showToast("Catatan transfer diperbarui ✅");
+            showToast("Transfer diperbarui ✅");
             return;
         }
 

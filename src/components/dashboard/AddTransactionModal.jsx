@@ -116,11 +116,22 @@ const AddTransactionModal = ({
             {editMode && isTransfer ? (
                 <>
                     <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                        ℹ️ Transfer hanya bisa diubah catatannya. Untuk mengubah akun / jumlah, <strong style={{ color: "#ff716c" }}>hapus dan buat ulang</strong>.
+                        ℹ️ Transfer hanya bisa diubah catatan &amp; tanggalnya. Untuk mengubah akun / jumlah, <strong style={{ color: "#ff716c" }}>hapus dan buat ulang</strong>.
                     </div>
                     <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
-                    <div style={{ padding: "8px 12px", background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, marginBottom: 16, fontSize: 12, color: "var(--color-muted)" }}>
-                        📅 Tanggal: <strong style={{ color: "var(--color-text)" }}>{txForm.date || "-"}</strong>
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block", letterSpacing: 0.5 }}>TANGGAL</label>
+                        <input
+                            type="date"
+                            value={txForm.date || ""}
+                            onChange={e => setTxForm(p => ({ ...p, date: e.target.value }))}
+                            style={{
+                                width: "100%", padding: "10px 14px", boxSizing: "border-box",
+                                background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
+                                borderRadius: 10, color: "var(--color-text)", fontSize: 13,
+                                fontFamily: "inherit", outline: "none",
+                            }}
+                        />
                     </div>
                 </>
             ) : isTransfer ? (
