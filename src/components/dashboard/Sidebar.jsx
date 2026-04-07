@@ -161,15 +161,6 @@ const Sidebar = ({
         items: g.items.filter(item => item.id === "dasbor" || !hiddenMenus.includes(item.id)),
     })).filter(g => g.items.length > 0);
 
-    const planLabel = (plan, expiresAt) => {
-        const expired = expiresAt ? new Date() > new Date(expiresAt) : false;
-        if (!plan || plan === "trial") return { text: expired ? "Trial Expired" : "Free Trial", color: expired ? "#f87171" : "#64748b" };
-        if (plan === "starter") return { text: "Starter 🚀", color: "#6ee7b7" };
-        if (plan === "pro")     return { text: "Pro ⭐",     color: "#fcd34d" };
-        return { text: plan, color: "#64748b" };
-    };
-
-    const { text: planText, color: planColor } = planLabel(user.plan, user.expiresAt);
     const currentLang = languages.find(l => l.code === lang);
 
     /* ── shared styles ── */
@@ -268,7 +259,6 @@ const Sidebar = ({
                     </div>
                     <div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>{user.name}</div>
-                        <div style={{ fontSize: 11, color: planColor }}>{planText}</div>
                     </div>
                 </div>
             </div>
@@ -495,7 +485,6 @@ const Sidebar = ({
                     </div>
                     <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: isMobile ? 16 : 14, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
-                        <div style={{ fontSize: isMobile ? 12 : 11, color: planColor, fontWeight: 600 }}>{planText}</div>
                     </div>
                 </div>
 
@@ -665,7 +654,6 @@ const Sidebar = ({
                     <button onClick={() => { setShowProfileMenu(v => !v); setProfileView("menu"); }}
                         style={{ flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
-                        <div style={{ fontSize: 10, color: planColor, fontWeight: 600 }}>{planText}</div>
                     </button>
 
                     {/* Theme toggle */}

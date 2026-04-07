@@ -21,7 +21,6 @@ import AiView from "../components/dashboard/views/AiView";
 import AnggaranView from "../components/dashboard/views/AnggaranView";
 import SplitBillView from "../components/dashboard/views/SplitBillView";
 import PrediksiView from "../components/dashboard/views/PrediksiView";
-import PricingModal from "../components/dashboard/PricingModal";
 import { categoryIcons } from "../constants/categories";
 import { supabase } from "../lib/supabase";
 
@@ -59,9 +58,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [investments, setInvestments] = useState([]);
     const [budgets, setBudgets] = useState([]);
     const [splitBills, setSplitBills] = useState([]);
-    const [subscription, setSubscription] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [showPricing, setShowPricing] = useState(false);
 
     const makeGreeting = () => {
         const name = userName.split(" ")[0];
@@ -200,7 +197,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             supabase.from("investments").delete().eq("user_id", user.id),
             supabase.from("categories").delete().eq("user_id", user.id),
             supabase.from("recurring_transactions").delete().eq("user_id", user.id),
-            supabase.from("subscriptions").delete().eq("user_id", user.id),
         ]);
         await supabase.auth.signOut();
         onLogout();
@@ -214,12 +210,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const fetchAll = async () => {
         setLoading(true);
         try {
-        const [accs, txs, gls, dbs, sub, cats, recs, invs, buds, splits, piu] = await Promise.all([
+        const [accs, txs, gls, dbs, cats, recs, invs, buds, splits, piu] = await Promise.all([
             supabase.from("accounts").select("*").order("created_at"),
             supabase.from("transactions").select("*").order("date", { ascending: false }),
             supabase.from("goals").select("*").order("created_at"),
             supabase.from("debts").select("*").order("created_at"),
-            supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle(),
             supabase.from("categories").select("*").order("created_at"),
             supabase.from("recurring_transactions").select("*").order("next_date"),
             supabase.from("investments").select("*").order("created_at"),
@@ -227,21 +222,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             supabase.from("split_bills").select("*, split_bill_members(*)").order("created_at", { ascending: false }),
             supabase.from("piutang").select("*").order("created_at"),
         ]);
-
-        // Buat trial subscription jika belum ada
-        if (!sub.data) {
-            const expires = new Date();
-            expires.setDate(expires.getDate() + 14);
-            const { data: newSub } = await supabase.from("subscriptions").insert({
-                user_id: user.id,
-                plan: "trial",
-                started_at: new Date().toISOString(),
-                expires_at: expires.toISOString(),
-            }).select().single();
-            setSubscription(newSub);
-        } else {
-            setSubscription(sub.data);
-        }
 
         const accounts = accs.data || [];
         const recurrings = recs.data || [];
@@ -1004,13 +984,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} aiConfig={aiConfig} onSubmitMultiple={addMultipleTx} />
             <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} isSaving={isSavingTx} aiConfig={aiConfig} />
             <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
-            <PricingModal open={showPricing} onClose={() => setShowPricing(false)} currentPlan={subscription?.plan} />
-
             <Sidebar
                 open={sidebarOpen}
                 activeMenu={activeMenu}
                 setActiveMenu={(m) => { setActiveMenu(m); if (isMobile) setSidebarOpen(false); }}
-                user={{ name: userName, plan: subscription?.plan, expiresAt: subscription?.expires_at }}
+                user={{ name: userName }}
                 onAddTx={() => setShowAddTx(true)}
                 onToggleSidebar={() => setSidebarOpen(p => !p)}
                 onLogout={onLogout}
@@ -1052,146 +1030,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 </header>
 
                 <div style={{ padding: isMobile ? "16px 12px" : 28 }}>
-                    {/* Banner subscription dinamis */}
-                    {(() => {
-                        const plan = subscription?.plan;
-                        const expires = subscription?.expires_at ? new Date(subscription.expires_at) : null;
-                        const daysLeft = expires ? Math.max(0, Math.ceil((expires - new Date()) / 86400000)) : 0;
-                        const isExpired = expires ? new Date() > expires : false;
-                        const isUrgent = !isExpired && daysLeft <= 3;
-
-                        if (!plan || plan === "trial") return (
-                            <div style={{
-                                position: "relative", overflow: "hidden",
-                                background: isExpired
-                                    ? "linear-gradient(135deg,rgba(255,113,108,.18),rgba(255,113,108,.08))"
-                                    : isUrgent
-                                        ? "linear-gradient(135deg,rgba(245,158,11,.18),rgba(255,113,108,.12))"
-                                        : "linear-gradient(135deg,rgba(96,252,198,.15),rgba(79,195,247,.08))",
-                                border: `1.5px solid ${isExpired ? "rgba(255,113,108,.5)" : isUrgent ? "rgba(245,158,11,.5)" : "rgba(96,252,198,.4)"}`,
-                                borderRadius: 16,
-                                padding: "18px 24px",
-                                marginBottom: 24,
-                                display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-                                boxShadow: isExpired
-                                    ? "0 0 24px rgba(255,113,108,.15), inset 0 1px 0 var(--color-border-soft)"
-                                    : isUrgent
-                                        ? "0 0 24px rgba(245,158,11,.15), inset 0 1px 0 var(--color-border-soft)"
-                                        : "0 0 32px rgba(96,252,198,.15), inset 0 1px 0 var(--color-border-soft)",
-                            }}>
-                                {/* Shimmer effect */}
-                                <div style={{
-                                    position: "absolute", top: 0, left: "-100%", width: "60%", height: "100%",
-                                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent)",
-                                    animation: "shimmer 3s infinite",
-                                    pointerEvents: "none",
-                                }} />
-                                {/* Glow orb */}
-                                <div style={{
-                                    position: "absolute", right: -40, top: -40,
-                                    width: 160, height: 160, borderRadius: "50%",
-                                    background: isExpired ? "rgba(255,113,108,.08)" : isUrgent ? "rgba(245,158,11,.08)" : "rgba(96,252,198,.1)",
-                                    filter: "blur(30px)",
-                                    pointerEvents: "none",
-                                }} />
-
-                                <div style={{ display: "flex", alignItems: "center", gap: 14, position: "relative" }}>
-                                    {/* Icon badge */}
-                                    <div style={{
-                                        width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-                                        background: isExpired ? "rgba(255,113,108,.15)" : isUrgent ? "rgba(245,158,11,.15)" : "rgba(96,252,198,.15)",
-                                        border: `1px solid ${isExpired ? "rgba(255,113,108,.3)" : isUrgent ? "rgba(245,158,11,.3)" : "rgba(96,252,198,.3)"}`,
-                                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
-                                    }}>
-                                        {isExpired ? "🔒" : isUrgent ? "⚠️" : "💎"}
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: isExpired ? "#ff716c" : isUrgent ? "#fbbf24" : "var(--color-primary)", marginBottom: 3 }}>
-                                            {isExpired ? t("sub.expired") : isUrgent ? `${t("sub.urgent")} ${daysLeft} ${t("sub.urgentSub")}` : t("sub.trial")}
-                                        </div>
-                                        <div style={{ fontSize: 12, color: "var(--color-muted)" }}>
-                                            {isExpired
-                                                ? t("sub.expiredSub")
-                                                : isUrgent
-                                                    ? t("sub.urgentCta")
-                                                    : `${t("sub.trialSub")} ${daysLeft} ${t("sub.trialSub2")}`}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", flexShrink: 0 }}>
-                                    {/* Progress bar hari tersisa */}
-                                    {!isExpired && (
-                                        <div style={{ textAlign: "center" }}>
-                                            <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 4 }}>{daysLeft}/14 {t("sub.days")}</div>
-                                            <div style={{ width: 80, height: 4, background: "var(--color-border-soft)", borderRadius: 4, overflow: "hidden" }}>
-                                                <div style={{
-                                                    height: "100%", borderRadius: 4,
-                                                    width: `${(daysLeft / 14) * 100}%`,
-                                                    background: isUrgent ? "linear-gradient(90deg,#ff716c,#f59e0b)" : "linear-gradient(90deg,#60fcc6,#4FC3F7)",
-                                                    transition: "width .3s",
-                                                }} />
-                                            </div>
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={() => setShowPricing(true)}
-                                        style={{
-                                            padding: "10px 22px", borderRadius: 10, border: "none",
-                                            background: isExpired || isUrgent
-                                                ? "linear-gradient(135deg,#ff716c,#e04f4f)"
-                                                : "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                                            color: isExpired || isUrgent ? "#fff" : "var(--color-on-primary)", fontSize: 13, fontWeight: 700,
-                                            cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
-                                            boxShadow: isExpired || isUrgent ? "0 4px 16px rgba(255,113,108,.35)" : "0 4px 16px rgba(96,252,198,.3)",
-                                            animation: isExpired || isUrgent ? "pulse-btn 2s infinite" : "none",
-                                        }}
-                                    >
-                                        {isExpired ? t("sub.upgrade") : t("sub.viewPlans")}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                        if (plan === "starter") return (
-                            <div style={{
-                                position: "relative", overflow: "hidden",
-                                background: "linear-gradient(135deg,rgba(96,252,198,.12),rgba(25,206,155,.06))",
-                                border: "1.5px solid rgba(96,252,198,.3)", borderRadius: 16,
-                                padding: "16px 24px", marginBottom: 24,
-                                display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-                                boxShadow: "0 0 24px rgba(96,252,198,.1), inset 0 1px 0 var(--color-border-soft)",
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🚀</div>
-                                    <div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-primary)" }}>{t("sub.starterActive")}</div>
-                                        <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 2 }}>{expires?.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })} · {daysLeft} {t("sub.expiresIn")}</div>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowPricing(true)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(96,252,198,.4)", background: "rgba(96,252,198,.1)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{t("sub.renew")}</button>
-                            </div>
-                        );
-                        if (plan === "pro") return (
-                            <div style={{
-                                position: "relative", overflow: "hidden",
-                                background: "linear-gradient(135deg,rgba(245,158,11,.12),rgba(217,119,6,.06))",
-                                border: "1.5px solid rgba(245,158,11,.3)", borderRadius: 16,
-                                padding: "16px 24px", marginBottom: 24,
-                                display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-                                boxShadow: "0 0 24px rgba(245,158,11,.1), inset 0 1px 0 var(--color-border-soft)",
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(245,158,11,.15)", border: "1px solid rgba(245,158,11,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⭐</div>
-                                    <div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#fcd34d" }}>{t("sub.proActive")}</div>
-                                        <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 2 }}>{expires?.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })} · {daysLeft} {t("sub.expiresIn")}</div>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowPricing(true)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(245,158,11,.4)", background: "rgba(245,158,11,.1)", color: "#fcd34d", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{t("sub.renew")}</button>
-                            </div>
-                        );
-                        return null;
-                    })()}
 
                     {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} investments={investments} debts={debts} budgets={budgets} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
                     {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} accounts={accounts} />}
