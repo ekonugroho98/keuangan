@@ -144,16 +144,19 @@ Langkah ini membuat semua tabel yang dibutuhkan aplikasi di database kamu.
 
 Kamu perlu 2 data ini untuk langkah berikutnya:
 
-1. Di sidebar Supabase, klik **"Settings"** (ikon gear di bawah)
-2. Klik **"API"**
+**Ambil Project URL:**
 
-> 📸 _[SS-16: halaman Settings → API Supabase]_
+1. Di sidebar Supabase, klik **"Settings"** → **"General"**
+2. Salin nilai **"Project URL"** — contoh: `https://abcdefgh.supabase.co`
 
-3. **Salin dan simpan** dua nilai berikut:
-   - **Project URL** — contoh: `https://abcdefgh.supabase.co`
-   - **anon public** key — string panjang di bawah "Project API Keys"
+> 📸 _[SS-16: halaman Settings → General, tunjukkan Project URL]_
 
-> 📸 _[SS-17: posisi Project URL dan anon key (sensor/blur sebagian nilainya)]_
+**Ambil Publishable Key (anon key):**
+
+3. Masih di Settings, klik **"API Keys"**
+4. Salin nilai **"Publishable key"** (baris `default`) — dimulai dengan `sb_publishable_...`
+
+> 📸 _[SS-17: halaman Settings → API Keys, tunjukkan Publishable key (blur sebagian)]_
 
 > 💡 Simpan kedua nilai ini di Notepad / Notes, akan dipakai di langkah 6.
 
