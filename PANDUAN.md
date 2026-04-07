@@ -92,28 +92,20 @@ Supabase adalah database gratis untuk menyimpan semua data keuanganmu (transaksi
 
 > 📸 _[SS-09: halaman Create a new organization — Name, Type Personal, Plan Free]_
 
-6. Kamu akan langsung masuk ke dashboard Supabase
-
-> 📸 _[SS-10: dashboard Supabase setelah berhasil login]_
-
 ### Buat Project Baru
 
-6. Klik tombol **"New project"**
-
-> 📸 _[SS-11: posisi tombol New project di dashboard]_
-
-7. Isi form:
-   - **Organization** — biarkan default
-   - **Project name** — isi bebas, contoh: `keuangan-pribadi`
+6. Langsung muncul form **"Create a new project"** — isi bagian berikut:
+   - **Project name** — ganti dengan nama bebas, contoh: `keuangan-pribadi`
    - **Database password** — klik **"Generate a password"** lalu **simpan password ini** di tempat aman
-   - **Region** — pilih **"Southeast Asia (Singapore)"**
+   - **Region** — biarkan **Asia-Pacific** (sudah dipilih otomatis, cocok untuk Indonesia)
+   - **Security** — biarkan default
 
-> 📸 _[SS-12: form buat project yang sudah diisi]_
+> 📸 _[SS-10: form Create a new project yang sudah diisi]_
 
-8. Klik **"Create new project"**
-9. Tunggu 1–2 menit sampai project selesai dibuat
+7. Klik **"Create new project"**
+8. Tunggu 1–2 menit sampai project selesai dibuat
 
-> 📸 _[SS-13: loading pembuatan project / tampilan project setelah selesai]_
+> 📸 _[SS-11: loading pembuatan project / tampilan project setelah selesai]_
 
 ✅ Project Supabase siap.
 
@@ -127,24 +119,24 @@ Langkah ini membuat semua tabel yang dibutuhkan aplikasi di database kamu.
 
 1. Di dashboard Supabase, klik menu **"SQL Editor"** di sidebar kiri
 
-> 📸 _[SS-14: sidebar Supabase, tunjukkan menu SQL Editor]_
+> 📸 _[SS-12: sidebar Supabase, tunjukkan menu SQL Editor]_
 
 2. Klik **"New query"**
 3. Buka link berikut di tab baru:
    👉 **https://github.com/ekonugroho98/keuangan/blob/main/supabase_schema.sql**
 4. Klik tombol **"Copy raw file"** (icon copy di kanan atas kode)
 
-> 📸 _[SS-15: halaman supabase_schema.sql di GitHub, tunjukkan tombol copy]_
+> 📸 _[SS-13: halaman supabase_schema.sql di GitHub, tunjukkan tombol copy]_
 
 5. Kembali ke tab Supabase SQL Editor
 6. **Paste** (Ctrl+V / Cmd+V) semua kode yang baru disalin
 7. Klik tombol **"Run"** (atau tekan Ctrl+Enter)
 
-> 📸 _[SS-16: SQL Editor dengan kode yang sudah di-paste, sebelum Run]_
+> 📸 _[SS-14: SQL Editor dengan kode yang sudah di-paste, sebelum Run]_
 
 8. Tunggu sampai muncul pesan **"Success"**
 
-> 📸 _[SS-17: pesan Success setelah Run berhasil]_
+> 📸 _[SS-15: pesan Success setelah Run berhasil]_
 
 ✅ Database siap.
 
@@ -155,13 +147,13 @@ Kamu perlu 2 data ini untuk langkah berikutnya:
 1. Di sidebar Supabase, klik **"Settings"** (ikon gear di bawah)
 2. Klik **"API"**
 
-> 📸 _[SS-18: halaman Settings → API Supabase]_
+> 📸 _[SS-16: halaman Settings → API Supabase]_
 
 3. **Salin dan simpan** dua nilai berikut:
    - **Project URL** — contoh: `https://abcdefgh.supabase.co`
    - **anon public** key — string panjang di bawah "Project API Keys"
 
-> 📸 _[SS-19: posisi Project URL dan anon key (sensor/blur sebagian nilainya)]_
+> 📸 _[SS-17: posisi Project URL dan anon key (sensor/blur sebagian nilainya)]_
 
 > 💡 Simpan kedua nilai ini di Notepad / Notes, akan dipakai di langkah 6.
 
@@ -178,15 +170,15 @@ Vercel adalah layanan hosting gratis untuk menjalankan aplikasimu di internet.
 1. Buka **https://vercel.com/signup**
 2. Pilih **"Continue with GitHub"**
 
-> 📸 _[SS-20: halaman signup Vercel, tunjukkan tombol Continue with GitHub]_
+> 📸 _[SS-18: halaman signup Vercel, tunjukkan tombol Continue with GitHub]_
 
 3. Klik **"Authorize Vercel"** jika muncul popup
 
-> 📸 _[SS-21: popup authorize Vercel di GitHub]_
+> 📸 _[SS-19: popup authorize Vercel di GitHub]_
 
 4. Pilih tipe akun: **"Hobby"** (gratis)
 
-> 📸 _[SS-22: pilihan tipe akun Vercel, tunjukkan opsi Hobby]_
+> 📸 _[SS-20: pilihan tipe akun Vercel, tunjukkan opsi Hobby]_
 
 5. Isi nama lengkap, lalu klik **"Continue"**
 
@@ -202,15 +194,15 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 1. Di dashboard Vercel, klik **"Add New Project"**
 
-> 📸 _[SS-23: dashboard Vercel, tunjukkan tombol Add New Project]_
+> 📸 _[SS-21: dashboard Vercel, tunjukkan tombol Add New Project]_
 
 2. Di bagian **"Import Git Repository"**, cari repo **"keuangan"**
 
-> 📸 _[SS-24: daftar repo GitHub di Vercel, repo keuangan terlihat]_
+> 📸 _[SS-22: daftar repo GitHub di Vercel, repo keuangan terlihat]_
 
 3. Klik **"Import"** di sebelah repo `keuangan`
 
-> 📸 _[SS-25: posisi tombol Import di sebelah repo keuangan]_
+> 📸 _[SS-23: posisi tombol Import di sebelah repo keuangan]_
 
 4. Di halaman konfigurasi, **jangan ubah apapun** kecuali bagian di bawah ini
 
@@ -218,7 +210,7 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 5. Scroll ke bawah, cari bagian **"Environment Variables"**
 
-> 📸 _[SS-26: bagian Environment Variables di halaman konfigurasi deploy]_
+> 📸 _[SS-24: bagian Environment Variables di halaman konfigurasi deploy]_
 
 6. Tambahkan **2 variabel** berikut (klik "Add" setelah setiap baris):
 
@@ -227,19 +219,19 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
    | `VITE_SUPABASE_URL` | *(Project URL dari Supabase tadi)* |
    | `VITE_SUPABASE_ANON_KEY` | *(anon public key dari Supabase tadi)* |
 
-> 📸 _[SS-27: 2 variabel sudah diisi di form Environment Variables]_
+> 📸 _[SS-25: 2 variabel sudah diisi di form Environment Variables]_
 
 7. Klik **"Deploy"**
 
-> 📸 _[SS-28: loading proses deployment Vercel]_
+> 📸 _[SS-26: loading proses deployment Vercel]_
 
 8. Muncul halaman konfetti 🎉 → klik **"Continue to Dashboard"**
 
-> 📸 _[SS-29: halaman sukses deploy dengan konfetti]_
+> 📸 _[SS-27: halaman sukses deploy dengan konfetti]_
 
 9. Klik tombol **"Visit"** untuk membuka aplikasimu
 
-> 📸 _[SS-30: dashboard Vercel dengan tombol Visit dan URL aplikasi]_
+> 📸 _[SS-28: dashboard Vercel dengan tombol Visit dan URL aplikasi]_
 
 ✅ Aplikasi sudah live di internet!
 
@@ -256,9 +248,9 @@ Kamu akan diarahkan ke halaman login aplikasi.
 3. Cek email → klik link konfirmasi dari Supabase
 4. Login → aplikasi siap digunakan ✅
 
-> 📸 _[SS-31: halaman login aplikasi]_
+> 📸 _[SS-29: halaman login aplikasi]_
 
-> 📸 _[SS-32: tampilan dasbor setelah berhasil login]_
+> 📸 _[SS-30: tampilan dasbor setelah berhasil login]_
 
 > 💡 URL aplikasimu bisa ditemukan di dashboard Vercel, contoh:
 > `https://keuangan-namakamu.vercel.app`
@@ -291,11 +283,11 @@ Jika ada update atau fitur baru, kamu bisa mengambil update tersebut tanpa kehil
    `https://github.com/USERNAME_KAMU/keuangan`
 2. Klik tombol **"Sync fork"** (ada di atas daftar file)
 
-> 📸 _[SS-33: posisi tombol Sync fork di halaman repo GitHub]_
+> 📸 _[SS-31: posisi tombol Sync fork di halaman repo GitHub]_
 
 3. Klik **"Update branch"**
 
-> 📸 _[SS-34: popup konfirmasi Update branch]_
+> 📸 _[SS-32: popup konfirmasi Update branch]_
 
 4. Vercel akan otomatis deploy ulang dalam 1–2 menit
 
