@@ -46,12 +46,13 @@ const Sidebar = ({
     const [editAppTagline, setEditAppTagline] = useState("");
 
     // AI Config state
-    const [aiProvider, setAiProvider] = useState(() => aiConfig?.provider || "groq");
-    const [aiModel,    setAiModel]    = useState(() => aiConfig?.model    || DEFAULT_MODEL["groq"]);
-    const [aiKey,      setAiKey]      = useState(() => aiConfig?.apiKey   || "");
-    const [aiKeyShow,  setAiKeyShow]  = useState(false);
-    const [aiSaving,   setAiSaving]   = useState(false);
-    const [aiTestMsg,  setAiTestMsg]  = useState("");
+    const [aiProvider,  setAiProvider]  = useState(() => aiConfig?.provider || "groq");
+    const [aiModel,     setAiModel]     = useState(() => aiConfig?.model    || DEFAULT_MODEL["groq"]);
+    const [aiKey,       setAiKey]       = useState(() => aiConfig?.apiKey   || "");
+    const [aiDisabled,  setAiDisabled]  = useState(() => aiConfig?.disabled || false);
+    const [aiKeyShow,   setAiKeyShow]   = useState(false);
+    const [aiSaving,    setAiSaving]    = useState(false);
+    const [aiTestMsg,   setAiTestMsg]   = useState("");
 
     const isDark = themeId === "dark";
 
@@ -64,6 +65,7 @@ const Sidebar = ({
         if (userSettings.app_tagline) { setAppTagline(userSettings.app_tagline); localStorage.setItem("karaya_app_tagline", userSettings.app_tagline); }
         if (userSettings.ai_config?.provider) { setAiProvider(userSettings.ai_config.provider); setAiModel(userSettings.ai_config.model || DEFAULT_MODEL[userSettings.ai_config.provider]); }
         if (userSettings.ai_config?.apiKey)   setAiKey(userSettings.ai_config.apiKey);
+        if (userSettings.ai_config?.disabled !== undefined) setAiDisabled(userSettings.ai_config.disabled);
     }, [userSettings]);
 
     /* sync browser tab title with custom app name on mount */
@@ -381,9 +383,9 @@ const Sidebar = ({
         if (profileView === "ai") {
             const currentProvider = AI_PROVIDERS[aiProvider];
             const handleSaveAi = async () => {
-                if (!aiKey.trim()) { setAiTestMsg("❌ API key tidak boleh kosong"); return; }
+                if (!aiKey.trim() && !aiDisabled) { setAiTestMsg("❌ API key tidak boleh kosong"); return; }
                 setAiSaving(true); setAiTestMsg("");
-                const cfg = { provider: aiProvider, model: aiModel, apiKey: aiKey.trim() };
+                const cfg = { provider: aiProvider, model: aiModel, apiKey: aiKey.trim(), disabled: aiDisabled };
                 await onSaveAiConfig(cfg);
                 setAiTestMsg("✅ Tersimpan!");
                 setAiSaving(false);
@@ -439,11 +441,26 @@ const Sidebar = ({
                     </div>
                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 16 }}>🔒 Disimpan terenkripsi di database, hanya kamu yang bisa akses.</div>
 
+                    {/* Toggle nonaktifkan AI */}
+                    <div onClick={() => setAiDisabled(v => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, border: `1px solid ${aiDisabled ? "rgba(255,113,108,.25)" : "var(--color-border-soft)"}`, background: aiDisabled ? "rgba(255,113,108,.06)" : "transparent", cursor: "pointer", marginBottom: 14, userSelect: "none" }}>
+                        <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: aiDisabled ? "#ff716c" : "var(--color-text)" }}>
+                                {aiDisabled ? "🚫 AI Dinonaktifkan" : "✅ AI Aktif"}
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>
+                                {aiDisabled ? "Scan struk pakai OCR saja" : "Scan struk pakai AI vision"}
+                            </div>
+                        </div>
+                        <div style={{ width: 36, height: 20, borderRadius: 10, background: aiDisabled ? "#ff716c" : "var(--color-primary)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
+                            <div style={{ position: "absolute", top: 3, left: aiDisabled ? 3 : 17, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+                        </div>
+                    </div>
+
                     {aiTestMsg && (
                         <div style={{ fontSize: 12, color: aiTestMsg.startsWith("✅") ? "var(--color-primary)" : "#ff716c", marginBottom: 10, fontWeight: 600 }}>{aiTestMsg}</div>
                     )}
 
-                    <button onClick={handleSaveAi} disabled={aiSaving || !aiKey.trim()}
+                    <button onClick={handleSaveAi} disabled={aiSaving || (!aiKey.trim() && !aiDisabled)}
                         style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: (!aiKey.trim() || aiSaving) ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: (!aiKey.trim() || aiSaving) ? "var(--color-muted)" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: (!aiKey.trim() || aiSaving) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: (!aiKey.trim() || aiSaving) ? 0.5 : 1 }}>
                         {aiSaving ? "Menyimpan..." : "Simpan"}
                     </button>
