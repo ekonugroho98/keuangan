@@ -147,18 +147,20 @@ Kamu perlu 2 data ini untuk langkah berikutnya:
 **Ambil Project URL:**
 
 1. Di sidebar Supabase, klik **"Settings"** → **"General"**
-2. Salin nilai **"Project URL"** — contoh: `https://abcdefgh.supabase.co`
+2. Salin nilai **"Project ID"** (klik tombol **Copy** di sebelahnya)
+3. Project URL kamu adalah: `https://[PROJECT_ID].supabase.co`
+   — contoh: jika Project ID = `abcdefgh`, maka URL = `https://abcdefgh.supabase.co`
 
-> 📸 _[SS-16: halaman Settings → General, tunjukkan Project URL]_
+> 📸 _[SS-16: halaman Settings → General, tunjukkan Project ID dan tombol Copy]_
 
 **Ambil Publishable Key (anon key):**
 
-3. Masih di Settings, klik **"API Keys"**
-4. Salin nilai **"Publishable key"** (baris `default`) — dimulai dengan `sb_publishable_...`
+4. Masih di Settings, klik **"API Keys"**
+5. Salin nilai **"Publishable key"** (baris `default`) — dimulai dengan `sb_publishable_...`
 
 > 📸 _[SS-17: halaman Settings → API Keys, tunjukkan Publishable key (blur sebagian)]_
 
-> 💡 Simpan kedua nilai ini di Notepad / Notes, akan dipakai di langkah 6.
+> 💡 Simpan Project URL dan Publishable key di Notepad / Notes, akan dipakai di langkah 6.
 
 ---
 
