@@ -183,15 +183,23 @@ Vercel adalah layanan hosting gratis untuk menjalankan aplikasimu di internet.
 
 > 📸 _[SS-19: halaman Let's create your account — tunjukkan tombol Continue with GitHub]_
 
-6. Muncul halaman **"Import Git Repository"** — klik tombol **"Install"** untuk sambungkan GitHub ke Vercel
+6. Muncul popup GitHub **"Authorize Vercel"** — klik **"Authorize Vercel"**
 
-> 📸 _[SS-20: halaman Import Git Repository — tunjukkan tombol Install]_
+> 📸 _[SS-20: popup GitHub Authorize Vercel — klik Authorize Vercel]_
 
-7. Muncul halaman GitHub **"Install Vercel"** — biarkan pilihan **"All repositories"**, klik **"Install"**
+7. Kamu masuk ke dashboard Vercel — klik **"Import"** di sebelah kanan (atau **"Add New..."** di pojok kanan atas)
+
+> 📸 _[SS-21: dashboard Vercel pertama kali — tunjukkan tombol Import atau Add New]_
+
+8. Muncul halaman **"New Project"** → bagian **"Import Git Repository"** → klik **"Continue with GitHub"**
+
+> 📸 _[SS-22: halaman New Project — Import Git Repository, klik Continue with GitHub]_
+
+9. Muncul halaman GitHub **"Install Vercel"** — biarkan pilihan **"All repositories"**, klik **"Install"**
 
 > ⚠️ **Sudah pernah install Vercel di GitHub?** Lewati langkah ini, langsung lanjut ke Import repo di bawah.
 
-> 📸 _[SS-21: halaman Install Vercel di GitHub — All repositories dipilih, klik Install]_
+> 📸 _[SS-23: halaman Install Vercel di GitHub — All repositories dipilih, klik Install]_
 
 ✅ Akun Vercel siap & GitHub terhubung.
 
@@ -205,11 +213,11 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 1. Setelah install, kamu kembali ke halaman **"Import Git Repository"** — cari repo **"keuangan"**
 
-> 📸 _[SS-22: daftar repo GitHub di Vercel, repo keuangan terlihat]_
+> 📸 _[SS-24: daftar repo GitHub di Vercel, repo keuangan terlihat]_
 
 2. Klik **"Import"** di sebelah repo `keuangan`
 
-> 📸 _[SS-23: posisi tombol Import di sebelah repo keuangan]_
+> 📸 _[SS-25: posisi tombol Import di sebelah repo keuangan]_
 
 3. Di halaman konfigurasi, **jangan ubah apapun** kecuali bagian di bawah ini
 
@@ -217,7 +225,7 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 4. Scroll ke bawah, cari bagian **"Environment Variables"**
 
-> 📸 _[SS-24: bagian Environment Variables di halaman konfigurasi deploy]_
+> 📸 _[SS-26: bagian Environment Variables di halaman konfigurasi deploy]_
 
 5. Tambahkan **2 variabel** berikut (klik "Add" setelah setiap baris):
 
@@ -226,19 +234,19 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
    | `VITE_SUPABASE_URL` | *(Project URL dari Supabase tadi)* |
    | `VITE_SUPABASE_ANON_KEY` | *(Publishable key dari Supabase tadi)* |
 
-> 📸 _[SS-25: 2 variabel sudah diisi di form Environment Variables]_
+> 📸 _[SS-27: 2 variabel sudah diisi di form Environment Variables]_
 
 6. Klik **"Deploy"**
 
-> 📸 _[SS-26: loading proses deployment Vercel]_
+> 📸 _[SS-28: loading proses deployment Vercel]_
 
 7. Muncul halaman konfetti 🎉 → klik **"Continue to Dashboard"**
 
-> 📸 _[SS-27: halaman sukses deploy dengan konfetti]_
+> 📸 _[SS-29: halaman sukses deploy dengan konfetti]_
 
 8. Klik tombol **"Visit"** untuk membuka aplikasimu
 
-> 📸 _[SS-28: dashboard Vercel dengan tombol Visit dan URL aplikasi]_
+> 📸 _[SS-30: dashboard Vercel dengan tombol Visit dan URL aplikasi]_
 
 ✅ Aplikasi sudah live di internet!
 
@@ -255,9 +263,9 @@ Kamu akan diarahkan ke halaman login aplikasi.
 3. Cek email → klik link konfirmasi dari Supabase
 4. Login → aplikasi siap digunakan ✅
 
-> 📸 _[SS-29: halaman login aplikasi]_
+> 📸 _[SS-31: halaman login aplikasi]_
 
-> 📸 _[SS-30: tampilan dasbor setelah berhasil login]_
+> 📸 _[SS-32: tampilan dasbor setelah berhasil login]_
 
 > 💡 URL aplikasimu bisa ditemukan di dashboard Vercel, contoh:
 > `https://keuangan-namakamu.vercel.app`
@@ -290,11 +298,11 @@ Jika ada update atau fitur baru, kamu bisa mengambil update tersebut tanpa kehil
    `https://github.com/USERNAME_KAMU/keuangan`
 2. Klik tombol **"Sync fork"** (ada di atas daftar file)
 
-> 📸 _[SS-31: posisi tombol Sync fork di halaman repo GitHub]_
+> 📸 _[SS-33: posisi tombol Sync fork di halaman repo GitHub]_
 
 3. Klik **"Update branch"**
 
-> 📸 _[SS-32: popup konfirmasi Update branch]_
+> 📸 _[SS-34: popup konfirmasi Update branch]_
 
 4. Vercel akan otomatis deploy ulang dalam 1–2 menit
 
