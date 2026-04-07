@@ -312,28 +312,31 @@ Fitur **AI Coach** bisa menganalisis keuanganmu dan memberi saran personal. Meng
 
 > 📸 _[SS-37: halaman Create Account or Login Groq]_
 
-4. Setelah masuk, buka **https://console.groq.com/keys**
+4. Kamu masuk ke dashboard Groq — klik **"API Keys"** di navbar atas
+
+> 📸 _[SS-38: dashboard Groq setelah login, tunjukkan menu API Keys di navbar]_
+
 5. Klik tombol **"Create API Key"**
 
-> 📸 _[SS-38: halaman console.groq.com/keys, tunjukkan tombol Create API Key]_
+> 📸 _[SS-39: halaman API Keys, tunjukkan tombol Create API Key]_
 
 6. Beri nama bebas (contoh: `karaya`), klik **"Submit"**
 7. Salin API key yang muncul (dimulai dengan `gsk_...`) — **simpan sekarang, tidak bisa dilihat lagi**
 
-> 📸 _[SS-39: API key yang baru dibuat — salin sebelum ditutup]_
+> 📸 _[SS-40: API key yang baru dibuat — salin sebelum ditutup]_
 
 ### Pasang API Key di Aplikasi
 
 8. Buka aplikasimu → klik **ikon profil / nama** di sidebar bawah
 9. Pilih menu **"🤖 AI Coach"**
 
-> 📸 _[SS-40: sidebar aplikasi, tunjukkan menu AI Coach di bagian bawah]_
+> 📸 _[SS-41: sidebar aplikasi, tunjukkan menu AI Coach di bagian bawah]_
 
 10. Di bagian **Provider**, pastikan pilih **"Groq"**
 11. Paste API key (`gsk_...`) ke kolom **"API Key"**
 12. Klik **"Simpan"**
 
-> 📸 _[SS-41: form AI Coach settings — Provider Groq, API key sudah diisi]_
+> 📸 _[SS-42: form AI Coach settings — Provider Groq, API key sudah diisi]_
 
 ✅ AI Coach aktif! Buka menu **🤖 AI Coach** dan mulai tanya soal keuanganmu.
 
