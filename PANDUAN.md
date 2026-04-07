@@ -333,16 +333,16 @@ Fitur **AI Coach** bisa menganalisis keuanganmu dan memberi saran personal. Meng
 
 ### Pasang API Key di Aplikasi
 
-8. Buka aplikasimu → klik **ikon profil / nama** di sidebar bawah
-9. Pilih menu **"🤖 AI Coach"**
+8. Buka aplikasimu → klik **nama / avatar** kamu di pojok kiri bawah sidebar
+9. Muncul menu profil — klik **"🤖 AI Coach"** (tertulis "Belum diatur")
 
-> 📸 _[SS-42: sidebar aplikasi, tunjukkan menu AI Coach di bagian bawah]_
+> 📸 _[SS-42: menu profil terbuka — tunjukkan pilihan AI Coach (Belum diatur)]_
 
-10. Di bagian **Provider**, pastikan pilih **"Groq"**
-11. Paste API key (`gsk_...`) ke kolom **"API Key"**
+10. Muncul panel **AI Coach Settings** — **Groq** sudah terpilih otomatis (ada badge ✓ **GRATIS**)
+11. Di bagian **API KEY**, paste key kamu (`gsk_...`) ke kolom yang tersedia
 12. Klik **"Simpan"**
 
-> 📸 _[SS-43: form AI Coach settings — Provider Groq, API key sudah diisi]_
+> 📸 _[SS-43: panel AI Coach Settings — Groq dipilih, kolom API KEY sudah diisi]_
 
 ✅ AI Coach aktif! Buka menu **🤖 AI Coach** dan mulai tanya soal keuanganmu.
 
