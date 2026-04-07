@@ -259,6 +259,19 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 ✅ Aplikasi sudah live di internet!
 
+### Penting — Setting URL di Supabase
+
+> ⚠️ Langkah ini wajib dilakukan agar link konfirmasi email mengarah ke aplikasimu, bukan ke localhost.
+
+9. Buka dashboard Supabase → klik **"Authentication"** di sidebar → pilih **"URL Configuration"**
+10. Ubah **"Site URL"** dari `http://localhost:3000` menjadi URL Vercel kamu
+    - Contoh: `https://keuangan-namakamu.vercel.app`
+11. Di bagian **"Redirect URLs"**, klik **"Add URL"** → masukkan:
+    `https://keuangan-namakamu.vercel.app/**`
+12. Klik **"Save"**
+
+✅ Sekarang link konfirmasi email akan mengarah ke aplikasimu yang sudah live.
+
 ---
 
 ## 7. Aplikasi Siap Dipakai
