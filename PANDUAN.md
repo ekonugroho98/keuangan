@@ -257,23 +257,26 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 ## 7. Aplikasi Siap Dipakai
 
-Kamu akan diarahkan ke halaman login aplikasi.
+Setelah klik **"Visit"** di Vercel, kamu akan dibawa ke halaman utama aplikasi.
 
 **Daftar akun pertama kali:**
 
-1. Klik tombol **"Daftar Gratis"**
+1. Klik tombol **"Mulai Gratis 14 Hari"** di halaman utama
+
+> 📸 _[SS-31: halaman utama aplikasi, tunjukkan tombol Mulai Gratis 14 Hari]_
+
 2. Isi **Nama Lengkap** dan **Email**, klik **"Lanjut"**
 
-> 📸 _[SS-31: halaman Daftar step 1 — isi Nama Lengkap dan Email]_
+> 📸 _[SS-32: halaman Daftar step 1 — isi Nama Lengkap dan Email]_
 
 3. Isi **Password** (min. 8 karakter) dan **Konfirmasi**, klik **"Buat Akun 🚀"**
 
-> 📸 _[SS-32: halaman Daftar step 2 — isi Password dan Konfirmasi]_
+> 📸 _[SS-33: halaman Daftar step 2 — isi Password dan Konfirmasi]_
 
 4. Cek email → klik link konfirmasi dari Supabase
 5. Login → aplikasi siap digunakan ✅
 
-> 📸 _[SS-33: tampilan dasbor setelah berhasil login]_
+> 📸 _[SS-34: tampilan dasbor setelah berhasil login]_
 
 > 💡 URL aplikasimu bisa ditemukan di dashboard Vercel, contoh:
 > `https://keuangan-namakamu.vercel.app`
@@ -306,11 +309,11 @@ Jika ada update atau fitur baru, kamu bisa mengambil update tersebut tanpa kehil
    `https://github.com/USERNAME_KAMU/keuangan`
 2. Klik tombol **"Sync fork"** (ada di atas daftar file)
 
-> 📸 _[SS-34: posisi tombol Sync fork di halaman repo GitHub]_
+> 📸 _[SS-35: posisi tombol Sync fork di halaman repo GitHub]_
 
 3. Klik **"Update branch"**
 
-> 📸 _[SS-35: popup konfirmasi Update branch]_
+> 📸 _[SS-36: popup konfirmasi Update branch]_
 
 4. Vercel akan otomatis deploy ulang dalam 1–2 menit
 
