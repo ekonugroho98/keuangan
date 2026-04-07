@@ -191,9 +191,9 @@ Vercel adalah layanan hosting gratis untuk menjalankan aplikasimu di internet.
 
 > 📸 _[SS-21: dashboard Vercel pertama kali — tunjukkan tombol Import atau Add New]_
 
-8. Muncul halaman **"New Project"** → bagian **"Import Git Repository"** → klik **"Continue with GitHub"**
+8. Muncul halaman **"Import Git Repository"** — klik tombol **"Install"** untuk sambungkan GitHub
 
-> 📸 _[SS-22: halaman New Project — Import Git Repository, klik Continue with GitHub]_
+> 📸 _[SS-22: halaman Import Git Repository — tunjukkan tombol Install]_
 
 9. Muncul halaman GitHub **"Install Vercel"** — biarkan pilihan **"All repositories"**, klik **"Install"**
 
