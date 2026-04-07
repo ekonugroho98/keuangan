@@ -9,25 +9,29 @@ import { useLanguage } from "../../i18n/LanguageContext";
 const SCAN_CATEGORIES = ["Makanan & Minuman","Transportasi","Belanja","Hiburan","Kesehatan","Pendidikan","Tagihan","Lainnya"];
 const VISION_PROVIDERS = ["groq","openai","anthropic","google"];
 
-/* ── OCR fallback dengan Tesseract.js ── */
-async function scanReceiptWithOCR(base64, mimeType, onProgress) {
-    const { createWorker } = await import("tesseract.js");
-    const worker = await createWorker("ind+eng", 1, {
-        logger: m => { if (m.status === "recognizing text") onProgress?.(Math.round(m.progress * 100)); }
-    });
-    const blob = await fetch(`data:${mimeType};base64,${base64}`).then(r => r.blob());
-    const { data: { text } } = await worker.recognize(blob);
-    await worker.terminate();
+/* ── Guess kategori dari nama item ── */
+function guessCategory(note) {
+    const n = note.toLowerCase();
+    if (/mie|nasi|ayam|sapi|ikan|sayur|buah|minum|kopi|teh|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air putih|minuman|makanan|bumbu|santan|telur|daging|bakso|soto/.test(n)) return "Makanan & Minuman";
+    if (/bensin|bbm|parkir|toll|tol|ojek|taxi|grab|gojek|bus|kereta|motor|mobil|transjakarta/.test(n)) return "Transportasi";
+    if (/deterjen|sabun|sampo|pasta gigi|sikat|tisu|pembalut|popok|kebersihan|pel|sapu|pewangi/.test(n)) return "Belanja";
+    if (/obat|vitamin|masker|apotek|klinik|dokter|rumah sakit|suplemen|kesehatan/.test(n)) return "Kesehatan";
+    if (/listrik|air|gas|internet|pulsa|token|tagihan|pln|wifi|indihome/.test(n)) return "Tagihan";
+    if (/buku|alat tulis|pendidikan|sekolah|kursus|les/.test(n)) return "Pendidikan";
+    return "Belanja";
+}
 
-    // Parse teks OCR → items
+/* ── Parse teks OCR dengan regex (fallback tanpa AI) ── */
+function parseOCRTextRegex(text) {
     const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 1);
-    const skipRe = /total|subtotal|bayar|kembali|ppn|tax|diskon|discount|kembalian|change|cash|tunai|struk|nota|terima kasih|thank|invoice|no\.|alamat|jl\.|telp|phone/i;
-    const priceRe = /^(.+?)\s{2,}(?:rp\.?\s*)?(\d[\d.,]+)\s*$/i;
+    const skipRe = /total|subtotal|bayar|kembali|ppn|tax|diskon|discount|kembalian|tunai|cash|terima kasih|thank|invoice|struk|nota|no\.\s*\d|^jl\.|telp|phone|alamat|tanda terima|receipt/i;
     const dateRe = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
+    // Harga Indonesia: 1.500 / 25.000 / 1.234.567
+    const priceRe = /(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+)\s*$/i;
 
-    const merchant = lines[0] || "Struk";
+    const merchant = lines.find(l => l.length > 2 && !/^\d/.test(l) && !dateRe.test(l)) || "Struk";
 
-    // Cari tanggal
+    // Tanggal
     let date = null;
     for (const line of lines) {
         const m = line.match(dateRe);
@@ -39,34 +43,136 @@ async function scanReceiptWithOCR(base64, mimeType, onProgress) {
         }
     }
 
-    // Cari subtotal
+    // Subtotal
     let subtotal = null;
     for (const line of lines) {
-        if (/(?:total|subtotal|bayar)/i.test(line)) {
-            const nums = line.match(/(\d[\d.,]+)/g);
-            if (nums) {
-                const v = parseInt(nums[nums.length - 1].replace(/[.,]/g, ""));
-                if (v > 0) { subtotal = v; break; }
+        if (/total|subtotal|bayar|grand total/i.test(line)) {
+            const m = line.match(priceRe);
+            if (m) { subtotal = parseInt(m[1].replace(/\./g, "")); break; }
+        }
+    }
+
+    const items = [];
+
+    // Strategi 1: nama + harga di baris yang sama (2+ spasi pemisah)
+    for (const line of lines) {
+        if (skipRe.test(line)) continue;
+        const m = line.match(/^(.+?)\s{2,}(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+)\s*$/i);
+        if (m) {
+            const note = m[1].replace(/\s+/g, " ").trim();
+            const amount = parseInt(m[2].replace(/\./g, ""));
+            if (note.length >= 2 && amount > 0 && !skipRe.test(note))
+                items.push({ note, amount, category: guessCategory(note) });
+        }
+    }
+
+    // Strategi 2: nama di baris N, harga/qty×harga di baris N+1
+    if (items.length === 0) {
+        for (let i = 0; i < lines.length - 1; i++) {
+            const nameLine = lines[i];
+            const nextLine = lines[i + 1];
+            if (skipRe.test(nameLine) || /^\d/.test(nameLine) || nameLine.length < 2) continue;
+            const m = nextLine.match(priceRe);
+            if (m && /\d/.test(nextLine[0])) {
+                const amount = parseInt(m[1].replace(/\./g, ""));
+                if (amount > 0 && !skipRe.test(nameLine)) {
+                    items.push({ note: nameLine.replace(/\s+/g, " ").trim(), amount, category: guessCategory(nameLine) });
+                    i++;
+                }
             }
         }
     }
 
-    // Cari items
-    const items = [];
-    for (const line of lines) {
-        if (skipRe.test(line)) continue;
-        const m = line.match(priceRe);
-        if (m) {
-            const note = m[1].replace(/\s+/g, " ").trim();
-            const amount = parseInt(m[2].replace(/[.,]/g, ""));
-            if (note.length > 1 && amount > 0) {
-                items.push({ note, amount, category: "Lainnya" });
+    // Strategi 3: tiap baris yang diakhiri harga
+    if (items.length === 0) {
+        for (const line of lines) {
+            if (skipRe.test(line)) continue;
+            const m = line.match(priceRe);
+            if (m) {
+                const note = line.slice(0, line.lastIndexOf(m[0])).replace(/\s+/g, " ").trim();
+                const amount = parseInt(m[1].replace(/\./g, ""));
+                if (note.length >= 2 && amount > 0 && !skipRe.test(note))
+                    items.push({ note, amount, category: guessCategory(note) });
             }
         }
     }
 
     if (!items.length) throw new Error("Tidak ada item yang terdeteksi. Coba foto lebih jelas atau gunakan AI.");
     return { merchant, date, subtotal, items };
+}
+
+/* ── Kirim teks OCR ke AI untuk diparse (provider text-only) ── */
+async function parseOCRTextWithAI(ocrText, aiConfig) {
+    const { provider, apiKey } = aiConfig;
+    const prompt = `Berikut teks struk/nota yang dibaca OCR. Ekstrak SEMUA item produk yang dibeli.
+Kembalikan HANYA JSON (tanpa penjelasan lain):
+{
+  "merchant": "Nama Toko",
+  "date": "YYYY-MM-DD atau null",
+  "subtotal": 200000,
+  "items": [
+    { "note": "Nama Produk", "amount": 15000, "category": "Makanan & Minuman" }
+  ]
+}
+Aturan: amount = harga total per item (qty×satuan), jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
+category: "Makanan & Minuman","Transportasi","Belanja","Hiburan","Kesehatan","Pendidikan","Tagihan","Lainnya"
+Jika bukan struk: {"error":"bukan struk"}
+
+TEKS OCR:
+${ocrText}`;
+
+    let url, headers, body;
+    const msgs = [{ role: "user", content: prompt }];
+
+    if (provider === "groq" || provider === "openai") {
+        url = provider === "groq" ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
+        headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+        body = { model: provider === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o-mini", max_tokens: 1000, messages: msgs };
+    } else if (provider === "anthropic") {
+        url = "https://api.anthropic.com/v1/messages";
+        headers = { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-allow-browser": "true" };
+        body = { model: "claude-3-5-haiku-20241022", max_tokens: 1000, messages: msgs };
+    } else if (provider === "google") {
+        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        headers = { "Content-Type": "application/json" };
+        body = { contents: [{ parts: [{ text: prompt }] }] };
+    } else {
+        // Mistral, DeepSeek, xAI, dll — OpenAI-compatible
+        const baseUrl = { mistral: "https://api.mistral.ai/v1", deepseek: "https://api.deepseek.com/v1", xai: "https://api.x.ai/v1" }[provider] || "https://api.openai.com/v1";
+        const model = { mistral: "mistral-small-latest", deepseek: "deepseek-chat", xai: "grok-2-latest" }[provider] || "gpt-4o-mini";
+        url = `${baseUrl}/chat/completions`;
+        headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+        body = { model, max_tokens: 1000, messages: msgs };
+    }
+
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || "Gagal parse dengan AI");
+
+    let text = "";
+    if (provider === "anthropic") text = data.content?.[0]?.text || "";
+    else if (provider === "google") text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    else text = data.choices?.[0]?.message?.content || "";
+
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Format respons AI tidak valid");
+    return JSON.parse(match[0]);
+}
+
+/* ── OCR: ambil teks lalu parse (AI jika ada, regex jika tidak) ── */
+async function scanReceiptWithOCR(base64, mimeType, onProgress, aiConfig) {
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("ind+eng", 1, {
+        logger: m => { if (m.status === "recognizing text") onProgress?.(Math.round(m.progress * 100)); }
+    });
+    const blob = await fetch(`data:${mimeType};base64,${base64}`).then(r => r.blob());
+    const { data: { text } } = await worker.recognize(blob);
+    await worker.terminate();
+
+    // Kalau ada API key → lempar teks OCR ke AI untuk diparse
+    if (aiConfig?.apiKey) return await parseOCRTextWithAI(text, aiConfig);
+    // Tidak ada AI → regex parsing
+    return parseOCRTextRegex(text);
 }
 
 async function scanReceiptWithAI(base64, mimeType, aiConfig) {
@@ -233,7 +339,7 @@ const AddTransactionModal = ({
                 result = await scanReceiptWithAI(base64, file.type, aiConfig);
             } else {
                 setScanMode("ocr");
-                result = await scanReceiptWithOCR(base64, file.type, p => setScanProgress(p));
+                result = await scanReceiptWithOCR(base64, file.type, p => setScanProgress(p), aiConfig);
             }
 
             if (result.error) { setScanError("⚠️ " + result.error); return; }
@@ -252,7 +358,7 @@ const AddTransactionModal = ({
                         r.onerror = rej;
                         r.readAsDataURL(file);
                     });
-                    const result = await scanReceiptWithOCR(base64, file.type, p => setScanProgress(p));
+                    const result = await scanReceiptWithOCR(base64, file.type, p => setScanProgress(p), aiConfig);
                     if (!result.items?.length) { setScanError("⚠️ Tidak ada item yang terdeteksi. Coba foto lebih jelas."); return; }
                     setScanResults(result);
                     setScanItems(result.items.map((item, i) => ({ ...item, id: i, selected: true })));
@@ -389,8 +495,8 @@ const AddTransactionModal = ({
                     <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</span>
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: scanMode === "ocr" ? "rgba(234,179,8,.15)" : "rgba(5,150,105,.15)", color: scanMode === "ocr" ? "#eab308" : "var(--color-primary)", letterSpacing: 0.5 }}>
-                                {scanMode === "ocr" ? "OCR" : "AI"}
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: scanMode === "ocr" ? (aiConfig?.apiKey ? "rgba(99,102,241,.15)" : "rgba(234,179,8,.15)") : "rgba(5,150,105,.15)", color: scanMode === "ocr" ? (aiConfig?.apiKey ? "#818cf8" : "#eab308") : "var(--color-primary)", letterSpacing: 0.5 }}>
+                                {scanMode === "ocr" ? (aiConfig?.apiKey ? "OCR+AI" : "OCR") : "AI Vision"}
                             </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
