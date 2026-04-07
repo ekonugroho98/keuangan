@@ -238,9 +238,14 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
    - Kolom **Value** → paste Publishable key Supabase kamu (dimulai `sb_publishable_...`)
    - Klik **"Add"**
 
+> 💡 **Opsional — Ganti nama aplikasi:** Jika ingin nama aplikasi bukan "Karaya", tambahkan 2 variabel berikut:
+> - **Key:** `VITE_APP_NAME` → **Value:** nama aplikasimu (contoh: `Dompetku`)
+> - **Key:** `VITE_APP_TAGLINE` → **Value:** tagline aplikasi (contoh: `Catatan Keuangan Pribadi`)
+> Jika tidak diisi, nama default tetap **Karaya — Wealth Ledger**.
+
 > 📸 _[SS-27: 2 variabel sudah diisi di form Environment Variables]_
 
-6. Klik **"Deploy"**
+7. Klik **"Deploy"**
 
 > 📸 _[SS-28: loading proses deployment Vercel]_
 
