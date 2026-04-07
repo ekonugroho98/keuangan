@@ -14,7 +14,8 @@
 5. [Buat Akun Vercel](#5-buat-akun-vercel)
 6. [Deploy Aplikasi](#6-deploy-aplikasi)
 7. [Aplikasi Siap Dipakai](#7-aplikasi-siap-dipakai)
-8. [Cara Update Jika Ada Fitur Baru](#8-cara-update-jika-ada-fitur-baru)
+8. [Aktifkan AI Coach Gratis (Groq)](#8-aktifkan-ai-coach-gratis-groq)
+9. [Cara Update Jika Ada Fitur Baru](#9-cara-update-jika-ada-fitur-baru)
 
 ---
 
@@ -262,21 +263,18 @@ Setelah klik **"Visit"** di Vercel, kamu akan dibawa ke halaman utama aplikasi.
 **Daftar akun pertama kali:**
 
 1. Klik tombol **"Mulai Gratis"** di halaman utama
-
-> 📸 _[SS-31: halaman utama aplikasi, tunjukkan tombol Mulai Gratis]_
-
 2. Isi **Nama Lengkap** dan **Email**, klik **"Lanjut"**
 
-> 📸 _[SS-32: halaman Daftar step 1 — isi Nama Lengkap dan Email]_
+> 📸 _[SS-31: halaman Daftar step 1 — isi Nama Lengkap dan Email]_
 
 3. Isi **Password** (min. 8 karakter) dan **Konfirmasi**, klik **"Buat Akun 🚀"**
 
-> 📸 _[SS-33: halaman Daftar step 2 — isi Password dan Konfirmasi]_
+> 📸 _[SS-32: halaman Daftar step 2 — isi Password dan Konfirmasi]_
 
 4. Cek email → klik link konfirmasi dari Supabase
 5. Login → aplikasi siap digunakan ✅
 
-> 📸 _[SS-34: tampilan dasbor setelah berhasil login]_
+> 📸 _[SS-33: tampilan dasbor setelah berhasil login]_
 
 > 💡 URL aplikasimu bisa ditemukan di dashboard Vercel, contoh:
 > `https://keuangan-namakamu.vercel.app`
@@ -299,7 +297,48 @@ Setelah klik **"Visit"** di Vercel, kamu akan dibawa ke halaman utama aplikasi.
 
 ---
 
-## 8. Cara Update Jika Ada Fitur Baru
+## 8. Aktifkan AI Coach Gratis (Groq)
+
+Fitur **AI Coach** bisa menganalisis keuanganmu dan memberi saran personal. Menggunakan Groq — layanan AI yang **100% gratis** untuk pemakaian pribadi.
+
+**Langkah:**
+
+1. Buka **https://groq.com/**
+2. Klik tombol **"Start Building"** di pojok kanan atas
+
+> 📸 _[SS-36: halaman utama Groq, tunjukkan tombol Start Building]_
+
+3. Daftar atau login dengan Google / GitHub
+4. Setelah masuk, buka **https://console.groq.com/keys**
+5. Klik tombol **"Create API Key"**
+
+> 📸 _[SS-37: halaman console.groq.com/keys, tunjukkan tombol Create API Key]_
+
+6. Beri nama bebas (contoh: `karaya`), klik **"Submit"**
+7. Salin API key yang muncul (dimulai dengan `gsk_...`) — **simpan sekarang, tidak bisa dilihat lagi**
+
+> 📸 _[SS-38: API key yang baru dibuat — salin sebelum ditutup]_
+
+### Pasang API Key di Aplikasi
+
+8. Buka aplikasimu → klik **ikon profil / nama** di sidebar bawah
+9. Pilih menu **"🤖 AI Coach"**
+
+> 📸 _[SS-39: sidebar aplikasi, tunjukkan menu AI Coach di bagian bawah]_
+
+10. Di bagian **Provider**, pastikan pilih **"Groq"**
+11. Paste API key (`gsk_...`) ke kolom **"API Key"**
+12. Klik **"Simpan"**
+
+> 📸 _[SS-40: form AI Coach settings — Provider Groq, API key sudah diisi]_
+
+✅ AI Coach aktif! Buka menu **🤖 AI Coach** dan mulai tanya soal keuanganmu.
+
+> 💡 Groq gratis hingga 14.400 request per hari — lebih dari cukup untuk pemakaian harian.
+
+---
+
+## 9. Cara Update Jika Ada Fitur Baru
 
 Jika ada update atau fitur baru, kamu bisa mengambil update tersebut tanpa kehilangan data.
 
@@ -309,11 +348,11 @@ Jika ada update atau fitur baru, kamu bisa mengambil update tersebut tanpa kehil
    `https://github.com/USERNAME_KAMU/keuangan`
 2. Klik tombol **"Sync fork"** (ada di atas daftar file)
 
-> 📸 _[SS-35: posisi tombol Sync fork di halaman repo GitHub]_
+> 📸 _[SS-34: posisi tombol Sync fork di halaman repo GitHub]_
 
 3. Klik **"Update branch"**
 
-> 📸 _[SS-36: popup konfirmasi Update branch]_
+> 📸 _[SS-35: popup konfirmasi Update branch]_
 
 4. Vercel akan otomatis deploy ulang dalam 1–2 menit
 
