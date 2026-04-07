@@ -4,7 +4,6 @@ import Navbar from "../components/landing/Navbar";
 import HeroSection from "../components/landing/HeroSection";
 import FeaturesSection from "../components/landing/FeaturesSection";
 import AiSection from "../components/landing/AiSection";
-import PricingSection from "../components/landing/PricingSection";
 import FaqSection from "../components/landing/FaqSection";
 import CtaSection from "../components/landing/CtaSection";
 import Footer from "../components/landing/Footer";
@@ -18,7 +17,6 @@ const LandingPage = ({ showToast }) => {
     const [showSignup, setShowSignup] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
     const [showDemo, setShowDemo] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState(null);
     const [signupForm, setSignupForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
     const [loginForm, setLoginForm] = useState({ email: "", password: "" });
     const [formErrors, setFormErrors] = useState({});
@@ -113,7 +111,7 @@ const LandingPage = ({ showToast }) => {
         }, 1500);
     };
 
-    const openSignupWithPlan = (plan) => { setSelectedPlan(plan); setShowSignup(true); };
+    const openSignup = () => { setShowSignup(true); };
     const closeSignup = () => { setShowSignup(false); setFormErrors({}); setFormStep(1); };
     const closeLogin = () => { setShowLogin(false); setFormErrors({}); };
 
@@ -135,7 +133,6 @@ const LandingPage = ({ showToast }) => {
             <HeroSection onSignup={() => setShowSignup(true)} onDemo={() => setShowDemo(true)} />
             <FeaturesSection />
             <AiSection chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput} isTyping={isTyping} handleChat={handleChat} />
-            <PricingSection onSelectPlan={openSignupWithPlan} />
             <FaqSection />
             <CtaSection onSignup={() => setShowSignup(true)} />
             <Footer />
@@ -146,7 +143,7 @@ const LandingPage = ({ showToast }) => {
                 errors={formErrors} setErrors={setFormErrors} step={formStep} setStep={setFormStep}
                 onSubmit={handleSignup} isLoading={isLoading}
                 onSwitchToLogin={() => { closeSignup(); setShowLogin(true); }}
-                selectedPlan={selectedPlan}
+
             />
             <LoginModal
                 open={showLogin} onClose={closeLogin}

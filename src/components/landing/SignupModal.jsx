@@ -1,7 +1,7 @@
 import Modal from "../ui/Modal";
 import InputField from "../ui/InputField";
 
-const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, setStep, onSubmit, isLoading, onSwitchToLogin, selectedPlan }) => {
+const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, setStep, onSubmit, isLoading, onSwitchToLogin }) => {
     const validateStep1 = () => {
         const err = {};
         if (!form.name.trim()) err.name = "Wajib";
@@ -26,7 +26,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                             <div>
                                 <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>Daftar Gratis</h2>
-                                <p style={{ color: "#76747e", fontSize: 12, marginTop: 4 }}>{selectedPlan ? `Paket: ${selectedPlan.name}` : "Daftar akun gratis"}</p>
+                                <p style={{ color: "#76747e", fontSize: 12, marginTop: 4 }}>Daftar akun gratis</p>
                             </div>
                             <button onClick={onClose} style={{ background: "rgba(255,255,255,.05)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                         </div>
