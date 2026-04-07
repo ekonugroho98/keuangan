@@ -261,14 +261,19 @@ Kamu akan diarahkan ke halaman login aplikasi.
 
 **Daftar akun pertama kali:**
 
-1. Klik **"Daftar"** atau **"Sign Up"**
-2. Isi email dan password
-3. Cek email → klik link konfirmasi dari Supabase
-4. Login → aplikasi siap digunakan ✅
+1. Klik tombol **"Daftar Gratis"**
+2. Isi **Nama Lengkap** dan **Email**, klik **"Lanjut"**
 
-> 📸 _[SS-31: halaman login aplikasi]_
+> 📸 _[SS-31: halaman Daftar step 1 — isi Nama Lengkap dan Email]_
 
-> 📸 _[SS-32: tampilan dasbor setelah berhasil login]_
+3. Isi **Password** (min. 8 karakter) dan **Konfirmasi**, klik **"Buat Akun 🚀"**
+
+> 📸 _[SS-32: halaman Daftar step 2 — isi Password dan Konfirmasi]_
+
+4. Cek email → klik link konfirmasi dari Supabase
+5. Login → aplikasi siap digunakan ✅
+
+> 📸 _[SS-33: tampilan dasbor setelah berhasil login]_
 
 > 💡 URL aplikasimu bisa ditemukan di dashboard Vercel, contoh:
 > `https://keuangan-namakamu.vercel.app`
@@ -301,11 +306,11 @@ Jika ada update atau fitur baru, kamu bisa mengambil update tersebut tanpa kehil
    `https://github.com/USERNAME_KAMU/keuangan`
 2. Klik tombol **"Sync fork"** (ada di atas daftar file)
 
-> 📸 _[SS-33: posisi tombol Sync fork di halaman repo GitHub]_
+> 📸 _[SS-34: posisi tombol Sync fork di halaman repo GitHub]_
 
 3. Klik **"Update branch"**
 
-> 📸 _[SS-34: popup konfirmasi Update branch]_
+> 📸 _[SS-35: popup konfirmasi Update branch]_
 
 4. Vercel akan otomatis deploy ulang dalam 1–2 menit
 
