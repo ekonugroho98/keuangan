@@ -227,12 +227,15 @@ Langkah ini menghubungkan kode di GitHub ke Vercel dan menjalankannya sebagai we
 
 > 📸 _[SS-26: bagian Environment Variables di halaman konfigurasi deploy]_
 
-5. Tambahkan **2 variabel** berikut (klik "Add" setelah setiap baris):
+5. Tambahkan variabel pertama:
+   - Kolom **Key** → ketik: `VITE_SUPABASE_URL`
+   - Kolom **Value** → paste Project URL Supabase kamu (contoh: `https://abcdefgh.supabase.co`)
+   - Klik **"Add"**
 
-   | Name | Value |
-   |------|-------|
-   | `VITE_SUPABASE_URL` | *(Project URL dari Supabase tadi)* |
-   | `VITE_SUPABASE_ANON_KEY` | *(Publishable key dari Supabase tadi)* |
+6. Tambahkan variabel kedua:
+   - Kolom **Key** → ketik: `VITE_SUPABASE_ANON_KEY`
+   - Kolom **Value** → paste Publishable key Supabase kamu (dimulai `sb_publishable_...`)
+   - Klik **"Add"**
 
 > 📸 _[SS-27: 2 variabel sudah diisi di form Environment Variables]_
 
