@@ -169,8 +169,8 @@ async function scanReceiptWithOCR(base64, mimeType, onProgress, aiConfig) {
     const { data: { text } } = await worker.recognize(blob);
     await worker.terminate();
 
-    // Kalau ada API key → lempar teks OCR ke AI untuk diparse
-    if (aiConfig?.apiKey) return await parseOCRTextWithAI(text, aiConfig);
+    // Kalau ada API key dan AI tidak dinonaktifkan → lempar teks OCR ke AI
+    if (aiConfig?.apiKey && !aiConfig?.disabled) return await parseOCRTextWithAI(text, aiConfig);
     // Tidak ada AI → regex parsing
     return parseOCRTextRegex(text);
 }
@@ -323,7 +323,7 @@ const AddTransactionModal = ({
         setScanProgress(0);
         setScanLoading(true);
 
-        const hasVision = aiConfig?.apiKey && VISION_PROVIDERS.includes(aiConfig?.provider);
+        const hasVision = !aiConfig?.disabled && aiConfig?.apiKey && VISION_PROVIDERS.includes(aiConfig?.provider);
 
         try {
             const base64 = await new Promise((res, rej) => {
