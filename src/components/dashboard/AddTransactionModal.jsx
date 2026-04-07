@@ -24,12 +24,25 @@ function guessCategory(note) {
 /* ── Parse teks OCR dengan regex (fallback tanpa AI) ── */
 function parseOCRTextRegex(text) {
     const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 1);
-    const skipRe = /total|subtotal|bayar|kembali|ppn|tax|diskon|discount|kembalian|tunai|cash|terima kasih|thank|invoice|struk|nota|no\.\s*\d|^jl\.|telp|phone|alamat|tanda terima|receipt/i;
+    const skipRe = /total|subtotal|bayar|kembali|ppn|pajak|tax|diskon|discount|kembalian|tunai|cash|change|terima kasih|thank|invoice|struk|nota|no\.\s*\d|^jl\.|telp|phone|alamat|tanda terima|receipt|kasir|member|harga|tgl|tanggal|jam|waktu/i;
     const dateRe = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
-    // Harga Indonesia: 1.500 / 25.000 / 1.234.567
-    const priceRe = /(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+)\s*$/i;
 
-    const merchant = lines.find(l => l.length > 2 && !/^\d/.test(l) && !dateRe.test(l)) || "Struk";
+    // Normalise raw OCR number: strip Rp, dots/commas as thousand sep → integer string
+    function parsePrice(raw) {
+        let s = raw.replace(/rp\.?\s*/i, "").trim();
+        // comma-thousand: 1,500 or 25,000
+        if (/^\d{1,3}(,\d{3})+$/.test(s)) return parseInt(s.replace(/,/g, ""));
+        // dot-thousand: 1.500 or 25.000
+        if (/^\d{1,3}(\.\d{3})+$/.test(s)) return parseInt(s.replace(/\./g, ""));
+        // plain integer (allow 3+ digits to avoid qty/percentage false positives)
+        if (/^\d{3,}$/.test(s)) return parseInt(s);
+        return null;
+    }
+
+    // Match a price at end-of-string (dotted, comma, or plain ≥3 digits)
+    const priceEndRe = /(?:rp\.?\s*)?((?:\d{1,3}(?:[.,]\d{3})+|\d{4,}))\s*$/i;
+
+    const merchant = lines.find(l => l.length > 2 && !/^\d/.test(l) && !dateRe.test(l) && !skipRe.test(l)) || "Struk";
 
     // Tanggal
     let date = null;
@@ -43,26 +56,40 @@ function parseOCRTextRegex(text) {
         }
     }
 
-    // Subtotal
+    // Subtotal — try dotted first, then plain
     let subtotal = null;
     for (const line of lines) {
         if (/total|subtotal|bayar|grand total/i.test(line)) {
-            const m = line.match(priceRe);
-            if (m) { subtotal = parseInt(m[1].replace(/\./g, "")); break; }
+            const m = line.match(priceEndRe);
+            if (m) { subtotal = parsePrice(m[1]); if (subtotal) break; }
         }
     }
 
     const items = [];
 
-    // Strategi 1: nama + harga di baris yang sama (2+ spasi pemisah)
+    // Strategi 1a: nama + harga di baris yang sama, dipisah 2+ spasi
     for (const line of lines) {
         if (skipRe.test(line)) continue;
-        const m = line.match(/^(.+?)\s{2,}(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+)\s*$/i);
+        const m = line.match(/^(.+?)\s{2,}((?:rp\.?\s*)?(?:\d{1,3}(?:[.,]\d{3})+|\d{4,}))\s*$/i);
         if (m) {
             const note = m[1].replace(/\s+/g, " ").trim();
-            const amount = parseInt(m[2].replace(/\./g, ""));
-            if (note.length >= 2 && amount > 0 && !skipRe.test(note))
+            const amount = parsePrice(m[2]);
+            if (note.length >= 2 && amount && amount > 0 && !skipRe.test(note))
                 items.push({ note, amount, category: guessCategory(note) });
+        }
+    }
+
+    // Strategi 1b: nama + tab/pipe + harga (sering terjadi di kasir thermal)
+    if (items.length === 0) {
+        for (const line of lines) {
+            if (skipRe.test(line)) continue;
+            const m = line.match(/^(.+?)[\t|]+\s*((?:rp\.?\s*)?(?:\d{1,3}(?:[.,]\d{3})+|\d{4,}))\s*$/i);
+            if (m) {
+                const note = m[1].replace(/\s+/g, " ").trim();
+                const amount = parsePrice(m[2]);
+                if (note.length >= 2 && amount && amount > 0 && !skipRe.test(note))
+                    items.push({ note, amount, category: guessCategory(note) });
+            }
         }
     }
 
@@ -72,10 +99,10 @@ function parseOCRTextRegex(text) {
             const nameLine = lines[i];
             const nextLine = lines[i + 1];
             if (skipRe.test(nameLine) || /^\d/.test(nameLine) || nameLine.length < 2) continue;
-            const m = nextLine.match(priceRe);
-            if (m && /\d/.test(nextLine[0])) {
-                const amount = parseInt(m[1].replace(/\./g, ""));
-                if (amount > 0 && !skipRe.test(nameLine)) {
+            const m = nextLine.match(priceEndRe);
+            if (m) {
+                const amount = parsePrice(m[1]);
+                if (amount && amount > 0 && !skipRe.test(nameLine)) {
                     items.push({ note: nameLine.replace(/\s+/g, " ").trim(), amount, category: guessCategory(nameLine) });
                     i++;
                 }
@@ -83,15 +110,16 @@ function parseOCRTextRegex(text) {
         }
     }
 
-    // Strategi 3: tiap baris yang diakhiri harga
+    // Strategi 3: tiap baris yang diakhiri harga (catch-all)
     if (items.length === 0) {
         for (const line of lines) {
             if (skipRe.test(line)) continue;
-            const m = line.match(priceRe);
+            const m = line.match(priceEndRe);
             if (m) {
-                const note = line.slice(0, line.lastIndexOf(m[0])).replace(/\s+/g, " ").trim();
-                const amount = parseInt(m[1].replace(/\./g, ""));
-                if (note.length >= 2 && amount > 0 && !skipRe.test(note))
+                const amount = parsePrice(m[1]);
+                const priceStr = m[0].trim();
+                const note = line.slice(0, line.length - priceStr.length).replace(/\s+/g, " ").trim();
+                if (note.length >= 2 && amount && amount > 0 && !skipRe.test(note))
                     items.push({ note, amount, category: guessCategory(note) });
             }
         }
