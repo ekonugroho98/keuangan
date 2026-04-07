@@ -173,19 +173,18 @@ Vercel adalah layanan hosting gratis untuk menjalankan aplikasimu di internet.
 **Langkah:**
 
 1. Buka **https://vercel.com/signup**
-2. Pilih **"Continue with GitHub"**
+2. Pilih **"I'm working on personal projects"** (Hobby — gratis)
+3. Klik **"Continue"**
 
-> 📸 _[SS-18: halaman signup Vercel, tunjukkan tombol Continue with GitHub]_
+> 📸 _[SS-18: halaman signup Vercel — pilih I'm working on personal projects]_
 
-3. Klik **"Authorize Vercel"** jika muncul popup
+4. Pilih **"Continue with GitHub"** untuk login dengan akun GitHub
 
-> 📸 _[SS-19: popup authorize Vercel di GitHub]_
+> 📸 _[SS-19: halaman pilih metode login Vercel, tunjukkan tombol Continue with GitHub]_
 
-4. Pilih tipe akun: **"Hobby"** (gratis)
+5. Klik **"Authorize Vercel"** jika muncul popup
 
-> 📸 _[SS-20: pilihan tipe akun Vercel, tunjukkan opsi Hobby]_
-
-5. Isi nama lengkap, lalu klik **"Continue"**
+> 📸 _[SS-20: popup authorize Vercel di GitHub]_
 
 ✅ Akun Vercel siap.
 
