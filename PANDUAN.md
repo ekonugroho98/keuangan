@@ -261,9 +261,9 @@ Setelah klik **"Visit"** di Vercel, kamu akan dibawa ke halaman utama aplikasi.
 
 **Daftar akun pertama kali:**
 
-1. Klik tombol **"Mulai Gratis 14 Hari"** di halaman utama
+1. Klik tombol **"Mulai Gratis"** di halaman utama
 
-> 📸 _[SS-31: halaman utama aplikasi, tunjukkan tombol Mulai Gratis 14 Hari]_
+> 📸 _[SS-31: halaman utama aplikasi, tunjukkan tombol Mulai Gratis]_
 
 2. Isi **Nama Lengkap** dan **Email**, klik **"Lanjut"**
 
