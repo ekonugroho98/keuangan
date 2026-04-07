@@ -96,7 +96,7 @@ Supabase adalah database gratis untuk menyimpan semua data keuanganmu (transaksi
 
 6. Langsung muncul form **"Create a new project"** — isi bagian berikut:
    - **Project name** — ganti dengan nama bebas, contoh: `keuangan-pribadi`
-   - **Database password** — klik **"Generate a password"** lalu **simpan password ini** di tempat aman
+   - **Database password** — klik **"Generate a password"** (tidak perlu disimpan, aplikasi tidak memakainya)
    - **Region** — biarkan **Asia-Pacific** (sudah dipilih otomatis, cocok untuk Indonesia)
    - **Security** — biarkan default
 
