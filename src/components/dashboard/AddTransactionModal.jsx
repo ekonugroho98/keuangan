@@ -7,10 +7,72 @@ import { useLanguage } from "../../i18n/LanguageContext";
 
 /* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ── */
 const SCAN_CATEGORIES = ["Makanan & Minuman","Transportasi","Belanja","Hiburan","Kesehatan","Pendidikan","Tagihan","Lainnya"];
+const VISION_PROVIDERS = ["groq","openai","anthropic","google"];
+
+/* ── OCR fallback dengan Tesseract.js ── */
+async function scanReceiptWithOCR(base64, mimeType, onProgress) {
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("ind+eng", 1, {
+        logger: m => { if (m.status === "recognizing text") onProgress?.(Math.round(m.progress * 100)); }
+    });
+    const blob = await fetch(`data:${mimeType};base64,${base64}`).then(r => r.blob());
+    const { data: { text } } = await worker.recognize(blob);
+    await worker.terminate();
+
+    // Parse teks OCR → items
+    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 1);
+    const skipRe = /total|subtotal|bayar|kembali|ppn|tax|diskon|discount|kembalian|change|cash|tunai|struk|nota|terima kasih|thank|invoice|no\.|alamat|jl\.|telp|phone/i;
+    const priceRe = /^(.+?)\s{2,}(?:rp\.?\s*)?(\d[\d.,]+)\s*$/i;
+    const dateRe = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
+
+    const merchant = lines[0] || "Struk";
+
+    // Cari tanggal
+    let date = null;
+    for (const line of lines) {
+        const m = line.match(dateRe);
+        if (m) {
+            const [, d, mo, y] = m;
+            const year = y.length === 2 ? "20" + y : y;
+            date = `${year}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`;
+            break;
+        }
+    }
+
+    // Cari subtotal
+    let subtotal = null;
+    for (const line of lines) {
+        if (/(?:total|subtotal|bayar)/i.test(line)) {
+            const nums = line.match(/(\d[\d.,]+)/g);
+            if (nums) {
+                const v = parseInt(nums[nums.length - 1].replace(/[.,]/g, ""));
+                if (v > 0) { subtotal = v; break; }
+            }
+        }
+    }
+
+    // Cari items
+    const items = [];
+    for (const line of lines) {
+        if (skipRe.test(line)) continue;
+        const m = line.match(priceRe);
+        if (m) {
+            const note = m[1].replace(/\s+/g, " ").trim();
+            const amount = parseInt(m[2].replace(/[.,]/g, ""));
+            if (note.length > 1 && amount > 0) {
+                items.push({ note, amount, category: "Lainnya" });
+            }
+        }
+    }
+
+    if (!items.length) throw new Error("Tidak ada item yang terdeteksi. Coba foto lebih jelas atau gunakan AI.");
+    return { merchant, date, subtotal, items };
+}
 
 async function scanReceiptWithAI(base64, mimeType, aiConfig) {
     const { provider, apiKey } = aiConfig || {};
-    if (!apiKey) throw new Error("API key belum diset");
+    if (!apiKey) throw new Error("no-key");
+    if (!VISION_PROVIDERS.includes(provider)) throw new Error("no-vision");
 
     const prompt = `Kamu adalah asisten keuangan Indonesia. Baca struk/nota/receipt ini dan ekstrak SEMUA item produk/layanan yang dibeli secara terpisah.
 Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
@@ -138,19 +200,25 @@ const AddTransactionModal = ({
     const { t } = useLanguage();
     const fileRef = useRef(null);
     const [scanLoading, setScanLoading]   = useState(false);
+    const [scanProgress, setScanProgress] = useState(0);   // 0-100 untuk OCR
+    const [scanMode, setScanMode]         = useState("");   // "ai" | "ocr"
     const [scanError, setScanError]       = useState("");
-    const [scanResults, setScanResults]   = useState(null); // { merchant, date, items }
-    const [scanItems, setScanItems]       = useState([]);   // editable items dengan .selected
+    const [scanResults, setScanResults]   = useState(null);
+    const [scanItems, setScanItems]       = useState([]);
     const [scanAccount, setScanAccount]   = useState("");
 
-    const resetScan = () => { setScanResults(null); setScanItems([]); setScanError(""); };
+    const resetScan = () => { setScanResults(null); setScanItems([]); setScanError(""); setScanProgress(0); setScanMode(""); };
 
     const handleScanFile = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         e.target.value = "";
         setScanError("");
+        setScanProgress(0);
         setScanLoading(true);
+
+        const hasVision = aiConfig?.apiKey && VISION_PROVIDERS.includes(aiConfig?.provider);
+
         try {
             const base64 = await new Promise((res, rej) => {
                 const r = new FileReader();
@@ -158,16 +226,46 @@ const AddTransactionModal = ({
                 r.onerror = rej;
                 r.readAsDataURL(file);
             });
-            const result = await scanReceiptWithAI(base64, file.type, aiConfig);
+
+            let result;
+            if (hasVision) {
+                setScanMode("ai");
+                result = await scanReceiptWithAI(base64, file.type, aiConfig);
+            } else {
+                setScanMode("ocr");
+                result = await scanReceiptWithOCR(base64, file.type, p => setScanProgress(p));
+            }
+
             if (result.error) { setScanError("⚠️ " + result.error); return; }
-            if (!result.items?.length) { setScanError("⚠️ Tidak ada item yang terdeteksi"); return; }
+            if (!result.items?.length) { setScanError("⚠️ Tidak ada item yang terdeteksi. Coba foto lebih jelas."); return; }
             setScanResults(result);
             setScanItems(result.items.map((item, i) => ({ ...item, id: i, selected: true })));
             setScanAccount(txForm.account || accounts[0]?.name || "");
         } catch (err) {
-            setScanError("❌ " + (err.message || "Gagal membaca struk"));
+            if (err.message === "no-key" || err.message === "no-vision") {
+                // Fallback ke OCR
+                try {
+                    setScanMode("ocr");
+                    const base64 = await new Promise((res, rej) => {
+                        const r = new FileReader();
+                        r.onload = () => res(r.result.split(",")[1]);
+                        r.onerror = rej;
+                        r.readAsDataURL(file);
+                    });
+                    const result = await scanReceiptWithOCR(base64, file.type, p => setScanProgress(p));
+                    if (!result.items?.length) { setScanError("⚠️ Tidak ada item yang terdeteksi. Coba foto lebih jelas."); return; }
+                    setScanResults(result);
+                    setScanItems(result.items.map((item, i) => ({ ...item, id: i, selected: true })));
+                    setScanAccount(txForm.account || accounts[0]?.name || "");
+                } catch (ocrErr) {
+                    setScanError("❌ " + (ocrErr.message || "Gagal membaca struk"));
+                }
+            } else {
+                setScanError("❌ " + (err.message || "Gagal membaca struk"));
+            }
         } finally {
             setScanLoading(false);
+            setScanProgress(0);
         }
     };
 
@@ -247,8 +345,8 @@ const AddTransactionModal = ({
                 })}
             </div>
 
-            {/* Scan Struk — hanya saat tambah baru, bukan transfer, ada API key */}
-            {!editMode && !isTransfer && aiConfig?.apiKey && (
+            {/* Scan Struk — selalu tampil saat tambah baru (AI jika ada, OCR jika tidak) */}
+            {!editMode && !isTransfer && (
                 <div style={{ marginBottom: 16 }}>
                     <input ref={fileRef} type="file" accept="image/*" capture="environment"
                         style={{ display: "none" }} onChange={handleScanFile} />
@@ -256,18 +354,26 @@ const AddTransactionModal = ({
                         onClick={() => { setScanError(""); fileRef.current?.click(); }}
                         disabled={scanLoading}
                         style={{
-                            width: "100%", padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+                            width: "100%", padding: "10px 14px", borderRadius: 10, cursor: scanLoading ? "default" : "pointer",
                             border: "1px dashed var(--color-primary)", fontFamily: "inherit",
                             background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
                             fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
-                            justifyContent: "center", gap: 8, opacity: scanLoading ? 0.6 : 1,
+                            justifyContent: "center", gap: 8, opacity: scanLoading ? 0.7 : 1,
                         }}
                     >
-                        {scanLoading
-                            ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span> Membaca struk...</>
-                            : <>📷 Scan Struk / Nota</>
-                        }
+                        {scanLoading ? (
+                            scanMode === "ocr"
+                                ? <>⏳ OCR {scanProgress > 0 ? `${scanProgress}%` : "memproses..."}  <span style={{ fontSize: 11, opacity: 0.7 }}>— sedang baca teks</span></>
+                                : <>⏳ AI sedang membaca struk...</>
+                        ) : (
+                            <>📷 Scan Struk / Nota {!aiConfig?.apiKey && <span style={{ fontSize: 10, opacity: 0.6 }}>(OCR)</span>}</>
+                        )}
                     </button>
+                    {!aiConfig?.apiKey && !scanLoading && (
+                        <div style={{ marginTop: 6, fontSize: 10, color: "var(--color-muted)", textAlign: "center" }}>
+                            Mode OCR — akurasi terbatas. Set API key AI Coach untuk hasil lebih baik.
+                        </div>
+                    )}
                     {scanError && (
                         <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(220,38,38,.08)", border: "1px solid rgba(220,38,38,.2)", borderRadius: 8, fontSize: 12, color: "var(--color-expense)" }}>
                             {scanError}
@@ -281,7 +387,12 @@ const AddTransactionModal = ({
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {/* Header merchant + edit tanggal */}
                     <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)", marginBottom: 8 }}>🧾 {scanResults.merchant || "Struk"}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</span>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: scanMode === "ocr" ? "rgba(234,179,8,.15)" : "rgba(5,150,105,.15)", color: scanMode === "ocr" ? "#eab308" : "var(--color-primary)", letterSpacing: 0.5 }}>
+                                {scanMode === "ocr" ? "OCR" : "AI"}
+                            </span>
+                        </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 11, color: "var(--color-muted)", flexShrink: 0 }}>📅 Tanggal</span>
                             <input
