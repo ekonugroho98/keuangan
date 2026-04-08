@@ -8,8 +8,9 @@ export default function InstallBanner() {
     const [dismissed, setDismissed]           = useState(false);
 
     useEffect(() => {
-        // Jangan tampilkan lagi kalau sudah pernah dismiss
-        if (localStorage.getItem("pwa_banner_dismissed")) return;
+        // Jangan tampilkan lagi kalau dismiss belum 3 hari
+        const dismissed = localStorage.getItem("pwa_banner_dismissed");
+        if (dismissed && Date.now() - Number(dismissed) < 3 * 24 * 60 * 60 * 1000) return;
 
         // Deteksi iOS (Safari tidak punya beforeinstallprompt)
         const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
@@ -47,7 +48,7 @@ export default function InstallBanner() {
     const handleDismiss = () => {
         setShow(false);
         setDismissed(true);
-        localStorage.setItem("pwa_banner_dismissed", "1");
+        localStorage.setItem("pwa_banner_dismissed", String(Date.now()));
     };
 
     if (!show || dismissed) return null;
