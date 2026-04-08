@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../i18n/ThemeContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
@@ -22,6 +22,25 @@ const Sidebar = ({
     const { t, lang, setLang, languages } = useLanguage();
     const { themeId, toggleTheme } = useTheme();
     const isMobile = useIsMobile();
+    const [installPrompt, setInstallPrompt] = useState(null);
+    const [isInstalled, setIsInstalled]     = useState(false);
+
+    useEffect(() => {
+        if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
+            setIsInstalled(true); return;
+        }
+        const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
+        window.addEventListener("beforeinstallprompt", handler);
+        window.addEventListener("appinstalled", () => setIsInstalled(true));
+        return () => window.removeEventListener("beforeinstallprompt", handler);
+    }, []);
+
+    const handleInstallFromSidebar = async () => {
+        if (!installPrompt) return;
+        installPrompt.prompt();
+        await installPrompt.userChoice;
+        setInstallPrompt(null);
+    };
 
     const [showLangPicker,  setShowLangPicker]  = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -618,6 +637,21 @@ const Sidebar = ({
                     </div>
                 ))}
             </nav>
+
+            {/* Install App button — hanya muncul jika belum terinstall & ada prompt */}
+            {!isInstalled && installPrompt && (
+                <div style={{ padding: "8px 16px", borderTop: "1px solid var(--color-border-soft)" }}>
+                    <button onClick={handleInstallFromSidebar} style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%",
+                        padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(96,252,198,.3)",
+                        background: "rgba(96,252,198,.08)", color: "var(--color-primary)",
+                        fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                        <span style={{ fontSize: 14 }}>⬇️</span>
+                        <span>Install {APP_NAME} App</span>
+                    </button>
+                </div>
+            )}
 
             {/* Language picker */}
             <div style={{ padding: "8px 16px", borderTop: "1px solid var(--color-border-soft)", position: "relative" }}>
