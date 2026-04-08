@@ -55,14 +55,17 @@ export default function InstallBanner() {
 
     return (
         <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
-            background: "#0d0d1a",
-            borderBottom: "1px solid rgba(96,252,198,.2)",
-            padding: "10px 16px",
+            position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)",
+            zIndex: 9999, width: "min(480px, calc(100vw - 32px))",
+            background: "#1a1a2e",
+            border: "1px solid rgba(96,252,198,.25)",
+            borderRadius: 14,
+            padding: "12px 16px",
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-            animation: "slideDown .3s ease",
+            boxShadow: "0 8px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(96,252,198,.1)",
+            animation: "slideUp .3s ease",
         }}>
-            <style>{`@keyframes slideDown { from { transform: translateY(-100%); opacity:0; } to { transform: translateY(0); opacity:1; } }`}</style>
+            <style>{`@keyframes slideUp { from { transform: translateX(-50%) translateY(20px); opacity:0; } to { transform: translateX(-50%) translateY(0); opacity:1; } }`}</style>
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
