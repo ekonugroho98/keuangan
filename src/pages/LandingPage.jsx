@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { APP_AI_NAME } from "../config/app";
+import { PASSWORD_MIN_LENGTH } from "../constants/validation";
 import Navbar from "../components/landing/Navbar";
 import HeroSection from "../components/landing/HeroSection";
 import FeaturesSection from "../components/landing/FeaturesSection";
@@ -39,7 +40,7 @@ const LandingPage = ({ showToast }) => {
         if (!signupForm.email.trim()) err.email = "Email wajib diisi";
         else if (!/\S+@\S+\.\S+/.test(signupForm.email)) err.email = "Format email tidak valid";
         if (!signupForm.password) err.password = "Password wajib diisi";
-        else if (signupForm.password.length < 8) err.password = "Minimal 8 karakter";
+        else if (signupForm.password.length < PASSWORD_MIN_LENGTH) err.password = `Minimal ${PASSWORD_MIN_LENGTH} karakter`;
         if (signupForm.password !== signupForm.confirmPassword) err.confirmPassword = "Password tidak cocok";
         setFormErrors(err);
         if (Object.keys(err).length > 0) return;
