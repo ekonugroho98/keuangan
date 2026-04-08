@@ -3,6 +3,7 @@ import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Toast from "./components/ui/Toast";
 import { supabase } from "./lib/supabase";
+import InstallBanner from "./components/ui/InstallBanner";
 
 const globalStyles = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
@@ -70,6 +71,8 @@ export default function App() {
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
+        // Clear sensitive cached data (API keys, user settings)
+        ["karaya_ai_config", "karaya_avatar_color", "karaya_hidden_menus", "karaya_app_name", "karaya_app_tagline"].forEach(k => localStorage.removeItem(k));
         setSession(null);
         showToast("Berhasil logout 👋", "info");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -91,6 +94,7 @@ export default function App() {
     return (
         <div style={{ fontFamily: "'Plus Jakarta Sans',-apple-system,sans-serif" }}>
             <style>{globalStyles}</style>
+            <InstallBanner />
             <Toast {...toast} />
             {session
                 ? <Dashboard session={session} onLogout={handleLogout} showToast={showToast} />

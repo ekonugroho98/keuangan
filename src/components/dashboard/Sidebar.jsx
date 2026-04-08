@@ -4,6 +4,7 @@ import { useTheme } from "../../i18n/ThemeContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { AI_PROVIDERS, PROVIDER_ORDER, DEFAULT_MODEL } from "../../services/aiService";
 import { APP_NAME, APP_TAGLINE } from "../../config/app";
+import { PASSWORD_MIN_LENGTH } from "../../constants/validation";
 
 const AVATAR_COLORS = [
     "#60fcc6","#4FC3F7","#f59e0b","#ff716c",
@@ -91,7 +92,7 @@ const Sidebar = ({
 
     const handleUpdatePass = async () => {
         if (isSaving) return;
-        if (newPass.length < 6) { setPassError("Password minimal 6 karakter"); return; }
+        if (newPass.length < PASSWORD_MIN_LENGTH) { setPassError(`Password minimal ${PASSWORD_MIN_LENGTH} karakter`); return; }
         if (newPass !== confirmPass) { setPassError("Password tidak cocok"); return; }
         setPassError("");
         setIsSaving(true);

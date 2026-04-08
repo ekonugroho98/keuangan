@@ -1,10 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchGoldPrices } from "../services/goldPrice";
 import { sendAiMessage, buildSystemPrompt } from "../services/aiService";
 import { APP_AI_NAME } from "../config/app";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useCategories } from "../hooks/useCategories";
+import { useInvestments } from "../hooks/useInvestments";
+import { useBudgets } from "../hooks/useBudgets";
+import { useGoals } from "../hooks/useGoals";
+import { useDebts } from "../hooks/useDebts";
+import { usePiutang } from "../hooks/usePiutang";
+import { useRecurrings } from "../hooks/useRecurrings";
+import { useSplitBills } from "../hooks/useSplitBills";
 import AddTransactionModal from "../components/dashboard/AddTransactionModal";
 import AddAccountModal from "../components/dashboard/AddAccountModal";
 import DasborView from "../components/dashboard/views/DasborView";
@@ -22,6 +30,7 @@ import AnggaranView from "../components/dashboard/views/AnggaranView";
 import SplitBillView from "../components/dashboard/views/SplitBillView";
 import PrediksiView from "../components/dashboard/views/PrediksiView";
 import { categoryIcons } from "../constants/categories";
+import { toLocalDateStr } from "../utils/dateHelpers";
 import { supabase } from "../lib/supabase";
 
 const NAV_LABELS = {
@@ -45,52 +54,56 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const [editingTx, setEditingTx] = useState(null);
     const [isSavingTx, setIsSavingTx] = useState(false);
     const [showAddAccount, setShowAddAccount] = useState(false);
-    const [txForm, setTxForm] = useState({ type: "expense", amount: "", category: "Makanan", note: "", account: "", toAccount: "", date: new Date().toISOString().slice(0, 10) });
+    const [txForm, setTxForm] = useState({ type: "expense", amount: "", category: "Makanan", note: "", account: "", toAccount: "", date: toLocalDateStr() });
     const [accForm, setAccForm] = useState({ name: "", type: "bank", balance: "" });
 
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
-    const [goals, setGoals] = useState([]);
-    const [debts, setDebts] = useState([]);
-    const [piutang, setPiutang] = useState([]);
-    const [recurrings, setRecurrings] = useState([]);
-    const [customCategories, setCustomCategories] = useState([]);
-    const [investments, setInvestments] = useState([]);
-    const [budgets, setBudgets] = useState([]);
-    const [splitBills, setSplitBills] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const makeGreeting = () => {
+    // Keep a ref for accounts so hooks can access latest value without re-render deps
+    const accountsRef = useRef(accounts);
+    accountsRef.current = accounts;
+
+    // ── Domain hooks ─────────────────────────────────────────
+    const { customCategories, setCustomCategories, addCategory, editCategory, deleteCategory } = useCategories(user.id, showToast);
+    const { investments, setInvestments, addInvestment, editInvestment, deleteInvestment } = useInvestments(user.id, showToast);
+    const { budgets, setBudgets, addBudget, editBudget, deleteBudget, copyBudgetMonth } = useBudgets(user.id, showToast);
+    const { goals, setGoals, addGoal, editGoal, deleteGoal, topupGoal } = useGoals(user.id, showToast, accountsRef);
+    const { debts, setDebts, addDebt, editDebt, deleteDebt, payDebt } = useDebts(user.id, showToast);
+    const { piutang, setPiutang, addPiutang, editPiutang, deletePiutang, terimaPiutang } = usePiutang(user.id, showToast);
+    const { recurrings, setRecurrings, addRecurring, editRecurring, deleteRecurring } = useRecurrings(user.id, showToast);
+    const { splitBills, setSplitBills, addSplitBill, deleteSplitBill, toggleMemberPaid } = useSplitBills(user.id, showToast);
+
+    // ── AI GREETING ──────────────────────────────────────────
+    const makeGreeting = useCallback(() => {
         const name = userName.split(" ")[0];
         const raw  = t("ai.greeting");
-        // Jika key belum ada di translations, fallback ke Indonesian
         const tmpl = raw === "ai.greeting"
             ? `Halo ${name}! 👋 Gue ${APP_AI_NAME}. Mau analisis keuangan atau tanya apa?`
             : raw.replace("{name}", name).replace("{ai}", APP_AI_NAME);
         return [{ role: "ai", text: tmpl }];
-    };
+    }, [userName, t]);
+
     const [aiChat, setAiChat] = useState(makeGreeting);
     const [aiInput, setAiInput] = useState("");
     const [aiTyping, setAiTyping] = useState(false);
 
-    // Update greeting saat bahasa berubah (hanya jika chat masih di pesan pertama)
     useEffect(() => {
         setAiChat(prev => {
             if (prev.length === 1) return makeGreeting();
-            // Sudah ada percakapan — hanya update pesan pertama (greeting)
             return [makeGreeting()[0], ...prev.slice(1)];
         });
-    }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [lang, makeGreeting]);
 
     // ── USER SETTINGS (synced to DB) ────────────────────────
     const [userSettings,   setUserSettings]   = useState(null);
     const [goldPrices,     setGoldPrices]     = useState(null);
     const [refreshingGold, setRefreshingGold] = useState(false);
     const [aiConfig,       setAiConfig]       = useState(() => {
-        // Load dari localStorage sebagai cache awal (supaya tidak hilang saat refresh sebelum DB load)
         try { const c = localStorage.getItem("karaya_ai_config"); return c ? JSON.parse(c) : null; } catch { return null; }
     });
-    const [aiSettingsTrigger, setAiSettingsTrigger] = useState(0); // bumped to open Sidebar AI panel
+    const [aiSettingsTrigger, setAiSettingsTrigger] = useState(0);
 
     useEffect(() => {
         fetchSettings();
@@ -102,7 +115,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             const data = await fetchGoldPrices("antam");
             setGoldPrices(data);
         } catch (err) {
-            console.warn("Gagal load harga emas:", err.message);
+            if (import.meta.env.DEV) console.warn("Gagal load harga emas:", err.message);
         }
     };
 
@@ -127,7 +140,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             .maybeSingle();
         if (data) {
             setUserSettings(data);
-            // sync ke localStorage sebagai cache cepat
             if (data.avatar_color) localStorage.setItem("karaya_avatar_color", data.avatar_color);
             if (data.hidden_menus) localStorage.setItem("karaya_hidden_menus", JSON.stringify(data.hidden_menus));
             if (data.app_name)    localStorage.setItem("karaya_app_name",    data.app_name);
@@ -140,14 +152,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     };
 
     const saveSettings = async (patch) => {
-        // optimistic update state
         setUserSettings(prev => ({ ...(prev || {}), ...patch }));
-        // sync localStorage cache
         Object.entries(patch).forEach(([k, v]) => {
             const key = { avatar_color: "karaya_avatar_color", hidden_menus: "karaya_hidden_menus", app_name: "karaya_app_name", app_tagline: "karaya_app_tagline" }[k];
             if (key) localStorage.setItem(key, typeof v === "object" ? JSON.stringify(v) : v);
         });
-        // upsert ke database
         await supabase.from("user_settings").upsert({
             user_id: user.id,
             ...(patch),
@@ -179,7 +188,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement("a");
         a.href = url;
-        a.download = `karaya-export-${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = `karaya-export-${toLocalDateStr()}.csv`;
         a.click();
         URL.revokeObjectURL(url);
         showToast(`✅ ${transactions.length} transaksi berhasil diekspor`);
@@ -187,7 +196,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     const deleteAccount = async () => {
         showToast("Menghapus akun...", "info");
-        // Hapus semua data user dari tabel-tabel
         await Promise.allSettled([
             supabase.from("transactions").delete().eq("user_id", user.id),
             supabase.from("accounts").delete().eq("user_id", user.id),
@@ -205,7 +213,71 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     // ── FETCH DATA ──────────────────────────────────────────
     useEffect(() => {
         fetchAll();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const autoExecuteRecurrings = async (recurringsData, accountsData, debtsData) => {
+        const todayStr = new Date().toLocaleDateString("en-CA");
+        const due = recurringsData.filter(r => r.active && r.next_date <= todayStr);
+        if (due.length === 0) return { accounts: accountsData, recurrings: recurringsData, debts: debtsData, executed: 0 };
+
+        const calcNextDate = (freq, from) => {
+            const d = new Date(from);
+            if (freq === "daily")   d.setDate(d.getDate() + 1);
+            if (freq === "weekly")  d.setDate(d.getDate() + 7);
+            if (freq === "monthly") d.setMonth(d.getMonth() + 1);
+            if (freq === "yearly")  d.setFullYear(d.getFullYear() + 1);
+            return d.toISOString().slice(0, 10);
+        };
+
+        const { data: existingAuto } = await supabase
+            .from("transactions")
+            .select("note, date")
+            .eq("user_id", user.id)
+            .like("note", "[Auto]%")
+            .gte("date", todayStr);
+        const alreadyInserted = new Set(
+            (existingAuto || []).map(t => `${t.note}|${t.date}`)
+        );
+        const dueToInsert = due.filter(
+            r => !alreadyInserted.has(`[Auto] ${r.name}|${r.next_date}`)
+        );
+
+        const newTxs = dueToInsert.map(r => ({
+            user_id: user.id,
+            type: "expense",
+            amount: r.amount,
+            category: r.category || "Lainnya",
+            note: `[Auto] ${r.name}`,
+            date: new Date(r.next_date).toISOString().slice(0, 10),
+            account_name: r.account_name,
+            icon: r.icon || "🔄",
+        }));
+        if (dueToInsert.length > 0) {
+            await supabase.from("transactions").insert(newTxs).select();
+        }
+
+        const updatedDebts = [...debtsData];
+        for (const r of dueToInsert) {
+            const acc = accountsData.find(a => a.name === r.account_name);
+            if (acc) {
+                await supabase.from("accounts").update({ balance: Math.max(0, acc.balance - r.amount) }).eq("id", acc.id);
+                acc.balance = Math.max(0, acc.balance - r.amount);
+            }
+            if (r.debt_id) {
+                const debtIdx = updatedDebts.findIndex(d => d.id === r.debt_id);
+                if (debtIdx !== -1) {
+                    const newRemaining = Math.max(0, updatedDebts[debtIdx].remaining - r.amount);
+                    await supabase.from("debts").update({ remaining: newRemaining }).eq("id", r.debt_id);
+                    updatedDebts[debtIdx] = { ...updatedDebts[debtIdx], remaining: newRemaining };
+                }
+            }
+            const newNext = calcNextDate(r.frequency, r.next_date);
+            await supabase.from("recurring_transactions").update({ next_date: newNext }).eq("id", r.id);
+            r.next_date = newNext;
+        }
+
+        return { accounts: accountsData, recurrings: recurringsData, debts: updatedDebts, executed: dueToInsert.length };
+    };
 
     const fetchAll = async () => {
         setLoading(true);
@@ -223,421 +295,41 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             supabase.from("piutang").select("*").order("created_at"),
         ]);
 
-        const accounts = accs.data || [];
-        const recurrings = recs.data || [];
+        const accountsData = accs.data || [];
+        const recurringsData = recs.data || [];
+        const debtsData = dbs.data || [];
 
-        // ── AUTO-EXECUTE transaksi berulang yang jatuh tempo ──
-        const todayStr = new Date().toLocaleDateString("en-CA"); // "YYYY-MM-DD" local timezone
-        const due = recurrings.filter(r => r.active && r.next_date <= todayStr);
+        const result = await autoExecuteRecurrings(recurringsData, accountsData, debtsData);
 
-        if (due.length > 0) {
-            const calcNextDate = (freq, from) => {
-                const d = new Date(from);
-                if (freq === "daily")   d.setDate(d.getDate() + 1);
-                if (freq === "weekly")  d.setDate(d.getDate() + 7);
-                if (freq === "monthly") d.setMonth(d.getMonth() + 1);
-                if (freq === "yearly")  d.setFullYear(d.getFullYear() + 1);
-                return d.toISOString().slice(0, 10);
-            };
-
-            // Idempotency check: cek transaksi [Auto] yang sudah diinsert hari ini
-            const { data: existingAuto } = await supabase
-                .from("transactions")
-                .select("note, date")
-                .eq("user_id", user.id)
-                .like("note", "[Auto]%")
-                .gte("date", todayStr);
-            const alreadyInserted = new Set(
-                (existingAuto || []).map(t => `${t.note}|${t.date}`)
-            );
-            const dueToInsert = due.filter(
-                r => !alreadyInserted.has(`[Auto] ${r.name}|${r.next_date}`)
-            );
-
-            // Insert hanya yang belum ada
-            const newTxs = dueToInsert.map(r => ({
-                user_id: user.id,
-                type: "expense",
-                amount: r.amount,
-                category: r.category || "Lainnya",
-                note: `[Auto] ${r.name}`,
-                date: new Date(r.next_date).toISOString().slice(0, 10),
-                account_name: r.account_name,
-                icon: r.icon || "🔄",
-            }));
-            if (dueToInsert.length > 0) {
-                await supabase.from("transactions").insert(newTxs).select();
-            }
-
-            // Update saldo tiap akun, next_date, dan sisa hutang (jika linked)
-            // Hanya untuk yang baru diinsert (dueToInsert), bukan semua due
-            const debtsList = dbs.data || [];
-            const updatedDebts = [...debtsList];
-            for (const r of dueToInsert) {
-                const acc = accounts.find(a => a.name === r.account_name);
-                if (acc) {
-                    await supabase.from("accounts").update({ balance: Math.max(0, acc.balance - r.amount) }).eq("id", acc.id);
-                    acc.balance = Math.max(0, acc.balance - r.amount);
-                }
-                // Kurangi sisa hutang jika linked
-                if (r.debt_id) {
-                    const debtIdx = updatedDebts.findIndex(d => d.id === r.debt_id);
-                    if (debtIdx !== -1) {
-                        const newRemaining = Math.max(0, updatedDebts[debtIdx].remaining - r.amount);
-                        await supabase.from("debts").update({ remaining: newRemaining }).eq("id", r.debt_id);
-                        updatedDebts[debtIdx] = { ...updatedDebts[debtIdx], remaining: newRemaining };
-                    }
-                }
-                const newNext = calcNextDate(r.frequency, r.next_date);
-                await supabase.from("recurring_transactions").update({ next_date: newNext }).eq("id", r.id);
-                r.next_date = newNext;
-            }
-            if (updatedDebts !== debtsList) setDebts(updatedDebts);
-
-            // Fetch ulang data terbaru setelah auto-execute
+        if (result.executed > 0) {
             const [freshAccs, freshTxs] = await Promise.all([
                 supabase.from("accounts").select("*").order("created_at"),
                 supabase.from("transactions").select("*").order("date", { ascending: false }),
             ]);
             if (freshAccs.data) setAccounts(freshAccs.data);
             if (freshTxs.data) setTransactions(freshTxs.data);
-            setRecurrings([...recurrings]);
-            if (dueToInsert.length > 0) {
-                showToast(`🔄 ${dueToInsert.length} transaksi berulang dijalankan otomatis!`);
-            }
+            setRecurrings([...recurringsData]);
+            setDebts(result.debts);
+            showToast(`🔄 ${result.executed} transaksi berulang dijalankan otomatis!`);
         } else {
             if (accs.data) setAccounts(accs.data);
             if (txs.data) setTransactions(txs.data);
         }
 
         if (gls.data) setGoals(gls.data);
-        if (dbs.data) setDebts(dbs.data);
+        if (!result.executed && dbs.data) setDebts(dbs.data);
         if (cats.data) setCustomCategories(cats.data);
-        if (recs.data) setRecurrings(recs.data);
+        if (recs.data && !result.executed) setRecurrings(recs.data);
         if (invs.data) setInvestments(invs.data);
         if (buds.data) setBudgets(buds.data);
         if (splits.data) setSplitBills(splits.data);
         if (piu.data) setPiutang(piu.data);
         setLoading(false);
         } catch (err) {
-            console.error("fetchAll error:", err);
+            if (import.meta.env.DEV) console.error("fetchAll error:", err);
             showToast("Gagal memuat data. Coba refresh halaman.", "error");
             setLoading(false);
         }
-    };
-
-    // ── CATEGORY CRUD ────────────────────────────────────────
-    const addCategory = async (form) => {
-        const { data, error } = await supabase.from("categories").insert({
-            user_id: user.id,
-            name: form.name.trim(),
-            icon: form.icon,
-            type: form.type,
-            color: form.color,
-        }).select().single();
-        if (error) { showToast("Gagal menambah kategori", "error"); return; }
-        setCustomCategories(p => [...p, data]);
-        showToast(`Kategori "${data.name}" berhasil ditambahkan!`);
-    };
-
-    const editCategory = async (id, form) => {
-        const { data, error } = await supabase.from("categories")
-            .update({ name: form.name.trim(), icon: form.icon, type: form.type, color: form.color })
-            .eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah kategori", "error"); return; }
-        setCustomCategories(p => p.map(c => c.id === id ? data : c));
-        showToast(`Kategori "${data.name}" berhasil diperbarui!`);
-    };
-
-    const deleteCategory = async (id) => {
-        const { error } = await supabase.from("categories").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus kategori", "error"); return; }
-        setCustomCategories(p => p.filter(c => c.id !== id));
-        showToast("Kategori berhasil dihapus");
-    };
-
-    // ── INVESTMENTS CRUD ─────────────────────────────────────
-    const addInvestment = async (payload) => {
-        const { data, error } = await supabase.from("investments").insert({ user_id: user.id, ...payload }).select().single();
-        if (error) { showToast("Gagal menyimpan aset", "error"); return; }
-        setInvestments(p => [...p, data]);
-        showToast(`📈 Aset "${data.name}" berhasil ditambahkan!`);
-    };
-
-    const editInvestment = async (id, payload) => {
-        const { data, error } = await supabase.from("investments").update(payload).eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah aset", "error"); return; }
-        setInvestments(p => p.map(i => i.id === id ? data : i));
-        showToast(`✅ Aset "${data.name}" diperbarui!`);
-    };
-
-    const deleteInvestment = async (id) => {
-        const { error } = await supabase.from("investments").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus aset", "error"); return; }
-        setInvestments(p => p.filter(i => i.id !== id));
-        showToast("Aset dihapus");
-    };
-
-    // ── BUDGETS CRUD ─────────────────────────────────────────
-    const addBudget = async (payload) => {
-        const { data, error } = await supabase.from("budgets").insert({ user_id: user.id, ...payload }).select().single();
-        if (error) { showToast("Gagal menyimpan anggaran", "error"); return; }
-        setBudgets(p => [...p, data]);
-        showToast(`💰 Anggaran "${data.category}" berhasil ditambahkan!`);
-    };
-
-    const editBudget = async (id, payload) => {
-        const { data, error } = await supabase.from("budgets").update(payload).eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah anggaran", "error"); return; }
-        setBudgets(p => p.map(b => b.id === id ? data : b));
-        showToast(`✅ Anggaran diperbarui!`);
-    };
-
-    const deleteBudget = async (id) => {
-        const { error } = await supabase.from("budgets").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus anggaran", "error"); return; }
-        setBudgets(p => p.filter(b => b.id !== id));
-        showToast("Anggaran dihapus");
-    };
-
-    const copyBudgetMonth = async (prevBudgets, targetMonth) => {
-        const inserts = prevBudgets.map(b => ({
-            user_id: user.id,
-            category: b.category,
-            amount: b.amount,
-            month: targetMonth,
-        }));
-        const { data, error } = await supabase.from("budgets").insert(inserts).select();
-        if (error) { showToast("Gagal menyalin anggaran", "error"); return; }
-        setBudgets(p => [...p, ...(data || [])]);
-        showToast(`✅ ${inserts.length} anggaran disalin ke bulan ini!`);
-    };
-
-    // ── GOALS CRUD ───────────────────────────────────────────
-    const addGoal = async (payload) => {
-        const { data, error } = await supabase.from("goals").insert({ user_id: user.id, ...payload }).select().single();
-        if (error) { showToast("Gagal menyimpan target", "error"); return; }
-        setGoals(p => [...p, data]);
-        showToast(`🎯 Target "${data.name}" berhasil ditambahkan!`);
-    };
-
-    const editGoal = async (id, payload) => {
-        const { data, error } = await supabase.from("goals").update(payload).eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah target", "error"); return; }
-        setGoals(p => p.map(g => g.id === id ? data : g));
-        showToast(`✅ Target "${data.name}" diperbarui!`);
-    };
-
-    const deleteGoal = async (id) => {
-        const { error } = await supabase.from("goals").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus target", "error"); return; }
-        setGoals(p => p.filter(g => g.id !== id));
-        showToast("Target dihapus");
-    };
-
-    // Topup goal — opsional catat sebagai transaksi + kurangi saldo akun
-    const topupGoal = async (goalId, goal, amount, accountName) => {
-        // 1. Update goal current
-        const newCurrent = goal.current + amount;
-        const { data: updGoal, error: gErr } = await supabase
-            .from("goals").update({ current: newCurrent }).eq("id", goalId).select().single();
-        if (gErr) { showToast("Gagal memperbarui target", "error"); return; }
-        setGoals(p => p.map(g => g.id === goalId ? updGoal : g));
-
-        // 2. Jika pilih akun → catat transaksi expense + kurangi saldo
-        if (accountName) {
-            const today = new Date();
-            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
-            const tx = {
-                user_id: user.id, type: "expense", amount,
-                category: "Tabungan & Goal",
-                note: `Tabungan: ${goal.name}`,
-                date: dateStr,
-                account_name: accountName,
-                icon: "🎯",
-            };
-            const { data: newTx } = await supabase.from("transactions").insert(tx).select().single();
-            if (newTx) setTransactions(p => [newTx, ...p]);
-
-            // Kurangi saldo akun
-            const acc = accounts.find(a => a.name === accountName);
-            if (acc) {
-                const newBal = Math.max(0, acc.balance - amount);
-                const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
-                if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
-            }
-            showToast(`💰 +Rp ${amount.toLocaleString("id-ID")} ditabung dari ${accountName}`);
-        } else {
-            showToast(`💰 Dana bertambah Rp ${amount.toLocaleString("id-ID")}!`);
-        }
-
-        if (newCurrent >= goal.target) showToast(`🎉 Target "${goal.name}" tercapai!`);
-    };
-
-    // ── DEBTS CRUD ───────────────────────────────────────────
-    const addDebt = async (payload) => {
-        const { data, error } = await supabase.from("debts").insert({ user_id: user.id, ...payload }).select().single();
-        if (error) { showToast("Gagal menyimpan hutang", "error"); return; }
-        setDebts(p => [...p, data]);
-        showToast(`📋 Hutang "${data.name}" berhasil dicatat!`);
-    };
-
-    const editDebt = async (id, payload) => {
-        const { data, error } = await supabase.from("debts").update(payload).eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah hutang", "error"); return; }
-        setDebts(p => p.map(d => d.id === id ? data : d));
-        showToast(`✅ Hutang "${data.name}" diperbarui!`);
-    };
-
-    const deleteDebt = async (id) => {
-        const { error } = await supabase.from("debts").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus hutang", "error"); return; }
-        setDebts(p => p.filter(d => d.id !== id));
-        showToast("Hutang dihapus");
-    };
-
-    // ── PAY DEBT ─────────────────────────────────────────────
-    const payDebt = async (debt, amount, accountName) => {
-        const today = new Date().toISOString().slice(0, 10);
-        // 1. Catat transaksi expense
-        const tx = {
-            user_id: user.id, type: "expense", amount,
-            category: "Hutang & Cicilan",
-            note: `Cicilan ${debt.name}`,
-            date: today,
-            account_name: accountName,
-            icon: "📋",
-        };
-        const { data: newTx } = await supabase.from("transactions").insert(tx).select().single();
-        if (newTx) setTransactions(p => [newTx, ...p]);
-
-        // 2. Kurangi saldo akun
-        const acc = accounts.find(a => a.name === accountName);
-        if (acc) {
-            const newBal = Math.max(0, acc.balance - amount);
-            const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
-            if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
-        }
-
-        // 3. Kurangi sisa hutang
-        const newRemaining = Math.max(0, debt.remaining - amount);
-        const { data: updDebt } = await supabase.from("debts").update({ remaining: newRemaining }).eq("id", debt.id).select().single();
-        if (updDebt) setDebts(p => p.map(d => d.id === debt.id ? updDebt : d));
-
-        showToast(`✅ Cicilan ${debt.name} Rp ${amount.toLocaleString("id-ID")} berhasil dicatat!`);
-    };
-
-    // ── PIUTANG CRUD ─────────────────────────────────────────
-    const addPiutang = async (payload) => {
-        const { data, error } = await supabase.from("piutang").insert({ user_id: user.id, ...payload }).select().single();
-        if (error) { showToast("Gagal menyimpan piutang", "error"); return; }
-        setPiutang(p => [...p, data]);
-
-        // Potong saldo akun sumber
-        if (payload.from_account) {
-            const acc = accounts.find(a => a.name === payload.from_account);
-            if (acc) {
-                const newBal = Math.max(0, acc.balance - payload.total);
-                const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
-                if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
-            }
-        }
-
-        showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
-    };
-
-    const editPiutang = async (id, payload) => {
-        const { data, error } = await supabase.from("piutang").update(payload).eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah piutang", "error"); return; }
-        setPiutang(p => p.map(d => d.id === id ? data : d));
-        showToast(`✅ Piutang "${data.borrower_name}" diperbarui!`);
-    };
-
-    const deletePiutang = async (id) => {
-        const { error } = await supabase.from("piutang").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus piutang", "error"); return; }
-        setPiutang(p => p.filter(d => d.id !== id));
-        showToast("Piutang dihapus");
-    };
-
-    // ── TERIMA KEMBALI PIUTANG ───────────────────────────────
-    const terimaPiutang = async (item, amount, accountName) => {
-        // 1. Tambah saldo akun (uang kembali) — tidak dicatat sebagai income
-        //    agar tidak mendistorsi laporan pemasukan bulanan
-        const acc = accounts.find(a => a.name === accountName);
-        if (acc) {
-            const newBal = acc.balance + amount;
-            const { data: updAcc } = await supabase.from("accounts").update({ balance: newBal }).eq("id", acc.id).select().single();
-            if (updAcc) setAccounts(p => p.map(a => a.id === acc.id ? updAcc : a));
-        }
-
-        // 2. Kurangi sisa piutang
-        const newRemaining = Math.max(0, item.remaining - amount);
-        const { data: updPiu } = await supabase.from("piutang").update({ remaining: newRemaining }).eq("id", item.id).select().single();
-        if (updPiu) setPiutang(p => p.map(d => d.id === item.id ? updPiu : d));
-
-        showToast(`✅ Terima Rp ${amount.toLocaleString("id-ID")} dari ${item.borrower_name} berhasil dicatat!`);
-    };
-
-    // ── RECURRING TRANSACTIONS ───────────────────────────────
-    const addRecurring = async (form) => {
-        const { data, error } = await supabase.from("recurring_transactions").insert({
-            user_id: user.id, ...form,
-        }).select().single();
-        if (error) { showToast("Gagal menyimpan transaksi berulang", "error"); return; }
-        setRecurrings(p => [...p, data].sort((a, b) => new Date(a.next_date) - new Date(b.next_date)));
-        showToast(`✅ "${data.name}" ditambahkan!`);
-    };
-
-    const editRecurring = async (id, form) => {
-        const { data, error } = await supabase.from("recurring_transactions")
-            .update(form).eq("id", id).select().single();
-        if (error) { showToast("Gagal mengubah transaksi berulang", "error"); return; }
-        setRecurrings(p => p.map(r => r.id === id ? data : r).sort((a, b) => new Date(a.next_date) - new Date(b.next_date)));
-        showToast(`✅ "${data.name}" diperbarui!`);
-    };
-
-    const deleteRecurring = async (id) => {
-        const { error } = await supabase.from("recurring_transactions").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus", "error"); return; }
-        setRecurrings(p => p.filter(r => r.id !== id));
-        showToast("Transaksi berulang dihapus");
-    };
-
-    // ── SPLIT BILL CRUD ──────────────────────────────────────
-    const addSplitBill = async (payload) => {
-        const { members, ...billData } = payload;
-        const { data: bill, error } = await supabase
-            .from("split_bills")
-            .insert({ user_id: user.id, title: billData.title, total_amount: billData.total_amount, date: billData.date, note: billData.note || "" })
-            .select().single();
-        if (error) { showToast("Gagal menyimpan tagihan", "error"); return; }
-        if (members && members.length > 0) {
-            const memberRows = members.map(m => ({ bill_id: bill.id, name: m.name, amount: m.amount, paid: false }));
-            const { data: mData } = await supabase.from("split_bill_members").insert(memberRows).select();
-            setSplitBills(p => [{ ...bill, split_bill_members: mData || [] }, ...p]);
-        } else {
-            setSplitBills(p => [{ ...bill, split_bill_members: [] }, ...p]);
-        }
-        showToast(`🧾 "${bill.title}" berhasil ditambahkan!`);
-    };
-
-    const deleteSplitBill = async (id) => {
-        await supabase.from("split_bill_members").delete().eq("bill_id", id);
-        const { error } = await supabase.from("split_bills").delete().eq("id", id);
-        if (error) { showToast("Gagal menghapus tagihan", "error"); return; }
-        setSplitBills(p => p.filter(b => b.id !== id));
-        showToast("Tagihan dihapus");
-    };
-
-    const toggleMemberPaid = async (memberId, paid) => {
-        const { data, error } = await supabase
-            .from("split_bill_members").update({ paid }).eq("id", memberId).select().single();
-        if (error) { showToast("Gagal update status", "error"); return; }
-        setSplitBills(p => p.map(bill => ({
-            ...bill,
-            split_bill_members: (bill.split_bill_members || []).map(m => m.id === memberId ? data : m),
-        })));
     };
 
     // ── COMPUTED VALUES ──────────────────────────────────────
@@ -664,14 +356,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             amount: parseInt(txForm.amount),
             category: txForm.category,
             note: txForm.note || txForm.category,
-            date: txForm.date || new Date().toISOString().slice(0, 10),
+            date: txForm.date || toLocalDateStr(),
             account_name: txForm.account || (accounts[0]?.name ?? ""),
             icon: categoryIcons[txForm.category] || "📦",
         };
         const { data, error } = await supabase.from("transactions").insert(newTx).select().single();
         if (error) { showToast("Gagal menyimpan transaksi", "info"); setIsSavingTx(false); return; }
 
-        // Update saldo akun
         const acc = accounts.find(a => a.name === newTx.account_name);
         if (acc) {
             const newBalance = newTx.type === "income"
@@ -683,17 +374,16 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         }
 
         setTransactions(p => [data, ...p]);
-        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: new Date().toISOString().slice(0, 10) });
+        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
         setIsSavingTx(false);
         setShowAddTx(false);
         showToast("Transaksi berhasil ditambahkan!");
     };
 
-    // ── TAMBAH BANYAK TRANSAKSI (scan struk multi-item) ─────
     const addMultipleTx = async (items, accountName, date) => {
         if (!items.length || isSavingTx) return;
         setIsSavingTx(true);
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toLocalDateStr();
         const acc = accounts.find(a => a.name === accountName);
         const txsToInsert = items.map(item => ({
             user_id: user.id,
@@ -707,7 +397,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         }));
         const { data, error } = await supabase.from("transactions").insert(txsToInsert).select();
         if (error) { showToast("Gagal menyimpan transaksi", "error"); setIsSavingTx(false); return; }
-        // Update saldo akun sekali (total semua item)
         if (acc) {
             const total = items.reduce((s, i) => s + i.amount, 0);
             const { data: updatedAcc } = await supabase.from("accounts")
@@ -730,7 +419,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             note:      tx.note,
             account:   tx.account_name,
             toAccount: "",
-            date:      tx.date || new Date().toISOString().slice(0, 10),
+            date:      tx.date || toLocalDateStr(),
         });
         setShowEditTx(true);
     };
@@ -743,7 +432,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         setIsSavingTx(true);
         const oldAcc = accounts.find(a => a.name === editingTx.account_name);
 
-        // Untuk transfer: update note + date
         if (editingTx.type === "transfer") {
             const { data, error } = await supabase.from("transactions")
                 .update({ note: txForm.note, date: txForm.date || editingTx.date })
@@ -756,7 +444,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             return;
         }
 
-        // Reverse saldo akun lama
         if (oldAcc) {
             const revertedBalance = editingTx.type === "income"
                 ? oldAcc.balance - editingTx.amount
@@ -765,7 +452,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             setAccounts(p => p.map(a => a.id === oldAcc.id ? { ...a, balance: revertedBalance } : a));
         }
 
-        // Apply saldo akun baru (mungkin akun berbeda)
         const targetAcc = accounts.find(a => a.name === txForm.account) || oldAcc;
         if (targetAcc) {
             const currentBalance = targetAcc.id === oldAcc?.id
@@ -779,7 +465,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             if (updatedAcc) setAccounts(p => p.map(a => a.id === targetAcc.id ? updatedAcc : a));
         }
 
-        // Update transaksi di DB
         const updatedFields = {
             type:         txForm.type,
             amount:       newAmount,
@@ -802,9 +487,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     // ── DELETE TRANSAKSI ─────────────────────────────────────
     const deleteTx = async (tx) => {
-        // Reverse saldo akun
         if (tx.type === "transfer") {
-            // Transfer: kembalikan saldo ke akun asal + kurangi dari akun tujuan
             const fromAcc = accounts.find(a => a.name === tx.account_name);
             const toAcc   = tx.to_account ? accounts.find(a => a.name === tx.to_account) : null;
             const updates = [];
@@ -826,7 +509,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 setAccounts(p => p.map(a => a.id === acc.id ? { ...a, balance: revertedBalance } : a));
             }
         }
-        // Delete dari DB
         const { error } = await supabase.from("transactions").delete().eq("id", tx.id);
         if (error) { showToast("Gagal menghapus transaksi", "error"); return; }
         setTransactions(p => p.filter(t => t.id !== tx.id));
@@ -841,7 +523,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         if (!amount || !fromAcc || !toAcc || fromAcc.id === toAcc.id || isSavingTx) return;
 
         setIsSavingTx(true);
-        const date = txForm.date || new Date().toISOString().slice(0, 10);
+        const date = txForm.date || toLocalDateStr();
         const note = txForm.note || `Transfer ${fromAcc.name} → ${toAcc.name}`;
 
         const { data: txData, error: txError } = await supabase.from("transactions").insert([
@@ -861,7 +543,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             if (a.id === toAcc.id)   return resTo.data;
             return a;
         }));
-        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: new Date().toISOString().slice(0, 10) });
+        setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
         setIsSavingTx(false);
         setShowAddTx(false);
         showToast(`✅ Transfer Rp ${amount.toLocaleString("id-ID")} dari ${fromAcc.name} ke ${toAcc.name} berhasil!`);
@@ -892,11 +574,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const handleAdjustBalance = async (account, newBalance) => {
         const diff = newBalance - account.balance;
         if (diff === 0) return;
-        // Update account balance
         const { data: updatedAcc, error: accErr } = await supabase
             .from("accounts").update({ balance: newBalance }).eq("id", account.id).select().single();
         if (accErr) { showToast("Gagal update saldo", "info"); return; }
-        // Record adjustment transaction
         const adjTx = {
             user_id: user.id,
             account_id: account.id,
@@ -906,7 +586,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             category: "Koreksi Saldo",
             note: `Koreksi saldo ${account.name}`,
             icon: "⚖️",
-            date: new Date().toISOString().slice(0, 10),
+            date: toLocalDateStr(),
         };
         const { data: newTx } = await supabase.from("transactions").insert(adjTx).select().single();
         setAccounts(p => p.map(a => a.id === account.id ? updatedAcc : a));
@@ -918,13 +598,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const saveAiConfig = async (cfg) => {
         setAiConfig(cfg);
         setUserSettings(prev => ({ ...(prev || {}), ai_config: cfg }));
-        // Simpan ke localStorage sebagai cache (bertahan saat refresh)
         if (cfg?.apiKey) {
             localStorage.setItem("karaya_ai_config", JSON.stringify(cfg));
         } else {
             localStorage.removeItem("karaya_ai_config");
         }
-        // Simpan ke Supabase DB
         await supabase.from("user_settings").upsert({
             user_id: user.id,
             ai_config: cfg,
@@ -965,6 +643,20 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         }
     };
 
+    // ── Wrappers for hooks that need cross-entity access ─────
+    const handleTopupGoal = (goalId, goal, amount, accountName) =>
+        topupGoal(goalId, goal, amount, accountName, { setTransactions, setAccounts });
+
+    const handlePayDebt = (debt, amount, accountName) =>
+        payDebt(debt, amount, accountName, { accounts, setAccounts, setTransactions });
+
+    const handleAddPiutang = (payload) =>
+        addPiutang(payload, { accounts, setAccounts });
+
+    const handleTerimaPiutang = (item, amount, accountName) =>
+        terimaPiutang(item, amount, accountName, { accounts, setAccounts });
+
+    // ── RENDER ───────────────────────────────────────────────
     const activeLabel = t(NAV_LABELS[activeMenu] || "nav.dashboard");
     const sharedProps = { totalBalance, totalIncome, totalExpense, netBalance, savingRate, expenseRate, sortedCats, catTotals };
 
@@ -1036,9 +728,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} />}
                     {activeMenu === "kategori" && <KategoriView catTotals={catTotals} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
-                    {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={topupGoal} />}
-                    {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={payDebt} accounts={accounts} />}
-                    {activeMenu === "piutang" && <PiutangView piutang={piutang} onAdd={addPiutang} onEdit={editPiutang} onDelete={deletePiutang} onTerima={terimaPiutang} accounts={accounts} />}
+                    {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={handleTopupGoal} />}
+                    {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={handlePayDebt} accounts={accounts} />}
+                    {activeMenu === "piutang" && <PiutangView piutang={piutang} onAdd={handleAddPiutang} onEdit={editPiutang} onDelete={deletePiutang} onTerima={handleTerimaPiutang} accounts={accounts} />}
                     {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
                     {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
                     {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
