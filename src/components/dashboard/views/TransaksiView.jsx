@@ -239,7 +239,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                             </div>
                         </div>
                         <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
-                            {byDateAndAccount.length} {t("tx.summary") || "transaksi"} · {periodLabel}
+                            {filtered.length} {t("tx.summary") || "transaksi"} · {periodLabel}
                         </div>
                     </div>
                     {/* Baris bawah: stat grid */}
@@ -269,7 +269,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                             <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                                {byDateAndAccount.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
+                                {filtered.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
                             </span>
                         </div>
                         <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
@@ -284,7 +284,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                             <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(255,113,108,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📉</div>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "#ff716c", background: "rgba(255,113,108,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                                {byDateAndAccount.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
+                                {filtered.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
                             </span>
                         </div>
                         <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
@@ -299,7 +299,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                             <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(79,195,247,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                                {byDateAndAccount.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
+                                {filtered.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
                             </span>
                         </div>
                         <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
