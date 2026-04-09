@@ -521,8 +521,9 @@ ATURAN:
 - Untuk "bulan ini" gunakan awal bulan sampai hari ini
 - Untuk "bulan lalu" hitung tanggal yang benar
 - Jika user sebut nama bulan (Januari, Maret, dll) tentukan tahun yang paling masuk akal
-- Jika user menyebut nama orang/toko/tempat → gunakan type "search" dengan keyword nama tersebut
-- Jika user mereferensikan percakapan sebelumnya (misal "yang tgl 5 bagaimana?"), LIHAT konteks percakapan dan buat query yang sesuai
+- Jika user menyebut nama orang/toko/tempat/produk → SELALU gunakan type "search" dengan keyword nama tersebut. JANGAN gunakan "transactions" atau "summary" untuk pencarian nama.
+- Jika user mereferensikan percakapan sebelumnya (misal "yang tgl 5 bagaimana?"), LIHAT konteks percakapan dan buat query "search" dengan keyword dari konteks + tambah "transactions" untuk tanggal spesifik.
+- Untuk pertanyaan "total biaya X" atau "berapa biaya X" → gunakan "search" dengan keyword X agar menemukan SEMUA transaksi terkait.
 - Untuk pertanyaan spesifik tentang tanggal tertentu → gunakan "transactions" dengan start_date = end_date = tanggal itu
 
 Pertanyaan user: "${userMessage}"
@@ -556,13 +557,17 @@ function executeQueryPlan(queries, financialData) {
 
     if (q.type === "summary" || q.type === "transactions" || q.type === "category_breakdown") {
       const txs = transactions.filter(tx => {
+        // Tanggal filter opsional — hanya apply jika ada
         if (q.start_date && tx.date < q.start_date) return false;
         if (q.end_date && tx.date > q.end_date) return false;
         if (q.category && tx.category !== q.category) return false;
         if (q.type_filter && tx.type !== q.type_filter) return false;
-        if (q.type === "transactions" && q.search) {
+        if (q.search) {
           const kw = q.search.toLowerCase();
-          return (tx.note?.toLowerCase().includes(kw) || tx.category?.toLowerCase().includes(kw));
+          const words = kw.split(/\s+/).filter(w => w.length >= 2);
+          const haystack = `${tx.note || ""} ${tx.category || ""} ${tx.account_name || ""}`.toLowerCase();
+          if (haystack.includes(kw)) return true;
+          return words.length > 0 && words.every(w => haystack.includes(w));
         }
         return true;
       });
@@ -653,14 +658,24 @@ ${p.label} (${p.txCount} tx):
     }
 
     if (q.type === "search") {
-      const kw = (q.keyword || "").toLowerCase();
-      const limit = q.limit || 20;
+      // Split keyword jadi kata-kata, match jika SALAH SATU kata ditemukan
+      const rawKw = (q.keyword || "").toLowerCase().trim();
+      const words = rawKw.split(/\s+/).filter(w => w.length >= 2);
+      const limit = q.limit || 30;
+      const matchTx = (tx) => {
+        const haystack = `${tx.note || ""} ${tx.category || ""} ${tx.account_name || ""}`.toLowerCase();
+        // Coba full keyword dulu, lalu per kata
+        if (haystack.includes(rawKw)) return true;
+        return words.length > 0 && words.every(w => haystack.includes(w));
+      };
+      // Search SEMUA transaksi (tanpa filter tanggal) agar tidak kehilangan data
       const found = transactions
-        .filter(tx => tx.note?.toLowerCase().includes(kw) || tx.category?.toLowerCase().includes(kw))
+        .filter(matchTx)
         .sort((a,b) => b.date.localeCompare(a.date))
         .slice(0, limit);
       const typeIcon = t => t.type === "income" ? "➕" : t.type === "transfer" ? "↔️" : "➖";
-      sections.push(`🔍 PENCARIAN "${q.keyword}" (${found.length} hasil):
+      const totalAmt = found.reduce((s,t) => s + t.amount, 0);
+      sections.push(`🔍 PENCARIAN "${q.keyword}" (${found.length} hasil, total: ${fmtRp(totalAmt)}):
 ${found.length ? found.map(t => `  ${t.date} | ${typeIcon(t)} ${fmtRp(t.amount)} | ${t.category} | ${t.note || "-"} | ${t.account_name || ""}`).join("\n") : "  Tidak ditemukan."}`);
     }
 
