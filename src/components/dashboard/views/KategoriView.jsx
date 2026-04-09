@@ -30,7 +30,7 @@ const SummaryCard = ({ label, value, sub, borderColor, valueStyle }) => (
 );
 
 /* ─── main ─── */
-const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCategory, onEditCategory, onDeleteCategory }) => {
+const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCategory, onEditCategory, onDeleteCategory, onViewCategory }) => {
     const { t } = useLanguage();
 
     /* Terjemahkan nama kategori default; custom tetap pakai nama aslinya */
@@ -43,7 +43,6 @@ const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCat
     const [filterType,    setFilterType]    = useState("all");  // all | expense | income
     const [search,        setSearch]        = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
-    const [selectedCat,   setSelectedCat]   = useState(null);   // for detail modal
 
     /* ── build category list ── */
     const defaultCats = Object.entries(categoryIcons).map(([name, icon]) => ({
@@ -246,7 +245,7 @@ const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCat
                         <div key={c.id || c.name}
                             onMouseEnter={() => setHoveredId(c.id || c.name)}
                             onMouseLeave={() => setHoveredId(null)}
-                            onClick={() => amt > 0 && setSelectedCat(c)}
+                            onClick={() => amt > 0 && onViewCategory?.(c.name)}
                             style={{
                                 background: "var(--bg-surface)",
                                 border: `1px solid ${isHov ? color + "45" : "var(--color-border-soft)"}`,
@@ -339,100 +338,6 @@ const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCat
                 </div>
             )}
 
-            {/* ── Detail Transaksi Modal ── */}
-            {selectedCat && (() => {
-                const catTxs = transactions
-                    .filter(tx => tx.category === selectedCat.name)
-                    .sort((a, b) => b.date.localeCompare(a.date));
-                const color = selectedCat.color || "var(--color-primary)";
-                const totalAmt = catTxs.reduce((s, tx) => s + tx.amount, 0);
-
-                return (
-                    <div onClick={() => setSelectedCat(null)} style={{
-                        position: "fixed", inset: 0, zIndex: 1000,
-                        background: "rgba(0,0,0,.6)", backdropFilter: "blur(6px)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        padding: 16, animation: "fadeIn .2s ease",
-                    }}>
-                        <div onClick={e => e.stopPropagation()} style={{
-                            background: "var(--bg-surface)", border: "1px solid var(--color-border)",
-                            borderRadius: 20, width: "min(520px, 100%)", maxHeight: "80vh",
-                            display: "flex", flexDirection: "column", overflow: "hidden",
-                            boxShadow: "0 20px 60px rgba(0,0,0,.4)",
-                        }}>
-                            {/* Header */}
-                            <div style={{
-                                padding: "20px 24px", borderBottom: "1px solid var(--color-border-soft)",
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                    <div style={{
-                                        width: 42, height: 42, borderRadius: 12,
-                                        background: color + "18", border: `1px solid ${color}30`,
-                                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
-                                    }}>
-                                        {selectedCat.icon}
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>
-                                            {tCat(selectedCat.name, selectedCat.isDefault)}
-                                        </div>
-                                        <div style={{ fontSize: 11, color: "var(--color-muted)" }}>
-                                            {catTxs.length} transaksi · Total {fmtRp(totalAmt)}
-                                        </div>
-                                    </div>
-                                </div>
-                                <button onClick={() => setSelectedCat(null)} style={{
-                                    width: 32, height: 32, borderRadius: 8, border: "none",
-                                    background: "rgba(255,255,255,.06)", color: "var(--color-muted)",
-                                    fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                                }}>✕</button>
-                            </div>
-
-                            {/* Transaction list */}
-                            <div style={{ overflowY: "auto", padding: "12px 24px 20px", flex: 1 }}>
-                                {catTxs.length === 0 ? (
-                                    <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-muted)", fontSize: 13 }}>
-                                        Tidak ada transaksi
-                                    </div>
-                                ) : catTxs.map((tx, i) => {
-                                    const isIncome   = tx.type === "income";
-                                    const isTransfer = tx.type === "transfer";
-                                    const prefix     = isIncome ? "+" : isTransfer ? "↔" : "-";
-                                    const amtColor   = isIncome ? "#60fcc6" : isTransfer ? "#4FC3F7" : "#ff716c";
-                                    const dateStr    = new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-
-                                    return (
-                                        <div key={tx.id || i} style={{
-                                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                                            padding: "10px 0",
-                                            borderBottom: i < catTxs.length - 1 ? "1px solid var(--color-border-soft)" : "none",
-                                        }}>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{
-                                                    fontSize: 13, fontWeight: 600, color: "var(--color-text)",
-                                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                                }}>
-                                                    {tx.note || tx.category}
-                                                </div>
-                                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>
-                                                    {dateStr}{tx.account_name ? ` · ${tx.account_name}` : ""}
-                                                </div>
-                                            </div>
-                                            <div style={{
-                                                fontSize: 13, fontWeight: 700, color: amtColor,
-                                                whiteSpace: "nowrap", marginLeft: 12,
-                                            }}>
-                                                {prefix}{fmtRp(tx.amount)}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
         </div>
     );
 };

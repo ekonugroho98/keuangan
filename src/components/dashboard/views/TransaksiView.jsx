@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { fmtRp, fmtDate } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
@@ -48,20 +48,35 @@ const MONTH_NAMES_ID  = ["","Januari","Februari","Maret","April","Mei","Juni","J
 const MONTH_NAMES_EN  = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 
-const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
+const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialCategory = "", onClearInitialCategory }) => {
     const { t, lang } = useLanguage();
     const isMobile = useIsMobile();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
     const now = new Date();
-    const [filterYear,    setFilterYear]    = useState(String(now.getFullYear()));
-    const [filterMonth,   setFilterMonth]   = useState(String(now.getMonth() + 1).padStart(2, "0"));
+    const [filterYear,    setFilterYear]    = useState(initialCategory ? "" : String(now.getFullYear()));
+    const [filterMonth,   setFilterMonth]   = useState(initialCategory ? "" : String(now.getMonth() + 1).padStart(2, "0"));
     const [filterDate,    setFilterDate]    = useState("");
     const [filterType,    setFilterType]    = useState("all");
     const [filterAccount,  setFilterAccount]  = useState("");
-    const [filterCategory, setFilterCategory] = useState("");
+    const [filterCategory, setFilterCategory] = useState(initialCategory);
     const [search,         setSearch]         = useState("");
+
+    // Apply initialCategory saat navigasi dari Kategori view
+    useEffect(() => {
+        if (initialCategory) {
+            setFilterCategory(initialCategory);
+            setFilterYear("");
+            setFilterMonth("");
+            setFilterDate("");
+            setFilterType("all");
+            setFilterAccount("");
+            setSearch("");
+            setPage(1);
+            onClearInitialCategory?.();
+        }
+    }, [initialCategory]);
     const [hoveredId,     setHoveredId]     = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [page,          setPage]          = useState(1);
