@@ -71,6 +71,10 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
         tq("ai.q2", "Tips hemat bulan ini"),
         tq("ai.q3", "Cek kondisi hutangku"),
         tq("ai.q4", "Gimana saving rate-ku?"),
+        "Bandingkan pengeluaran bulan ini vs bulan lalu",
+        "Tren keuangan 6 bulan terakhir",
+        "Kategori apa yang paling boros bulan ini?",
+        "Cari transaksi listrik",
     ];
 
     return (
