@@ -30,7 +30,7 @@ const SummaryCard = ({ label, value, sub, borderColor, valueStyle }) => (
 );
 
 /* ─── main ─── */
-const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCategory, onEditCategory, onDeleteCategory, onViewCategory }) => {
+const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEditCategory, onDeleteCategory, onViewCategory }) => {
     const { t } = useLanguage();
 
     /* Terjemahkan nama kategori default; custom tetap pakai nama aslinya */
@@ -43,6 +43,20 @@ const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCat
     const [filterType,    setFilterType]    = useState("all");  // all | expense | income
     const [search,        setSearch]        = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
+
+    /* ── Hitung catTotals BULAN INI saja ── */
+    const now = new Date();
+    const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const monthLabel = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+    const monthTxs = transactions.filter(tx => tx.date?.startsWith(currentYM));
+
+    const catTotals = useMemo(() => {
+        const totals = {};
+        monthTxs.forEach(tx => {
+            if (tx.category) totals[tx.category] = (totals[tx.category] || 0) + tx.amount;
+        });
+        return totals;
+    }, [monthTxs]);
 
     /* ── build category list ── */
     const defaultCats = Object.entries(categoryIcons).map(([name, icon]) => ({
@@ -188,10 +202,15 @@ const KategoriView = ({ catTotals, transactions = [], customCategories, onAddCat
             {/* ── Page Header ── */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-                        {t("cat.title")}
-                    </h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: 0, letterSpacing: "-0.5px" }}>
+                            {t("cat.title")}
+                        </h1>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.1)", border: "1px solid rgba(96,252,198,.25)", padding: "3px 10px", borderRadius: 99 }}>
+                            📅 {monthLabel}
+                        </span>
+                    </div>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "4px 0 0" }}>
                         {t("cat.subtitle") || "Atur kategori pengeluaran dan pemasukan Anda."}
                     </p>
                 </div>
