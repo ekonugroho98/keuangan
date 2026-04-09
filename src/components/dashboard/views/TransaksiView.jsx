@@ -62,6 +62,10 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
     const [filterAccount,  setFilterAccount]  = useState("");
     const [filterCategory, setFilterCategory] = useState(initialCategory);
     const [search,         setSearch]         = useState("");
+    const [hoveredId,     setHoveredId]     = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
+    const [page,          setPage]          = useState(1);
+    const PAGE_SIZE = 50;
 
     // Apply initialCategory saat navigasi dari Kategori view
     useEffect(() => {
@@ -77,10 +81,6 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
             onClearInitialCategory?.();
         }
     }, [initialCategory]);
-    const [hoveredId,     setHoveredId]     = useState(null);
-    const [confirmDelete, setConfirmDelete] = useState(null);
-    const [page,          setPage]          = useState(1);
-    const PAGE_SIZE = 50;
 
     const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
     const categories = [...new Set(transactions.map(tx => tx.category).filter(Boolean))].sort();
