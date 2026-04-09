@@ -101,34 +101,10 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
         return false;
     };
 
-    // Terapkan filter akun ke summary (termasuk transfer masuk ke akun)
-    const byDateAndAccount = filterAccount
-        ? byDate.filter(tx => involvesAccount(tx, filterAccount))
-        : byDate;
-
-    const sumIn       = byDateAndAccount.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
-    const sumOut      = byDateAndAccount.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
-    const sumTransfer = byDateAndAccount.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
-    // Transfer masuk ke akun ini
-    const sumTransferIn  = filterAccount
-        ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.to_account === filterAccount).reduce((a, tx) => a + tx.amount, 0)
-        : 0;
-    // Transfer keluar dari akun ini
-    const sumTransferOut = filterAccount
-        ? byDateAndAccount.filter(tx => tx.type === "transfer" && tx.account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
-        : 0;
-    // Bersih:
-    // - Tanpa filter akun → income − expense (transfer netral di level portfolio)
-    // - Dengan filter akun → income − expense + transferIn − transferOut
-    //   (transfer nyata mempengaruhi saldo akun tersebut)
-    const net = filterAccount
-        ? sumIn - sumOut + sumTransferIn - sumTransferOut
-        : sumIn - sumOut;
-
     // Data akun yang sedang difilter
     const activeAccount = filterAccount ? accounts.find(a => a.name === filterAccount) : null;
 
-    /* --- further filtered by type + account + search --- */
+    /* --- further filtered by ALL active filters --- */
     const filtered = byDate.filter(tx => {
         if (filterType !== "all" && tx.type !== filterType) return false;
         if (filterAccount && !involvesAccount(tx, filterAccount)) return false;
@@ -143,6 +119,20 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
         }
         return true;
     });
+
+    // Summary dihitung dari filtered (semua filter aktif mempengaruhi total)
+    const sumIn       = filtered.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
+    const sumOut      = filtered.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
+    const sumTransfer = filtered.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
+    const sumTransferIn  = filterAccount
+        ? filtered.filter(tx => tx.type === "transfer" && tx.to_account === filterAccount).reduce((a, tx) => a + tx.amount, 0)
+        : 0;
+    const sumTransferOut = filterAccount
+        ? filtered.filter(tx => tx.type === "transfer" && tx.account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
+        : 0;
+    const net = filterAccount
+        ? sumIn - sumOut + sumTransferIn - sumTransferOut
+        : sumIn - sumOut;
 
     const handleReset = () => {
         setFilterYear(String(now.getFullYear()));
