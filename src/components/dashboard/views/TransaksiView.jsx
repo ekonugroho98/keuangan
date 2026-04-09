@@ -59,14 +59,16 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const [filterMonth,   setFilterMonth]   = useState(String(now.getMonth() + 1).padStart(2, "0"));
     const [filterDate,    setFilterDate]    = useState("");
     const [filterType,    setFilterType]    = useState("all");
-    const [filterAccount, setFilterAccount] = useState("");
-    const [search,        setSearch]        = useState("");
+    const [filterAccount,  setFilterAccount]  = useState("");
+    const [filterCategory, setFilterCategory] = useState("");
+    const [search,         setSearch]         = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [page,          setPage]          = useState(1);
     const PAGE_SIZE = 50;
 
     const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
+    const categories = [...new Set(transactions.map(tx => tx.category).filter(Boolean))].sort();
 
     /* --- filtered by date/year/month --- */
     const byDate = transactions.filter(tx => {
@@ -115,6 +117,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
     const filtered = byDate.filter(tx => {
         if (filterType !== "all" && tx.type !== filterType) return false;
         if (filterAccount && !involvesAccount(tx, filterAccount)) return false;
+        if (filterCategory && tx.category !== filterCategory) return false;
         if (search) {
             const q = search.toLowerCase();
             return (
@@ -133,6 +136,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
         setSearch("");
         setFilterType("all");
         setFilterAccount("");
+        setFilterCategory("");
         setPage(1);
     };
 
@@ -401,6 +405,37 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                             </select>
                         </>
                     )}
+
+                    {/* Category filter */}
+                    {categories.length > 0 && (
+                        <>
+                            <div style={{ width: 1, height: 24, background: "rgba(72,71,79,.3)" }} />
+                            <select
+                                value={filterCategory}
+                                onChange={e => { setFilterCategory(e.target.value); setPage(1); }}
+                                style={{
+                                    background: filterCategory ? "rgba(96,252,198,.1)" : "transparent",
+                                    border: filterCategory ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    borderRadius: 8,
+                                    color: filterCategory ? "var(--color-primary)" : "var(--color-muted)",
+                                    fontSize: 12, fontWeight: filterCategory ? 700 : 500,
+                                    fontFamily: "inherit", cursor: "pointer", outline: "none",
+                                    padding: filterCategory ? "4px 8px" : "0",
+                                    transition: "all .2s",
+                                    maxWidth: isMobile ? 130 : "none",
+                                }}
+                            >
+                                <option value="" style={{ background: "var(--bg-surface)" }}>
+                                    Semua Kategori
+                                </option>
+                                {categories.map(c => (
+                                    <option key={c} value={c} style={{ background: "var(--bg-surface)" }}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    )}
                 </div>
 
                 {/* Right: search + date + reset */}
@@ -430,7 +465,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [] }) => {
                     />
 
                     {/* Reset */}
-                    {(filterDate || search || filterType !== "all" || filterAccount) && (
+                    {(filterDate || search || filterType !== "all" || filterAccount || filterCategory) && (
                         <button onClick={handleReset}
                             style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid rgba(255,113,108,.2)", background: "rgba(255,113,108,.08)", color: "#ff716c", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
                             ✕ {t("common.reset")}
