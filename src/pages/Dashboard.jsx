@@ -49,6 +49,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
     const [activeMenu, setActiveMenu] = useState("dasbor");
+    const [initialCategoryFilter, setInitialCategoryFilter] = useState("");
     const [showAddTx, setShowAddTx] = useState(false);
     const [showEditTx, setShowEditTx] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
@@ -341,8 +342,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const expenseRate = totalIncome > 0 ? Math.round((totalExpense / totalIncome) * 100) : 0;
 
     const catTotals = {};
-    transactions.filter(t => t.type === "expense" || t.type === "income").forEach(t => {
-        catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+    transactions.forEach(t => {
+        if (t.category) catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
     });
     const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
 
@@ -724,9 +725,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 <div style={{ padding: isMobile ? "16px 12px" : 28 }}>
 
                     {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} investments={investments} debts={debts} budgets={budgets} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
-                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} accounts={accounts} />}
+                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} accounts={accounts} initialCategory={initialCategoryFilter} onClearInitialCategory={() => setInitialCategoryFilter("")} />}
                     {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} />}
-                    {activeMenu === "kategori" && <KategoriView catTotals={catTotals} transactions={transactions} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} />}
+                    {activeMenu === "kategori" && <KategoriView catTotals={catTotals} transactions={transactions} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} onViewCategory={(catName) => { setInitialCategoryFilter(catName); setActiveMenu("transaksi"); }} />}
                     {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
                     {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={handleTopupGoal} />}
                     {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={handlePayDebt} accounts={accounts} />}
