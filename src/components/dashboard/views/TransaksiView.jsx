@@ -48,18 +48,19 @@ const MONTH_NAMES_ID  = ["","Januari","Februari","Maret","April","Mei","Juni","J
 const MONTH_NAMES_EN  = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 
-const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialCategory = "", onClearInitialCategory }) => {
+const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialCategory = "", onClearInitialCategory, initialAccount = "", onClearInitialAccount }) => {
     const { t, lang } = useLanguage();
     const isMobile = useIsMobile();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
+    const hasInitialFilter = !!(initialCategory || initialAccount);
     const now = new Date();
-    const [filterYear,    setFilterYear]    = useState(initialCategory ? "" : String(now.getFullYear()));
-    const [filterMonth,   setFilterMonth]   = useState(initialCategory ? "" : String(now.getMonth() + 1).padStart(2, "0"));
+    const [filterYear,    setFilterYear]    = useState(hasInitialFilter ? "" : String(now.getFullYear()));
+    const [filterMonth,   setFilterMonth]   = useState(hasInitialFilter ? "" : String(now.getMonth() + 1).padStart(2, "0"));
     const [filterDate,    setFilterDate]    = useState("");
     const [filterType,    setFilterType]    = useState("all");
-    const [filterAccount,  setFilterAccount]  = useState("");
+    const [filterAccount,  setFilterAccount]  = useState(initialAccount);
     const [filterCategory, setFilterCategory] = useState(initialCategory);
     const [search,         setSearch]         = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
@@ -67,20 +68,24 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
     const [page,          setPage]          = useState(1);
     const PAGE_SIZE = 50;
 
-    // Apply initialCategory saat navigasi dari Kategori view
+    // Apply initial filters saat navigasi dari Kategori / Akun view
     useEffect(() => {
         if (initialCategory) {
             setFilterCategory(initialCategory);
-            setFilterYear("");
-            setFilterMonth("");
-            setFilterDate("");
-            setFilterType("all");
-            setFilterAccount("");
-            setSearch("");
-            setPage(1);
+            setFilterYear(""); setFilterMonth(""); setFilterDate("");
+            setFilterType("all"); setFilterAccount(""); setSearch(""); setPage(1);
             onClearInitialCategory?.();
         }
     }, [initialCategory]);
+
+    useEffect(() => {
+        if (initialAccount) {
+            setFilterAccount(initialAccount);
+            setFilterYear(""); setFilterMonth(""); setFilterDate("");
+            setFilterType("all"); setFilterCategory(""); setSearch(""); setPage(1);
+            onClearInitialAccount?.();
+        }
+    }, [initialAccount]);
 
     const years = [...new Set(transactions.map(tx => tx.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
     const categories = [...new Set(transactions.map(tx => tx.category).filter(Boolean))].sort();

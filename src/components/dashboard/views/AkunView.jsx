@@ -47,7 +47,7 @@ const card = {
 };
 
 /* ── component ── */
-const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, onAdjustBalance }) => {
+const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, onAdjustBalance, onViewAccount }) => {
     const { t } = useLanguage();
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
     const [activeTab, setActiveTab] = useState(accounts[0]?.id || null);
@@ -200,7 +200,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                 {/* Bottom: action buttons */}
                                 <div style={{ display: "flex", gap: 8, borderTop: "1px solid var(--color-border-soft)", paddingTop: 14 }}>
                                     <button
-                                        onClick={() => setActiveMenu && setActiveMenu("transaksi")}
+                                        onClick={() => onViewAccount ? onViewAccount(a.name) : setActiveMenu?.("transaksi")}
                                         style={{
                                             flex: 1, padding: "8px 0", borderRadius: 9,
                                             border: `1px solid ${color}30`,
@@ -335,7 +335,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                 );
                             })}
                             <button
-                                onClick={() => setActiveMenu && setActiveMenu("transaksi")}
+                                onClick={() => onViewAccount ? onViewAccount(a.name) : setActiveMenu?.("transaksi")}
                                 style={{ width: "100%", marginTop: 12, padding: "9px 0", borderRadius: 10, border: "1px dashed rgba(96,252,198,.2)", background: "transparent", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                             >
                                 {t("dash.viewAll") || "Lihat Semua"} →
