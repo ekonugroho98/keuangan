@@ -333,6 +333,7 @@ const AddTransactionModal = ({
 }) => {
     const { t } = useLanguage();
     const fileRef = useRef(null);
+    const fileRefGallery = useRef(null);
     const [scanLoading, setScanLoading]   = useState(false);
     const [scanProgress, setScanProgress] = useState(0);   // 0-100 untuk OCR
     const [scanMode, setScanMode]         = useState("");   // "ai" | "ocr"
@@ -484,25 +485,51 @@ const AddTransactionModal = ({
                 <div style={{ marginBottom: 16 }}>
                     <input ref={fileRef} type="file" accept="image/*" capture="environment"
                         style={{ display: "none" }} onChange={handleScanFile} />
-                    <button
-                        onClick={() => { setScanError(""); fileRef.current?.click(); }}
-                        disabled={scanLoading}
-                        style={{
-                            width: "100%", padding: "10px 14px", borderRadius: 10, cursor: scanLoading ? "default" : "pointer",
-                            border: "1px dashed var(--color-primary)", fontFamily: "inherit",
-                            background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
-                            fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
-                            justifyContent: "center", gap: 8, opacity: scanLoading ? 0.7 : 1,
-                        }}
-                    >
-                        {scanLoading ? (
-                            scanMode === "ocr"
+                    <input ref={fileRefGallery} type="file" accept="image/*"
+                        style={{ display: "none" }} onChange={handleScanFile} />
+                    {scanLoading ? (
+                        <button
+                            disabled
+                            style={{
+                                width: "100%", padding: "10px 14px", borderRadius: 10, cursor: "default",
+                                border: "1px dashed var(--color-primary)", fontFamily: "inherit",
+                                background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
+                                fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
+                                justifyContent: "center", gap: 8, opacity: 0.7,
+                            }}
+                        >
+                            {scanMode === "ocr"
                                 ? <>⏳ OCR {scanProgress > 0 ? `${scanProgress}%` : "memproses..."}  <span style={{ fontSize: 11, opacity: 0.7 }}>— sedang baca teks</span></>
-                                : <>⏳ AI sedang membaca struk...</>
-                        ) : (
-                            <>📷 Scan Struk / Nota {!aiConfig?.apiKey && <span style={{ fontSize: 10, opacity: 0.6 }}>(OCR)</span>}</>
-                        )}
-                    </button>
+                                : <>⏳ AI sedang membaca struk...</>}
+                        </button>
+                    ) : (
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                                onClick={() => { setScanError(""); fileRef.current?.click(); }}
+                                style={{
+                                    flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+                                    border: "1px dashed var(--color-primary)", fontFamily: "inherit",
+                                    background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
+                                    fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
+                                    justifyContent: "center", gap: 6,
+                                }}
+                            >
+                                📷 Scan Kamera {!aiConfig?.apiKey && <span style={{ fontSize: 10, opacity: 0.6 }}>(OCR)</span>}
+                            </button>
+                            <button
+                                onClick={() => { setScanError(""); fileRefGallery.current?.click(); }}
+                                style={{
+                                    flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+                                    border: "1px dashed var(--color-primary)", fontFamily: "inherit",
+                                    background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
+                                    fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
+                                    justifyContent: "center", gap: 6,
+                                }}
+                            >
+                                🖼️ Pilih Gambar
+                            </button>
+                        </div>
+                    )}
                     {!aiConfig?.apiKey && !scanLoading && (
                         <div style={{ marginTop: 6, fontSize: 10, color: "var(--color-muted)", textAlign: "center" }}>
                             Mode OCR — akurasi terbatas. Set API key AI Coach untuk hasil lebih baik.
