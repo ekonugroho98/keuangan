@@ -10,6 +10,7 @@ import CtaSection from "../components/landing/CtaSection";
 import Footer from "../components/landing/Footer";
 import SignupModal from "../components/landing/SignupModal";
 import LoginModal from "../components/landing/LoginModal";
+import ForgotPasswordModal from "../components/landing/ForgotPasswordModal";
 import DemoModal from "../components/landing/DemoModal";
 import { supabase } from "../lib/supabase";
 
@@ -18,6 +19,7 @@ const LandingPage = ({ showToast }) => {
     const [showSignup, setShowSignup] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
     const [showDemo, setShowDemo] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [signupForm, setSignupForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
     const [loginForm, setLoginForm] = useState({ email: "", password: "" });
     const [formErrors, setFormErrors] = useState({});
@@ -151,6 +153,12 @@ const LandingPage = ({ showToast }) => {
                 form={loginForm} setForm={setLoginForm}
                 errors={formErrors} onSubmit={handleLogin} isLoading={isLoading}
                 onSwitchToSignup={() => { closeLogin(); setShowSignup(true); }}
+                onForgotPassword={() => { closeLogin(); setShowForgotPassword(true); }}
+            />
+            <ForgotPasswordModal
+                open={showForgotPassword}
+                onClose={() => setShowForgotPassword(false)}
+                onBackToLogin={() => { setShowForgotPassword(false); setShowLogin(true); }}
             />
             <DemoModal open={showDemo} onClose={() => setShowDemo(false)} onSignup={() => setShowSignup(true)} />
         </div>
