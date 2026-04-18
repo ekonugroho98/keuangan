@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import Toast from "./components/ui/Toast";
 import { supabase } from "./lib/supabase";
 import InstallBanner from "./components/ui/InstallBanner";
@@ -49,6 +50,7 @@ html, body { overflow-x: hidden; }
 export default function App() {
     const [session, setSession] = useState(undefined); // undefined = loading
     const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+    const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
     const showToast = (msg, type = "success") => {
         setToast({ show: true, message: msg, type });
@@ -61,9 +63,12 @@ export default function App() {
             setSession(session);
         });
 
-        // Listen perubahan auth state (login, logout, token refresh)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        // Listen perubahan auth state (login, logout, token refresh, password recovery)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             setSession(session);
+            if (event === "PASSWORD_RECOVERY") {
+                setIsPasswordRecovery(true);
+            }
         });
 
         return () => subscription.unsubscribe();
@@ -96,9 +101,11 @@ export default function App() {
             <style>{globalStyles}</style>
             <InstallBanner />
             <Toast {...toast} />
-            {session
-                ? <Dashboard session={session} onLogout={handleLogout} showToast={showToast} />
-                : <LandingPage showToast={showToast} />
+            {isPasswordRecovery
+                ? <ResetPasswordPage showToast={showToast} onDone={() => setIsPasswordRecovery(false)} />
+                : session
+                    ? <Dashboard session={session} onLogout={handleLogout} showToast={showToast} />
+                    : <LandingPage showToast={showToast} />
             }
         </div>
     );

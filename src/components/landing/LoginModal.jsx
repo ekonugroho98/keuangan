@@ -1,7 +1,7 @@
 import Modal from "../ui/Modal";
 import InputField from "../ui/InputField";
 
-const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading, onSwitchToSignup }) => (
+const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading, onSwitchToSignup, onForgotPassword }) => (
     <Modal open={open} onClose={onClose}>
         {({ isDesktop }) => (
             <div style={{
@@ -23,6 +23,10 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
 
                     <InputField label="EMAIL" icon="📧" type="email" placeholder="email@example.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} error={errors.email} />
                     <InputField label="PASSWORD" icon="🔒" type="password" placeholder="Password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} error={errors.password} />
+
+                    <div style={{ textAlign: "right", marginTop: -8, marginBottom: 16 }}>
+                        <button className="link-btn" onClick={onForgotPassword} style={{ fontSize: 12 }}>Lupa password?</button>
+                    </div>
 
                     <button
                         className="btn-primary"
