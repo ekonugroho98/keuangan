@@ -19,6 +19,47 @@ const SCAN_CATEGORIES = [
 ];
 const VISION_PROVIDERS = ["groq", "openai", "anthropic", "google"];
 
+/* ── Validasi & sanitasi hasil parse AI/OCR ── */
+function sanitizeScanResult(raw) {
+  if (!raw || typeof raw !== "object") throw new Error("Hasil scan tidak valid");
+  if (raw.error) return raw; // pass-through error dari AI
+
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  const sanitized = items
+    .map((item) => {
+      const amount =
+        typeof item.amount === "number"
+          ? Math.round(item.amount)
+          : parseInt(String(item.amount).replace(/\D/g, ""), 10);
+      const note =
+        typeof item.note === "string" ? item.note.trim() : String(item.note || "").trim();
+      const category = SCAN_CATEGORIES.includes(item.category)
+        ? item.category
+        : guessCategory(note);
+      if (!note || isNaN(amount) || amount <= 0) return null;
+      return { note, amount, category };
+    })
+    .filter(Boolean);
+
+  if (!sanitized.length)
+    throw new Error("Tidak ada item valid yang terdeteksi dari struk.");
+
+  const subtotal =
+    typeof raw.subtotal === "number" && raw.subtotal > 0
+      ? Math.round(raw.subtotal)
+      : null;
+  const date =
+    typeof raw.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.date)
+      ? raw.date
+      : null;
+  const merchant =
+    typeof raw.merchant === "string" && raw.merchant.trim()
+      ? raw.merchant.trim()
+      : "Struk";
+
+  return { merchant, date, subtotal, items: sanitized };
+}
+
 /* ── Guess kategori dari nama item ── */
 function guessCategory(note) {
   const n = note.toLowerCase();
@@ -267,7 +308,7 @@ ${ocrText}`;
 
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Format respons AI tidak valid");
-  return JSON.parse(match[0]);
+  return sanitizeScanResult(JSON.parse(match[0]));
 }
 
 /* ── OCR: ambil teks lalu parse (AI jika ada, regex jika tidak) ── */
@@ -421,7 +462,7 @@ Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`;
 
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Format respons tidak valid");
-  return JSON.parse(match[0]);
+  return sanitizeScanResult(JSON.parse(match[0]));
 }
 
 const fmtRpLocal = (n) => "Rp " + Number(n).toLocaleString("id-ID");
@@ -664,12 +705,6 @@ const AddTransactionModal = ({
       if (err.message === "no-key" || err.message === "no-vision") {
         try {
           setScanMode("ocr");
-          const base64 = await new Promise((res, rej) => {
-            const r = new FileReader();
-            r.onload = () => res(r.result.split(",")[1]);
-            r.onerror = rej;
-            r.readAsDataURL(file);
-          });
           const result = await scanReceiptWithOCR(
             base64,
             file.type,
@@ -699,7 +734,7 @@ const AddTransactionModal = ({
     }
   };
 
-  const handleSaveMultiple = () => {
+  const handleSaveMultiple = async () => {
     const selected = scanItems.filter((i) => i.selected);
     if (!selected.length) return;
     const zeroItems = selected.filter((i) => !i.amount || i.amount <= 0);
@@ -710,8 +745,9 @@ const AddTransactionModal = ({
       return;
     }
     setScanError("");
-    onSubmitMultiple &&
-      onSubmitMultiple(selected, scanAccount, scanResults?.date);
+    if (onSubmitMultiple) {
+      await onSubmitMultiple(selected, scanAccount, scanResults?.date);
+    }
     resetScan();
   };
 
@@ -1303,6 +1339,25 @@ const AddTransactionModal = ({
                           height: 18,
                         }}
                       />
+                      <button
+                        onClick={() =>
+                          setScanItems((p) => p.filter((_, i) => i !== idx))
+                        }
+                        title="Hapus item"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--color-expense)",
+                          cursor: "pointer",
+                          fontSize: 14,
+                          padding: 0,
+                          flexShrink: 0,
+                          opacity: 0.6,
+                          lineHeight: 1,
+                        }}
+                      >
+                        ✕
+                      </button>
                       <input
                         value={item.note}
                         onChange={(e) =>
@@ -1398,6 +1453,39 @@ const AddTransactionModal = ({
                   </div>
                 ))}
               </div>
+
+              {/* Tambah item manual */}
+              <button
+                onClick={() =>
+                  setScanItems((p) => [
+                    ...p,
+                    {
+                      id: Date.now(),
+                      note: "",
+                      amount: 0,
+                      category: "Belanja",
+                      selected: true,
+                    },
+                  ])
+                }
+                className="link-btn"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "10px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  color: "var(--color-primary)",
+                  border: "1px dashed color-mix(in srgb, var(--color-primary) 30%, transparent)",
+                  borderRadius: 12,
+                  background: "color-mix(in srgb, var(--color-primary) 4%, transparent)",
+                  cursor: "pointer",
+                }}
+              >
+                + Tambah Item
+              </button>
 
               {/* Total + validation */}
               {(() => {

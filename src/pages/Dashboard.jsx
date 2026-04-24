@@ -415,18 +415,38 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       icon: r.icon || "🔄",
     }));
     if (dueToInsert.length > 0) {
-      await supabase.from("transactions").insert(newTxs).select();
+      const { error: insertErr } = await supabase
+        .from("transactions")
+        .insert(newTxs)
+        .select();
+      if (insertErr) {
+        console.error("Auto-recurring insert failed:", insertErr);
+        return {
+          accounts: accountsData,
+          recurrings: recurringsData,
+          debts: debtsData,
+          executed: 0,
+        };
+      }
     }
 
     const updatedDebts = [...debtsData];
     for (const r of dueToInsert) {
       const acc = accountsData.find((a) => a.name === r.account_name);
       if (acc) {
+        // Refetch saldo terbaru dari DB untuk hindari stale balance
+        const { data: freshAcc } = await supabase
+          .from("accounts")
+          .select("*")
+          .eq("id", acc.id)
+          .single();
+        const currentBal = freshAcc ? freshAcc.balance : acc.balance;
+        const newBal = Math.max(0, currentBal - r.amount);
         await supabase
           .from("accounts")
-          .update({ balance: Math.max(0, acc.balance - r.amount) })
+          .update({ balance: newBal })
           .eq("id", acc.id);
-        acc.balance = Math.max(0, acc.balance - r.amount);
+        acc.balance = newBal;
       }
       if (r.debt_id) {
         const debtIdx = updatedDebts.findIndex((d) => d.id === r.debt_id);
@@ -788,6 +808,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const newAccountName = txForm.account || editingTx.account_name;
     const oldAcc = accounts.find((a) => a.name === editingTx.account_name);
     const targetAcc = accounts.find((a) => a.name === newAccountName) || oldAcc;
+    const isSameAcc = targetAcc?.id === oldAcc?.id;
 
     // Refetch saldo terbaru kedua akun dari DB
     let freshOldAcc = null,
@@ -800,7 +821,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         .single();
       freshOldAcc = data;
     }
-    if (targetAcc && targetAcc.id !== oldAcc?.id) {
+    if (targetAcc && !isSameAcc) {
       const { data } = await supabase
         .from("accounts")
         .select("*")
@@ -811,63 +832,73 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       freshTargetAcc = freshOldAcc;
     }
 
-    // Hitung saldo: revert old tx di akun lama, apply new tx di akun target
+    // Hitung saldo baru: revert old tx di akun lama, apply new tx di akun target
+    // Hitung sekaligus agar bisa atomic check sebelum write
+    let oldAccFinalBalance = null;
+    let targetAccFinalBalance = null;
+
     if (freshOldAcc) {
       const revertedBalance =
         editingTx.type === "income"
           ? freshOldAcc.balance - editingTx.amount
           : freshOldAcc.balance + editingTx.amount;
-      const { error: revErr } = await supabase
+
+      if (isSameAcc) {
+        // Akun sama: revert + apply sekaligus
+        targetAccFinalBalance =
+          txForm.type === "income"
+            ? revertedBalance + newAmount
+            : revertedBalance - newAmount;
+        oldAccFinalBalance = targetAccFinalBalance;
+      } else {
+        oldAccFinalBalance = revertedBalance;
+        if (freshTargetAcc) {
+          targetAccFinalBalance =
+            txForm.type === "income"
+              ? freshTargetAcc.balance + newAmount
+              : freshTargetAcc.balance - newAmount;
+        }
+      }
+    }
+
+    // Update saldo akun lama
+    let updatedOldAcc = null;
+    if (freshOldAcc && oldAccFinalBalance !== null) {
+      const { data, error: revErr } = await supabase
         .from("accounts")
-        .update({ balance: revertedBalance })
-        .eq("id", oldAcc.id);
+        .update({ balance: oldAccFinalBalance })
+        .eq("id", oldAcc.id)
+        .select()
+        .single();
       if (revErr) {
-        showToast("Gagal mengembalikan saldo akun lama", "error");
+        showToast("Gagal update saldo akun lama", "error");
         setIsSavingTx(false);
         return;
       }
-      // Update freshTargetAcc jika sama dengan oldAcc
-      if (targetAcc?.id === oldAcc.id) {
-        freshTargetAcc = { ...freshOldAcc, balance: revertedBalance };
-      }
-      setAccounts((p) =>
-        p.map((a) =>
-          a.id === oldAcc.id ? { ...a, balance: revertedBalance } : a,
-        ),
-      );
+      updatedOldAcc = data;
     }
 
-    if (freshTargetAcc) {
-      const newBalance =
-        txForm.type === "income"
-          ? freshTargetAcc.balance + newAmount
-          : freshTargetAcc.balance - newAmount;
-      const { data: updatedAcc, error: updErr } = await supabase
+    // Update saldo akun target (hanya jika beda akun)
+    let updatedTargetAcc = null;
+    if (!isSameAcc && freshTargetAcc && targetAccFinalBalance !== null) {
+      const { data, error: updErr } = await supabase
         .from("accounts")
-        .update({ balance: newBalance })
+        .update({ balance: targetAccFinalBalance })
         .eq("id", targetAcc.id)
         .select()
         .single();
-      if (updErr || !updatedAcc) {
-        // Rollback revert jika akun lama sudah di-revert
-        if (freshOldAcc) {
+      if (updErr) {
+        // Rollback akun lama
+        if (freshOldAcc)
           await supabase
             .from("accounts")
             .update({ balance: freshOldAcc.balance })
             .eq("id", oldAcc.id);
-          setAccounts((p) =>
-            p.map((a) =>
-              a.id === oldAcc.id ? { ...a, balance: freshOldAcc.balance } : a,
-            ),
-          );
-        }
         showToast("Gagal update saldo. Edit dibatalkan.", "error");
         setIsSavingTx(false);
         return;
       }
-      setAccounts((p) =>
-        p.map((a) => (a.id === targetAcc.id ? updatedAcc : a)),
-      );
+      updatedTargetAcc = data;
     }
 
     // Update transaksi di DB
@@ -887,13 +918,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       .select()
       .single();
     if (error) {
-      // Rollback semua balance changes
+      // Rollback SEMUA balance changes (termasuk akun sama)
       if (freshOldAcc)
         await supabase
           .from("accounts")
           .update({ balance: freshOldAcc.balance })
           .eq("id", oldAcc.id);
-      if (freshTargetAcc && targetAcc?.id !== oldAcc?.id)
+      if (!isSameAcc && freshTargetAcc)
         await supabase
           .from("accounts")
           .update({ balance: freshTargetAcc.balance })
@@ -903,6 +934,14 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       return;
     }
 
+    // Semua berhasil — update state sekali di akhir
+    setAccounts((p) =>
+      p.map((a) => {
+        if (updatedOldAcc && a.id === oldAcc.id) return updatedOldAcc;
+        if (updatedTargetAcc && a.id === targetAcc.id) return updatedTargetAcc;
+        return a;
+      }),
+    );
     setTransactions((p) => p.map((t) => (t.id === editingTx.id ? data : t)));
     setShowEditTx(false);
     setEditingTx(null);
@@ -912,17 +951,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
   // ── DELETE TRANSAKSI ─────────────────────────────
   const deleteTx = async (tx) => {
-    // 1. Hapus transaksi dulu dari DB
-    const { error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", tx.id);
-    if (error) {
-      showToast("Gagal menghapus transaksi", "error");
-      return;
-    }
-
-    // 2. Kembalikan saldo berdasarkan tipe transaksi
+    // 1. Kembalikan saldo DULU sebelum hapus transaksi (agar bisa rollback)
     if (tx.type === "transfer") {
       const fromAcc = accounts.find((a) => a.name === tx.account_name);
       const toAcc = tx.to_account
@@ -969,23 +998,56 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             .single(),
         );
       const results = await Promise.all(updates);
+      const anyBalErr = results.some((r) => r.error);
+      if (anyBalErr) {
+        // Rollback: kembalikan saldo yang sudah terupdate
+        if (freshFrom && !results[0]?.error)
+          await supabase
+            .from("accounts")
+            .update({ balance: freshFrom.balance })
+            .eq("id", fromAcc.id);
+        if (freshTo && !results[freshFrom ? 1 : 0]?.error)
+          await supabase
+            .from("accounts")
+            .update({ balance: freshTo.balance })
+            .eq("id", toAcc.id);
+        showToast("Gagal update saldo. Hapus dibatalkan.", "error");
+        return;
+      }
+
+      // 2. Saldo berhasil di-revert, sekarang hapus transaksi
+      const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", tx.id);
+      if (error) {
+        // Rollback: kembalikan saldo ke nilai setelah revert gagal
+        if (freshFrom)
+          await supabase
+            .from("accounts")
+            .update({ balance: freshFrom.balance })
+            .eq("id", fromAcc.id);
+        if (freshTo)
+          await supabase
+            .from("accounts")
+            .update({ balance: freshTo.balance })
+            .eq("id", toAcc.id);
+        showToast("Gagal menghapus transaksi", "error");
+        return;
+      }
 
       setAccounts((p) =>
         p.map((a) => {
           if (freshFrom && a.id === fromAcc.id)
-            return (
-              results[0]?.data || {
-                ...a,
-                balance: freshFrom.balance + tx.amount,
-              }
-            );
+            return results[0]?.data || {
+              ...a,
+              balance: freshFrom.balance + tx.amount,
+            };
           if (freshTo && a.id === toAcc.id)
-            return (
-              results[freshFrom ? 1 : 0]?.data || {
-                ...a,
-                balance: freshTo.balance - tx.amount,
-              }
-            );
+            return results[freshFrom ? 1 : 0]?.data || {
+              ...a,
+              balance: freshTo.balance - tx.amount,
+            };
           return a;
         }),
       );
@@ -1003,12 +1065,32 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             tx.type === "income"
               ? freshAcc.balance - tx.amount
               : freshAcc.balance + tx.amount;
-          const { data: updatedAcc } = await supabase
+          const { data: updatedAcc, error: balErr } = await supabase
             .from("accounts")
             .update({ balance: revertedBalance })
             .eq("id", acc.id)
             .select()
             .single();
+          if (balErr) {
+            showToast("Gagal update saldo. Hapus dibatalkan.", "error");
+            return;
+          }
+
+          // Saldo berhasil di-revert, sekarang hapus transaksi
+          const { error } = await supabase
+            .from("transactions")
+            .delete()
+            .eq("id", tx.id);
+          if (error) {
+            // Rollback: kembalikan saldo asli
+            await supabase
+              .from("accounts")
+              .update({ balance: freshAcc.balance })
+              .eq("id", acc.id);
+            showToast("Gagal menghapus transaksi", "error");
+            return;
+          }
+
           setAccounts((p) =>
             p.map((a) =>
               a.id === acc.id
@@ -1016,6 +1098,16 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 : a,
             ),
           );
+        }
+      } else {
+        // Akun tidak ditemukan — langsung hapus transaksi saja
+        const { error } = await supabase
+          .from("transactions")
+          .delete()
+          .eq("id", tx.id);
+        if (error) {
+          showToast("Gagal menghapus transaksi", "error");
+          return;
         }
       }
     }
@@ -1436,7 +1528,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       <main
         style={{
           flex: 1,
-          marginLeft: isMobile ? 0 : sidebarOpen ? 248 : 0,
+          marginLeft: isMobile ? 0 : sidebarOpen ? 232 : 0,
           transition: "margin-left .35s cubic-bezier(.2,.8,.2,1)",
           minHeight: "100vh",
           minWidth: 0,

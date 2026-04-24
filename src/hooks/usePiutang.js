@@ -9,38 +9,24 @@ export function usePiutang(userId, showToast) {
     payload,
     { accounts, setAccounts, setTransactions },
   ) => {
-    const { data, error } = await supabase
-      .from("piutang")
-      .insert({ user_id: userId, ...payload })
-      .select()
-      .single();
-    if (error) {
-      showToast("Gagal menyimpan piutang", "error");
-      return;
-    }
-    setPiutang((p) => [...p, data]);
-
     if (payload.from_account) {
       const acc = accounts.find((a) => a.name === payload.from_account);
       if (!acc) {
         showToast(
-          `🤝 Piutang dicatat, tapi akun "${payload.from_account}" tidak ditemukan untuk potong saldo.`,
+          `Akun "${payload.from_account}" tidak ditemukan.`,
           "error",
         );
         return;
       }
 
-      // Refetch saldo terbaru
+      // 1. Refetch saldo terbaru
       const { data: freshAcc, error: fetchErr } = await supabase
         .from("accounts")
         .select("*")
         .eq("id", acc.id)
         .single();
       if (fetchErr || !freshAcc) {
-        showToast(
-          `🤝 Piutang dicatat, tapi gagal membaca saldo akun.`,
-          "error",
-        );
+        showToast("Gagal membaca saldo akun. Coba lagi.", "error");
         return;
       }
 
@@ -52,7 +38,18 @@ export function usePiutang(userId, showToast) {
         return;
       }
 
-      // Update saldo
+      // 2. Insert piutang
+      const { data, error } = await supabase
+        .from("piutang")
+        .insert({ user_id: userId, ...payload })
+        .select()
+        .single();
+      if (error) {
+        showToast("Gagal menyimpan piutang", "error");
+        return;
+      }
+
+      // 3. Update saldo
       const newBal = freshAcc.balance - payload.total;
       const { data: updAcc, error: accErr } = await supabase
         .from("accounts")
@@ -61,12 +58,14 @@ export function usePiutang(userId, showToast) {
         .select()
         .single();
       if (accErr || !updAcc) {
-        showToast("Piutang dicatat, tapi gagal update saldo akun.", "error");
+        // Rollback: hapus piutang
+        await supabase.from("piutang").delete().eq("id", data.id);
+        showToast("Gagal update saldo. Piutang dibatalkan.", "error");
         return;
       }
       setAccounts((p) => p.map((a) => (a.id === acc.id ? updAcc : a)));
 
-      // Buat record transaksi untuk audit trail
+      // 4. Buat record transaksi untuk audit trail
       const tx = {
         user_id: userId,
         type: "expense",
@@ -77,15 +76,42 @@ export function usePiutang(userId, showToast) {
         account_name: payload.from_account,
         icon: "🤝",
       };
-      const { data: newTx } = await supabase
+      const { data: newTx, error: txErr } = await supabase
         .from("transactions")
         .insert(tx)
         .select()
         .single();
+      if (txErr) {
+        // Rollback: kembalikan saldo & hapus piutang
+        await supabase
+          .from("accounts")
+          .update({ balance: freshAcc.balance })
+          .eq("id", acc.id);
+        await supabase.from("piutang").delete().eq("id", data.id);
+        setAccounts((p) =>
+          p.map((a) => (a.id === acc.id ? { ...a, balance: freshAcc.balance } : a)),
+        );
+        showToast("Gagal membuat transaksi. Piutang dibatalkan.", "error");
+        return;
+      }
       if (newTx && setTransactions) setTransactions((p) => [newTx, ...p]);
-    }
 
-    showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
+      setPiutang((p) => [...p, data]);
+      showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
+    } else {
+      // Piutang tanpa potong akun
+      const { data, error } = await supabase
+        .from("piutang")
+        .insert({ user_id: userId, ...payload })
+        .select()
+        .single();
+      if (error) {
+        showToast("Gagal menyimpan piutang", "error");
+        return;
+      }
+      setPiutang((p) => [...p, data]);
+      showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
+    }
   };
 
   const editPiutang = async (id, payload) => {
