@@ -484,55 +484,207 @@ const Sidebar = ({
             );
         }
 
-        /* ── Main Menu ── */
+        /* ── Main Menu — premium bento tiles ── */
         const aiStatus = aiConfig?.apiKey ? `${AI_PROVIDERS[aiConfig.provider]?.label || ""} · Aktif` : "Belum diatur";
-        const menuItems = [
-            { icon: "✏️", label: "Ganti Nama",      sub: user.name,        action: () => { setNewName(user.name); setProfileView("name"); } },
-            { icon: "🔑", label: "Ganti Password",  sub: "••••••••",       action: () => setProfileView("password") },
-            { icon: "🎨", label: "Warna Avatar",    sub: "Personalisasi",  action: () => setProfileView("color") },
-            { icon: "🤖", label: "AI Coach",        sub: aiStatus,         action: () => { setAiProvider(aiConfig?.provider || "groq"); setAiModel(aiConfig?.model || DEFAULT_MODEL[aiConfig?.provider || "groq"]); setAiKey(aiConfig?.apiKey || ""); setProfileView("ai"); } },
-            { icon: "📱", label: "Nama Aplikasi",   sub: appName,          action: () => { setEditAppName(appName); setEditAppTagline(appTagline); setProfileView("appname"); } },
-            { icon: "📤", label: "Export Data CSV", sub: "Unduh transaksi",action: () => { onExportCSV(); closeProfile(); } },
-            { icon: "☰",  label: "Kelola Menu",     sub: `${hiddenMenus.length} tersembunyi`, action: () => setProfileView("menus") },
+        const aiActive = !!aiConfig?.apiKey;
+
+        /* Each tile: SVG icon + gradient tile background per category */
+        const tiles = [
+            {
+                id: "name",
+                label: "Ganti Nama",
+                sub: user.name,
+                grad: "linear-gradient(135deg, #60fcc6, #19ce9b)",
+                tint: "rgba(96,252,198,.12)",
+                iconColor: "#003828",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>),
+                action: () => { setNewName(user.name); setProfileView("name"); },
+            },
+            {
+                id: "password",
+                label: "Password",
+                sub: "••••••••",
+                grad: "linear-gradient(135deg, #f59e0b, #d97706)",
+                tint: "rgba(245,158,11,.12)",
+                iconColor: "#3b1d00",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>),
+                action: () => setProfileView("password"),
+            },
+            {
+                id: "color",
+                label: "Warna Avatar",
+                sub: "Personalisasi",
+                grad: "linear-gradient(135deg, #a78bfa, #7c3aed)",
+                tint: "rgba(167,139,250,.12)",
+                iconColor: "#2e1a6b",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="13" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="10" cy="19" r="2.5"/><path d="M12 2a10 10 0 1 0 0 20"/></svg>),
+                action: () => setProfileView("color"),
+            },
+            {
+                id: "ai",
+                label: "AI Coach",
+                sub: aiStatus,
+                grad: "linear-gradient(135deg, #4FC3F7, #0288d1)",
+                tint: "rgba(79,195,247,.12)",
+                iconColor: "#003952",
+                badge: aiActive ? "●" : null,
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M12 2v4M9 13h.01M15 13h.01M9 17h6"/></svg>),
+                action: () => { setAiProvider(aiConfig?.provider || "groq"); setAiModel(aiConfig?.model || DEFAULT_MODEL[aiConfig?.provider || "groq"]); setAiKey(aiConfig?.apiKey || ""); setProfileView("ai"); },
+            },
+            {
+                id: "appname",
+                label: "Nama App",
+                sub: appName,
+                grad: "linear-gradient(135deg, #ec4899, #be185d)",
+                tint: "rgba(236,72,153,.12)",
+                iconColor: "#4a0c28",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 18h.01"/></svg>),
+                action: () => { setEditAppName(appName); setEditAppTagline(appTagline); setProfileView("appname"); },
+            },
+            {
+                id: "export",
+                label: "Export CSV",
+                sub: "Unduh data",
+                grad: "linear-gradient(135deg, #14b8a6, #0d9488)",
+                tint: "rgba(20,184,166,.12)",
+                iconColor: "#003936",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>),
+                action: () => { onExportCSV(); closeProfile(); },
+            },
+            {
+                id: "menus",
+                label: "Kelola Menu",
+                sub: `${hiddenMenus.length} tersembunyi`,
+                grad: "linear-gradient(135deg, #f97316, #ea580c)",
+                tint: "rgba(249,115,22,.12)",
+                iconColor: "#4a1a00",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>),
+                action: () => setProfileView("menus"),
+            },
         ];
+
+        const tileStyle = {
+            position: "relative", overflow: "hidden",
+            padding: "12px 12px",
+            borderRadius: 14,
+            background: "rgba(255,255,255,.025)",
+            border: "1px solid var(--glass-border)",
+            cursor: "pointer", fontFamily: "inherit",
+            textAlign: "left",
+            transition: "transform .2s, border-color .2s, background .2s",
+            display: "flex", flexDirection: "column", gap: 8,
+            minHeight: 68,
+        };
 
         return (
             <div>
-                {/* User header */}
-                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: isMobile ? "0 0 16px" : "0 0 12px", borderBottom: "1px solid var(--color-border-soft)", marginBottom: 8 }}>
-                    <div style={{ width: isMobile ? 48 : 40, height: isMobile ? 48 : 40, borderRadius: "50%", background: avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 20 : 17, color: "#fff", fontWeight: 800, flexShrink: 0 }}>
+                {/* ═══ PROFILE HERO — big centered avatar + chip ═══ */}
+                <div style={{
+                    position: "relative", overflow: "hidden",
+                    padding: "20px 16px 16px",
+                    marginBottom: 14,
+                    borderRadius: 16,
+                    background: `linear-gradient(145deg, color-mix(in srgb, ${avatarColor} 14%, transparent), color-mix(in srgb, ${avatarColor} 2%, transparent))`,
+                    border: `1px solid color-mix(in srgb, ${avatarColor} 22%, transparent)`,
+                    display: "flex", alignItems: "center", gap: 14,
+                }}>
+                    {/* Ambient orb */}
+                    <div style={{ position: "absolute", top: -40, right: -20, width: 120, height: 120, borderRadius: "50%", background: `radial-gradient(circle, color-mix(in srgb, ${avatarColor} 28%, transparent), transparent 70%)`, pointerEvents: "none", filter: "blur(6px)" }} />
+                    <div style={{
+                        width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                        background: `linear-gradient(135deg, ${avatarColor}, color-mix(in srgb, ${avatarColor} 60%, black))`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 20, color: "#fff", fontWeight: 900,
+                        boxShadow: `0 8px 20px color-mix(in srgb, ${avatarColor} 40%, transparent), inset 0 1px 0 rgba(255,255,255,.35)`,
+                        position: "relative", zIndex: 1,
+                    }}>
                         {user.name.charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: isMobile ? 16 : 14, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
+                    <div style={{ minWidth: 0, flex: 1, position: "relative", zIndex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.02em", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", letterSpacing: 1.4, textTransform: "uppercase", marginTop: 6 }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 99, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.25)", color: "var(--color-primary)" }}>
+                                <span style={{ width: 5, height: 5, borderRadius: 99, background: "currentColor", animation: "glow-pulse 2s infinite" }} />
+                                AKTIF
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Menu items */}
-                {menuItems.map(item => (
-                    <button key={item.label} onClick={item.action} style={rowBtn()}
-                        onMouseOver={e => e.currentTarget.style.background = "var(--color-border-soft)"}
-                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontSize: isMobile ? 20 : 17, width: isMobile ? 28 : 22, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: isMobile ? 15 : 13, fontWeight: 600, color: "var(--color-text)" }}>{item.label}</div>
-                            <div style={{ fontSize: isMobile ? 12 : 11, color: "var(--color-subtle)", marginTop: 1 }}>{item.sub}</div>
-                        </div>
-                        <span style={{ fontSize: 12, color: "var(--color-subtle)" }}>›</span>
-                    </button>
-                ))}
+                {/* ═══ SETTINGS TILES — 2-col grid ═══ */}
+                <div style={{ fontSize: 9, fontWeight: 800, color: "var(--color-subtle)", letterSpacing: 1.8, textTransform: "uppercase", padding: "2px 4px 8px" }}>Pengaturan</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                    {tiles.map(tile => (
+                        <button key={tile.id} onClick={tile.action} style={tileStyle}
+                            onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.borderColor = "var(--color-border-strong)"; e.currentTarget.style.background = tile.tint; }}
+                            onMouseOut={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "var(--glass-border)"; e.currentTarget.style.background = "rgba(255,255,255,.025)"; }}>
+                            {/* Icon tile */}
+                            <div style={{
+                                width: 32, height: 32, borderRadius: 10,
+                                background: tile.grad,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: tile.iconColor,
+                                boxShadow: `0 4px 12px color-mix(in srgb, ${tile.tint.replace('rgba(','rgb(').replace(',.12)',')')} 50%, transparent), inset 0 1px 0 rgba(255,255,255,.3)`,
+                                flexShrink: 0, position: "relative",
+                            }}>
+                                {tile.icon}
+                                {tile.badge && (
+                                    <span style={{ position: "absolute", top: -3, right: -3, width: 10, height: 10, borderRadius: 99, background: "var(--color-primary)", border: "2px solid var(--glass-2, var(--bg-surface))", boxShadow: "0 0 6px var(--color-primary)" }} />
+                                )}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.01em", lineHeight: 1.2 }}>{tile.label}</div>
+                                <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 3, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.sub}</div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
 
-                {/* Danger zone */}
-                <div style={{ borderTop: "1px solid var(--color-border-soft)", marginTop: 8, paddingTop: 8 }}>
+                {/* ═══ DANGER ZONE — tinted red card ═══ */}
+                <div style={{
+                    padding: 8, borderRadius: 14,
+                    background: "linear-gradient(145deg, rgba(255,113,108,.05), rgba(255,113,108,.01))",
+                    border: "1px solid rgba(255,113,108,.15)",
+                }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: "#ff716c", letterSpacing: 1.8, textTransform: "uppercase", padding: "4px 8px 6px", opacity: .8 }}>Zona Berbahaya</div>
                     {[
-                        { icon: "🗑️", label: "Hapus Akun", action: () => setProfileView("delete") },
-                        { icon: "🚪", label: "Keluar",     action: () => { closeProfile(); onLogout(); } },
+                        {
+                            icon: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>),
+                            label: "Hapus Akun",
+                            sub: "Permanen, tidak bisa dibatalkan",
+                            action: () => setProfileView("delete"),
+                        },
+                        {
+                            icon: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>),
+                            label: "Keluar",
+                            sub: "Sign out dari sesi ini",
+                            action: () => { closeProfile(); onLogout(); },
+                        },
                     ].map(item => (
-                        <button key={item.label} onClick={item.action} style={rowBtn(true)}
-                            onMouseOver={e => e.currentTarget.style.background = "rgba(255,113,108,.06)"}
+                        <button key={item.label} onClick={item.action}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                width: "100%", padding: "10px 10px",
+                                borderRadius: 10, border: "none",
+                                background: "transparent",
+                                color: "#ff716c",
+                                cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                                transition: "background .15s",
+                                minHeight: 44,
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = "rgba(255,113,108,.1)"}
                             onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                            <span style={{ fontSize: isMobile ? 20 : 17, width: isMobile ? 28 : 22, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
-                            <span style={{ fontSize: isMobile ? 15 : 13, fontWeight: 600 }}>{item.label}</span>
+                            <span style={{
+                                width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                                background: "rgba(255,113,108,.12)",
+                                border: "1px solid rgba(255,113,108,.2)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: "#ff716c",
+                            }}>{item.icon}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "-.01em", lineHeight: 1.2 }}>{item.label}</div>
+                                <div style={{ fontSize: 10, color: "rgba(255,113,108,.7)", marginTop: 2, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.sub}</div>
+                            </div>
                         </button>
                     ))}
                 </div>
@@ -577,16 +729,16 @@ const Sidebar = ({
                     <div style={{
                         position: "fixed",
                         bottom: 70, left: 12,
-                        width: 264,
-                        background: "var(--glass-2, rgba(28,28,38,.85))",
+                        width: 320,
+                        background: "var(--glass-2, rgba(28,28,38,.88))",
                         backdropFilter: "var(--glass-blur)",
                         WebkitBackdropFilter: "var(--glass-blur)",
                         border: "1px solid var(--glass-border-strong)",
-                        borderRadius: 18,
-                        padding: "14px 12px",
+                        borderRadius: 20,
+                        padding: "14px 14px",
                         zIndex: 201,
-                        boxShadow: "var(--glass-highlight), 0 16px 48px rgba(0,0,0,.5)",
-                        maxHeight: "80vh",
+                        boxShadow: "var(--glass-highlight), 0 24px 64px rgba(0,0,0,.55)",
+                        maxHeight: "85vh",
                         overflowY: "auto",
                     }}>
                         {renderPanel()}
@@ -596,92 +748,124 @@ const Sidebar = ({
         )}
 
         <aside className="glass-sidebar" style={{
-            width: open ? 248 : 0,
+            width: open ? 232 : 0,
             height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 50,
             transition: "width 0.35s cubic-bezier(.2,.8,.2,1)", overflow: "hidden",
             display: "flex", flexDirection: "column",
-            backgroundImage: "radial-gradient(600px 400px at -20% 0%, rgba(96,252,198,.06), transparent 60%)",
+            backgroundImage: "radial-gradient(500px 300px at 0% 0%, rgba(96,252,198,.05), transparent 55%), radial-gradient(400px 300px at 100% 100%, rgba(167,139,250,.03), transparent 60%)",
         }}>
-            {/* Logo */}
-            <div style={{ padding: "22px 20px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+            {/* ═══ Workspace brand row ═══ */}
+            <div style={{
+                padding: "16px 14px 12px",
+                display: "flex", alignItems: "center", gap: 10,
+                borderBottom: "1px solid var(--glass-border)",
+            }}>
                 <div style={{
-                    width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+                    width: 32, height: 32, borderRadius: 10, flexShrink: 0,
                     background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: "0 6px 20px rgba(96,252,198,.3), inset 0 1px 0 rgba(255,255,255,.3)",
-                    position: "relative", overflow: "hidden",
+                    boxShadow: "0 4px 14px rgba(96,252,198,.28), inset 0 1px 0 rgba(255,255,255,.28)",
                 }}>
-                    <img src="/favicon.svg" alt={appName} style={{ width: 24, height: 24, filter: "brightness(0) invert(1) opacity(.95)" }} />
+                    <img src="/favicon.svg" alt={appName} style={{ width: 20, height: 20, filter: "brightness(0) invert(1) opacity(.95)" }} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                    <h1 style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1, letterSpacing: "-.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appName}</h1>
-                    <p style={{ fontSize: 9, color: "var(--color-muted)", letterSpacing: 2.4, textTransform: "uppercase", margin: "4px 0 0", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appTagline}</p>
+                    <h1 style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1.15, letterSpacing: "-.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appName}</h1>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
+                        <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--color-primary)", boxShadow: "0 0 6px var(--color-primary)" }} />
+                        <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0, fontWeight: 600, letterSpacing: ".3px" }}>Workspace aktif</p>
+                    </div>
                 </div>
             </div>
 
-            {/* + Transaksi */}
-            <div style={{ padding: "0 14px 14px" }}>
+            {/* ═══ Add Transaction — compact pill ═══ */}
+            <div style={{ padding: "12px 12px 6px" }}>
                 <button onClick={onAddTx}
                     style={{
-                        width: "100%", padding: "11px 0",
+                        width: "100%", padding: "10px 14px",
                         background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
                         color: "var(--color-on-primary)",
-                        fontWeight: 700, fontSize: 13, borderRadius: 12, border: "none",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        fontWeight: 700, fontSize: 13, borderRadius: 10, border: "none",
+                        display: "flex", alignItems: "center", gap: 10,
                         cursor: "pointer", fontFamily: "inherit",
                         letterSpacing: "-.01em",
-                        boxShadow: "0 6px 18px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+                        boxShadow: "0 4px 14px rgba(96,252,198,.22), inset 0 1px 0 rgba(255,255,255,.28)",
                         transition: "transform .2s, box-shadow .25s",
                     }}
-                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 10px 24px rgba(96,252,198,.4), inset 0 1px 0 rgba(255,255,255,.4)"; }}
-                    onMouseOut={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 6px 18px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.3)"; }}>
-                    <span style={{ fontSize: 16, lineHeight: 1, fontWeight: 800 }}>+</span>
-                    <span>{t("nav.transaction")}</span>
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(96,252,198,.36), inset 0 1px 0 rgba(255,255,255,.38)"; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 14px rgba(96,252,198,.22), inset 0 1px 0 rgba(255,255,255,.28)"; }}>
+                    <span style={{
+                        width: 18, height: 18, borderRadius: 6,
+                        background: "rgba(0,56,40,.2)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 900, lineHeight: 1, flexShrink: 0,
+                    }}>+</span>
+                    <span style={{ flex: 1, textAlign: "left" }}>{t("nav.transaction")}</span>
+                    <kbd style={{
+                        fontSize: 9, fontFamily: "inherit", fontWeight: 700,
+                        padding: "2px 6px", borderRadius: 4,
+                        background: "rgba(0,56,40,.22)", color: "rgba(0,56,40,.7)",
+                        letterSpacing: .5,
+                    }}>⌘N</kbd>
                 </button>
             </div>
 
-            {/* Nav */}
-            <nav style={{ flex: 1, overflowY: "auto", padding: "4px 10px 12px" }}>
-                {sidebarItems.map(g => (
-                    <div key={g.group} style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 2, padding: "10px 14px 6px", textTransform: "uppercase" }}>{g.group}</div>
+            {/* ═══ Nav — minimal, accent-bar style ═══ */}
+            <nav style={{
+                flex: 1, overflowY: "auto",
+                padding: "6px 8px 12px",
+                maskImage: "linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%)",
+                WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%)",
+            }}>
+                {sidebarItems.map((g, gi) => (
+                    <div key={g.group} style={{ marginBottom: 4 }}>
+                        {/* Group header with subtle divider */}
+                        <div style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: gi === 0 ? "6px 12px 6px" : "14px 12px 6px",
+                        }}>
+                            <span style={{
+                                fontSize: 9, fontWeight: 700,
+                                color: "var(--color-subtle)",
+                                letterSpacing: 1.4, textTransform: "uppercase",
+                            }}>{g.group}</span>
+                            <span style={{ flex: 1, height: 1, background: "linear-gradient(to right, var(--glass-border), transparent)" }} />
+                        </div>
                         {g.items.map(item => {
                             const isActive = activeMenu === item.id;
                             return (
                                 <button key={item.id} onClick={() => setActiveMenu(item.id)}
                                     style={{
                                         display: "flex", alignItems: "center", gap: 10,
-                                        width: "100%", padding: "8px 10px",
-                                        borderRadius: 10, border: "none",
+                                        width: "100%", padding: "8px 10px 8px 14px",
+                                        borderRadius: 8, border: "none",
                                         background: isActive ? "var(--color-primary-soft)" : "transparent",
                                         color: isActive ? "var(--color-primary)" : "var(--color-muted)",
                                         fontSize: 13, fontWeight: isActive ? 700 : 500,
                                         cursor: "pointer", fontFamily: "inherit",
-                                        transition: "all .2s cubic-bezier(.2,.8,.2,1)",
+                                        transition: "color .15s, background .15s",
                                         textAlign: "left", position: "relative",
                                         letterSpacing: "-.01em",
+                                        minHeight: 34,
                                     }}
                                     onMouseOver={e => { if (!isActive) { e.currentTarget.style.background = "var(--color-border-soft)"; e.currentTarget.style.color = "var(--color-text)"; } }}
                                     onMouseOut={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--color-muted)"; } }}>
+                                    {/* Left accent bar */}
                                     <span style={{
-                                        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 14,
-                                        background: isActive
-                                            ? "linear-gradient(135deg,rgba(96,252,198,.18),rgba(96,252,198,.08))"
-                                            : "var(--bg-surface-low)",
-                                        boxShadow: isActive ? "inset 0 0 0 1px rgba(96,252,198,.25)" : "inset 0 0 0 1px var(--color-border-soft)",
-                                        transition: "all .2s",
+                                        position: "absolute", left: 4, top: "50%",
+                                        transform: `translateY(-50%) scaleY(${isActive ? 1 : 0})`,
+                                        width: 3, height: 18, borderRadius: 99,
+                                        background: "var(--color-primary)",
+                                        boxShadow: "0 0 8px var(--color-primary)",
+                                        transition: "transform .25s cubic-bezier(.2,.8,.2,1)",
+                                        transformOrigin: "center",
+                                    }} />
+                                    {/* Icon — inline, no tile */}
+                                    <span style={{
+                                        fontSize: 15, flexShrink: 0, width: 20, textAlign: "center",
+                                        filter: isActive ? "none" : "saturate(.6) opacity(.85)",
+                                        transition: "filter .2s",
                                     }}>{item.icon}</span>
                                     <span style={{ flex: 1 }}>{item.label}</span>
-                                    {isActive && (
-                                        <span style={{
-                                            width: 4, height: 4, borderRadius: 99,
-                                            background: "var(--color-primary)",
-                                            boxShadow: "0 0 10px var(--color-primary)",
-                                            animation: "glow-pulse 2s ease-in-out infinite",
-                                        }} />
-                                    )}
                                 </button>
                             );
                         })}
@@ -689,105 +873,124 @@ const Sidebar = ({
                 ))}
             </nav>
 
-            {/* Install App — tucked in, mint-glow */}
+            {/* ═══ Install prompt — compact, subtle ═══ */}
             {!isInstalled && installPrompt && (
-                <div style={{ padding: "6px 14px 4px" }}>
+                <div style={{ padding: "6px 12px 4px" }}>
                     <button onClick={handleInstallFromSidebar} style={{
-                        display: "flex", alignItems: "center", gap: 8, width: "100%",
+                        display: "flex", alignItems: "center", gap: 10, width: "100%",
                         padding: "9px 12px", borderRadius: 10,
-                        border: "1px solid rgba(96,252,198,.22)",
-                        background: "linear-gradient(135deg, rgba(96,252,198,.08), rgba(96,252,198,.03))",
+                        border: "1px dashed rgba(96,252,198,.28)",
+                        background: "transparent",
                         color: "var(--color-primary)",
-                        fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                        transition: "all .2s",
+                        fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                        transition: "all .2s", textAlign: "left",
                     }}
-                    onMouseOver={e => e.currentTarget.style.background = "linear-gradient(135deg, rgba(96,252,198,.14), rgba(96,252,198,.06))"}
-                    onMouseOut={e => e.currentTarget.style.background = "linear-gradient(135deg, rgba(96,252,198,.08), rgba(96,252,198,.03))"}>
-                        <span style={{ fontSize: 14 }}>⬇️</span>
-                        <span>Install {APP_NAME}</span>
+                    onMouseOver={e => { e.currentTarget.style.background = "var(--color-primary-soft)"; e.currentTarget.style.borderStyle = "solid"; }}
+                    onMouseOut={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderStyle = "dashed"; }}>
+                        <span style={{
+                            width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                            background: "rgba(96,252,198,.12)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 11,
+                        }}>⬇</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "-.01em" }}>Install {APP_NAME}</div>
+                            <div style={{ fontSize: 9, color: "var(--color-subtle)", marginTop: 1, fontWeight: 500 }}>PWA · akses cepat</div>
+                        </div>
                     </button>
                 </div>
             )}
 
-            {/* Bottom control strip — language, theme */}
-            <div style={{ padding: "8px 14px", display: "flex", gap: 6, position: "relative" }}>
-                <button onClick={() => setShowLangPicker(v => !v)}
-                    style={{
-                        flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        padding: "8px 10px", borderRadius: 10,
-                        border: "1px solid var(--glass-border)",
-                        background: showLangPicker ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.025)",
-                        backdropFilter: "var(--glass-blur-sm)",
-                        WebkitBackdropFilter: "var(--glass-blur-sm)",
-                        color: "var(--color-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                        transition: "background .2s",
-                    }}>
-                    <span style={{ fontSize: 13 }}>{currentLang?.flag}</span>
-                    <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, fontSize: 10 }}>{currentLang?.code}</span>
-                </button>
-                <button onClick={toggleTheme} title={isDark ? "Mode Terang" : "Mode Gelap"}
-                    style={{
-                        flexShrink: 0, width: 38, height: 34, borderRadius: 10,
-                        border: "1px solid var(--glass-border)",
-                        background: "rgba(255,255,255,.025)",
-                        backdropFilter: "var(--glass-blur-sm)",
-                        WebkitBackdropFilter: "var(--glass-blur-sm)",
-                        cursor: "pointer", padding: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        transition: "all .2s",
-                    }}
-                    onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
-                    onMouseOut={e => e.currentTarget.style.background = "rgba(255,255,255,.025)"}>
-                    <span style={{ fontSize: 13 }}>{isDark ? "🌙" : "☀️"}</span>
-                </button>
+            {/* ═══ Unified footer — profile + theme + lang in one row ═══ */}
+            <div style={{
+                padding: "10px 10px calc(10px + env(safe-area-inset-bottom))",
+                borderTop: "1px solid var(--glass-border)",
+                background: "rgba(0,0,0,.04)",
+                position: "relative",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {/* Profile button — the main element */}
+                    <button onClick={() => { setShowProfileMenu(v => !v); setProfileView("menu"); }}
+                        style={{
+                            flex: 1, display: "flex", alignItems: "center", gap: 9,
+                            padding: "6px 8px 6px 6px", borderRadius: 10,
+                            background: showProfileMenu ? "var(--color-primary-soft)" : "transparent",
+                            border: "1px solid transparent",
+                            cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                            transition: "background .2s, border .2s",
+                            minWidth: 0,
+                        }}
+                        onMouseOver={e => { if (!showProfileMenu) e.currentTarget.style.background = "var(--color-border-soft)"; }}
+                        onMouseOut={e => { if (!showProfileMenu) e.currentTarget.style.background = "transparent"; }}>
+                        <div style={{
+                            width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                            background: `linear-gradient(135deg, ${avatarColor}, color-mix(in srgb, ${avatarColor} 65%, black))`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 12, color: "#fff", fontWeight: 800,
+                            boxShadow: `0 2px 8px color-mix(in srgb, ${avatarColor} 35%, transparent), inset 0 1px 0 rgba(255,255,255,.3)`,
+                        }}>
+                            {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.01em", lineHeight: 1.2 }}>{user.name}</div>
+                            <div style={{ fontSize: 9, color: "var(--color-subtle)", marginTop: 2, fontWeight: 600, letterSpacing: ".3px" }}>Pengaturan</div>
+                        </div>
+                    </button>
 
+                    {/* Theme toggle */}
+                    <button onClick={toggleTheme} title={isDark ? "Mode Terang" : "Mode Gelap"} aria-label="Toggle theme"
+                        style={{
+                            flexShrink: 0, width: 32, height: 32, borderRadius: 8,
+                            border: "1px solid var(--glass-border)",
+                            background: "transparent",
+                            cursor: "pointer", padding: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all .2s", fontSize: 13,
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.background = "var(--color-border-soft)"; e.currentTarget.style.borderColor = "var(--color-border)"; }}
+                        onMouseOut={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "var(--glass-border)"; }}>
+                        {isDark ? "🌙" : "☀️"}
+                    </button>
+
+                    {/* Lang button */}
+                    <button onClick={() => setShowLangPicker(v => !v)} aria-label="Change language"
+                        style={{
+                            flexShrink: 0, width: 32, height: 32, borderRadius: 8,
+                            border: "1px solid var(--glass-border)",
+                            background: showLangPicker ? "var(--color-primary-soft)" : "transparent",
+                            cursor: "pointer", padding: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all .2s", fontSize: 13,
+                        }}
+                        onMouseOver={e => { if (!showLangPicker) e.currentTarget.style.background = "var(--color-border-soft)"; }}
+                        onMouseOut={e => { if (!showLangPicker) e.currentTarget.style.background = "transparent"; }}>
+                        {currentLang?.flag}
+                    </button>
+                </div>
+
+                {/* Lang picker popup */}
                 {showLangPicker && (
-                    <div style={{ position: "absolute", bottom: "calc(100% + 4px)", left: 14, right: 14, background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 12, padding: 6, zIndex: 100, boxShadow: "var(--shadow-lg)", backdropFilter: "blur(12px)" }}>
+                    <div style={{
+                        position: "absolute", bottom: "calc(100% + 4px)", right: 10, left: 10,
+                        background: "var(--glass-2, var(--bg-surface))",
+                        backdropFilter: "var(--glass-blur)",
+                        WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border-strong)",
+                        borderRadius: 12, padding: 6, zIndex: 100,
+                        boxShadow: "var(--glass-highlight), var(--shadow-lg)",
+                    }}>
                         {languages.map(l => (
                             <button key={l.code} onClick={() => { setLang(l.code); setShowLangPicker(false); }}
-                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", background: lang === l.code ? "var(--color-primary-soft)" : "transparent", color: lang === l.code ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: lang === l.code ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "background .15s" }}
+                                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", background: lang === l.code ? "var(--color-primary-soft)" : "transparent", color: lang === l.code ? "var(--color-primary)" : "var(--color-text)", fontSize: 12, fontWeight: lang === l.code ? 700 : 500, cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "background .15s" }}
                                 onMouseOver={e => { if (lang !== l.code) e.currentTarget.style.background = "var(--color-border-soft)"; }}
                                 onMouseOut={e => { if (lang !== l.code) e.currentTarget.style.background = "transparent"; }}>
                                 <span style={{ fontSize: 14 }}>{l.flag}</span>
-                                <span>{l.label}</span>
-                                {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-primary)" }}>✓</span>}
+                                <span style={{ flex: 1 }}>{l.label}</span>
+                                {lang === l.code && <span style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 700 }}>✓</span>}
                             </button>
                         ))}
                     </div>
                 )}
-            </div>
-
-            {/* ── Profile card — elevated ── */}
-            <div style={{ padding: "8px 14px 14px" }}>
-                <button onClick={() => { setShowProfileMenu(v => !v); setProfileView("menu"); }}
-                    style={{
-                        width: "100%", display: "flex", alignItems: "center", gap: 10,
-                        padding: "10px 12px", borderRadius: 14,
-                        background: "var(--glass-2, rgba(255,255,255,.04))",
-                        backdropFilter: "var(--glass-blur-sm)",
-                        WebkitBackdropFilter: "var(--glass-blur-sm)",
-                        border: `1px solid ${showProfileMenu ? "rgba(96,252,198,.35)" : "var(--glass-border)"}`,
-                        cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                        transition: "border .2s, transform .2s",
-                        boxShadow: "var(--glass-highlight), 0 2px 8px rgba(0,0,0,.1)",
-                    }}
-                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
-                    onMouseOut={e => { e.currentTarget.style.transform = ""; }}>
-                    <div style={{
-                        width: 34, height: 34, borderRadius: 11, flexShrink: 0,
-                        background: `linear-gradient(135deg, ${avatarColor}, color-mix(in srgb, ${avatarColor} 70%, black))`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 14, color: "#fff", fontWeight: 800,
-                        boxShadow: `0 4px 12px color-mix(in srgb, ${avatarColor} 40%, transparent), inset 0 1px 0 rgba(255,255,255,.3)`,
-                    }}>
-                        {user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.01em" }}>{user.name}</div>
-                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 2, fontWeight: 500 }}>Pengaturan akun</div>
-                    </div>
-                    <span style={{ fontSize: 14, color: "var(--color-subtle)" }}>⚙</span>
-                </button>
             </div>
         </aside>
         </>

@@ -199,6 +199,22 @@ function MiniSpark({ values, color = "var(--color-primary)", width = 200, height
     );
 }
 
+/* ═══ Fallback palette — cycles through distinct colors for custom categories ═══ */
+const FALLBACK_PALETTE = [
+    "#60fcc6", // mint
+    "#a78bfa", // purple
+    "#4FC3F7", // sky blue
+    "#f59e0b", // amber
+    "#ff716c", // red
+    "#ec4899", // pink
+    "#14b8a6", // teal
+    "#f97316", // orange
+    "#6366f1", // indigo
+    "#22c55e", // green
+];
+const colorForCategory = (cat, index) =>
+    categoryColors[cat] || FALLBACK_PALETTE[index % FALLBACK_PALETTE.length];
+
 /* ═══ Donut chart ═══ */
 function CategoryDonut({ sortedCats, totalExpense }) {
     if (sortedCats.length === 0) return null;
@@ -209,7 +225,7 @@ function CategoryDonut({ sortedCats, totalExpense }) {
     const segments = top5.map(([cat, amt], i) => {
         const pct = totalExpense > 0 ? amt / totalExpense : 0;
         const dash = pct * CIRC;
-        const seg = { dash, offset, color: categoryColors[cat] || "var(--color-primary)", cat, amt, pct };
+        const seg = { dash, offset, color: colorForCategory(cat, i), cat, amt, pct };
         offset += dash;
         return seg;
     });
@@ -747,7 +763,7 @@ const DasborView = ({
                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
                                 {sortedCats.slice(0, 5).map(([cat, amt], i) => {
                                     const pct = totalExpense > 0 ? (amt / totalExpense) * 100 : 0;
-                                    const color = categoryColors[cat] || "var(--color-primary)";
+                                    const color = colorForCategory(cat, i);
                                     return (
                                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                             <span style={{ width: 8, height: 8, borderRadius: 99, background: color, flexShrink: 0, boxShadow: `0 0 8px ${color}` }} />
