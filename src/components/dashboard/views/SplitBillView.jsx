@@ -29,15 +29,21 @@ const emptyForm = () => ({
 });
 
 const inputStyle = {
-    width: "100%", padding: "10px 14px",
-    background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)",
-    borderRadius: 10, color: "var(--color-text)", fontSize: 13,
+    width: "100%", padding: "12px 14px", minHeight: 44,
+    background: "var(--glass-2)",
+    backdropFilter: "var(--glass-blur)",
+    WebkitBackdropFilter: "var(--glass-blur)",
+    border: "1px solid var(--glass-border)",
+    borderRadius: 12, color: "var(--color-text)", fontSize: 13,
     fontFamily: "inherit", outline: "none", boxSizing: "border-box",
 };
 
 const selectStyle = {
-    padding: "9px 10px", background: "var(--color-border-soft)",
-    border: "1px solid var(--color-border-soft)", borderRadius: 10,
+    padding: "10px 12px", minHeight: 44,
+    background: "var(--glass-2)",
+    backdropFilter: "var(--glass-blur)",
+    WebkitBackdropFilter: "var(--glass-blur)",
+    border: "1px solid var(--glass-border)", borderRadius: 12,
     color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none",
     cursor: "pointer",
 };
@@ -103,20 +109,13 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("split.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>SPLIT BILL</div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("split.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
                         {splitBills.length} {t("split.activeBills") || "tagihan aktif"}
                     </p>
                 </div>
-                <button
-                    onClick={openAdd}
-                    style={{
-                        padding: "9px 18px", borderRadius: 10, border: "none",
-                        background: "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                        color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600,
-                        cursor: "pointer", fontFamily: "inherit",
-                    }}
-                >
+                <button onClick={openAdd} className="btn-primary" style={{ minHeight: 42 }}>
                     {t("split.addNew")}
                 </button>
             </div>
@@ -124,20 +123,17 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
             {/* Empty state */}
             {splitBills.length === 0 && (
                 <div style={{
-                    background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)",
-                    borderRadius: 16, padding: "48px 24px", textAlign: "center",
+                    background: "var(--glass-1)",
+                    backdropFilter: "var(--glass-blur)",
+                    WebkitBackdropFilter: "var(--glass-blur)",
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: 20, padding: "48px 24px", textAlign: "center",
+                    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
                 }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🧾</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("split.noData")}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-subtle)", marginBottom: 20 }}>{t("split.noDataSub")}</div>
-                    <button
-                        onClick={openAdd}
-                        style={{
-                            padding: "10px 24px", borderRadius: 10, border: "none",
-                            background: "var(--color-primary)", color: "var(--color-on-primary)",
-                            fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                        }}
-                    >
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.4 }}>🧾</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", marginBottom: 6, letterSpacing: "-.01em" }}>{t("split.noData")}</div>
+                    <div style={{ fontSize: 13, color: "var(--color-muted)", marginBottom: 20 }}>{t("split.noDataSub")}</div>
+                    <button onClick={openAdd} className="btn-primary" style={{ minHeight: 44 }}>
                         {t("split.addFirst")}
                     </button>
                 </div>
@@ -154,27 +150,32 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
 
                     return (
                         <div key={bill.id} style={{
-                            background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)",
-                            borderRadius: 16, overflow: "hidden",
-                            boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+                            background: "var(--glass-1)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: "1px solid var(--glass-border)",
+                            borderRadius: 20, overflow: "hidden",
+                            boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                            position: "relative",
                         }}>
                             {/* Card header — clickable */}
                             <div
                                 onClick={() => toggleExpand(bill.id)}
-                                style={{ padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 14 }}
+                                style={{ padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 14, minHeight: 42 }}
                             >
                                 <div style={{
-                                    width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                                    background: "rgba(96,252,198,.12)", border: "1px solid rgba(96,252,198,.25)",
+                                    width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                                    background: "var(--color-primary-soft)",
+                                    border: "1px solid var(--glass-border)",
                                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
                                 }}>
                                     🧾
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{bill.title}</div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8, flexWrap: "wrap" }}>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", letterSpacing: "-.01em" }}>{bill.title}</div>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>{fmtRp(bill.total_amount)}</span>
+                                            <span className="num-tight mono" style={{ fontSize: 14, fontWeight: 800, color: "var(--color-primary)" }}>{fmtRp(bill.total_amount)}</span>
                                             <span style={{ fontSize: 12, color: "var(--color-subtle)", transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▼</span>
                                         </div>
                                     </div>
@@ -182,18 +183,18 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                                         {formatDate(bill.date)} · {members.length} peserta
                                     </div>
                                     {/* Progress bar */}
-                                    <div style={{ height: 6, borderRadius: 3, background: "var(--color-border-soft)", marginBottom: 6 }}>
+                                    <div style={{ height: 8, borderRadius: 99, background: "var(--color-border-soft)", marginBottom: 6, overflow: "hidden" }}>
                                         <div style={{
-                                            height: "100%", borderRadius: 3,
-                                            background: pct === 100 ? "linear-gradient(90deg,#60fcc6,#19ce9b)" : "linear-gradient(90deg,#4FC3F7,#60fcc6)",
+                                            height: "100%", borderRadius: 99,
+                                            background: pct === 100 ? "linear-gradient(90deg,var(--color-primary),var(--color-primary-deep))" : "linear-gradient(90deg,var(--color-transfer),var(--color-primary))",
                                             width: `${pct}%`, transition: "width .5s",
                                         }} />
                                     </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, gap: 8, flexWrap: "wrap" }}>
                                         <span style={{ color: "var(--color-muted)" }}>
-                                            <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>{paidCount}</span>/{members.length} sudah bayar
+                                            <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>{paidCount}</span>/{members.length} sudah bayar
                                         </span>
-                                        <span style={{ color: pct === 100 ? "var(--color-primary)" : "#ff716c", fontWeight: 600 }}>
+                                        <span className="num-tight" style={{ color: pct === 100 ? "var(--color-primary)" : "var(--color-expense)", fontWeight: 700 }}>
                                             {pct === 100 ? "Lunas!" : `${fmtRp(bill.total_amount - paidAmount)} belum`}
                                         </span>
                                     </div>
@@ -204,55 +205,59 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                             {isExpanded && (
                                 <div style={{
                                     borderTop: "1px solid var(--color-border-soft)",
-                                    background: "var(--bg-surface-low)",
+                                    background: "var(--glass-2)",
+                                    backdropFilter: "var(--glass-blur)",
+                                    WebkitBackdropFilter: "var(--glass-blur)",
                                     padding: "16px 20px",
                                 }}>
                                     {bill.note && (
                                         <div style={{
-                                            fontSize: 12, color: "var(--color-subtle)",
-                                            background: "var(--color-border-soft)", borderRadius: 8,
-                                            padding: "8px 12px", marginBottom: 14,
+                                            fontSize: 12, color: "var(--color-muted)",
+                                            background: "var(--bg-surface-low)",
+                                            border: "1px solid var(--color-border-soft)",
+                                            borderRadius: 10,
+                                            padding: "10px 12px", marginBottom: 14,
                                         }}>
                                             {bill.note}
                                         </div>
                                     )}
-                                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1, marginBottom: 10 }}>PESERTA</div>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", letterSpacing: 1.6, marginBottom: 10, textTransform: "uppercase" }}>Peserta</div>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                                         {members.map(m => (
                                             <div key={m.id} style={{
                                                 display: "flex", alignItems: "center", gap: 10,
-                                                padding: "10px 12px", borderRadius: 10,
-                                                background: m.paid ? "rgba(96,252,198,.06)" : "var(--bg-surface)",
-                                                border: `1px solid ${m.paid ? "rgba(96,252,198,.2)" : "var(--color-border-soft)"}`,
+                                                padding: "10px 12px", borderRadius: 12,
+                                                background: m.paid ? "var(--color-primary-soft)" : "var(--glass-1)",
+                                                backdropFilter: "var(--glass-blur)",
+                                                WebkitBackdropFilter: "var(--glass-blur)",
+                                                border: `1px solid ${m.paid ? "var(--glass-border)" : "var(--color-border-soft)"}`,
+                                                minHeight: 52, flexWrap: "wrap",
                                             }}>
                                                 <div style={{
-                                                    width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                                                    background: m.paid ? "rgba(96,252,198,.15)" : "var(--color-border-soft)",
+                                                    width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                                                    background: m.paid ? "var(--color-primary-soft)" : "var(--bg-surface-low)",
+                                                    border: "1px solid var(--glass-border)",
                                                     display: "flex", alignItems: "center", justifyContent: "center",
-                                                    fontSize: 13, fontWeight: 700, color: m.paid ? "var(--color-primary)" : "var(--color-muted)",
+                                                    fontSize: 13, fontWeight: 800, color: m.paid ? "var(--color-primary)" : "var(--color-muted)",
                                                 }}>
                                                     {m.name.charAt(0).toUpperCase()}
                                                 </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>{m.name}</div>
-                                                    <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>{fmtRp(m.amount)}</div>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{m.name}</div>
+                                                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-subtle)" }}>{fmtRp(m.amount)}</div>
                                                 </div>
                                                 {m.paid && (
-                                                    <span style={{
-                                                        fontSize: 10, fontWeight: 700, color: "var(--color-primary)",
-                                                        background: "rgba(96,252,198,.12)", border: "1px solid rgba(96,252,198,.25)",
-                                                        borderRadius: 6, padding: "3px 8px",
-                                                    }}>
-                                                        LUNAS
-                                                    </span>
+                                                    <span className="chip chip-mint">LUNAS</span>
                                                 )}
                                                 <button
                                                     onClick={() => onTogglePaid(m.id, !m.paid)}
-                                                    title={m.paid ? "Tandai belum bayar" : "Tandai sudah bayar"}
+                                                    aria-label={m.paid ? `Tandai ${m.name} belum bayar` : `Tandai ${m.name} sudah bayar`}
                                                     style={{
-                                                        width: 32, height: 32, borderRadius: 8,
-                                                        border: `1px solid ${m.paid ? "rgba(96,252,198,.3)" : "var(--color-border)"}`,
-                                                        background: m.paid ? "rgba(96,252,198,.12)" : "transparent",
+                                                        width: 42, height: 42, borderRadius: 10,
+                                                        border: `1px solid ${m.paid ? "var(--glass-border)" : "var(--color-border)"}`,
+                                                        background: m.paid ? "var(--color-primary-soft)" : "var(--glass-2)",
+                                                        backdropFilter: "var(--glass-blur)",
+                                                        WebkitBackdropFilter: "var(--glass-blur)",
                                                         color: m.paid ? "var(--color-primary)" : "var(--color-muted)",
                                                         cursor: "pointer", fontSize: 16, flexShrink: 0,
                                                         display: "flex", alignItems: "center", justifyContent: "center",
@@ -267,10 +272,10 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                                     <button
                                         onClick={() => setConfirmDelete(bill)}
                                         style={{
-                                            width: "100%", padding: "9px 0", borderRadius: 10,
-                                            border: "1px solid rgba(255,113,108,.2)",
-                                            background: "rgba(255,113,108,.06)",
-                                            color: "#ff716c", fontSize: 12, fontWeight: 600,
+                                            width: "100%", padding: "11px 0", minHeight: 42, borderRadius: 12,
+                                            border: "1px solid var(--color-expense-soft)",
+                                            background: "var(--color-expense-soft)",
+                                            color: "var(--color-expense)", fontSize: 12, fontWeight: 700,
                                             cursor: "pointer", fontFamily: "inherit",
                                         }}
                                     >
@@ -289,26 +294,31 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                     onClick={() => setShowModal(false)}
                     style={{
                         position: "fixed", inset: 0, zIndex: 100,
-                        background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)",
+                        background: "rgba(0,0,0,.55)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
                         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
                     }}
                 >
                     <div
                         onClick={e => e.stopPropagation()}
                         style={{
-                            background: "var(--bg-deep)", border: "1px solid var(--color-border-soft)",
-                            borderRadius: 20, padding: 28, width: "100%", maxWidth: 480,
+                            background: "var(--glass-hero)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: "1px solid var(--glass-border)",
+                            borderRadius: 24, padding: "clamp(20px, 4vw, 28px)", width: "100%", maxWidth: 480,
                             maxHeight: "90vh", overflowY: "auto",
+                            boxShadow: "var(--glass-highlight), 0 12px 40px rgba(0,0,0,.2)",
                         }}
                     >
                         {/* Modal header */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-                            <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 17, margin: 0 }}>{t("split.addTitle")}</h3>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22, gap: 8 }}>
+                            <h3 style={{ color: "var(--color-text)", fontWeight: 800, fontSize: 18, margin: 0, letterSpacing: "-.015em" }}>{t("split.addTitle")}</h3>
                             <button
                                 onClick={() => setShowModal(false)}
+                                aria-label="Tutup"
                                 style={{
-                                    background: "var(--color-border-soft)", border: "none",
-                                    color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8,
+                                    background: "var(--glass-2)", border: "1px solid var(--glass-border)",
+                                    color: "var(--color-muted)", width: 36, height: 36, borderRadius: 10,
                                     cursor: "pointer", fontSize: 16,
                                 }}
                             >✕</button>
@@ -393,11 +403,12 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                                     {form.members.length > 1 && (
                                         <button
                                             onClick={() => removeMember(m.id)}
+                                            aria-label={`Hapus peserta ${idx + 1}`}
                                             style={{
-                                                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                                                border: "1px solid rgba(255,113,108,.25)",
-                                                background: "rgba(255,113,108,.08)",
-                                                color: "#ff716c", cursor: "pointer", fontSize: 14,
+                                                width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+                                                border: "1px solid var(--color-expense-soft)",
+                                                background: "var(--color-expense-soft)",
+                                                color: "var(--color-expense)", cursor: "pointer", fontSize: 14,
                                             }}
                                         >✕</button>
                                     )}
@@ -408,9 +419,12 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                         <button
                             onClick={addMember}
                             style={{
-                                width: "100%", padding: "9px 0", borderRadius: 10,
+                                width: "100%", padding: "11px 0", minHeight: 44, borderRadius: 12,
                                 border: "1px dashed var(--color-border)",
-                                background: "transparent", color: "var(--color-muted)",
+                                background: "var(--glass-2)",
+                                backdropFilter: "var(--glass-blur)",
+                                WebkitBackdropFilter: "var(--glass-blur)",
+                                color: "var(--color-muted)",
                                 fontSize: 13, cursor: "pointer", fontFamily: "inherit", marginBottom: 20,
                             }}
                         >
@@ -420,12 +434,11 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                         <button
                             onClick={handleSubmit}
                             disabled={!canSubmit}
+                            className="btn-primary"
                             style={{
-                                width: "100%", padding: 12, borderRadius: 12, border: "none",
-                                background: !canSubmit ? "var(--color-border-soft)" : "var(--color-primary)",
-                                color: "var(--color-on-primary)", fontWeight: 700, fontSize: 13,
+                                width: "100%", minHeight: 46,
                                 cursor: !canSubmit ? "not-allowed" : "pointer",
-                                opacity: !canSubmit ? .4 : 1, fontFamily: "inherit",
+                                opacity: !canSubmit ? .4 : 1,
                             }}
                         >
                             Buat Tagihan
@@ -440,40 +453,40 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                     onClick={() => setConfirmDelete(null)}
                     style={{
                         position: "fixed", inset: 0, zIndex: 110,
-                        background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)",
+                        background: "rgba(0,0,0,.55)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
                         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
                     }}
                 >
                     <div
                         onClick={e => e.stopPropagation()}
                         style={{
-                            background: "var(--bg-deep)", border: "1px solid rgba(255,113,108,.2)",
-                            borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, textAlign: "center",
+                            background: "var(--glass-hero)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: "1px solid var(--color-expense-soft)",
+                            borderRadius: 24, padding: "clamp(20px, 4vw, 28px)", width: "100%", maxWidth: 360, textAlign: "center",
+                            boxShadow: "var(--glass-highlight), 0 12px 40px rgba(0,0,0,.2)",
                         }}
                     >
-                        <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
-                        <h3 style={{ color: "var(--color-text)", fontWeight: 700, fontSize: 16, margin: "0 0 8px" }}>{t("split.deleteConfirm")}</h3>
-                        <p style={{ color: "var(--color-subtle)", fontSize: 13, margin: "0 0 24px" }}>
-                            <strong style={{ color: "#ff716c" }}>{confirmDelete.title}</strong> akan dihapus permanen.
+                        <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.5 }}>🗑️</div>
+                        <h3 style={{ color: "var(--color-text)", fontWeight: 800, fontSize: 17, margin: "0 0 8px", letterSpacing: "-.015em" }}>{t("split.deleteConfirm")}</h3>
+                        <p style={{ color: "var(--color-muted)", fontSize: 13, margin: "0 0 24px" }}>
+                            <strong style={{ color: "var(--color-expense)" }}>{confirmDelete.title}</strong> akan dihapus permanen.
                         </p>
-                        <div style={{ display: "flex", gap: 10 }}>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                             <button
                                 onClick={() => setConfirmDelete(null)}
-                                style={{
-                                    flex: 1, padding: 11, borderRadius: 10,
-                                    border: "1px solid var(--color-border-soft)",
-                                    background: "transparent", color: "var(--color-muted)",
-                                    fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                                }}
+                                className="btn-ghost"
+                                style={{ flex: 1, minHeight: 44, minWidth: 110 }}
                             >
                                 Batal
                             </button>
                             <button
                                 onClick={() => { onDelete(confirmDelete.id); setConfirmDelete(null); setExpanded(null); }}
                                 style={{
-                                    flex: 1, padding: 11, borderRadius: 10, border: "none",
-                                    background: "linear-gradient(135deg,#ff716c,#e04f4f)",
-                                    color: "#fff", fontSize: 13, fontWeight: 700,
+                                    flex: 1, minHeight: 44, minWidth: 110, padding: 11, borderRadius: 12, border: "1px solid var(--color-expense-soft)",
+                                    background: "var(--color-expense-soft)",
+                                    color: "var(--color-expense)", fontSize: 13, fontWeight: 800,
                                     cursor: "pointer", fontFamily: "inherit",
                                 }}
                             >

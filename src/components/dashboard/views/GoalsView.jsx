@@ -24,29 +24,29 @@ function DeadlineBadge({ deadline, done }) {
     const days = getDaysLeft(deadline);
     if (days === null) return null;
 
-    let text, color, bg, border;
+    let text, chipClass;
     if (days < 0) {
-        text  = `❌ Terlambat ${Math.abs(days)} hari`;
-        color = "#ff716c"; bg = "rgba(255,113,108,.1)"; border = "rgba(255,113,108,.25)";
+        text = `Terlambat ${Math.abs(days)} hari`;
+        chipClass = "chip chip-red";
     } else if (days === 0) {
-        text  = "⚠️ Hari ini!";
-        color = "#f97316"; bg = "rgba(249,115,22,.1)"; border = "rgba(249,115,22,.25)";
+        text = "Hari ini!";
+        chipClass = "chip chip-red";
     } else if (days <= 7) {
-        text  = `⚠️ ${days} hari lagi!`;
-        color = "#f97316"; bg = "rgba(249,115,22,.1)"; border = "rgba(249,115,22,.25)";
+        text = `${days} hari lagi`;
+        chipClass = "chip chip-amber";
     } else if (days <= 30) {
-        text  = `🗓️ ${days} hari lagi`;
-        color = "#f59e0b"; bg = "rgba(245,158,11,.08)"; border = "rgba(245,158,11,.2)";
+        text = `${days} hari lagi`;
+        chipClass = "chip chip-amber";
     } else {
         const months = Math.round(days / 30);
-        text  = `🗓️ ~${months} bulan lagi`;
-        color = "var(--color-muted)"; bg = "var(--bg-surface-low)"; border = "var(--color-border-soft)";
+        text = `~${months} bulan lagi`;
+        chipClass = "chip chip-ghost";
     }
 
     return (
-        <div style={{ display: "inline-block", fontSize: 10, fontWeight: 700, color, background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: "2px 8px", marginBottom: 10 }}>
+        <span className={chipClass} style={{ marginBottom: 10, display: "inline-block" }}>
             {text}
-        </div>
+        </span>
     );
 }
 
@@ -107,90 +107,133 @@ const GoalsView = ({ goals, accounts = [], onAdd, onEdit, onDelete, onTopup }) =
 
     const canSubmit = form.name.trim() && form.target;
 
+    // Aggregates for top summary
+    const totalTarget    = goals.reduce((a, g) => a + (g.target || 0), 0);
+    const totalCollected = goals.reduce((a, g) => a + Math.min(g.current || 0, g.target || 0), 0);
+    const achievedCount  = goals.filter(g => g.current >= g.target).length;
+    const overallPct     = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
+
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("goals.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
-                        {goals.length} target · {goals.filter(g => g.current >= g.target).length} {t("goals.achieved")}
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>TARGET &amp; TABUNGAN</div>
+                    <h2 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("goals.title")}</h2>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        {goals.length} target · {achievedCount} {t("goals.achieved")}
                     </p>
                 </div>
-                <button
-                    onClick={openAdd}
-                    style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                >
+                <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 18px", fontSize: 13, minHeight: 42 }}>
                     {t("goals.addNew")}
                 </button>
             </div>
 
+            {/* Top summary bento */}
+            {goals.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 20 }}>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>TOTAL TARGET</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 28px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalTarget)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{goals.length} tujuan aktif</div>
+                    </div>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>TERKUMPUL</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 28px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalCollected)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{overallPct}% dari target</div>
+                    </div>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>TERCAPAI</div>
+                        <div className="num-tight" style={{ fontSize: "clamp(20px, 2.6vw, 28px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", lineHeight: 1 }}>{achievedCount} <span style={{ fontSize: 14, color: "var(--color-muted)", fontWeight: 700 }}>/ {goals.length}</span></div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{t("goals.achieved")}</div>
+                    </div>
+                </div>
+            )}
+
             {/* Empty state */}
             {goals.length === 0 && (
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("goals.noData")}</div>
-                    <div style={{ fontSize: 13, color: "#48474f", marginBottom: 20 }}>{t("goals.noDataSub")}</div>
-                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                        {t("goals.addFirst")}
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: "48px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>🎯</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("goals.noData")}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 16 }}>{t("goals.noDataSub")}</div>
+                    <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 24px", fontSize: 13 }}>
+                        + {t("goals.addFirst")}
                     </button>
                 </div>
             )}
 
             {/* Goals grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 }}>
                 {goals.map(g => {
                     const pct  = g.target > 0 ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
                     const done = g.current >= g.target;
                     return (
-                        <div key={g.id} style={{ background: "var(--bg-surface)", border: `1px solid ${done ? g.color + "44" : "var(--color-border-soft)"}`, borderRadius: 16, padding: 24, position: "relative" }}>
+                        <div key={g.id} style={{
+                            background: "var(--glass-1)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: `1px solid ${done ? g.color + "55" : "var(--glass-border)"}`,
+                            borderRadius: 20,
+                            padding: 22,
+                            position: "relative",
+                            overflow: "hidden",
+                            boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                        }}>
                             {/* Badge tercapai */}
                             {done && (
-                                <div style={{ position: "absolute", top: 12, right: 12, background: g.color + "20", border: `1px solid ${g.color}44`, borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: g.color }}>
+                                <span className="chip chip-mint" style={{ position: "absolute", top: 14, right: 14 }}>
                                     {t("goals.achieved_badge")}
-                                </div>
+                                </span>
                             )}
 
                             {/* Header kartu */}
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                    <div style={{ width: 48, height: 48, borderRadius: 14, background: g.color + "18", border: `1px solid ${g.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 10 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+                                    <div style={{ width: 44, height: 44, borderRadius: 14, background: g.color + "18", border: `1px solid ${g.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
                                         {g.icon}
                                     </div>
-                                    <div>
-                                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{g.name}</div>
-                                        <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>{t("goals.target")}: {fmtRp(g.target)}</div>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</div>
+                                        <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>{t("goals.target")}: <span className="num-tight mono">{fmtRp(g.target)}</span></div>
                                     </div>
                                 </div>
-                                {!done && <div style={{ fontSize: 22, fontWeight: 800, color: g.color }}>{pct}%</div>}
+                                {!done && <div className="num-tight" style={{ fontSize: 22, fontWeight: 800, color: g.color, letterSpacing: "-.02em" }}>{pct}%</div>}
                             </div>
 
                             {/* Deadline badge */}
                             <DeadlineBadge deadline={g.deadline} done={done} />
 
-                            {/* Progress bar */}
-                            <div style={{ height: 10, borderRadius: 5, background: "var(--color-border-soft)", marginBottom: 12 }}>
-                                <div style={{ height: "100%", borderRadius: 5, background: `linear-gradient(135deg,${g.color},${g.color}88)`, width: `${pct}%`, transition: "width 1s" }} />
+                            {/* Progress bar with glow */}
+                            <div style={{ height: 10, borderRadius: 5, background: "var(--bg-sunk, var(--color-border-soft))", marginBottom: 12, overflow: "hidden", position: "relative" }}>
+                                <div style={{
+                                    height: "100%",
+                                    borderRadius: 5,
+                                    background: `linear-gradient(135deg, ${g.color}, ${g.color}cc)`,
+                                    width: `${pct}%`,
+                                    transition: "width 1s",
+                                    boxShadow: `0 0 12px ${g.color}66`,
+                                }} />
                             </div>
 
                             {/* Terkumpul & Kurang */}
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 16 }}>
-                                <span style={{ color: "var(--color-muted)" }}>{t("goals.collected")}: <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{fmtRp(g.current)}</span></span>
-                                {!done && <span style={{ color: g.color, fontWeight: 600 }}>{t("goals.remaining")}: {fmtRp(g.target - g.current)}</span>}
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 16, gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ color: "var(--color-muted)" }}>{t("goals.collected")}: <span className="num-tight mono" style={{ color: "var(--color-text)", fontWeight: 600 }}>{fmtRp(g.current)}</span></span>
+                                {!done && <span className="num-tight mono" style={{ color: g.color, fontWeight: 600 }}>{t("goals.remaining")}: {fmtRp(g.target - g.current)}</span>}
                             </div>
 
                             {/* Actions */}
-                            <div style={{ display: "flex", gap: 8 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                 {!done && (
                                     <button
                                         onClick={() => { setTopupTarget(g); setTopupAmount(""); setTopupRecord(false); setTopupAccount(accounts[0]?.name || ""); }}
-                                        style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: g.color + "20", color: g.color, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                                        className="btn-primary"
+                                        style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}
                                     >
-                                        💰 Tambah Dana
+                                        + Tambah Dana
                                     </button>
                                 )}
-                                <button onClick={() => openEdit(g)} style={{ flex: done ? 1 : 0, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.08)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✏️</button>
-                                <button onClick={() => setConfirmDelete(g)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
+                                <button onClick={() => openEdit(g)} className="btn-ghost" aria-label="Edit goal" style={{ flex: done ? 1 : 0, minHeight: 42, minWidth: 42, padding: "8px 14px", fontSize: 12 }}>✏️</button>
+                                <button onClick={() => setConfirmDelete(g)} aria-label="Delete goal" style={{ minHeight: 42, minWidth: 42, padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,113,108,.18)", background: "rgba(255,113,108,.06)", color: "var(--color-expense, #ff716c)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
                             </div>
                         </div>
                     );

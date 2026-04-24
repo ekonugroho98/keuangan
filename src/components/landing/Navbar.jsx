@@ -23,16 +23,23 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
             <nav style={{
                 position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
                 padding: isMobile ? "12px 16px" : "14px 24px",
-                background: (scrollY > 50 || mobileOpen) ? "rgba(14,14,21,.95)" : "transparent",
-                backdropFilter: (scrollY > 50 || mobileOpen) ? "blur(20px)" : "none",
-                borderBottom: (scrollY > 50 || mobileOpen) ? "1px solid rgba(255,255,255,.05)" : "none",
+                background: (scrollY > 50 || mobileOpen) ? "rgba(10,10,16,.7)" : "transparent",
+                backdropFilter: (scrollY > 50 || mobileOpen) ? "saturate(180%) blur(24px)" : "none",
+                WebkitBackdropFilter: (scrollY > 50 || mobileOpen) ? "saturate(180%) blur(24px)" : "none",
+                borderBottom: (scrollY > 50 || mobileOpen) ? "1px solid rgba(255,255,255,.06)" : "none",
                 transition: "all .3s",
             }}>
-                <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ maxWidth: 1240, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     {/* Logo */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false); }}>
-                        <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#60fcc6,#19ce9b)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#005e44" }}>{APP_NAME[0]}</div>
-                        <span style={{ fontWeight: 800, fontSize: 18, color: "#fff" }}>{APP_NAME}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false); }}>
+                        <div style={{
+                            width: 34, height: 34, borderRadius: 11,
+                            background: "linear-gradient(135deg,#60fcc6,#19ce9b)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 800, fontSize: 16, color: "#003828",
+                            boxShadow: "0 4px 14px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.35)",
+                        }}>{APP_NAME[0]}</div>
+                        <span style={{ fontWeight: 800, fontSize: 18, color: "#fff", letterSpacing: "-.02em" }}>{APP_NAME}</span>
                     </div>
 
                     {/* Desktop Nav */}

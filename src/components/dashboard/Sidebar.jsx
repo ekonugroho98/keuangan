@@ -549,15 +549,17 @@ const Sidebar = ({
                 <div onClick={closeProfile} style={{ position: "fixed", inset: 0, zIndex: 200, background: isMobile ? "rgba(0,0,0,.5)" : "transparent", backdropFilter: isMobile ? "blur(4px)" : "none" }} />
 
                 {isMobile ? (
-                    /* ── MOBILE: Bottom sheet ── */
+                    /* ── MOBILE: Glass bottom sheet ── */
                     <div style={{
                         position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 201,
-                        background: "var(--bg-surface)",
-                        borderRadius: "20px 20px 0 0",
-                        border: "1px solid var(--color-border)",
+                        background: "var(--glass-2, rgba(28,28,38,.85))",
+                        backdropFilter: "var(--glass-blur)",
+                        WebkitBackdropFilter: "var(--glass-blur)",
+                        borderRadius: "24px 24px 0 0",
+                        border: "1px solid var(--glass-border)",
                         borderBottom: "none",
                         padding: "0 0 env(safe-area-inset-bottom)",
-                        boxShadow: "0 -16px 48px rgba(0,0,0,.4)",
+                        boxShadow: "var(--glass-highlight), 0 -24px 64px rgba(0,0,0,.45)",
                         animation: "slideUp .25s ease",
                         maxHeight: "90vh",
                         overflowY: "auto",
@@ -571,17 +573,19 @@ const Sidebar = ({
                         </div>
                     </div>
                 ) : (
-                    /* ── DESKTOP: Popup above profile bar ── */
+                    /* ── DESKTOP: Glass popup above profile bar ── */
                     <div style={{
                         position: "fixed",
                         bottom: 70, left: 12,
-                        width: 260,
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 16,
+                        width: 264,
+                        background: "var(--glass-2, rgba(28,28,38,.85))",
+                        backdropFilter: "var(--glass-blur)",
+                        WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border-strong)",
+                        borderRadius: 18,
                         padding: "14px 12px",
                         zIndex: 201,
-                        boxShadow: "0 -8px 32px rgba(0,0,0,.35)",
+                        boxShadow: "var(--glass-highlight), 0 16px 48px rgba(0,0,0,.5)",
                         maxHeight: "80vh",
                         overflowY: "auto",
                     }}>
@@ -591,46 +595,93 @@ const Sidebar = ({
             </>
         )}
 
-        <aside style={{
-            width: open ? 240 : 0,
-            background: "var(--bg-deep)",
-            borderRight: "1px solid var(--color-border)",
+        <aside className="glass-sidebar" style={{
+            width: open ? 248 : 0,
             height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 50,
-            transition: "width 0.3s", overflow: "hidden",
+            transition: "width 0.35s cubic-bezier(.2,.8,.2,1)", overflow: "hidden",
             display: "flex", flexDirection: "column",
+            backgroundImage: "radial-gradient(600px 400px at -20% 0%, rgba(96,252,198,.06), transparent 60%)",
         }}>
             {/* Logo */}
-            <div style={{ padding: "24px 24px 20px", display: "flex", alignItems: "center", gap: 8 }}>
-                <img src="/favicon.svg" alt={appName} style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0 }} />
-                <div style={{ minWidth: 0 }}>
-                    <h1 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appName}</h1>
-                    <p style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 3, textTransform: "uppercase", margin: "3px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appTagline}</p>
+            <div style={{ padding: "22px 20px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                    width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+                    background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 6px 20px rgba(96,252,198,.3), inset 0 1px 0 rgba(255,255,255,.3)",
+                    position: "relative", overflow: "hidden",
+                }}>
+                    <img src="/favicon.svg" alt={appName} style={{ width: 24, height: 24, filter: "brightness(0) invert(1) opacity(.95)" }} />
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                    <h1 style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1, letterSpacing: "-.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appName}</h1>
+                    <p style={{ fontSize: 9, color: "var(--color-muted)", letterSpacing: 2.4, textTransform: "uppercase", margin: "4px 0 0", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appTagline}</p>
                 </div>
             </div>
 
             {/* + Transaksi */}
-            <div style={{ padding: "0 16px 20px" }}>
+            <div style={{ padding: "0 14px 14px" }}>
                 <button onClick={onAddTx}
-                    style={{ width: "100%", padding: "12px 0", background: "var(--color-primary)", color: "var(--color-on-primary)", fontWeight: 700, fontSize: 13, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }}
-                    onMouseOver={e => e.currentTarget.style.opacity = ".85"}
-                    onMouseOut={e => e.currentTarget.style.opacity = "1"}>
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
+                    style={{
+                        width: "100%", padding: "11px 0",
+                        background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
+                        color: "var(--color-on-primary)",
+                        fontWeight: 700, fontSize: 13, borderRadius: 12, border: "none",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        cursor: "pointer", fontFamily: "inherit",
+                        letterSpacing: "-.01em",
+                        boxShadow: "0 6px 18px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.3)",
+                        transition: "transform .2s, box-shadow .25s",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 10px 24px rgba(96,252,198,.4), inset 0 1px 0 rgba(255,255,255,.4)"; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 6px 18px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.3)"; }}>
+                    <span style={{ fontSize: 16, lineHeight: 1, fontWeight: 800 }}>+</span>
                     <span>{t("nav.transaction")}</span>
                 </button>
             </div>
 
             {/* Nav */}
-            <nav style={{ flex: 1, overflowY: "auto", padding: "0 12px" }}>
+            <nav style={{ flex: 1, overflowY: "auto", padding: "4px 10px 12px" }}>
                 {sidebarItems.map(g => (
-                    <div key={g.group} style={{ marginBottom: 20 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1.5, padding: "0 12px", marginBottom: 4 }}>{g.group.toUpperCase()}</div>
+                    <div key={g.group} style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 2, padding: "10px 14px 6px", textTransform: "uppercase" }}>{g.group}</div>
                         {g.items.map(item => {
                             const isActive = activeMenu === item.id;
                             return (
                                 <button key={item.id} onClick={() => setActiveMenu(item.id)}
-                                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 0, border: "none", borderRight: isActive ? `2px solid var(--color-primary)` : "2px solid transparent", background: isActive ? "var(--nav-active-bg)" : "transparent", color: isActive ? "var(--color-primary)" : "var(--color-muted)", fontSize: 13, fontWeight: isActive ? 700 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>
-                                    <span style={{ fontSize: 15 }}>{item.icon}</span>
-                                    <span>{item.label}</span>
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        width: "100%", padding: "8px 10px",
+                                        borderRadius: 10, border: "none",
+                                        background: isActive ? "var(--color-primary-soft)" : "transparent",
+                                        color: isActive ? "var(--color-primary)" : "var(--color-muted)",
+                                        fontSize: 13, fontWeight: isActive ? 700 : 500,
+                                        cursor: "pointer", fontFamily: "inherit",
+                                        transition: "all .2s cubic-bezier(.2,.8,.2,1)",
+                                        textAlign: "left", position: "relative",
+                                        letterSpacing: "-.01em",
+                                    }}
+                                    onMouseOver={e => { if (!isActive) { e.currentTarget.style.background = "var(--color-border-soft)"; e.currentTarget.style.color = "var(--color-text)"; } }}
+                                    onMouseOut={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--color-muted)"; } }}>
+                                    <span style={{
+                                        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 14,
+                                        background: isActive
+                                            ? "linear-gradient(135deg,rgba(96,252,198,.18),rgba(96,252,198,.08))"
+                                            : "var(--bg-surface-low)",
+                                        boxShadow: isActive ? "inset 0 0 0 1px rgba(96,252,198,.25)" : "inset 0 0 0 1px var(--color-border-soft)",
+                                        transition: "all .2s",
+                                    }}>{item.icon}</span>
+                                    <span style={{ flex: 1 }}>{item.label}</span>
+                                    {isActive && (
+                                        <span style={{
+                                            width: 4, height: 4, borderRadius: 99,
+                                            background: "var(--color-primary)",
+                                            boxShadow: "0 0 10px var(--color-primary)",
+                                            animation: "glow-pulse 2s ease-in-out infinite",
+                                        }} />
+                                    )}
                                 </button>
                             );
                         })}
@@ -638,34 +689,65 @@ const Sidebar = ({
                 ))}
             </nav>
 
-            {/* Install App button — hanya muncul jika belum terinstall & ada prompt */}
+            {/* Install App — tucked in, mint-glow */}
             {!isInstalled && installPrompt && (
-                <div style={{ padding: "8px 16px", borderTop: "1px solid var(--color-border-soft)" }}>
+                <div style={{ padding: "6px 14px 4px" }}>
                     <button onClick={handleInstallFromSidebar} style={{
                         display: "flex", alignItems: "center", gap: 8, width: "100%",
-                        padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(96,252,198,.3)",
-                        background: "rgba(96,252,198,.08)", color: "var(--color-primary)",
-                        fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                    }}>
+                        padding: "9px 12px", borderRadius: 10,
+                        border: "1px solid rgba(96,252,198,.22)",
+                        background: "linear-gradient(135deg, rgba(96,252,198,.08), rgba(96,252,198,.03))",
+                        color: "var(--color-primary)",
+                        fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                        transition: "all .2s",
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = "linear-gradient(135deg, rgba(96,252,198,.14), rgba(96,252,198,.06))"}
+                    onMouseOut={e => e.currentTarget.style.background = "linear-gradient(135deg, rgba(96,252,198,.08), rgba(96,252,198,.03))"}>
                         <span style={{ fontSize: 14 }}>⬇️</span>
-                        <span>Install {APP_NAME} App</span>
+                        <span>Install {APP_NAME}</span>
                     </button>
                 </div>
             )}
 
-            {/* Language picker */}
-            <div style={{ padding: "8px 16px", borderTop: "1px solid var(--color-border-soft)", position: "relative" }}>
+            {/* Bottom control strip — language, theme */}
+            <div style={{ padding: "8px 14px", display: "flex", gap: 6, position: "relative" }}>
                 <button onClick={() => setShowLangPicker(v => !v)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--color-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-                    <span style={{ fontSize: 15 }}>🌐</span>
-                    <span style={{ flex: 1, textAlign: "left" }}>{currentLang?.flag} {currentLang?.label}</span>
-                    <span style={{ fontSize: 9, opacity: .6 }}>{showLangPicker ? "▲" : "▼"}</span>
+                    style={{
+                        flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        padding: "8px 10px", borderRadius: 10,
+                        border: "1px solid var(--glass-border)",
+                        background: showLangPicker ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.025)",
+                        backdropFilter: "var(--glass-blur-sm)",
+                        WebkitBackdropFilter: "var(--glass-blur-sm)",
+                        color: "var(--color-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                        transition: "background .2s",
+                    }}>
+                    <span style={{ fontSize: 13 }}>{currentLang?.flag}</span>
+                    <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, fontSize: 10 }}>{currentLang?.code}</span>
                 </button>
+                <button onClick={toggleTheme} title={isDark ? "Mode Terang" : "Mode Gelap"}
+                    style={{
+                        flexShrink: 0, width: 38, height: 34, borderRadius: 10,
+                        border: "1px solid var(--glass-border)",
+                        background: "rgba(255,255,255,.025)",
+                        backdropFilter: "var(--glass-blur-sm)",
+                        WebkitBackdropFilter: "var(--glass-blur-sm)",
+                        cursor: "pointer", padding: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "all .2s",
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
+                    onMouseOut={e => e.currentTarget.style.background = "rgba(255,255,255,.025)"}>
+                    <span style={{ fontSize: 13 }}>{isDark ? "🌙" : "☀️"}</span>
+                </button>
+
                 {showLangPicker && (
-                    <div style={{ position: "absolute", bottom: "100%", left: 12, right: 12, background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 12, padding: 6, zIndex: 100, boxShadow: "0 -8px 24px rgba(0,0,0,.3)" }}>
+                    <div style={{ position: "absolute", bottom: "calc(100% + 4px)", left: 14, right: 14, background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 12, padding: 6, zIndex: 100, boxShadow: "var(--shadow-lg)", backdropFilter: "blur(12px)" }}>
                         {languages.map(l => (
                             <button key={l.code} onClick={() => { setLang(l.code); setShowLangPicker(false); }}
-                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", background: lang === l.code ? "var(--nav-active-bg)" : "transparent", color: lang === l.code ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: lang === l.code ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", background: lang === l.code ? "var(--color-primary-soft)" : "transparent", color: lang === l.code ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: lang === l.code ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "background .15s" }}
+                                onMouseOver={e => { if (lang !== l.code) e.currentTarget.style.background = "var(--color-border-soft)"; }}
+                                onMouseOut={e => { if (lang !== l.code) e.currentTarget.style.background = "transparent"; }}>
                                 <span style={{ fontSize: 14 }}>{l.flag}</span>
                                 <span>{l.label}</span>
                                 {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-primary)" }}>✓</span>}
@@ -675,30 +757,37 @@ const Sidebar = ({
                 )}
             </div>
 
-            {/* ── Profile bar ── */}
-            <div style={{ padding: "10px 16px", borderTop: "1px solid var(--color-border-soft)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {/* Avatar */}
-                    <button onClick={() => { setShowProfileMenu(v => !v); setProfileView("menu"); }}
-                        title="Pengaturan Profil"
-                        style={{ width: 32, height: 32, borderRadius: "50%", background: avatarColor, border: showProfileMenu ? "2px solid var(--color-text)" : "2px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 700, flexShrink: 0, cursor: "pointer", transition: "border .15s", padding: 0 }}>
+            {/* ── Profile card — elevated ── */}
+            <div style={{ padding: "8px 14px 14px" }}>
+                <button onClick={() => { setShowProfileMenu(v => !v); setProfileView("menu"); }}
+                    style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 10,
+                        padding: "10px 12px", borderRadius: 14,
+                        background: "var(--glass-2, rgba(255,255,255,.04))",
+                        backdropFilter: "var(--glass-blur-sm)",
+                        WebkitBackdropFilter: "var(--glass-blur-sm)",
+                        border: `1px solid ${showProfileMenu ? "rgba(96,252,198,.35)" : "var(--glass-border)"}`,
+                        cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                        transition: "border .2s, transform .2s",
+                        boxShadow: "var(--glass-highlight), 0 2px 8px rgba(0,0,0,.1)",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = ""; }}>
+                    <div style={{
+                        width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+                        background: `linear-gradient(135deg, ${avatarColor}, color-mix(in srgb, ${avatarColor} 70%, black))`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, color: "#fff", fontWeight: 800,
+                        boxShadow: `0 4px 12px color-mix(in srgb, ${avatarColor} 40%, transparent), inset 0 1px 0 rgba(255,255,255,.3)`,
+                    }}>
                         {user.name.charAt(0).toUpperCase()}
-                    </button>
-
-                    {/* Name */}
-                    <button onClick={() => { setShowProfileMenu(v => !v); setProfileView("menu"); }}
-                        style={{ flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
-                    </button>
-
-                    {/* Theme toggle */}
-                    <button onClick={toggleTheme} title={isDark ? "Mode Terang" : "Mode Gelap"}
-                        style={{ flexShrink: 0, width: 36, height: 20, borderRadius: 10, border: "none", background: isDark ? "rgba(96,252,198,.2)" : "rgba(0,184,122,.15)", cursor: "pointer", position: "relative", transition: "background .3s", padding: 0 }}>
-                        <div style={{ position: "absolute", top: 3, left: isDark ? 3 : 17, width: 14, height: 14, borderRadius: "50%", background: "var(--color-primary)", transition: "left .3s", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8 }}>
-                            {isDark ? "🌙" : "☀️"}
-                        </div>
-                    </button>
-                </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.01em" }}>{user.name}</div>
+                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 2, fontWeight: 500 }}>Pengaturan akun</div>
+                    </div>
+                    <span style={{ fontSize: 14, color: "var(--color-subtle)" }}>⚙</span>
+                </button>
             </div>
         </aside>
         </>

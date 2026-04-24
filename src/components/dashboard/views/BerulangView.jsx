@@ -63,13 +63,13 @@ const inputStyle = {
 
 /* ─── SummaryCard ─── */
 const SCard = ({ label, value, sub, color, icon }) => (
-    <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: `4px solid ${color}` }}>
+    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: `4px solid ${color}`, position: "relative", overflow: "hidden" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>{label}</p>
-            <span style={{ fontSize: 18 }}>{icon}</span>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6 }}>{label}</div>
+            <span style={{ fontSize: 18, opacity: .7 }}>{icon}</span>
         </div>
-        <h3 style={{ fontSize: 22, fontWeight: 800, color, margin: "0 0 3px", lineHeight: 1 }}>{value}</h3>
-        <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>{sub}</p>
+        <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 24px)", fontWeight: 900, color, margin: 0, lineHeight: 1, letterSpacing: "-.03em" }}>{value}</div>
+        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{sub}</div>
     </div>
 );
 
@@ -281,19 +281,20 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
             )}
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>
+                        TRANSAKSI BERULANG
+                    </div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", margin: 0, letterSpacing: "-.025em" }}>
                         {t("rec.title")}
                     </h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
                         {t("rec.subtitle") || "Otomasi tagihan dan pembayaran rutin Anda."}
                     </p>
                 </div>
-                <button onClick={openAdd}
-                    style={{ padding: "10px 22px", borderRadius: 9999, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, transition: "opacity .2s" }}
-                    onMouseOver={e => e.currentTarget.style.opacity = ".85"}
-                    onMouseOut={e => e.currentTarget.style.opacity = "1"}>
+                <button onClick={openAdd} className="btn-primary"
+                    style={{ padding: "10px 22px", minHeight: 42, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
                     + {t("rec.addNew")?.replace("+ ","") || "Tambah Berulang"}
                 </button>
             </div>
@@ -307,8 +308,8 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
             </div>
 
             {/* ── Filter Bar ── */}
-            <div style={{ background: "var(--bg-glass)", backdropFilter: "blur(20px)", border: "1px solid rgba(72,71,79,.15)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 10, padding: 4, gap: 2 }}>
+            <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: "12px 14px", boxShadow: "var(--glass-highlight)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 10, padding: 4, gap: 2, overflowX: "auto", maxWidth: "100%", scrollSnapType: "x mandatory" }}>
                     {STATUS_TABS.map(tab => {
                         const isActive  = filterStatus === tab.id;
                         const tabColor  = tab.accent || "var(--color-primary)";
@@ -328,35 +329,36 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                             : "var(--color-muted)";
                         return (
                             <button key={tab.id} onClick={() => setFilterStatus(tab.id)}
-                                style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: isActive ? activeBg : "transparent", color: isActive ? activeClr : "var(--color-muted)", fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
+                                style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: isActive ? activeBg : "transparent", color: isActive ? activeClr : "var(--color-muted)", fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", minHeight: 36, scrollSnapAlign: "start" }}>
                                 {tab.label}
                                 <span style={{ fontSize: 10, background: badgeBg, color: badgeClr, borderRadius: 99, padding: "1px 6px", fontWeight: 700 }}>{tab.count}</span>
                             </button>
                         );
                     })}
                 </div>
-                <div style={{ position: "relative" }}>
+                <div style={{ position: "relative", flex: "1 1 160px", minWidth: "min(60vw, 160px)" }}>
                     <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: .4, pointerEvents: "none" }}>🔍</span>
                     <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t("rec.search") || "Cari transaksi berulang..."}
-                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 9, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "8px 12px 8px 28px", outline: "none", width: 200 }} />
+                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "10px 12px 10px 28px", outline: "none", width: "100%", boxSizing: "border-box", minHeight: 42 }} />
                 </div>
             </div>
 
             {/* ── Empty State ── */}
             {recurrings.length === 0 ? (
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 18, padding: "52px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 14 }}>🔄</div>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "52px 24px", textAlign: "center", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)" }}>
+                    <div style={{ fontSize: 48, marginBottom: 14, opacity: .4 }}>🔄</div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: "0 0 8px" }}>{t("rec.noData")}</h3>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "0 0 24px" }}>{t("rec.noDataSub")}</p>
-                    <button onClick={openAdd}
-                        style={{ padding: "10px 24px", borderRadius: 9999, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    <button onClick={openAdd} className="btn-primary"
+                        style={{ padding: "10px 24px", minHeight: 42, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                         {t("rec.addFirst")}
                     </button>
                 </div>
             ) : displayed.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "#475569" }}>
-                    <div style={{ fontSize: 36, marginBottom: 10 }}>🔍</div>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)" }}>{t("tx.noTxPeriod")}</p>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-subtle)" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>🔍</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>Tidak ada hasil</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)" }}>{t("tx.noTxPeriod")}</div>
                 </div>
             ) : (
                 /* ── Recurring List ── */
@@ -395,20 +397,22 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                                     </div>
                                     <div style={{ minWidth: 0 }}>
                                         {/* Name + freq badge */}
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
-                                            <span style={{ fontSize: 14, fontWeight: 700, color: paid ? "var(--color-muted)" : "var(--color-text)", textDecoration: paid ? "none" : "none" }}>{r.name}</span>
-                                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 9999, background: accent + "18", color: accent, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
+                                            <span style={{ fontSize: 14, fontWeight: 700, color: paid ? "var(--color-muted)" : "var(--color-text)" }}>{r.name}</span>
+                                            <span style={{ fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 9999, background: accent + "18", color: accent, letterSpacing: 0.5, textTransform: "uppercase" }}>
                                                 {FREQ_LABEL[r.frequency]}
                                             </span>
                                             {paid && (
-                                                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 9999, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", letterSpacing: 0.5 }}>
-                                                    ✓ {t("rec.paid") || "TERBAYAR"}
-                                                </span>
+                                                <span className="chip chip-mint">✓ {t("rec.paid") || "TERBAYAR"}</span>
+                                            )}
+                                            {!paid && days < 0 && (
+                                                <span className="chip chip-red">overdue</span>
+                                            )}
+                                            {!paid && days >= 0 && days <= 3 && (
+                                                <span className="chip chip-amber">due soon</span>
                                             )}
                                             {r.debt_id && debts.find(d => d.id === r.debt_id) && (
-                                                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 9999, background: "rgba(255,113,108,.12)", color: "#ff716c" }}>
-                                                    🔗 {debts.find(d => d.id === r.debt_id).name}
-                                                </span>
+                                                <span className="chip chip-red">🔗 {debts.find(d => d.id === r.debt_id).name}</span>
                                             )}
                                         </div>
                                         {/* Meta row */}
@@ -435,25 +439,21 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                                 </div>
 
                                 {/* Right: amount + actions */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                                     <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 16, fontWeight: 800, color: amtColor(r), whiteSpace: "nowrap", letterSpacing: "-0.3px" }}>
+                                        <div className="num-tight mono" style={{ fontSize: "clamp(14px, 2vw, 16px)", fontWeight: 800, color: amtColor(r), whiteSpace: "nowrap", letterSpacing: "-.02em" }}>
                                             {amtSign(r)}{fmtRp(r.amount)}
                                         </div>
-                                        <div style={{ fontSize: 9, color: "var(--color-muted)", marginTop: 2 }}>
+                                        <div className="num-tight mono" style={{ fontSize: 9, color: "var(--color-muted)", marginTop: 2 }}>
                                             ≈ {fmtRp(toMonthly(r))}{t("rec.perMonth") || "/bln"}
                                         </div>
                                     </div>
                                     {/* Action buttons — on hover */}
                                     <div style={{ display: "flex", gap: 4, opacity: isHov ? 1 : 0, transition: "opacity .15s", pointerEvents: isHov ? "auto" : "none" }}>
-                                        <button onClick={() => openEdit(r)}
-                                            style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "rgba(96,252,198,.12)", color: "var(--color-primary)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
-                                            onMouseOver={e => e.currentTarget.style.background = "rgba(96,252,198,.22)"}
-                                            onMouseOut={e => e.currentTarget.style.background = "rgba(96,252,198,.12)"}>✏️</button>
-                                        <button onClick={() => setConfirmDelete(r)}
-                                            style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "rgba(255,113,108,.1)", color: "#ff716c", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
-                                            onMouseOver={e => e.currentTarget.style.background = "rgba(255,113,108,.2)"}
-                                            onMouseOut={e => e.currentTarget.style.background = "rgba(255,113,108,.1)"}>🗑️</button>
+                                        <button aria-label="Edit" onClick={() => openEdit(r)}
+                                            style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "var(--color-primary-soft)", color: "var(--color-primary)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}>✏️</button>
+                                        <button aria-label="Hapus" onClick={() => setConfirmDelete(r)}
+                                            style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "var(--color-expense-soft)", color: "var(--color-expense)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}>🗑️</button>
                                     </div>
                                 </div>
                             </div>

@@ -35,15 +35,20 @@ const typeBadgeStyle = (type) => {
 };
 
 const card = {
-    background: "var(--bg-surface)",
-    borderRadius: 18,
+    background: "var(--glass-1)",
+    backdropFilter: "var(--glass-blur)",
+    WebkitBackdropFilter: "var(--glass-blur)",
+    borderRadius: 20,
     padding: "22px 22px 18px",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
     transition: "transform .25s, box-shadow .25s, border-color .25s",
-    border: "1px solid var(--color-border-soft)",
+    border: "1px solid var(--glass-border)",
+    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)",
     cursor: "default",
+    position: "relative",
+    overflow: "hidden",
 };
 
 /* ── component ── */
@@ -73,75 +78,78 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
         <div style={{ animation: "fadeIn .4s", display: "flex", flexDirection: "column", gap: 22 }}>
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>
+                        AKUN &amp; REKENING
+                    </div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>
                         {t("acc.title") || "Akun & Saldo"}
                     </h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
                         {t("acc.subtitle") || "Kelola rekening dan pantau saldo Anda."}
                     </p>
                 </div>
-                <div style={{ background: "rgba(96,252,198,.08)", border: "1px solid var(--color-border)", borderRadius: 12, padding: "8px 18px", textAlign: "right" }}>
-                    <div style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>
+                <div style={{ background: "var(--color-primary-soft)", border: "1px solid var(--color-border)", borderRadius: 14, padding: "10px 18px", textAlign: "right" }}>
+                    <div className="eyebrow" style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", marginBottom: 2 }}>
                         {t("dash.totalBalance") || "Total Saldo"}
                     </div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)" }}>{fmtRp(totalBalance)}</div>
+                    <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 22px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em" }}>{fmtRp(totalBalance)}</div>
                 </div>
             </div>
 
             {/* ── Summary Cards ── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
                 {/* Total Saldo */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #00C896" }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-primary)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>
                         {t("dash.totalBalance") || "Total Saldo"}
-                    </p>
-                    <h3 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 4px" }}>{fmtRp(totalBalance)}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>
+                    </div>
+                    <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 22px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalBalance)}</div>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
                         {accounts.length} {t("dash.accountsCount") || "rekening"}
-                    </p>
+                    </div>
                 </div>
                 {/* Jumlah Rekening */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #a78bfa" }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-purple)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>
                         {t("acc.totalAccounts") || "Jumlah Rekening"}
-                    </p>
-                    <h3 style={{ fontSize: 32, fontWeight: 800, color: "#a78bfa", margin: "0 0 4px", lineHeight: 1 }}>{accounts.length}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>
+                    </div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-purple)", letterSpacing: "-.03em", lineHeight: 1 }}>{accounts.length}</div>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
                         {t("acc.allTypes") || "Bank, E-Wallet, Tunai"}
-                    </p>
+                    </div>
                 </div>
                 {/* Bank */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #00C896" }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Bank</p>
-                    <h3 style={{ fontSize: 32, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 4px", lineHeight: 1 }}>{bankCount}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-primary)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>Bank</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{bankCount}</div>
+                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
                         {fmtRp(accounts.filter(a => a.type === "bank").reduce((s, a) => s + a.balance, 0))}
-                    </p>
+                    </div>
                 </div>
                 {/* E-Wallet */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #a78bfa" }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>E-Wallet</p>
-                    <h3 style={{ fontSize: 32, fontWeight: 800, color: "#a78bfa", margin: "0 0 4px", lineHeight: 1 }}>{ewalletCount}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-purple)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>E-Wallet</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-purple)", letterSpacing: "-.03em", lineHeight: 1 }}>{ewalletCount}</div>
+                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
                         {fmtRp(accounts.filter(a => a.type === "ewallet").reduce((s, a) => s + a.balance, 0))}
-                    </p>
+                    </div>
                 </div>
                 {/* Tunai */}
-                <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #f59e0b" }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{t("acc.cash") || "Tunai"}</p>
-                    <h3 style={{ fontSize: 32, fontWeight: 800, color: "#f59e0b", margin: "0 0 4px", lineHeight: 1 }}>{cashCount}</h3>
-                    <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-amber)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("acc.cash") || "Tunai"}</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-amber)", letterSpacing: "-.03em", lineHeight: 1 }}>{cashCount}</div>
+                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
                         {fmtRp(accounts.filter(a => a.type === "cash").reduce((s, a) => s + a.balance, 0))}
-                    </p>
+                    </div>
                 </div>
                 {/* Tabungan — hanya tampil jika ada */}
                 {tabunganCount > 0 && (
-                    <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: "4px solid #38bdf8" }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>🪙 Tabungan</p>
-                        <h3 style={{ fontSize: 32, fontWeight: 800, color: "#38bdf8", margin: "0 0 4px", lineHeight: 1 }}>{tabunganCount}</h3>
-                        <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>{fmtRp(tabunganBalance)}</p>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-transfer)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>Tabungan</div>
+                        <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-transfer)", letterSpacing: "-.03em", lineHeight: 1 }}>{tabunganCount}</div>
+                        <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{fmtRp(tabunganBalance)}</div>
                     </div>
                 )}
             </div>
@@ -151,7 +159,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: "0 0 14px" }}>
                     {t("acc.allAccounts") || "Semua Rekening"}
                 </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))", gap: 16 }}>
                     {accounts.map(a => {
                         const color   = accentColor(a.type);
                         const txCount = transactions.filter(tx => tx.account_name === a.name).length;
@@ -159,16 +167,16 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                         return (
                             <div
                                 key={a.id}
-                                style={{ ...card }}
+                                style={{ ...card, borderLeft: `4px solid ${color}` }}
                                 onMouseOver={e => {
                                     e.currentTarget.style.transform = "translateY(-3px)";
-                                    e.currentTarget.style.boxShadow = `0 12px 40px ${color}18`;
+                                    e.currentTarget.style.boxShadow = `var(--glass-highlight), 0 12px 40px ${color}22`;
                                     e.currentTarget.style.borderColor = `${color}40`;
                                 }}
                                 onMouseOut={e => {
                                     e.currentTarget.style.transform = "translateY(0)";
-                                    e.currentTarget.style.boxShadow = "none";
-                                    e.currentTarget.style.borderColor = "var(--color-border-soft)";
+                                    e.currentTarget.style.boxShadow = "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)";
+                                    e.currentTarget.style.borderColor = "var(--glass-border)";
                                 }}
                             >
                                 {/* Top: badge + icon */}
@@ -193,7 +201,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                 </div>
 
                                 {/* Balance */}
-                                <div style={{ fontSize: 24, fontWeight: 800, color, letterSpacing: "-0.5px", marginBottom: 16 }}>
+                                <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 900, color, letterSpacing: "-.03em", marginBottom: 16, lineHeight: 1 }}>
                                     {fmtRp(acctBalance)}
                                 </div>
 
@@ -202,10 +210,10 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                     <button
                                         onClick={() => onViewAccount ? onViewAccount(a.name) : setActiveMenu?.("transaksi")}
                                         style={{
-                                            flex: 1, padding: "8px 0", borderRadius: 9,
+                                            flex: 1, padding: "10px 0", borderRadius: 10,
                                             border: `1px solid ${color}30`,
                                             background: "transparent",
-                                            color, fontSize: 11, fontWeight: 600,
+                                            color, fontSize: 12, fontWeight: 700, minHeight: 42,
                                             cursor: "pointer", fontFamily: "inherit",
                                             transition: "background .15s",
                                         }}
@@ -216,12 +224,13 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                     </button>
                                     <button
                                         onClick={() => { setEditBalanceAcc(a); setNewBalanceInput(String(acctBalance)); }}
+                                        aria-label="Edit Saldo"
                                         title="Edit Saldo"
                                         style={{
-                                            padding: "8px 11px", borderRadius: 9,
+                                            padding: "10px 12px", borderRadius: 10,
                                             border: `1px solid ${color}30`,
                                             background: "transparent",
-                                            color, fontSize: 13,
+                                            color, fontSize: 13, minHeight: 42,
                                             cursor: "pointer", fontFamily: "inherit",
                                             transition: "background .15s",
                                         }}
@@ -265,7 +274,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
 
             {/* ── Recent Transactions per Account ── */}
             {accounts.length > 0 && (
-                <div style={{ background: "var(--bg-surface)", borderRadius: 18, padding: "22px 22px 18px", border: "1px solid var(--color-border-soft)" }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", borderRadius: 20, padding: "22px 22px 18px", border: "1px solid var(--glass-border)", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)" }}>
                     <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: "0 0 16px" }}>
                         {t("acc.recentTxPerAccount") || "Transaksi Terbaru per Rekening"}
                     </h3>
@@ -300,9 +309,10 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
 
                     {/* Transactions list */}
                     {recentTx.length === 0 ? (
-                        <div style={{ textAlign: "center", padding: "32px 0", color: "#475569" }}>
-                            <div style={{ fontSize: 32, marginBottom: 8 }}>💳</div>
-                            <p style={{ fontSize: 12, margin: 0, color: "var(--color-muted)" }}>{t("tx.noTxPeriod") || "Belum ada transaksi"}</p>
+                        <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-subtle)" }}>
+                            <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>💳</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("tx.noTxPeriod") || "Belum ada transaksi"}</div>
+                            <div style={{ fontSize: 12, color: "var(--color-muted)" }}>Transaksi pada rekening ini akan tampil di sini</div>
                         </div>
                     ) : (
                         <>
@@ -328,7 +338,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                                 <div style={{ fontSize: 10, color: "var(--color-subtle)" }}>{fmtDate(tx.date)} · {tCat(tx.category)}</div>
                                             </div>
                                         </div>
-                                        <div style={{ fontSize: 13, fontWeight: 700, color: amtColor, flexShrink: 0, whiteSpace: "nowrap" }}>
+                                        <div className="num-tight mono" style={{ fontSize: 13, fontWeight: 800, color: amtColor, flexShrink: 0, whiteSpace: "nowrap", letterSpacing: "-.02em" }}>
                                             {sign}{fmtRp(tx.amount)}
                                         </div>
                                     </div>

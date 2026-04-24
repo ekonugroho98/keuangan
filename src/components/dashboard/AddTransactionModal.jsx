@@ -1,7 +1,5 @@
 import { useRef, useState } from "react";
 import Modal from "../ui/Modal";
-import InputField from "../ui/InputField";
-import AmountInput from "../ui/AmountInput";
 import { expenseCategories, incomeCategories } from "../../constants/categories";
 import { useLanguage } from "../../i18n/LanguageContext";
 
@@ -27,24 +25,18 @@ function parseOCRTextRegex(text) {
     const skipRe = /total|subtotal|bayar|kembali|ppn|pajak|tax|diskon|discount|kembalian|tunai|cash|change|terima kasih|thank|invoice|struk|nota|no\.\s*\d|^jl\.|telp|phone|alamat|tanda terima|receipt|kasir|member|harga|tgl|tanggal|jam|waktu/i;
     const dateRe = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
 
-    // Normalise raw OCR number: strip Rp, dots/commas as thousand sep → integer string
     function parsePrice(raw) {
         let s = raw.replace(/rp\.?\s*/i, "").trim();
-        // comma-thousand: 1,500 or 25,000
         if (/^\d{1,3}(,\d{3})+$/.test(s)) return parseInt(s.replace(/,/g, ""));
-        // dot-thousand: 1.500 or 25.000
         if (/^\d{1,3}(\.\d{3})+$/.test(s)) return parseInt(s.replace(/\./g, ""));
-        // plain integer (allow 3+ digits to avoid qty/percentage false positives)
         if (/^\d{3,}$/.test(s)) return parseInt(s);
         return null;
     }
 
-    // Match a price at end-of-string (dotted, comma, or plain ≥3 digits)
     const priceEndRe = /(?:rp\.?\s*)?((?:\d{1,3}(?:[.,]\d{3})+|\d{4,}))\s*$/i;
 
     const merchant = lines.find(l => l.length > 2 && !/^\d/.test(l) && !dateRe.test(l) && !skipRe.test(l)) || "Struk";
 
-    // Tanggal
     let date = null;
     for (const line of lines) {
         const m = line.match(dateRe);
@@ -56,7 +48,6 @@ function parseOCRTextRegex(text) {
         }
     }
 
-    // Subtotal — try dotted first, then plain
     let subtotal = null;
     for (const line of lines) {
         if (/total|subtotal|bayar|grand total/i.test(line)) {
@@ -67,7 +58,6 @@ function parseOCRTextRegex(text) {
 
     const items = [];
 
-    // Strategi 1a: nama + harga di baris yang sama, dipisah 2+ spasi
     for (const line of lines) {
         if (skipRe.test(line)) continue;
         const m = line.match(/^(.+?)\s{2,}((?:rp\.?\s*)?(?:\d{1,3}(?:[.,]\d{3})+|\d{4,}))\s*$/i);
@@ -79,7 +69,6 @@ function parseOCRTextRegex(text) {
         }
     }
 
-    // Strategi 1b: nama + tab/pipe + harga (sering terjadi di kasir thermal)
     if (items.length === 0) {
         for (const line of lines) {
             if (skipRe.test(line)) continue;
@@ -93,7 +82,6 @@ function parseOCRTextRegex(text) {
         }
     }
 
-    // Strategi 2: nama di baris N, harga/qty×harga di baris N+1
     if (items.length === 0) {
         for (let i = 0; i < lines.length - 1; i++) {
             const nameLine = lines[i];
@@ -110,7 +98,6 @@ function parseOCRTextRegex(text) {
         }
     }
 
-    // Strategi 3: tiap baris yang diakhiri harga (catch-all)
     if (items.length === 0) {
         for (const line of lines) {
             if (skipRe.test(line)) continue;
@@ -165,7 +152,6 @@ ${ocrText}`;
         headers = { "Content-Type": "application/json" };
         body = { contents: [{ parts: [{ text: prompt }] }] };
     } else {
-        // Mistral, DeepSeek, xAI, dll — OpenAI-compatible
         const baseUrl = { mistral: "https://api.mistral.ai/v1", deepseek: "https://api.deepseek.com/v1", xai: "https://api.x.ai/v1" }[provider] || "https://api.openai.com/v1";
         const model = { mistral: "mistral-small-latest", deepseek: "deepseek-chat", xai: "grok-2-latest" }[provider] || "gpt-4o-mini";
         url = `${baseUrl}/chat/completions`;
@@ -197,9 +183,7 @@ async function scanReceiptWithOCR(base64, mimeType, onProgress, aiConfig) {
     const { data: { text } } = await worker.recognize(blob);
     await worker.terminate();
 
-    // Kalau ada API key dan AI tidak dinonaktifkan → lempar teks OCR ke AI
     if (aiConfig?.apiKey && !aiConfig?.disabled) return await parseOCRTextWithAI(text, aiConfig);
-    // Tidak ada AI → regex parsing
     return parseOCRTextRegex(text);
 }
 
@@ -282,22 +266,36 @@ Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`;
 }
 
 const fmtRpLocal = (n) => "Rp " + Number(n).toLocaleString("id-ID");
+const fmtAmount = (raw) => {
+    if (raw === "" || raw === null || raw === undefined) return "";
+    const n = parseInt(String(raw).replace(/\D/g, ""), 10);
+    if (isNaN(n)) return "";
+    return n.toLocaleString("id-ID");
+};
 
-/* ── DatePicker: 3 selects (day/month/year) — works in all browsers/mobile ── */
+/* ── DatePicker: 3 selects (day/month/year) — glassy ── */
 const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 const DatePicker = ({ value, onChange }) => {
     const [y, m, d] = (value || new Date().toISOString().slice(0,10)).split("-");
     const year = parseInt(y), month = parseInt(m), day = parseInt(d);
     const daysInMonth = new Date(year, month, 0).getDate();
     const years = Array.from({ length: 5 }, (_, i) => year - 2 + i);
-    const sel = { padding: "9px 8px", borderRadius: 9, border: "1px solid var(--color-border)", background: "var(--bg-surface-low)", color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer", flex: 1 };
+    const sel = {
+        padding: "12px 10px", borderRadius: 12,
+        border: "1px solid var(--glass-border)",
+        background: "rgba(255,255,255,.02)",
+        color: "var(--color-text)",
+        fontSize: 14, fontFamily: "inherit",
+        outline: "none", cursor: "pointer",
+        flex: 1, minHeight: 46, boxSizing: "border-box",
+    };
     const set = (newY, newM, newD) => {
         const maxD = new Date(newY, newM, 0).getDate();
         const safeD = Math.min(newD, maxD);
         onChange(`${newY}-${String(newM).padStart(2,"0")}-${String(safeD).padStart(2,"0")}`);
     };
     return (
-        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
             <select value={day} onChange={e => set(year, month, parseInt(e.target.value))} style={sel}>
                 {Array.from({ length: daysInMonth }, (_, i) => i+1).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
@@ -312,31 +310,45 @@ const DatePicker = ({ value, onChange }) => {
 };
 
 const TYPES = [
-    { v: "expense",  l: "Pengeluaran", c: "#ff716c" },
+    { v: "expense",  l: "Pengeluaran", c: "var(--color-expense)" },
     { v: "income",   l: "Pemasukan",   c: "var(--color-primary)" },
-    { v: "transfer", l: "Antar Rekening", c: "#06b6d4" },
+    { v: "transfer", l: "Transfer",    c: "var(--color-transfer)" },
 ];
+
+/* Reusable field shell */
+const FieldLabel = ({ children, hint }) => (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+        <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)", letterSpacing: 0.8 }}>{children}</label>
+        {hint && <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>{hint}</span>}
+    </div>
+);
+
+const glassInputStyle = {
+    width: "100%", padding: "14px 16px", fontSize: 15,
+    borderRadius: 14, border: "1px solid var(--glass-border)",
+    background: "rgba(255,255,255,.02)",
+    color: "var(--color-text)",
+    fontFamily: "inherit", outline: "none",
+    transition: "border-color .2s, background .2s, box-shadow .2s",
+    minHeight: 46, boxSizing: "border-box",
+};
 
 const AddTransactionModal = ({
     open, onClose,
     txForm, setTxForm,
     onSubmit, onTransfer,
     accounts, customCategories = [],
-    // Edit mode
     editMode = false, onUpdate,
-    // Loading state
     isSaving = false,
-    // AI config for scan struk
     aiConfig = null,
-    // Multi-item save
     onSubmitMultiple,
 }) => {
     const { t } = useLanguage();
     const fileRef = useRef(null);
     const fileRefGallery = useRef(null);
     const [scanLoading, setScanLoading]   = useState(false);
-    const [scanProgress, setScanProgress] = useState(0);   // 0-100 untuk OCR
-    const [scanMode, setScanMode]         = useState("");   // "ai" | "ocr"
+    const [scanProgress, setScanProgress] = useState(0);
+    const [scanMode, setScanMode]         = useState("");
     const [scanError, setScanError]       = useState("");
     const [scanResults, setScanResults]   = useState(null);
     const [scanItems, setScanItems]       = useState([]);
@@ -378,7 +390,6 @@ const AddTransactionModal = ({
             setScanAccount(txForm.account || accounts[0]?.name || "");
         } catch (err) {
             if (err.message === "no-key" || err.message === "no-vision") {
-                // Fallback ke OCR
                 try {
                     setScanMode("ocr");
                     const base64 = await new Promise((res, rej) => {
@@ -407,7 +418,6 @@ const AddTransactionModal = ({
     const handleSaveMultiple = () => {
         const selected = scanItems.filter(i => i.selected);
         if (!selected.length) return;
-        // Validasi: tidak boleh ada item dengan amount 0
         const zeroItems = selected.filter(i => !i.amount || i.amount <= 0);
         if (zeroItems.length) {
             setScanError(`❌ ${zeroItems.length} item memiliki jumlah Rp 0. Isi jumlahnya dulu.`);
@@ -418,7 +428,6 @@ const AddTransactionModal = ({
         resetScan();
     };
 
-    /* Terjemahkan nama kategori default, custom tetap nama asli */
     const DEFAULT_CATS = new Set([...expenseCategories, ...incomeCategories]);
     const tCat = (name) => { if (!DEFAULT_CATS.has(name)) return name; const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
@@ -428,6 +437,7 @@ const AddTransactionModal = ({
     const allIncome  = [...incomeCategories,  ...extraIncome];
 
     const isTransfer = txForm.type === "transfer";
+    const activeType = TYPES.find(tt => tt.v === txForm.type) || TYPES[0];
     const canSubmit = isTransfer
         ? txForm.amount && txForm.account && txForm.toAccount && txForm.account !== txForm.toAccount
         : !!txForm.amount;
@@ -441,102 +451,203 @@ const AddTransactionModal = ({
     const submitLabel = isSaving
         ? "Menyimpan..."
         : editMode
-            ? "✅ Update Transaksi"
-            : isTransfer ? "🔀 Pindah Antar Rekening" : "Simpan Transaksi";
+            ? "Update Transaksi"
+            : isTransfer ? "Pindahkan Antar Rekening" : "Simpan Transaksi";
+
+    /* ── Chip-style picker for accounts & categories ── */
+    const Chip = ({ active, color = "var(--color-primary)", onClick, disabled, children, style }) => (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            style={{
+                padding: "9px 14px",
+                borderRadius: 999,
+                border: `1px solid ${active ? `color-mix(in srgb, ${color} 40%, transparent)` : "var(--glass-border)"}`,
+                background: active
+                    ? `color-mix(in srgb, ${color} 14%, transparent)`
+                    : "rgba(255,255,255,.02)",
+                color: active ? color : "var(--color-muted)",
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: disabled ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                opacity: disabled ? 0.35 : 1,
+                minHeight: 36,
+                boxShadow: active ? `inset 0 0 0 1px color-mix(in srgb, ${color} 22%, transparent)` : "none",
+                transition: "all .18s",
+                ...style,
+            }}
+        >
+            {children}
+        </button>
+    );
 
     return (
     <Modal open={open} onClose={onClose}>
-        <div style={{ background: "var(--bg-surface-low)", borderRadius: "20px 20px 0 0", border: "1px solid var(--color-border)", borderBottom: "none", padding: "24px 20px 36px", maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-                <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)" }}>
-                        {editMode ? "✏️ Edit Transaksi" : "Tambah Transaksi"}
+        {({ isDesktop }) => (
+        <div style={{
+            background: "var(--glass-hero)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: isDesktop ? 24 : "24px 24px 0 0",
+            padding: isDesktop ? "28px 28px 32px" : "24px 20px calc(32px + env(safe-area-inset-bottom))",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            boxShadow: "var(--glass-highlight), 0 20px 60px rgba(0,0,0,.35)",
+            position: "relative",
+        }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8 }}>
+                            {editMode ? "EDIT" : "TRANSAKSI BARU"}
+                        </div>
+                        {editMode && (
+                            <span className="chip chip-blue" style={{ fontSize: 9, letterSpacing: 0.5 }}>
+                                ✏️ Edit mode
+                            </span>
+                        )}
+                    </div>
+                    <h3 style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>
+                        {editMode ? "Edit Transaksi" : "Tambah Transaksi"}
                     </h3>
-                    {editMode && <p style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Ubah detail transaksi di bawah</p>}
+                    <p style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 4, margin: "4px 0 0" }}>
+                        {editMode ? "Ubah detail transaksi di bawah" : "Catat pengeluaran, pemasukan, atau transfer"}
+                    </p>
                 </div>
-                <button onClick={onClose} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
+                <button
+                    onClick={onClose}
+                    aria-label="Close"
+                    style={{
+                        width: 36, height: 36, borderRadius: 12,
+                        background: "var(--color-border-soft)",
+                        border: "1px solid var(--glass-border)",
+                        color: "var(--color-muted)", cursor: "pointer", fontSize: 16, flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "all .2s", fontFamily: "inherit",
+                    }}
+                >
+                    ✕
+                </button>
             </div>
 
-            {/* Tipe — tidak bisa ganti tipe saat edit transfer */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                {TYPES.map(t => {
-                    const disabled = editMode && isTransfer && t.v !== "transfer";
+            {/* Type segmented control */}
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${TYPES.length}, 1fr)`,
+                    gap: 6, padding: 4, marginBottom: 18,
+                    background: "rgba(255,255,255,.03)",
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: 14,
+                }}
+            >
+                {TYPES.map(tt => {
+                    const active = txForm.type === tt.v;
+                    const disabled = (editMode && isTransfer && tt.v !== "transfer") || editMode;
                     return (
-                        <button key={t.v}
-                            onClick={() => !disabled && !editMode && setTxForm(p => ({ ...p, type: t.v, toAccount: "" }))}
-                            disabled={disabled || editMode}
+                        <button
+                            key={tt.v}
+                            onClick={() => !disabled && !editMode && setTxForm(p => ({ ...p, type: tt.v, toAccount: "" }))}
+                            disabled={disabled}
                             style={{
-                                flex: 1, padding: 10, borderRadius: 10,
-                                border: `1px solid ${txForm.type === t.v ? t.c + "55" : "var(--color-border-soft)"}`,
-                                background: txForm.type === t.v ? t.c + "15" : "transparent",
-                                color: txForm.type === t.v ? t.c : "#475569",
-                                fontWeight: 600, fontSize: 12,
-                                cursor: (disabled || editMode) ? "default" : "pointer",
+                                padding: "10px 8px",
+                                borderRadius: 10,
+                                border: "none",
+                                background: active ? `color-mix(in srgb, ${tt.c} 14%, transparent)` : "transparent",
+                                color: active ? tt.c : "var(--color-muted)",
+                                boxShadow: active ? `inset 0 0 0 1px color-mix(in srgb, ${tt.c} 25%, transparent)` : "none",
+                                fontWeight: 700, fontSize: 13, cursor: disabled ? "default" : "pointer",
                                 fontFamily: "inherit",
-                                opacity: (disabled || (editMode && txForm.type !== t.v)) ? 0.35 : 1,
+                                minHeight: 42, transition: "all .2s",
+                                opacity: (disabled && !active) ? 0.35 : 1,
                             }}
-                        >{t.l}</button>
+                        >
+                            {tt.l}
+                        </button>
                     );
                 })}
             </div>
 
-            {/* Scan Struk — selalu tampil saat tambah baru (AI jika ada, OCR jika tidak) */}
-            {!editMode && !isTransfer && (
-                <div style={{ marginBottom: 16 }}>
+            {/* Scan Struk CTA — selalu tampil saat tambah baru */}
+            {!editMode && !isTransfer && !scanResults && (
+                <div style={{ marginBottom: 18 }}>
                     <input ref={fileRef} type="file" accept="image/*" capture="environment"
                         style={{ display: "none" }} onChange={handleScanFile} />
                     <input ref={fileRefGallery} type="file" accept="image/*"
                         style={{ display: "none" }} onChange={handleScanFile} />
                     {scanLoading ? (
-                        <button
-                            disabled
+                        <div
                             style={{
-                                width: "100%", padding: "10px 14px", borderRadius: 10, cursor: "default",
-                                border: "1px dashed var(--color-primary)", fontFamily: "inherit",
-                                background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
-                                fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
-                                justifyContent: "center", gap: 8, opacity: 0.7,
+                                width: "100%",
+                                padding: "14px 16px",
+                                borderRadius: 14,
+                                border: "1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)",
+                                background: "color-mix(in srgb, var(--color-primary) 8%, transparent)",
+                                color: "var(--color-primary)",
+                                fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                                minHeight: 48,
                             }}
                         >
+                            <span style={{ width: 14, height: 14, border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
                             {scanMode === "ocr"
-                                ? <>⏳ OCR {scanProgress > 0 ? `${scanProgress}%` : "memproses..."}  <span style={{ fontSize: 11, opacity: 0.7 }}>— sedang baca teks</span></>
-                                : <>⏳ AI sedang membaca struk...</>}
-                        </button>
+                                ? <span>OCR {scanProgress > 0 ? `${scanProgress}%` : "memproses..."}</span>
+                                : <span>AI sedang membaca struk...</span>}
+                        </div>
                     ) : (
                         <div style={{ display: "flex", gap: 8 }}>
                             <button
                                 onClick={() => { setScanError(""); fileRef.current?.click(); }}
+                                className="chip chip-mint"
                                 style={{
-                                    flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer",
-                                    border: "1px dashed var(--color-primary)", fontFamily: "inherit",
-                                    background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
-                                    fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
-                                    justifyContent: "center", gap: 6,
+                                    flex: 1,
+                                    padding: "12px 14px",
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                    minHeight: 46,
+                                    borderRadius: 14,
+                                    fontFamily: "inherit",
                                 }}
                             >
-                                📷 Scan Kamera {!aiConfig?.apiKey && <span style={{ fontSize: 10, opacity: 0.6 }}>(OCR)</span>}
+                                📷 Scan Kamera
+                                {!aiConfig?.apiKey && <span style={{ fontSize: 10, opacity: 0.7 }}>· OCR</span>}
                             </button>
                             <button
                                 onClick={() => { setScanError(""); fileRefGallery.current?.click(); }}
+                                className="chip chip-mint"
                                 style={{
-                                    flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer",
-                                    border: "1px dashed var(--color-primary)", fontFamily: "inherit",
-                                    background: "rgba(5,150,105,.06)", color: "var(--color-primary)",
-                                    fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center",
-                                    justifyContent: "center", gap: 6,
+                                    flex: 1,
+                                    padding: "12px 14px",
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                    minHeight: 46,
+                                    borderRadius: 14,
+                                    fontFamily: "inherit",
                                 }}
                             >
-                                🖼️ Pilih Gambar
+                                🖼️ Galeri
                             </button>
                         </div>
                     )}
                     {!aiConfig?.apiKey && !scanLoading && (
-                        <div style={{ marginTop: 6, fontSize: 10, color: "var(--color-muted)", textAlign: "center" }}>
-                            Mode OCR — akurasi terbatas. Set API key AI Coach untuk hasil lebih baik.
+                        <div style={{ marginTop: 8, fontSize: 10.5, color: "var(--color-subtle)", textAlign: "center" }}>
+                            Mode OCR · set API key di AI Coach untuk akurasi lebih tinggi
                         </div>
                     )}
                     {scanError && (
-                        <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(220,38,38,.08)", border: "1px solid rgba(220,38,38,.2)", borderRadius: 8, fontSize: 12, color: "var(--color-expense)" }}>
+                        <div style={{
+                            marginTop: 10, padding: "10px 14px",
+                            background: "color-mix(in srgb, var(--color-expense) 8%, transparent)",
+                            border: "1px solid color-mix(in srgb, var(--color-expense) 25%, transparent)",
+                            borderRadius: 12, fontSize: 12, color: "var(--color-expense)",
+                        }}>
                             {scanError}
                         </div>
                     )}
@@ -545,94 +656,148 @@ const AddTransactionModal = ({
 
             {/* ── Hasil Scan Multi-Item ── */}
             {scanResults && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {/* Header merchant + edit tanggal */}
-                    <div style={{ padding: "10px 14px", background: "rgba(5,150,105,.08)", border: "1px solid rgba(5,150,105,.2)", borderRadius: 10 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</span>
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: scanMode === "ocr" ? (aiConfig?.apiKey ? "rgba(99,102,241,.15)" : "rgba(234,179,8,.15)") : "rgba(5,150,105,.15)", color: scanMode === "ocr" ? (aiConfig?.apiKey ? "#818cf8" : "#eab308") : "var(--color-primary)", letterSpacing: 0.5 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {/* Merchant + date */}
+                    <div style={{
+                        padding: "14px 16px",
+                        background: "color-mix(in srgb, var(--color-primary) 8%, transparent)",
+                        border: "1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)",
+                        borderRadius: 14,
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: "var(--color-primary)" }}>🧾 {scanResults.merchant || "Struk"}</span>
+                            <span style={{
+                                fontSize: 9, fontWeight: 800,
+                                padding: "3px 8px", borderRadius: 999,
+                                background: scanMode === "ocr"
+                                    ? (aiConfig?.apiKey ? "color-mix(in srgb, var(--color-purple) 18%, transparent)" : "color-mix(in srgb, var(--color-amber) 18%, transparent)")
+                                    : "color-mix(in srgb, var(--color-primary) 18%, transparent)",
+                                color: scanMode === "ocr"
+                                    ? (aiConfig?.apiKey ? "var(--color-purple)" : "var(--color-amber)")
+                                    : "var(--color-primary)",
+                                letterSpacing: 0.8, textTransform: "uppercase",
+                            }}>
                                 {scanMode === "ocr" ? (aiConfig?.apiKey ? "OCR+AI" : "OCR") : "AI Vision"}
                             </span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 11, color: "var(--color-muted)", flexShrink: 0 }}>📅 Tanggal</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontSize: 11, color: "var(--color-muted)", flexShrink: 0, fontWeight: 700 }}>📅 Tanggal</span>
                             <input
                                 type="date"
                                 value={scanResults.date || ""}
                                 onChange={e => setScanResults(p => ({ ...p, date: e.target.value }))}
                                 onClick={e => e.target.showPicker?.()}
-                                style={{ flex: 1, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(5,150,105,.3)", background: "rgba(5,150,105,.08)", color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", outline: "none", cursor: "pointer", colorScheme: "dark" }}
+                                style={{
+                                    flex: 1, padding: "8px 12px", borderRadius: 10,
+                                    border: "1px solid var(--glass-border)",
+                                    background: "rgba(255,255,255,.03)",
+                                    color: "var(--color-text)", fontSize: 13,
+                                    fontFamily: "inherit", outline: "none", cursor: "pointer",
+                                    colorScheme: "dark", minHeight: 40, boxSizing: "border-box",
+                                }}
                             />
                         </div>
                     </div>
 
-                    {/* Pilih Akun */}
+                    {/* Akun selector */}
                     <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6, letterSpacing: 0.5 }}>AKUN (semua item)</label>
+                        <FieldLabel>AKUN (berlaku ke semua item)</FieldLabel>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {accounts.map(a => (
-                                <button key={a.name} onClick={() => setScanAccount(a.name)}
-                                    style={{
-                                        padding: "7px 12px", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                                        border: `1px solid ${scanAccount === a.name ? "rgba(5,150,105,.4)" : "var(--color-border-soft)"}`,
-                                        background: scanAccount === a.name ? "rgba(5,150,105,.15)" : "transparent",
-                                        color: scanAccount === a.name ? "var(--color-primary)" : "var(--color-muted)",
-                                    }}>
+                                <Chip
+                                    key={a.name}
+                                    active={scanAccount === a.name}
+                                    color={a.color || "var(--color-primary)"}
+                                    onClick={() => setScanAccount(a.name)}
+                                >
                                     {a.icon} {a.name}
-                                </button>
+                                </Chip>
                             ))}
                         </div>
                     </div>
 
-                    {/* Header daftar item */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", letterSpacing: 0.5 }}>
-                            ITEM ({scanItems.filter(i => i.selected).length}/{scanItems.length} dipilih) · ✏️ ketuk untuk edit
+                    {/* Item list header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)", letterSpacing: 0.5 }}>
+                            ITEM ({scanItems.filter(i => i.selected).length}/{scanItems.length}) · ketuk untuk edit
                         </span>
-                        <button onClick={() => setScanItems(p => p.every(i => i.selected) ? p.map(i => ({...i, selected: false})) : p.map(i => ({...i, selected: true})))}
-                            style={{ fontSize: 11, color: "var(--color-primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, flexShrink: 0 }}>
+                        <button
+                            onClick={() => setScanItems(p => p.every(i => i.selected) ? p.map(i => ({...i, selected: false})) : p.map(i => ({...i, selected: true})))}
+                            className="link-btn"
+                            style={{ fontSize: 11, fontWeight: 700, flexShrink: 0 }}
+                        >
                             {scanItems.every(i => i.selected) ? "Batal semua" : "Pilih semua"}
                         </button>
                     </div>
 
-                    {/* Daftar item */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "45vH", overflowY: "auto" }}>
+                    {/* Items */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "42vh", overflowY: "auto", paddingRight: 4 }}>
                         {scanItems.map((item, idx) => (
                             <div key={item.id} style={{
-                                padding: "10px",
-                                background: item.selected ? "var(--bg-surface-low)" : "transparent",
-                                border: `1px solid ${item.selected ? "var(--color-border)" : "var(--color-border-soft)"}`,
-                                borderRadius: 10, opacity: item.selected ? 1 : 0.45,
+                                padding: 12,
+                                background: item.selected ? "rgba(255,255,255,.03)" : "transparent",
+                                border: `1px solid ${item.selected ? "var(--glass-border)" : "var(--color-border-soft)"}`,
+                                borderRadius: 14,
+                                opacity: item.selected ? 1 : 0.45,
+                                transition: "all .2s",
                             }}>
-                                {/* Baris 1: checkbox + nama */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                    <input type="checkbox" checked={item.selected}
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={item.selected}
                                         onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, selected: e.target.checked} : it))}
-                                        style={{ accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0, width: 18, height: 18 }} />
-                                    <input value={item.note}
+                                        style={{ accentColor: "var(--color-primary)", cursor: "pointer", flexShrink: 0, width: 18, height: 18 }}
+                                    />
+                                    <input
+                                        value={item.note}
                                         onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, note: e.target.value} : it))}
-                                        style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1.5px solid var(--color-border)", background: "var(--bg-app)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none", minWidth: 0, boxSizing: "border-box" }} />
+                                        style={{
+                                            flex: 1, minWidth: 0, padding: "9px 12px",
+                                            borderRadius: 10, border: "1px solid var(--glass-border)",
+                                            background: "rgba(255,255,255,.02)",
+                                            color: "var(--color-text)", fontSize: 13, fontWeight: 600,
+                                            fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+                                        }}
+                                    />
                                 </div>
-                                {/* Baris 2: kategori | jumlah — full width, no padding offset */}
-                                <div style={{ display: "flex", gap: 6 }}>
-                                    <select value={item.category}
+                                <div style={{ display: "flex", gap: 8 }}>
+                                    <select
+                                        value={item.category}
                                         onChange={e => setScanItems(p => p.map((it, i) => i === idx ? {...it, category: e.target.value} : it))}
-                                        style={{ flex: 1, padding: "7px 8px", borderRadius: 8, border: "1.5px solid var(--color-border)", background: "var(--bg-app)", color: "var(--color-muted)", fontFamily: "inherit", cursor: "pointer", outline: "none", fontSize: 11, minWidth: 0, boxSizing: "border-box" }}>
+                                        style={{
+                                            flex: 1, padding: "9px 10px", borderRadius: 10,
+                                            border: "1px solid var(--glass-border)",
+                                            background: "rgba(255,255,255,.02)",
+                                            color: "var(--color-muted)", fontFamily: "inherit",
+                                            cursor: "pointer", outline: "none", fontSize: 12,
+                                            minWidth: 0, boxSizing: "border-box",
+                                        }}
+                                    >
                                         {SCAN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
-                                    <input type="text" inputMode="numeric"
+                                    <input
+                                        type="text" inputMode="numeric"
                                         value={Number(item.amount).toLocaleString("id-ID")}
                                         onChange={e => {
                                             const raw = parseInt(e.target.value.replace(/\D/g, "")) || 0;
                                             setScanItems(p => p.map((it, i) => i === idx ? { ...it, amount: raw } : it));
                                         }}
-                                        style={{ width: "35%", maxWidth: 120, textAlign: "right", padding: "7px 10px", borderRadius: 8, border: "1.5px solid rgba(220,38,38,.35)", background: "rgba(220,38,38,.05)", color: "var(--color-expense)", fontSize: 12, fontWeight: 700, fontFamily: "inherit", outline: "none", flexShrink: 0, boxSizing: "border-box" }} />
+                                        style={{
+                                            width: "38%", maxWidth: 130, textAlign: "right",
+                                            padding: "9px 12px", borderRadius: 10,
+                                            border: "1px solid color-mix(in srgb, var(--color-expense) 30%, transparent)",
+                                            background: "color-mix(in srgb, var(--color-expense) 6%, transparent)",
+                                            color: "var(--color-expense)", fontSize: 13, fontWeight: 800,
+                                            fontFamily: "inherit", outline: "none", flexShrink: 0,
+                                            boxSizing: "border-box", fontVariantNumeric: "tabular-nums",
+                                        }}
+                                    />
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Total + validasi vs subtotal struk */}
+                    {/* Total + validation */}
                     {(() => {
                         const selected = scanItems.filter(i => i.selected);
                         if (!selected.length) return null;
@@ -642,18 +807,30 @@ const AddTransactionModal = ({
                         const hasZero = selected.some(i => !i.amount || i.amount <= 0);
                         return (
                             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                <div style={{ padding: "10px 14px", background: "rgba(220,38,38,.06)", border: `1px solid ${mismatch ? "rgba(234,179,8,.4)" : "rgba(220,38,38,.15)"}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <span style={{ fontSize: 12, color: "var(--color-muted)" }}>Total {selected.length} item dipilih</span>
-                                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-expense)" }}>{fmtRpLocal(totalSelected)}</span>
+                                <div style={{
+                                    padding: "12px 16px",
+                                    background: "color-mix(in srgb, var(--color-expense) 8%, transparent)",
+                                    border: `1px solid ${mismatch ? "color-mix(in srgb, var(--color-amber) 40%, transparent)" : "color-mix(in srgb, var(--color-expense) 20%, transparent)"}`,
+                                    borderRadius: 12,
+                                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                                }}>
+                                    <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 600 }}>Total {selected.length} item</span>
+                                    <span className="num-tight" style={{ fontSize: 16, fontWeight: 800, color: "var(--color-expense)" }}>{fmtRpLocal(totalSelected)}</span>
                                 </div>
                                 {subtotal && (
-                                    <div style={{ padding: "8px 14px", background: mismatch ? "rgba(234,179,8,.08)" : "rgba(5,150,105,.06)", border: `1px solid ${mismatch ? "rgba(234,179,8,.3)" : "rgba(5,150,105,.2)"}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div style={{
+                                        padding: "10px 16px",
+                                        background: mismatch ? "color-mix(in srgb, var(--color-amber) 10%, transparent)" : "color-mix(in srgb, var(--color-primary) 8%, transparent)",
+                                        border: `1px solid ${mismatch ? "color-mix(in srgb, var(--color-amber) 35%, transparent)" : "color-mix(in srgb, var(--color-primary) 25%, transparent)"}`,
+                                        borderRadius: 12,
+                                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                                    }}>
                                         <span style={{ fontSize: 11, color: "var(--color-muted)" }}>{mismatch ? "⚠️" : "✅"} Subtotal di struk</span>
-                                        <span style={{ fontSize: 12, fontWeight: 700, color: mismatch ? "#eab308" : "var(--color-primary)" }}>{fmtRpLocal(subtotal)}</span>
+                                        <span className="num-tight" style={{ fontSize: 13, fontWeight: 800, color: mismatch ? "var(--color-amber)" : "var(--color-primary)" }}>{fmtRpLocal(subtotal)}</span>
                                     </div>
                                 )}
                                 {mismatch && (
-                                    <div style={{ fontSize: 11, color: "#eab308", padding: "0 4px" }}>
+                                    <div style={{ fontSize: 11, color: "var(--color-amber)", padding: "0 4px" }}>
                                         Selisih {fmtRpLocal(Math.abs(totalSelected - subtotal))} — mungkin ada item yang di-uncheck atau jumlah yang perlu dicek.
                                     </div>
                                 )}
@@ -666,157 +843,290 @@ const AddTransactionModal = ({
                         );
                     })()}
 
-                    {/* Tombol aksi */}
-                    <div style={{ display: "flex", gap: 10 }}>
-                        <button onClick={resetScan}
-                            style={{ flex: 1, padding: "13px 10px", borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    {/* Actions */}
+                    <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                        <button
+                            onClick={resetScan}
+                            className="btn-secondary"
+                            style={{ flex: 1, minHeight: 48, fontSize: 13 }}
+                        >
                             ← Kembali
                         </button>
-                        <button onClick={handleSaveMultiple} disabled={isSaving || !scanItems.filter(i => i.selected).length || !scanAccount}
-                            style={{ flex: 2, padding: "13px 10px", borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                                opacity: (isSaving || !scanItems.filter(i => i.selected).length || !scanAccount) ? 0.5 : 1 }}>
-                            {isSaving ? "Menyimpan..." : `✅ Simpan ${scanItems.filter(i => i.selected).length} Transaksi`}
+                        <button
+                            onClick={handleSaveMultiple}
+                            disabled={isSaving || !scanItems.filter(i => i.selected).length || !scanAccount}
+                            className="btn-primary"
+                            style={{
+                                flex: 2, minHeight: 48, fontSize: 13,
+                                opacity: (isSaving || !scanItems.filter(i => i.selected).length || !scanAccount) ? 0.5 : 1,
+                                cursor: (isSaving || !scanItems.filter(i => i.selected).length || !scanAccount) ? "not-allowed" : "pointer",
+                            }}
+                        >
+                            {isSaving ? "Menyimpan..." : `Simpan ${scanItems.filter(i => i.selected).length} Transaksi`}
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Form normal — sembunyikan jika scan results aktif */}
-            {/* Transfer edit: only note editable */}
-            {!scanResults && editMode && isTransfer ? (
+            {/* ── Form (non-scan) ── */}
+            {!scanResults && editMode && isTransfer && (
                 <>
-                    <div style={{ background: "rgba(6,182,212,.06)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                        ℹ️ Transfer hanya bisa diubah catatan &amp; tanggalnya. Untuk mengubah akun / jumlah, <strong style={{ color: "#ff716c" }}>hapus dan buat ulang</strong>.
+                    <div style={{
+                        background: "color-mix(in srgb, var(--color-transfer) 8%, transparent)",
+                        border: "1px solid color-mix(in srgb, var(--color-transfer) 25%, transparent)",
+                        borderRadius: 12, padding: "10px 14px", marginBottom: 16,
+                        fontSize: 12, color: "var(--color-muted)", lineHeight: 1.55,
+                    }}>
+                        ℹ️ Transfer hanya bisa diubah catatan &amp; tanggalnya. Untuk mengubah akun / jumlah, <strong style={{ color: "var(--color-expense)" }}>hapus dan buat ulang</strong>.
                     </div>
-                    <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
                     <div style={{ marginBottom: 16 }}>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block", letterSpacing: 0.5 }}>TANGGAL</label>
+                        <FieldLabel>CATATAN</FieldLabel>
+                        <input
+                            value={txForm.note}
+                            onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))}
+                            placeholder="Opsional"
+                            style={glassInputStyle}
+                        />
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>📅 TANGGAL</FieldLabel>
                         <input
                             type="date"
                             value={txForm.date || ""}
                             onChange={e => setTxForm(p => ({ ...p, date: e.target.value }))}
                             onClick={e => e.target.showPicker?.()}
-                            style={{
-                                width: "100%", padding: "10px 14px", boxSizing: "border-box",
-                                background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
-                                borderRadius: 10, color: "var(--color-text)", fontSize: 13,
-                                fontFamily: "inherit", outline: "none", cursor: "pointer",
-                                colorScheme: "dark",
-                            }}
+                            style={{ ...glassInputStyle, colorScheme: "dark", cursor: "pointer" }}
                         />
                     </div>
                 </>
-            ) : !scanResults && isTransfer ? (
-                /* ── Mode Transfer (tambah baru) ── */
-                <>
-                    <AmountInput label="JUMLAH (Rp)" icon="💰" placeholder="150.000" value={txForm.amount} onChange={v => setTxForm(p => ({ ...p, amount: v }))} />
+            )}
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>DARI AKUN</label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                        {accounts.map(a => {
-                            const selected = txForm.account === a.name;
-                            const isDestination = txForm.toAccount === a.name;
-                            return (
-                                <button key={a.name}
-                                    onClick={() => !isDestination && setTxForm(p => ({ ...p, account: a.name }))}
-                                    disabled={isDestination}
-                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#06b6d455" : "var(--color-border-soft)"}`, background: selected ? "rgba(6,182,212,.15)" : "transparent", color: selected ? "#06b6d4" : isDestination ? "#334155" : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: isDestination ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isDestination ? 0.4 : 1 }}
-                                >{a.icon} {a.name}</button>
-                            );
-                        })}
+            {!scanResults && !editMode && isTransfer && (
+                <>
+                    {/* Amount hero */}
+                    <div style={{ marginBottom: 18 }}>
+                        <FieldLabel>JUMLAH TRANSFER</FieldLabel>
+                        <div style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "10px 12px 10px 10px", borderRadius: 16,
+                            border: "1px solid var(--glass-border)",
+                            background: "rgba(255,255,255,.02)",
+                            minHeight: 64,
+                        }}>
+                            <span className="mono" style={{
+                                padding: "8px 12px", borderRadius: 12,
+                                background: "color-mix(in srgb, var(--color-transfer) 14%, transparent)",
+                                color: "var(--color-transfer)", fontSize: 13, fontWeight: 800, letterSpacing: 0.5, flexShrink: 0,
+                            }}>Rp</span>
+                            <input
+                                type="text" inputMode="numeric"
+                                value={fmtAmount(txForm.amount)}
+                                onChange={e => setTxForm(p => ({ ...p, amount: e.target.value.replace(/\D/g, "") }))}
+                                placeholder="150.000"
+                                style={{
+                                    flex: 1, minWidth: 0, padding: 0,
+                                    border: "none", background: "transparent",
+                                    color: "var(--color-text)", fontSize: 24, fontWeight: 800,
+                                    fontFamily: "inherit", outline: "none",
+                                    fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+                                }}
+                            />
+                        </div>
                     </div>
 
-                    <div style={{ textAlign: "center", fontSize: 20, marginBottom: 16, color: "#06b6d4" }}>↓</div>
+                    <div style={{ marginBottom: 14 }}>
+                        <FieldLabel>DARI AKUN</FieldLabel>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {accounts.map(a => {
+                                const selected = txForm.account === a.name;
+                                const isDestination = txForm.toAccount === a.name;
+                                return (
+                                    <Chip
+                                        key={a.name}
+                                        active={selected}
+                                        disabled={isDestination}
+                                        color={a.color || "var(--color-transfer)"}
+                                        onClick={() => !isDestination && setTxForm(p => ({ ...p, account: a.name }))}
+                                    >
+                                        {a.icon} {a.name}
+                                    </Chip>
+                                );
+                            })}
+                        </div>
+                    </div>
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>KE AKUN</label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                        {accounts.map(a => {
-                            const selected = txForm.toAccount === a.name;
-                            const isSource = txForm.account === a.name;
-                            return (
-                                <button key={a.name}
-                                    onClick={() => !isSource && setTxForm(p => ({ ...p, toAccount: a.name }))}
-                                    disabled={isSource}
-                                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selected ? "#60fcc655" : "var(--color-border-soft)"}`, background: selected ? "rgba(96,252,198,.15)" : "transparent", color: selected ? "var(--color-primary)" : isSource ? "#334155" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: isSource ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: isSource ? 0.4 : 1 }}
-                                >{a.icon} {a.name}</button>
-                            );
-                        })}
+                    <div style={{ textAlign: "center", fontSize: 18, margin: "10px 0", color: "var(--color-transfer)" }}>↓</div>
+
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>KE AKUN</FieldLabel>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {accounts.map(a => {
+                                const selected = txForm.toAccount === a.name;
+                                const isSource = txForm.account === a.name;
+                                return (
+                                    <Chip
+                                        key={a.name}
+                                        active={selected}
+                                        disabled={isSource}
+                                        color={a.color || "var(--color-primary)"}
+                                        onClick={() => !isSource && setTxForm(p => ({ ...p, toAccount: a.name }))}
+                                    >
+                                        {a.icon} {a.name}
+                                    </Chip>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {txForm.account && txForm.toAccount && txForm.amount && (
-                        <div style={{ background: "rgba(6,182,212,.08)", border: "1px solid rgba(6,182,212,.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <div style={{ textAlign: "center" }}>
-                                <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>DARI</div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "#ff716c" }}>{txForm.account}</div>
-                                <div style={{ fontSize: 11, color: "#ff716c" }}>-Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
+                        <div style={{
+                            background: "color-mix(in srgb, var(--color-transfer) 8%, transparent)",
+                            border: "1px solid color-mix(in srgb, var(--color-transfer) 22%, transparent)",
+                            borderRadius: 14, padding: "14px 16px", marginBottom: 16,
+                            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                        }}>
+                            <div style={{ textAlign: "center", minWidth: 0 }}>
+                                <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 2, letterSpacing: 0.8, fontWeight: 700 }}>DARI</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-expense)" }}>{txForm.account}</div>
+                                <div className="num-tight" style={{ fontSize: 11, color: "var(--color-expense)" }}>−Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
                             </div>
-                            <div style={{ fontSize: 20 }}>→</div>
-                            <div style={{ textAlign: "center" }}>
-                                <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>KE</div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>{txForm.toAccount}</div>
-                                <div style={{ fontSize: 11, color: "var(--color-primary)" }}>+Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
+                            <div style={{ fontSize: 18, color: "var(--color-transfer)" }}>→</div>
+                            <div style={{ textAlign: "center", minWidth: 0 }}>
+                                <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 2, letterSpacing: 0.8, fontWeight: 700 }}>KE</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>{txForm.toAccount}</div>
+                                <div className="num-tight" style={{ fontSize: 11, color: "var(--color-primary)" }}>+Rp {parseInt(txForm.amount || 0).toLocaleString("id-ID")}</div>
                             </div>
                         </div>
                     )}
-                    <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
-                    {/* Date for transfer */}
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>📅 TANGGAL</label>
-                    <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
+
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>CATATAN</FieldLabel>
+                        <input
+                            value={txForm.note}
+                            onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))}
+                            placeholder="Opsional"
+                            style={glassInputStyle}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>📅 TANGGAL</FieldLabel>
+                        <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
+                    </div>
                 </>
-            ) : !scanResults ? (
-                /* ── Mode Normal (expense / income) ── */
+            )}
+
+            {!scanResults && !isTransfer && (
                 <>
-                    <AmountInput label="JUMLAH (Rp)" icon="💰" placeholder="150.000" value={txForm.amount} onChange={v => setTxForm(p => ({ ...p, amount: v }))} />
-
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>{t("addTx.category") || "KATEGORI"}</label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                        {(txForm.type === "expense" ? allExpense : allIncome).map(c => (
-                            <button key={c} onClick={() => setTxForm(p => ({ ...p, category: c }))}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.category === c ? "#60fcc655" : "var(--color-border-soft)"}`, background: txForm.category === c ? "rgba(96,252,198,.15)" : "transparent", color: txForm.category === c ? "var(--color-primary)" : "var(--color-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                            >{tCat(c)}</button>
-                        ))}
+                    {/* Amount hero */}
+                    <div style={{ marginBottom: 18 }}>
+                        <FieldLabel>JUMLAH</FieldLabel>
+                        <div style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "12px 12px 12px 10px", borderRadius: 16,
+                            border: `1px solid color-mix(in srgb, ${activeType.c} 25%, var(--glass-border))`,
+                            background: `linear-gradient(135deg, color-mix(in srgb, ${activeType.c} 6%, transparent), rgba(255,255,255,.02))`,
+                            minHeight: 72,
+                            transition: "all .2s",
+                        }}>
+                            <span className="mono" style={{
+                                padding: "10px 14px", borderRadius: 12,
+                                background: `color-mix(in srgb, ${activeType.c} 16%, transparent)`,
+                                color: activeType.c, fontSize: 14, fontWeight: 800, letterSpacing: 0.5,
+                                flexShrink: 0, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${activeType.c} 25%, transparent)`,
+                            }}>Rp</span>
+                            <input
+                                type="text" inputMode="numeric"
+                                value={fmtAmount(txForm.amount)}
+                                onChange={e => setTxForm(p => ({ ...p, amount: e.target.value.replace(/\D/g, "") }))}
+                                placeholder="150.000"
+                                style={{
+                                    flex: 1, minWidth: 0, padding: 0,
+                                    border: "none", background: "transparent",
+                                    color: "var(--color-text)",
+                                    fontSize: "clamp(24px, 4.5vw, 32px)", fontWeight: 800,
+                                    fontFamily: "inherit", outline: "none",
+                                    fontVariantNumeric: "tabular-nums", letterSpacing: "-0.025em",
+                                }}
+                            />
+                        </div>
                     </div>
 
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>AKUN SUMBER</label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                        {accounts.map(a => (
-                            <button key={a.name} onClick={() => setTxForm(p => ({ ...p, account: a.name }))}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${txForm.account === a.name ? a.color + "55" : "var(--color-border-soft)"}`, background: txForm.account === a.name ? a.color + "15" : "transparent", color: txForm.account === a.name ? a.color : "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                            >{a.icon} {a.name}</button>
-                        ))}
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>{t("addTx.category") || "KATEGORI"}</FieldLabel>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {(txForm.type === "expense" ? allExpense : allIncome).map(c => (
+                                <Chip
+                                    key={c}
+                                    active={txForm.category === c}
+                                    color={activeType.c}
+                                    onClick={() => setTxForm(p => ({ ...p, category: c }))}
+                                >
+                                    {tCat(c)}
+                                </Chip>
+                            ))}
+                        </div>
                     </div>
 
-                    <InputField label="CATATAN" icon="📝" placeholder="Opsional" value={txForm.note} onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))} />
-                    {/* Date for normal mode */}
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6, display: "block" }}>📅 TANGGAL</label>
-                    <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>AKUN SUMBER</FieldLabel>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {accounts.map(a => (
+                                <Chip
+                                    key={a.name}
+                                    active={txForm.account === a.name}
+                                    color={a.color || "var(--color-primary)"}
+                                    onClick={() => setTxForm(p => ({ ...p, account: a.name }))}
+                                >
+                                    {a.icon} {a.name}
+                                </Chip>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>CATATAN</FieldLabel>
+                        <input
+                            value={txForm.note}
+                            onChange={e => setTxForm(p => ({ ...p, note: e.target.value }))}
+                            placeholder="Opsional"
+                            style={glassInputStyle}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                        <FieldLabel>📅 TANGGAL</FieldLabel>
+                        <DatePicker value={txForm.date} onChange={date => setTxForm(p => ({ ...p, date }))} />
+                    </div>
                 </>
-            ) : null}
+            )}
 
-            {!scanResults && <button onClick={handleSubmit} disabled={(!canSubmit && !editMode) || isSaving}
-                style={{
-                    width: "100%", padding: 13, borderRadius: 12, border: "none",
-                    background: ((!canSubmit && !editMode) || isSaving)
-                        ? "rgba(255,255,255,.07)"
-                        : editMode
-                            ? "linear-gradient(135deg,#60fcc6,#19ce9b)"
-                            : isTransfer
-                                ? "linear-gradient(135deg,#06b6d4,#0891b2)"
-                                : "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                    color: ((!canSubmit && !editMode) || isSaving) ? "#94a3b8" : isTransfer ? "#fff" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13,
-                    cursor: ((!canSubmit && !editMode) || isSaving) ? "not-allowed" : "pointer",
-                    opacity: ((!canSubmit && !editMode) || isSaving) ? .5 : 1,
-                    fontFamily: "inherit",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    transition: "opacity .2s, background .2s",
-                }}
-            >
-                {isSaving && (
-                    <span style={{ width: 15, height: 15, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />
-                )}
-                {submitLabel}
-            </button>}
+            {!scanResults && (
+                <button
+                    onClick={handleSubmit}
+                    disabled={(!canSubmit && !editMode) || isSaving}
+                    className="btn-primary"
+                    style={{
+                        width: "100%",
+                        minHeight: 48,
+                        fontSize: 15,
+                        marginTop: 8,
+                        opacity: ((!canSubmit && !editMode) || isSaving) ? 0.5 : 1,
+                        cursor: ((!canSubmit && !editMode) || isSaving) ? "not-allowed" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        ...(isTransfer && !editMode
+                            ? { background: "linear-gradient(135deg, var(--color-transfer), color-mix(in srgb, var(--color-transfer) 70%, #000))", color: "#fff" }
+                            : {}),
+                    }}
+                >
+                    {isSaving && (
+                        <span style={{ width: 15, height: 15, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />
+                    )}
+                    {submitLabel}
+                </button>
+            )}
         </div>
+        )}
     </Modal>
     );
 };

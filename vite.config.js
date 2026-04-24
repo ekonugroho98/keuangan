@@ -3,6 +3,23 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core React framework
+          'react-vendor': ['react', 'react-dom'],
+          // Supabase SDK (largest external dep)
+          'supabase': ['@supabase/supabase-js'],
+          // Heavy OCR libs lazy-loaded separately
+          'ocr': ['tesseract.js'],
+          // DOCX generator for export feature
+          'docx': ['docx'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

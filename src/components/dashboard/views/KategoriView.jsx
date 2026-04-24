@@ -22,10 +22,10 @@ const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","
 
 /* ─── sub-components ─── */
 const SummaryCard = ({ label, value, sub, borderColor, valueStyle }) => (
-    <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: "18px 20px", borderLeft: `4px solid ${borderColor}` }}>
-        <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{label}</p>
-        <h3 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 3px", lineHeight: 1, ...valueStyle }}>{value}</h3>
-        <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0 }}>{sub}</p>
+    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: `4px solid ${borderColor}`, position: "relative", overflow: "hidden" }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{label}</div>
+        <div className="num-tight" style={{ fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 900, margin: 0, lineHeight: 1, letterSpacing: "-.03em", ...valueStyle }}>{value}</div>
+        <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{sub}</div>
     </div>
 );
 
@@ -200,23 +200,22 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
             )}
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
                 <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: 0, letterSpacing: "-0.5px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>
+                        KATEGORI
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", margin: 0, letterSpacing: "-.025em" }}>
                             {t("cat.title")}
                         </h1>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.1)", border: "1px solid rgba(96,252,198,.25)", padding: "3px 10px", borderRadius: 99 }}>
-                            📅 {monthLabel}
-                        </span>
+                        <span className="chip chip-mint">📅 {monthLabel}</span>
                     </div>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "4px 0 0" }}>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
                         {t("cat.subtitle") || "Atur kategori pengeluaran dan pemasukan Anda."}
                     </p>
                 </div>
-                <button onClick={openAdd} style={{ padding: "10px 20px", borderRadius: 9999, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, transition: "opacity .2s" }}
-                    onMouseOver={e => e.currentTarget.style.opacity = ".85"}
-                    onMouseOut={e => e.currentTarget.style.opacity = "1"}>
+                <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 22px", minHeight: 42, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
                     + {t("cat.addNew")?.replace("+ ", "") || "Kategori Baru"}
                 </button>
             </div>
@@ -229,13 +228,13 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
             </div>
 
             {/* ── Filter Bar ── */}
-            <div style={{ background: "var(--bg-glass)", backdropFilter: "blur(20px)", border: "1px solid rgba(72,71,79,.15)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: "12px 14px", boxShadow: "var(--glass-highlight)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 {/* Type tabs */}
-                <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 10, padding: 4, gap: 2 }}>
+                <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 10, padding: 4, gap: 2, overflowX: "auto", maxWidth: "100%", scrollSnapType: "x mandatory" }}>
                     {TYPE_TABS.map(tab => {
                         const isActive = filterType === tab.id;
                         return (
-                            <button key={tab.id} onClick={() => setFilterType(tab.id)} style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: isActive ? "var(--color-primary)" : "transparent", color: isActive ? "var(--color-on-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
+                            <button key={tab.id} onClick={() => setFilterType(tab.id)} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: isActive ? "var(--color-primary)" : "transparent", color: isActive ? "var(--color-on-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", minHeight: 36, scrollSnapAlign: "start" }}>
                                 {tab.label}
                                 <span style={{ fontSize: 10, background: isActive ? "rgba(0,94,68,.2)" : "rgba(255,255,255,.07)", borderRadius: 99, padding: "1px 6px", fontWeight: 700 }}>{tab.count}</span>
                             </button>
@@ -243,15 +242,15 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
                     })}
                 </div>
                 {/* Search */}
-                <div style={{ position: "relative" }}>
+                <div style={{ position: "relative", flex: "1 1 160px", minWidth: "min(60vw, 160px)" }}>
                     <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: .4, pointerEvents: "none" }}>🔍</span>
                     <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t("cat.search") || "Cari kategori..."}
-                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 9, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "8px 12px 8px 28px", outline: "none", width: 180 }} />
+                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 10, color: "var(--color-text)", fontSize: 12, fontFamily: "inherit", padding: "10px 12px 10px 28px", outline: "none", width: "100%", boxSizing: "border-box", minHeight: 42 }} />
                 </div>
             </div>
 
             {/* ── Category Grid ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 180px), 1fr))", gap: 14 }}>
                 {displayCats.map((c) => {
                     const amt      = catTotals[c.name] || 0;
                     const total    = filterType === "income" ? totalIncomeAmt : totalExpenseAmt;
@@ -266,14 +265,17 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
                             onMouseLeave={() => setHoveredId(null)}
                             onClick={() => amt > 0 && onViewCategory?.(c.name)}
                             style={{
-                                background: "var(--bg-surface)",
-                                border: `1px solid ${isHov ? color + "45" : "var(--color-border-soft)"}`,
-                                borderRadius: 16, padding: "18px 18px 14px",
+                                background: "var(--glass-1)",
+                                backdropFilter: "var(--glass-blur)",
+                                WebkitBackdropFilter: "var(--glass-blur)",
+                                border: `1px solid ${isHov ? color + "45" : "var(--glass-border)"}`,
+                                borderRadius: 18, padding: "18px 18px 14px",
                                 display: "flex", flexDirection: "column", gap: 10,
                                 transition: "border-color .2s, box-shadow .2s, transform .2s",
                                 transform: isHov ? "translateY(-2px)" : "translateY(0)",
-                                boxShadow: isHov ? `0 8px 28px ${color}18` : "none",
+                                boxShadow: isHov ? `var(--glass-highlight), 0 8px 28px ${color}22` : "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.04)",
                                 position: "relative",
+                                overflow: "hidden",
                                 cursor: amt > 0 ? "pointer" : "default",
                             }}
                         >
@@ -301,7 +303,7 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
                             {/* Name */}
                             <div>
                                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tCat(c.name, c.isDefault)}</div>
-                                <div style={{ fontSize: 11, color: amt > 0 ? color : "#48474f", marginTop: 2, fontWeight: amt > 0 ? 600 : 400 }}>
+                                <div className={amt > 0 ? "num-tight mono" : ""} style={{ fontSize: 11, color: amt > 0 ? color : "var(--color-subtle)", marginTop: 2, fontWeight: amt > 0 ? 700 : 400, letterSpacing: amt > 0 ? "-.01em" : "normal" }}>
                                     {amt > 0 ? fmtRp(amt) : t("cat.noTx") || "Belum ada transaksi"}
                                 </div>
                             </div>
@@ -351,9 +353,10 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
 
             {/* ── Empty state ── */}
             {displayCats.length === 0 && search && (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "#475569" }}>
-                    <div style={{ fontSize: 36, marginBottom: 10 }}>🔍</div>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)" }}>Tidak ada kategori yang cocok dengan "<strong>{search}</strong>"</p>
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-subtle)" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>🔍</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>Tidak ada hasil</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)" }}>Tidak ada kategori yang cocok dengan "<strong>{search}</strong>"</div>
                 </div>
             )}
 

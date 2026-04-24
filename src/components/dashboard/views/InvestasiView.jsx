@@ -22,46 +22,46 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
         ? new Date(scraped_at).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
         : "-";
 
+    // Staleness heuristic: fresh if scraped within 12 hours
+    const scrapedMs = scraped_at ? new Date(scraped_at).getTime() : 0;
+    const isFresh   = scrapedMs > 0 && (Date.now() - scrapedMs) < 12 * 3600 * 1000;
+
     return (
         <div style={{ marginBottom: 20 }}>
             {/* ── Collapsed: tombol kecil ── */}
             {!open ? (
                 <button onClick={() => setOpen(true)}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", borderRadius: 12, border: "1px solid rgba(245,158,11,.25)", background: "rgba(245,158,11,.06)", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 16px", borderRadius: 14, border: "1px solid var(--glass-border)", background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.06)", cursor: "pointer", fontFamily: "inherit", textAlign: "left", minHeight: 48, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 18 }}>🥇</span>
-                    <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b" }}>
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-amber, #f59e0b)" }}>
                             Lihat Harga Emas {goldPrices.brand?.toUpperCase()}
                         </span>
                         {spot1gr && (
-                            <span style={{ fontSize: 11, color: "var(--color-muted)", marginLeft: 8 }}>
+                            <span className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)" }}>
                                 1gr = {fmtRp(spot1gr.buy_price)}
                             </span>
                         )}
-                        {tanggal && (
-                            <span style={{ fontSize: 10, color: "var(--color-subtle)", marginLeft: 6 }}>
-                                · {tanggal.replace("Harga Emas Hari Ini, ", "")}
-                            </span>
-                        )}
+                        <span className={isFresh ? "chip chip-mint" : "chip chip-ghost"}>
+                            {isFresh ? "Fresh" : (tanggal ? tanggal.replace("Harga Emas Hari Ini, ", "") : "Stale")}
+                        </span>
                     </div>
                     <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>▼</span>
                 </button>
             ) : (
                 /* ── Expanded: panel penuh ── */
-                <div style={{ background: "rgba(245,158,11,.06)", border: "1px solid rgba(245,158,11,.25)", borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, overflow: "hidden", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)" }}>
                     {/* Header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", gap: 10, flexWrap: "wrap" }}
                         onClick={() => setOpen(false)}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                             <span style={{ fontSize: 20 }}>🥇</span>
-                            <div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>
-                                    Harga Emas {goldPrices.brand?.toUpperCase()} Hari Ini
-                                    {tanggal && (
-                                        <span style={{ marginLeft: 8, fontSize: 11, color: "var(--color-muted)", fontWeight: 400 }}>
-                                            · {tanggal.replace("Harga Emas Hari Ini, ", "")}
-                                        </span>
-                                    )}
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                    <span>Harga Emas {goldPrices.brand?.toUpperCase()} Hari Ini</span>
+                                    <span className={isFresh ? "chip chip-mint" : "chip chip-ghost"}>
+                                        {isFresh ? "Fresh" : "Stale"}
+                                    </span>
                                 </div>
                                 <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
                                     Diperbarui: {lastUpdate} · Sumber: {goldPrices.source || "-"}
@@ -69,9 +69,10 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
                             </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <button onClick={e => { e.stopPropagation(); onRefresh(); }} disabled={refreshing}
-                                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(245,158,11,.35)", background: "transparent", color: "#f59e0b", cursor: refreshing ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: refreshing ? 0.6 : 1 }}>
-                                {refreshing ? "⏳ Memuat..." : "🔄 Perbarui"}
+                            <button onClick={e => { e.stopPropagation(); onRefresh && onRefresh(); }} disabled={refreshing || !onRefresh}
+                                className="btn-ghost"
+                                style={{ fontSize: 11, padding: "6px 12px", minHeight: 32, cursor: (refreshing || !onRefresh) ? "not-allowed" : "pointer", opacity: (refreshing || !onRefresh) ? 0.5 : 1 }}>
+                                {refreshing ? "Memuat..." : "Perbarui"}
                             </button>
                             <span style={{ color: "var(--color-muted)", fontSize: 12 }}>▲</span>
                         </div>
@@ -93,24 +94,24 @@ function GoldPricePanel({ goldPrices, onRefresh, refreshing, onSelectPrice }) {
                         )}
 
                         {/* Price grid */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 150px), 1fr))", gap: 8 }}>
                             {items.map((item, i) => (
                                 <button key={i} onClick={() => onSelectPrice(item, activeCat)}
-                                    style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "background .15s" }}
-                                    onMouseOver={e => e.currentTarget.style.background = "rgba(245,158,11,.2)"}
-                                    onMouseOut={e  => e.currentTarget.style.background = "rgba(245,158,11,.08)"}>
-                                    <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginBottom: 4 }}>{item.weight}</div>
-                                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)" }}>{fmtRp(item.buy_price)}</div>
+                                    style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 12, padding: "10px 14px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "all .15s" }}
+                                    onMouseOver={e => { e.currentTarget.style.background = "rgba(245,158,11,.12)"; e.currentTarget.style.borderColor = "rgba(245,158,11,.3)"; }}
+                                    onMouseOut={e  => { e.currentTarget.style.background = "var(--bg-surface-low)"; e.currentTarget.style.borderColor = "var(--color-border-soft)"; }}>
+                                    <div style={{ fontSize: 11, color: "var(--color-amber, #f59e0b)", fontWeight: 700, marginBottom: 4 }}>{item.weight}</div>
+                                    <div className="num-tight mono" style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)" }}>{fmtRp(item.buy_price)}</div>
                                     {item.weight_grams > 0 && (
-                                        <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>{fmtRp(item.price_per_gram)}/gram</div>
+                                        <div className="num-tight mono" style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>{fmtRp(item.price_per_gram)}/gram</div>
                                     )}
                                     {item.sell_price && (
-                                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 1 }}>+PPh: {fmtRp(item.sell_price)}</div>
+                                        <div className="num-tight mono" style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 1 }}>+PPh: {fmtRp(item.sell_price)}</div>
                                     )}
                                     {item.buyback_price && (
-                                        <div style={{ fontSize: 10, color: "#34d399", marginTop: 1 }}>Buyback: {fmtRp(item.buyback_price)}</div>
+                                        <div className="num-tight mono" style={{ fontSize: 10, color: "var(--color-primary)", marginTop: 1 }}>Buyback: {fmtRp(item.buyback_price)}</div>
                                     )}
-                                    <div style={{ fontSize: 9, color: "rgba(245,158,11,.6)", marginTop: 4, fontWeight: 600 }}>Klik untuk isi form →</div>
+                                    <div style={{ fontSize: 9, color: "var(--color-subtle)", marginTop: 4, fontWeight: 600 }}>Klik untuk isi form →</div>
                                 </button>
                             ))}
                         </div>
@@ -413,52 +414,69 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
     const totalGain      = totalNilai - totalModal;
     const totalReturnPct = totalModal > 0 ? ((totalGain / totalModal) * 100).toFixed(2) : 0;
 
+    const gainPositive = totalGain >= 0;
+
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("inv.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
-                        {investments.length} {t("inv.assets")} · {t("inv.portfolio")} {fmtRp(totalNilai)}
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PORTOFOLIO</div>
+                    <h2 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("inv.title")}</h2>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        {investments.length} {t("inv.assets")} · {t("inv.portfolio")} <span className="num-tight mono">{fmtRp(totalNilai)}</span>
                     </p>
                 </div>
-                <button onClick={openAdd} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 18px", fontSize: 13, minHeight: 42 }}>
                     {t("inv.addNew")}
                 </button>
             </div>
 
             {/* Summary cards */}
             {investments.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
-                    {[
-                        { l: t("inv.totalModal"),    v: fmtRp(totalModal),  c: "var(--color-muted)", bg: "rgba(148,163,184,.08)", border: "rgba(148,163,184,.15)" },
-                        { l: t("inv.currentValue"),  v: fmtRp(totalNilai),  c: "var(--color-primary)", bg: "rgba(96,252,198,.08)",  border: "rgba(96,252,198,.2)" },
-                        { l: t("inv.gainLoss"),      v: (totalGain >= 0 ? "+" : "") + fmtRp(totalGain), c: totalGain >= 0 ? "var(--color-primary)" : "#ff716c", bg: totalGain >= 0 ? "rgba(96,252,198,.08)" : "rgba(255,113,108,.08)", border: totalGain >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)" },
-                        { l: t("inv.return"),        v: `${totalGain >= 0 ? "+" : ""}${totalReturnPct}%`, c: totalGain >= 0 ? "var(--color-primary)" : "#ff716c", bg: totalGain >= 0 ? "rgba(96,252,198,.08)" : "rgba(255,113,108,.08)", border: totalGain >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)" },
-                    ].map((s, i) => (
-                        <div key={i} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: "14px 18px" }}>
-                            <div style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 4 }}>{s.l}</div>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: s.c }}>{s.v}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 12, marginBottom: 20 }}>
+                    {/* Modal */}
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("inv.totalModal")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 24px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalModal)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Total yang diinvestasikan</div>
+                    </div>
+                    {/* Nilai sekarang */}
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("inv.currentValue")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 24px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalNilai)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Nilai live portofolio</div>
+                    </div>
+                    {/* Gain / Loss */}
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                            {t("inv.gainLoss")}
+                            <span className={gainPositive ? "chip chip-mint" : "chip chip-red"}>
+                                {gainPositive ? "▲" : "▼"} {Math.abs(totalReturnPct)}%
+                            </span>
                         </div>
-                    ))}
+                        <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 24px)", fontWeight: 900, color: gainPositive ? "var(--color-primary)" : "var(--color-expense, #ff716c)", letterSpacing: "-.03em", lineHeight: 1 }}>
+                            {gainPositive ? "+" : ""}{fmtRp(totalGain)}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Unrealized P/L</div>
+                    </div>
                 </div>
             )}
 
             {/* Empty state */}
             {investments.length === 0 && (
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("inv.noData")}</div>
-                    <div style={{ fontSize: 13, color: "#48474f", marginBottom: 20 }}>{t("inv.noDataSub")}</div>
-                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                        {t("inv.addFirst")}
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: "48px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>📈</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("inv.noData")}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 16 }}>{t("inv.noDataSub")}</div>
+                    <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 24px", fontSize: 13 }}>
+                        + {t("inv.addFirst")}
                     </button>
                 </div>
             )}
 
             {/* Investment cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 }}>
                 {investments.map(inv => {
                     // Emas: live price HANYA jika ada quantity tersimpan
                     const goldData  = inv.type === "emas" ? getGoldPrices(inv.brand) : null;
@@ -484,99 +502,106 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                     const isProfit = gain >= 0;
                     const typeInfo = TYPES.find(tp => tp.v === inv.type) || TYPES[7];
                     return (
-                        <div key={inv.id} style={{ background: "var(--bg-surface)", border: `1px solid ${inv.color}22`, borderRadius: 16, padding: 22, position: "relative" }}>
-                            <div style={{ position: "absolute", top: 14, right: 14, fontSize: 9, fontWeight: 700, color: typeInfo.color, background: typeInfo.color + "15", border: `1px solid ${typeInfo.color}30`, borderRadius: 6, padding: "2px 8px" }}>
-                                {typeInfo.l.toUpperCase()}
-                            </div>
+                        <div key={inv.id} style={{
+                            background: "var(--glass-1)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: "1px solid var(--glass-border)",
+                            borderRadius: 20, padding: 22, position: "relative", overflow: "hidden",
+                            boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                        }}>
+                            <span className="chip chip-ghost" style={{ position: "absolute", top: 14, right: 14, color: typeInfo.color, borderColor: typeInfo.color + "40", background: typeInfo.color + "12" }}>
+                                {typeInfo.l}
+                            </span>
 
-                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                                <div style={{ width: 48, height: 48, borderRadius: 14, background: inv.color + "18", border: `1px solid ${inv.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingRight: 80 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 14, background: inv.color + "18", border: `1px solid ${inv.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
                                     {inv.icon}
                                 </div>
-                                <div style={{ minWidth: 0 }}>
+                                <div style={{ minWidth: 0, flex: 1 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                                         <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.name}</div>
                                         {inv.brand && (() => {
                                             const b = GOLD_BRANDS.find(x => x.id === inv.brand);
                                             return b ? (
-                                                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: "rgba(245,158,11,.15)", color: "#f59e0b", border: "1px solid rgba(245,158,11,.3)", whiteSpace: "nowrap" }}>
+                                                <span className="chip chip-amber">
                                                     {b.icon} {b.label}
                                                 </span>
                                             ) : null;
                                         })()}
                                     </div>
                                     <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                                        {inv.quantity ? `${inv.quantity} ${inv.unit}` : ""}
+                                        {inv.quantity ? <span className="num-tight">{inv.quantity} {inv.unit}</span> : ""}
                                         {inv.buy_date ? ` · ${t("inv.buy")} ${new Date(inv.buy_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}` : ""}
                                     </div>
                                 </div>
                             </div>
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                                <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 12px" }}>
-                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 3 }}>{t("inv.modal").toUpperCase()}</div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-muted)" }}>{fmtRp(inv.buy_price)}</div>
+                                <div style={{ background: "var(--bg-surface-low)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border-soft)" }}>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 4 }}>{t("inv.modal")}</div>
+                                    <div className="num-tight mono" style={{ fontSize: 13, fontWeight: 800, color: "var(--color-muted)" }}>{fmtRp(inv.buy_price)}</div>
                                 </div>
-                                <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 12px" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 3 }}>
-                                        <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>{t("inv.currentValueLabel").toUpperCase()}</span>
+                                <div style={{ background: "var(--bg-surface-low)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border-soft)" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                                        <span style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.2 }}>{t("inv.currentValueLabel")}</span>
                                         {isLive && (
-                                            <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 4, padding: "1px 5px" }}>
-                                                ⚡ LIVE
+                                            <span className="chip chip-mint" style={{ fontSize: 8, padding: "1px 5px" }}>
+                                                LIVE
                                             </span>
                                         )}
                                     </div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: isLive ? "var(--color-primary)" : "var(--color-text)" }}>{fmtRp(currentVal)}</div>
+                                    <div className="num-tight mono" style={{ fontSize: 13, fontWeight: 800, color: isLive ? "var(--color-primary)" : "var(--color-text)" }}>{fmtRp(currentVal)}</div>
                                 </div>
                             </div>
 
                             {missingQty && (
-                                <div style={{ fontSize: 11, color: "#f59e0b", background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
-                                    ⚠️ Tambahkan jumlah (gram) untuk harga live otomatis
+                                <div style={{ fontSize: 11, color: "var(--color-amber, #f59e0b)", background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 10, padding: "6px 10px", marginBottom: 10 }}>
+                                    Tambahkan jumlah (gram) untuk harga live otomatis
                                 </div>
                             )}
                             {missingCode && (
-                                <div style={{ fontSize: 11, color: "#818cf8", background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
-                                    💡 Tambahkan kode saham (misal: BBCA) untuk harga live otomatis
+                                <div style={{ fontSize: 11, color: "var(--color-transfer, #4FC3F7)", background: "var(--color-transfer-soft, rgba(79,195,247,.08))", border: "1px solid rgba(79,195,247,.25)", borderRadius: 10, padding: "6px 10px", marginBottom: 10 }}>
+                                    Tambahkan kode saham (mis: BBCA) untuk harga live
                                 </div>
                             )}
                             {inv.type === "saham" && inv.kode_saham && stockLoading[inv.kode_saham.toUpperCase()] && (
-                                <div style={{ fontSize: 11, color: "var(--color-subtle)", background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
-                                    ⏳ Memuat harga {inv.kode_saham}...
+                                <div style={{ fontSize: 11, color: "var(--color-subtle)", background: "var(--bg-surface-low)", border: "1px solid var(--color-border-soft)", borderRadius: 10, padding: "6px 10px", marginBottom: 10 }}>
+                                    Memuat harga {inv.kode_saham}...
                                 </div>
                             )}
                             {inv.type === "saham" && inv.kode_saham && stockErrors[inv.kode_saham.toUpperCase()] && (
-                                <div style={{ fontSize: 11, color: "#ff716c", background: "rgba(255,113,108,.06)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
-                                    ❌ Kode "{inv.kode_saham}" tidak ditemukan di IDX — cek kembali & edit aset
+                                <div style={{ fontSize: 11, color: "var(--color-expense, #ff716c)", background: "rgba(255,113,108,.06)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 10, padding: "6px 10px", marginBottom: 10 }}>
+                                    Kode "{inv.kode_saham}" tidak ditemukan di IDX
                                 </div>
                             )}
                             {stockData && (
-                                <div style={{ fontSize: 11, color: stockData.change_pct >= 0 ? "var(--color-primary)" : "#ff716c", background: stockData.change_pct >= 0 ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${stockData.change_pct >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)"}`, borderRadius: 8, padding: "5px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
-                                    <span>📈 {inv.kode_saham} · {fmtRp(stockData.price)}/saham</span>
-                                    <span style={{ fontWeight: 700 }}>{formatChangePct(stockData.change_pct)}</span>
+                                <div style={{ fontSize: 11, color: stockData.change_pct >= 0 ? "var(--color-primary)" : "var(--color-expense, #ff716c)", background: stockData.change_pct >= 0 ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${stockData.change_pct >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)"}`, borderRadius: 10, padding: "5px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
+                                    <span className="num-tight mono">{inv.kode_saham} · {fmtRp(stockData.price)}/saham</span>
+                                    <span className="num-tight" style={{ fontWeight: 700 }}>{formatChangePct(stockData.change_pct)}</span>
                                 </div>
                             )}
 
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.15)" : "rgba(255,113,108,.15)"}`, borderRadius: 10, padding: "8px 12px", marginBottom: 14 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.18)" : "rgba(255,113,108,.18)"}`, borderRadius: 12, padding: "8px 12px", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
                                 <div style={{ fontSize: 12, color: "var(--color-subtle)" }}>{t("inv.gainLoss")}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c" }}>
+                                    <span className="num-tight mono" style={{ fontSize: 13, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "var(--color-expense, #ff716c)" }}>
                                         {isProfit ? "+" : ""}{fmtRp(gain)}
                                     </span>
-                                    <span style={{ fontSize: 11, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c", background: isProfit ? "rgba(96,252,198,.12)" : "rgba(255,113,108,.12)", padding: "2px 7px", borderRadius: 6 }}>
+                                    <span className={isProfit ? "chip chip-mint" : "chip chip-red"}>
                                         {isProfit ? "▲" : "▼"} {Math.abs(returnPct)}%
                                     </span>
                                 </div>
                             </div>
 
                             {inv.notes && (
-                                <div style={{ fontSize: 11, color: "#48474f", marginBottom: 14, fontStyle: "italic" }}>📝 {inv.notes}</div>
+                                <div style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 14, fontStyle: "italic" }}>{inv.notes}</div>
                             )}
 
-                            <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => openEdit(inv)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.08)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("inv.editBtn")}</button>
-                                <button onClick={() => setPriceTarget(inv)} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid rgba(99,102,241,.2)", background: "rgba(99,102,241,.07)", color: "#818cf8", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }} title="Lihat harga">💹</button>
-                                <button onClick={() => setConfirmDelete(inv)} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                <button onClick={() => openEdit(inv)} className="btn-ghost" style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}>{t("inv.editBtn")}</button>
+                                <button onClick={() => setPriceTarget(inv)} aria-label="Lihat harga" style={{ minHeight: 42, minWidth: 42, padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(79,195,247,.22)", background: "var(--color-transfer-soft, rgba(79,195,247,.07))", color: "var(--color-transfer, #4FC3F7)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>💹</button>
+                                <button onClick={() => setConfirmDelete(inv)} aria-label="Delete asset" style={{ minHeight: 42, minWidth: 42, padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,113,108,.18)", background: "rgba(255,113,108,.06)", color: "var(--color-expense, #ff716c)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
                             </div>
                         </div>
                     );
