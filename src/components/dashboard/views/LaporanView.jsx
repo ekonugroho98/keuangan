@@ -49,24 +49,33 @@ const CAT_COLORS = [
 ];
 
 const selectStyle = {
-    padding: "7px 12px", borderRadius: 9,
-    background: "var(--color-border-soft)",
-    border: "1px solid var(--color-border-soft)",
+    padding: "9px 14px", borderRadius: 12, minHeight: 42,
+    background: "var(--glass-1)",
+    backdropFilter: "var(--glass-blur)",
+    WebkitBackdropFilter: "var(--glass-blur)",
+    border: "1px solid var(--glass-border)",
     color: "var(--color-text)", fontSize: 12, fontFamily: "inherit",
     outline: "none", cursor: "pointer",
 };
 
-/* Toggle button group */
+/* Toggle button group — segmented control */
 const ChartToggle = ({ value, options, onChange }) => (
-    <div style={{ display: "flex", gap: 2, background: "var(--color-border-soft)", borderRadius: 8, padding: 2 }}>
+    <div style={{
+        display: "flex", gap: 2, padding: 3, borderRadius: 10,
+        background: "var(--glass-2)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
+    }}>
         {options.map(opt => (
             <button key={opt.v} onClick={() => onChange(opt.v)}
                 style={{
-                    padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                    fontFamily: "inherit", fontSize: 11, fontWeight: 600, transition: "all .15s",
+                    padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                    fontFamily: "inherit", fontSize: 11, fontWeight: 700, transition: "all .18s",
                     background: value === opt.v ? "var(--bg-surface)" : "transparent",
                     color: value === opt.v ? "var(--color-text)" : "var(--color-subtle)",
-                    boxShadow: value === opt.v ? "0 1px 3px rgba(0,0,0,.15)" : "none",
+                    boxShadow: value === opt.v ? "var(--glass-highlight), 0 1px 3px rgba(0,0,0,.12)" : "none",
+                    minHeight: 32,
                 }}>
                 {opt.icon} {opt.l}
             </button>
@@ -241,10 +250,11 @@ const LaporanView = ({ transactions = [] }) => {
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header + Filter */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("rep.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>{t("rep.period")}: {periodLabel}</p>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>REPORTS</div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("rep.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>{t("rep.period")}: {periodLabel}</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={selectStyle}>
@@ -258,11 +268,20 @@ const LaporanView = ({ transactions = [] }) => {
                 </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 }}>
 
                 {/* ── Ringkasan ── */}
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>{t("rep.summary")} {periodLabel}</h3>
+                <div style={{
+                    background: "var(--glass-1)",
+                    backdropFilter: "var(--glass-blur)",
+                    WebkitBackdropFilter: "var(--glass-blur)",
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: 20, padding: "22px 24px",
+                    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                    position: "relative", overflow: "hidden",
+                }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 6 }}>SUMMARY</div>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 16, marginTop: 0 }}>{t("rep.summary")} {periodLabel}</h3>
                     {[
                         { l: t("rep.totalIncome"),   v: fmtRp(income),    c: "var(--color-primary)" },
                         { l: t("rep.totalExpense"),  v: fmtRp(expense),   c: "#ff716c" },
@@ -272,15 +291,23 @@ const LaporanView = ({ transactions = [] }) => {
                         { l: t("rep.avgPerDay"),     v: fmtRp(avgPerDay), c: "var(--color-primary)" },
                         { l: t("rep.txCount"),       v: filtered.length,  c: "var(--color-muted)" },
                     ].map((r, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: i > 0 ? "1px solid var(--color-border-soft)" : "none" }}>
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: i > 0 ? "1px solid var(--color-border-soft)" : "none", gap: 8, flexWrap: "wrap" }}>
                             <span style={{ fontSize: 13, color: "var(--color-muted)" }}>{r.l}</span>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: r.c }}>{r.v}</span>
+                            <span className="num-tight mono" style={{ fontSize: 14, fontWeight: 700, color: r.c }}>{r.v}</span>
                         </div>
                     ))}
                 </div>
 
                 {/* ── Pengeluaran Harian ── */}
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
+                <div style={{
+                    background: "var(--glass-1)",
+                    backdropFilter: "var(--glass-blur)",
+                    WebkitBackdropFilter: "var(--glass-blur)",
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: 20, padding: "22px 24px",
+                    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                    position: "relative", overflow: "hidden",
+                }}>
                     {/* Header row */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
                         <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("rep.dailyExpense")}</h3>
@@ -373,7 +400,15 @@ const LaporanView = ({ transactions = [] }) => {
                 </div>
 
                 {/* ── Breakdown Kategori ── */}
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: 22 }}>
+                <div style={{
+                    background: "var(--glass-1)",
+                    backdropFilter: "var(--glass-blur)",
+                    WebkitBackdropFilter: "var(--glass-blur)",
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: 20, padding: "22px 24px",
+                    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                    position: "relative", overflow: "hidden",
+                }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
                         <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>{t("rep.breakdown")}</h3>
                         <ChartToggle

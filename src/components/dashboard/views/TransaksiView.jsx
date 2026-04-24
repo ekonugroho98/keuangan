@@ -211,20 +211,23 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
             )}
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(26px,4vw,36px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>
+                        {t("tx.allTransactions") || "TRANSAKSI"}
+                    </div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>
                         {t("tx.allTransactions") || "Transaksi"}
                     </h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0, fontWeight: 500 }}>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6, fontWeight: 500 }}>
                         {t("tx.subtitle") || "Kelola arus kas dengan presisi."}
                     </p>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
+                    <span className="eyebrow" style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.8, textTransform: "uppercase", color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
                         {t("tx.activePeriod") || "Periode Aktif"}
                     </span>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-text)" }}>{periodLabel}</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.02em" }}>{periodLabel}</div>
                 </div>
             </div>
 
@@ -240,7 +243,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                             </div>
                             <div>
                                 <div style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500 }}>{t("acc.balance") || "Saldo"} · {activeAccount.name}</div>
-                                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text)", lineHeight: 1.2 }}>{fmtRp(activeAccount.balance)}</div>
+                                <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 22px)", fontWeight: 900, color: "var(--color-text)", lineHeight: 1.2, letterSpacing: "-.03em" }}>{fmtRp(activeAccount.balance)}</div>
                             </div>
                         </div>
                         <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
@@ -258,87 +261,109 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                         ].filter(s => s.show).map((s, i, arr) => (
                             <div key={i} style={{ padding: "12px 20px", borderRight: i < arr.length - 1 ? "1px solid var(--color-border-soft)" : "none" }}>
                                 <div style={{ fontSize: 10, color: "var(--color-muted)", marginBottom: 4 }}>{s.label}</div>
-                                <div style={{ fontSize: 15, fontWeight: 700, color: s.color }}>{s.value}</div>
+                                <div className="num-tight mono" style={{ fontSize: 15, fontWeight: 800, color: s.color, letterSpacing: "-.02em" }}>{s.value}</div>
                             </div>
                         ))}
                     </div>
                 </div>
             ) : (
                 /* ── MODE SEMUA AKUN: 4 cards biasa ── */
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
                     {/* Pemasukan */}
-                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #60fcc6", transition: "transform .3s" }}
-                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    <div style={{
+                        background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px",
+                        boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                        position: "relative", overflow: "hidden", borderLeft: "4px solid var(--color-primary)",
+                        transition: "transform .3s"
+                    }}
+                        onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
                     >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", background: "rgba(96,252,198,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                                {filtered.filter(tx => tx.type === "income").length} {t("tx.summary") || "tx"}
-                            </span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6 }}>{t("tx.income") || "Pemasukan"}</div>
+                            <span className="chip chip-mint">{filtered.filter(tx => tx.type === "income").length} tx</span>
                         </div>
-                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.income") || "Pemasukan"}</p>
-                        <h3 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 3px" }}>+{fmtRp(sumIn)}</h3>
-                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>+{fmtRp(sumIn)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{t("tx.moreEconomical") || "periode ini"}</div>
                     </div>
                     {/* Pengeluaran */}
-                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #ff716c", transition: "transform .3s" }}
-                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    <div style={{
+                        background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px",
+                        boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                        position: "relative", overflow: "hidden", borderLeft: "4px solid var(--color-expense)",
+                        transition: "transform .3s"
+                    }}
+                        onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
                     >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(255,113,108,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📉</div>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#ff716c", background: "rgba(255,113,108,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                                {filtered.filter(tx => tx.type === "expense").length} {t("tx.summary") || "tx"}
-                            </span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6 }}>{t("tx.expense") || "Pengeluaran"}</div>
+                            <span className="chip chip-red">{filtered.filter(tx => tx.type === "expense").length} tx</span>
                         </div>
-                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.expense") || "Pengeluaran"}</p>
-                        <h3 style={{ fontSize: 20, fontWeight: 800, color: "#ff716c", margin: "0 0 3px" }}>-{fmtRp(sumOut)}</h3>
-                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.moreEconomical") || "periode ini"}</p>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-expense)", letterSpacing: "-.03em", lineHeight: 1 }}>-{fmtRp(sumOut)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{t("tx.moreEconomical") || "periode ini"}</div>
                     </div>
                     {/* Transfer */}
-                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: "4px solid #4FC3F7", transition: "transform .3s" }}
-                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    <div style={{
+                        background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px",
+                        boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                        position: "relative", overflow: "hidden", borderLeft: "4px solid var(--color-transfer)",
+                        transition: "transform .3s"
+                    }}
+                        onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
                     >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(79,195,247,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔀</div>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.08)", padding: "3px 8px", borderRadius: 6 }}>
-                                {filtered.filter(tx => tx.type === "transfer").length} {t("tx.summary") || "tx"}
-                            </span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6 }}>{t("tx.transfer") || "Transfer"}</div>
+                            <span className="chip chip-blue">{filtered.filter(tx => tx.type === "transfer").length} tx</span>
                         </div>
-                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.transfer") || "Transfer"}</p>
-                        <h3 style={{ fontSize: 20, fontWeight: 800, color: "#4FC3F7", margin: "0 0 3px" }}>↔ {fmtRp(sumTransfer)}</h3>
-                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.transferNote") || "pemindahan antar akun"}</p>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-transfer)", letterSpacing: "-.03em", lineHeight: 1 }}>↔ {fmtRp(sumTransfer)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{t("tx.transferNote") || "pemindahan antar akun"}</div>
                     </div>
                     {/* Bersih */}
-                    <div style={{ background: "var(--bg-surface)", borderRadius: 16, padding: 20, borderLeft: `4px solid ${net >= 0 ? "#a78bfa" : "#ff716c"}`, transition: "transform .3s" }}
-                        onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                        onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                    <div style={{
+                        background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px",
+                        boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                        position: "relative", overflow: "hidden",
+                        borderLeft: `4px solid ${net >= 0 ? "var(--color-purple)" : "var(--color-expense)"}`,
+                        transition: "transform .3s"
+                    }}
+                        onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                        onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
                     >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(167,139,250,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💰</div>
-                            <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid rgba(167,139,250,.25)` }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6 }}>{t("tx.net") || "Saldo Bersih"}</div>
+                            <span className={net >= 0 ? "chip chip-ghost" : "chip chip-red"}>{net >= 0 ? "positif" : "negatif"}</span>
                         </div>
-                        <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 3 }}>{t("tx.net") || "Saldo Bersih"}</p>
-                        <h3 style={{ fontSize: 20, fontWeight: 800, color: net >= 0 ? "var(--color-text)" : "#ff716c", margin: "0 0 3px" }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</h3>
-                        <p style={{ fontSize: 10, color: "var(--color-subtle)", margin: 0 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</p>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: net >= 0 ? "var(--color-text)" : "var(--color-expense)", letterSpacing: "-.03em", lineHeight: 1 }}>{net >= 0 ? "+" : ""}{fmtRp(net)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{t("tx.netAccumulation") || "pemasukan − pengeluaran"}</div>
                     </div>
                 </div>
             )}
 
             {/* ── Filter Bar (glass) ── */}
             <div style={{
-                background: "var(--bg-glass)", backdropFilter: "blur(20px)",
-                border: "1px solid rgba(72,71,79,.15)",
-                borderRadius: 16, padding: "16px 18px",
-                display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between",
+                background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+                border: "1px solid var(--glass-border)",
+                borderRadius: 20, padding: "14px 16px",
+                boxShadow: "var(--glass-highlight)",
+                display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between",
             }}>
                 {/* Left: type tabs + year/month */}
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
 
                     {/* Type tabs — pill group */}
-                    <div style={{ display: "flex", background: "var(--bg-surface-low)", borderRadius: 12, padding: 4, gap: 2 }}>
+                    <div style={{
+                        display: "flex", background: "var(--bg-surface-low)", borderRadius: 12,
+                        padding: 4, gap: 2, overflowX: "auto", maxWidth: "100%",
+                        scrollSnapType: "x mandatory",
+                        maskImage: "linear-gradient(to right, black calc(100% - 30px), transparent)",
+                        WebkitMaskImage: "linear-gradient(to right, black calc(100% - 30px), transparent)",
+                    }}>
                         {TYPE_TABS.map(tab => {
                             const isActive = filterType === tab.id;
                             return (
@@ -451,7 +476,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                 {/* Right: search + date + reset */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     {/* Search */}
-                    <div style={{ position: "relative" }}>
+                    <div style={{ position: "relative", flex: "1 1 160px", minWidth: "min(60vw, 160px)" }}>
                         <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, opacity: .5, pointerEvents: "none" }}>🔍</span>
                         <input
                             type="text"
@@ -461,7 +486,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                             style={{
                                 background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12,
                                 color: "var(--color-text)", fontSize: 12, fontFamily: "inherit",
-                                padding: "8px 12px 8px 30px", outline: "none", width: 200,
+                                padding: "10px 12px 10px 30px", outline: "none", minHeight: 42, width: "100%", boxSizing: "border-box",
                             }}
                         />
                     </div>
@@ -471,13 +496,14 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                         type="date"
                         value={filterDate}
                         onChange={e => { setFilterDate(e.target.value); setFilterYear(""); setFilterMonth(""); setPage(1); }}
-                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12, color: "var(--color-muted)", fontSize: 12, fontFamily: "inherit", padding: "8px 10px", outline: "none", colorScheme: "normal", cursor: "pointer" }}
+                        style={{ background: "var(--bg-surface-low)", border: "1px solid var(--color-border)", borderRadius: 12, color: "var(--color-muted)", fontSize: 12, fontFamily: "inherit", padding: "10px", minHeight: 42, outline: "none", colorScheme: "normal", cursor: "pointer" }}
                     />
 
                     {/* Reset */}
                     {(filterDate || search || filterType !== "all" || filterAccount || filterCategory) && (
                         <button onClick={handleReset}
-                            style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid rgba(255,113,108,.2)", background: "rgba(255,113,108,.08)", color: "#ff716c", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                            className="chip chip-red"
+                            style={{ cursor: "pointer", border: "none", fontFamily: "inherit", minHeight: 32, whiteSpace: "nowrap" }}>
                             ✕ {t("common.reset")}
                         </button>
                     )}
@@ -487,28 +513,29 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
             {/* ── Stats Mini Bar ── */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", flexWrap: "wrap", gap: 6 }}>
                 <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0, display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center" }}>
-                    <span><span style={{ fontWeight: 600, color: "var(--color-text)" }}>{filtered.length}</span> {t("tx.summary") || "transaksi"}</span>
+                    <span><span style={{ fontWeight: 700, color: "var(--color-text)" }}>{filtered.length}</span> {t("tx.summary") || "transaksi"}</span>
                     <span style={{ opacity: .35 }}>·</span>
-                    <span style={{ color: "rgba(96,252,198,.85)", fontWeight: 600 }}>↑ {fmtRp(sumIn)}</span>
+                    <span className="num-tight mono" style={{ color: "var(--color-primary)", fontWeight: 700 }}>↑ {fmtRp(sumIn)}</span>
                     <span style={{ opacity: .35 }}>·</span>
-                    <span style={{ color: "rgba(255,113,108,.85)", fontWeight: 600 }}>↓ {fmtRp(sumOut)}</span>
+                    <span className="num-tight mono" style={{ color: "var(--color-expense)", fontWeight: 700 }}>↓ {fmtRp(sumOut)}</span>
                     {sumTransfer > 0 && <>
                         <span style={{ opacity: .35 }}>·</span>
-                        <span style={{ color: "rgba(79,195,247,.85)", fontWeight: 600 }}>↔ {fmtRp(sumTransfer)}</span>
+                        <span className="num-tight mono" style={{ color: "var(--color-transfer)", fontWeight: 700 }}>↔ {fmtRp(sumTransfer)}</span>
                     </>}
                     <span style={{ opacity: .35 }}>·</span>
-                    <span style={{ color: net >= 0 ? "var(--color-text)" : "#ff716c", fontWeight: 600 }}>
+                    <span className="num-tight mono" style={{ color: net >= 0 ? "var(--color-text)" : "var(--color-expense)", fontWeight: 700 }}>
                         {t("tx.net") || "Bersih"}: {net >= 0 ? "+" : ""}{fmtRp(net)}
                     </span>
                 </p>
             </div>
 
             {/* ── Transaction List ── */}
-            <div style={{ borderRadius: 24, overflow: "hidden" }}>
+            <div style={{ borderRadius: 24, overflow: "hidden", border: "1px solid var(--color-border-soft)" }}>
                 {filtered.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", background: "var(--bg-surface-low)", borderRadius: 24 }}>
-                        <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
-                        <p style={{ fontSize: 13, margin: 0, color: "var(--color-muted)" }}>{t("tx.noTxPeriod")}</p>
+                    <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-subtle)", background: "var(--bg-surface-low)", borderRadius: 24 }}>
+                        <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>🔍</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("tx.noTxPeriod") || "Belum ada transaksi"}</div>
+                        <div style={{ fontSize: 12, color: "var(--color-muted)" }}>Coba ubah filter atau periode pencarian</div>
                     </div>
                 ) : (
                     pagedFiltered.map((tx, idx) => {
@@ -549,9 +576,9 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                     </div>
 
                                     {/* Name + badge + meta */}
-                                    <div style={{ minWidth: 0 }}>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
-                                            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
+                                            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
                                                 {tx.note}
                                             </span>
                                             <span style={{
@@ -574,23 +601,25 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                 </div>
 
                                 {/* Right: amount + actions */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
-                                    <span style={{ fontSize: 16, fontWeight: 700, color: meta.amtColor, letterSpacing: "-0.3px", whiteSpace: "nowrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                                    <span className="num-tight mono" style={{ fontSize: "clamp(14px, 2vw, 16px)", fontWeight: 800, color: meta.amtColor, letterSpacing: "-.02em", whiteSpace: "nowrap" }}>
                                         {meta.sign}{fmtRp(tx.amount)}
                                     </span>
 
                                     {/* Action buttons — always visible on mobile */}
                                     <div style={{ display: "flex", gap: 4, opacity: isMobile || isHovered ? 1 : 0, transition: "opacity .15s", pointerEvents: isMobile || isHovered ? "auto" : "none" }}>
                                         <button
+                                            aria-label="Edit transaksi"
                                             onClick={() => onEdit(tx)}
-                                            style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "var(--color-muted)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
+                                            style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "transparent", color: "var(--color-muted)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
                                             onMouseOver={e => e.currentTarget.style.background = "var(--bg-surface-hover)"}
                                             onMouseOut={e => e.currentTarget.style.background = "transparent"}
                                         >✏️</button>
                                         <button
+                                            aria-label="Hapus transaksi"
                                             onClick={() => setConfirmDelete(tx)}
-                                            style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "transparent", color: "#ff716c", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
-                                            onMouseOver={e => e.currentTarget.style.background = "rgba(255,113,108,.1)"}
+                                            style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "transparent", color: "var(--color-expense)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s" }}
+                                            onMouseOver={e => e.currentTarget.style.background = "var(--color-expense-soft)"}
                                             onMouseOut={e => e.currentTarget.style.background = "transparent"}
                                         >🗑️</button>
                                     </div>
@@ -608,7 +637,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                     <button
                         onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                         disabled={page === 1}
-                        style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--color-border)", background: "transparent", color: page === 1 ? "var(--color-subtle)" : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: page === 1 ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: page === 1 ? .4 : 1 }}>
+                        style={{ padding: "9px 14px", minHeight: 36, borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: page === 1 ? "var(--color-subtle)" : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: page === 1 ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: page === 1 ? .4 : 1 }}>
                         ← Prev
                     </button>
 
@@ -636,7 +665,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                     <button
                         onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                         disabled={page === totalPages}
-                        style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--color-border)", background: "transparent", color: page === totalPages ? "var(--color-subtle)" : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: page === totalPages ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: page === totalPages ? .4 : 1 }}>
+                        style={{ padding: "9px 14px", minHeight: 36, borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: page === totalPages ? "var(--color-subtle)" : "var(--color-muted)", fontSize: 12, fontWeight: 600, cursor: page === totalPages ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: page === totalPages ? .4 : 1 }}>
                         Next →
                     </button>
 

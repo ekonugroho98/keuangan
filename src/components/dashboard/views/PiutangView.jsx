@@ -80,52 +80,54 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(22px,4vw,32px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PIUTANG</div>
+                    <h2 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>
                         {t("piu.title")}
-                    </h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
-                        {piutang.length} {t("piu.countLabel")} · {t("piu.outstanding")} {fmtRp(totalSisa)}
+                    </h2>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        {piutang.length} {t("piu.countLabel")} · {t("piu.outstanding")} <span className="num-tight mono">{fmtRp(totalSisa)}</span>
                     </p>
                 </div>
-                <button onClick={openAdd}
-                    style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#0a2e22", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 18px", fontSize: 13, minHeight: 42 }}>
                     {t("piu.addBtn")}
                 </button>
             </div>
 
             {/* Summary cards */}
             {piutang.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
-                    <div style={{ background: "rgba(96,252,198,.08)", border: "1px solid rgba(96,252,198,.2)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("piu.totalLent")}</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)" }}>{fmtRp(totalDipinjamkan)}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 12, marginBottom: 20 }}>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("piu.totalLent")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalDipinjamkan)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Total dipinjamkan</div>
                     </div>
-                    <div style={{ background: "rgba(96,252,198,.06)", border: "1px solid rgba(96,252,198,.15)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("piu.totalReturned")}</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#22c55e" }}>{fmtRp(totalKembali)}</div>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("piu.totalReturned")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalKembali)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Sudah kembali</div>
                     </div>
-                    <div style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("piu.totalOutstanding")}</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>{fmtRp(totalSisa)}</div>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("piu.totalOutstanding")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-amber, #f59e0b)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalSisa)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Belum kembali</div>
                     </div>
                 </div>
             )}
 
             {/* Empty state */}
             {piutang.length === 0 && (
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🤝</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("piu.noData")}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-subtle)", marginBottom: 20 }}>{t("piu.noDataSub")}</div>
-                    <button onClick={openAdd}
-                        style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#0a2e22", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        {t("piu.addFirst")}
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: "48px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>🤝</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("piu.noData")}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 16 }}>{t("piu.noDataSub")}</div>
+                    <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 24px", fontSize: 13 }}>
+                        + {t("piu.addFirst")}
                     </button>
                 </div>
             )}
 
             {/* Grid kartu */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 }}>
                 {piutang.map(p => {
                     const returned = p.total - p.remaining;
                     const pct      = p.total > 0 ? Math.min(100, Math.round((returned / p.total) * 100)) : 0;
@@ -136,32 +138,42 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                     const overdue   = !lunas && p.due_date && p.due_date < today;
                     const nearDue   = !lunas && !overdue && p.due_date && (new Date(p.due_date) - new Date(today)) / 86400000 <= 7;
 
+                    const hasBadge = lunas || overdue || (nearDue && !overdue);
+
                     return (
                         <div key={p.id} style={{
-                            background: "var(--bg-surface)",
-                            border: `1px solid ${lunas ? "#60fcc633" : overdue ? "rgba(255,113,108,.3)" : p.color + "22"}`,
-                            borderRadius: 16, padding: 24, position: "relative",
+                            background: "var(--glass-1)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: `1px solid ${lunas ? "rgba(96,252,198,.4)" : overdue ? "rgba(255,113,108,.35)" : "var(--glass-border)"}`,
+                            borderRadius: 20, padding: 22, position: "relative", overflow: "hidden",
+                            boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
                         }}>
                             {/* Badge status */}
                             {lunas && (
-                                <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "var(--color-primary)" }}>
+                                <span className="chip chip-mint" style={{ position: "absolute", top: 14, right: 14 }}>
                                     {t("piu.badgePaid")}
-                                </div>
+                                </span>
                             )}
                             {overdue && (
-                                <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,113,108,.12)", border: "1px solid rgba(255,113,108,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "#ff716c" }}>
+                                <span className="chip chip-red" style={{ position: "absolute", top: 14, right: 14 }}>
                                     {t("piu.badgeOverdue")}
-                                </div>
+                                </span>
                             )}
                             {nearDue && !overdue && (
-                                <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "#f59e0b" }}>
+                                <span className="chip chip-amber" style={{ position: "absolute", top: 14, right: 14 }}>
                                     {t("piu.badgeNearDue")}
-                                </div>
+                                </span>
+                            )}
+                            {!hasBadge && !lunas && (
+                                <span className="chip chip-ghost" style={{ position: "absolute", top: 14, right: 14 }}>
+                                    Menunggu
+                                </span>
                             )}
 
                             {/* Header kartu */}
-                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                                <div style={{ width: 48, height: 48, borderRadius: 14, background: p.color + "18", border: `1px solid ${p.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingRight: 90 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 14, background: p.color + "18", border: `1px solid ${p.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
                                     {p.icon}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -169,37 +181,37 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                         {p.borrower_name}
                                     </div>
                                     {p.due_date && (
-                                        <div style={{ fontSize: 11, color: overdue ? "#ff716c" : "var(--color-muted)" }}>
+                                        <div style={{ fontSize: 11, color: overdue ? "var(--color-expense, #ff716c)" : "var(--color-muted)" }}>
                                             {t("piu.dueDate")} {new Date(p.due_date + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                                         </div>
                                     )}
                                     {p.notes && (
                                         <div style={{ fontSize: 11, color: "var(--color-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            📝 {p.notes}
+                                            {p.notes}
                                         </div>
                                     )}
                                 </div>
                             </div>
 
                             {/* Progress */}
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                                <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{t("piu.returnedPct")} {pct}%</span>
-                                <span style={{ fontSize: 12, color: lunas ? "var(--color-primary)" : p.color, fontWeight: 600 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{t("piu.returnedPct")} <span className="num-tight">{pct}%</span></span>
+                                <span className="num-tight mono" style={{ fontSize: 12, color: lunas ? "var(--color-primary)" : p.color, fontWeight: 600 }}>
                                     {fmtRp(returned)} / {fmtRp(p.total)}
                                 </span>
                             </div>
-                            <div style={{ height: 8, borderRadius: 4, background: "var(--color-border-soft)", marginBottom: 12 }}>
-                                <div style={{ height: "100%", borderRadius: 4, background: lunas ? "var(--color-primary)" : p.color, width: `${pct}%`, transition: "width 1s" }} />
+                            <div style={{ height: 8, borderRadius: 4, background: "var(--bg-sunk, var(--color-border-soft))", marginBottom: 12, overflow: "hidden" }}>
+                                <div style={{ height: "100%", borderRadius: 4, background: lunas ? "var(--color-primary)" : p.color, width: `${pct}%`, transition: "width 1s", boxShadow: `0 0 10px ${lunas ? "var(--color-primary)" : p.color}55` }} />
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 16 }}>
-                                <span style={{ color: "var(--color-subtle)" }}>{t("piu.lent")} {fmtRp(p.total)}</span>
-                                <span style={{ color: lunas ? "var(--color-primary)" : "#f59e0b", fontWeight: 700 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 16, gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ color: "var(--color-subtle)" }}>{t("piu.lent")} <span className="num-tight mono">{fmtRp(p.total)}</span></span>
+                                <span className="num-tight mono" style={{ color: lunas ? "var(--color-primary)" : "var(--color-amber, #f59e0b)", fontWeight: 700 }}>
                                     {t("piu.remaining")} {fmtRp(p.remaining)}
                                 </span>
                             </div>
 
                             {/* Actions */}
-                            <div style={{ display: "flex", gap: 8 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                 {!lunas && (
                                     <button
                                         onClick={() => {
@@ -207,16 +219,17 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                             setTerimaAmount("");
                                             setTerimaAccount(accounts[0]?.name || "");
                                         }}
-                                        style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#60fcc6,#19ce9b)", color: "#0a2e22", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                        className="btn-primary"
+                                        style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}>
                                         {t("piu.receiveBtn")}
                                     </button>
                                 )}
-                                <button onClick={() => openEdit(p)}
-                                    style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.06)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                <button onClick={() => openEdit(p)} className="btn-ghost"
+                                    style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}>
                                     {t("piu.editBtn")}
                                 </button>
-                                <button onClick={() => setConfirmDelete(p)}
-                                    style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                                <button onClick={() => setConfirmDelete(p)} aria-label="Delete piutang"
+                                    style={{ minHeight: 42, minWidth: 42, padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,113,108,.18)", background: "rgba(255,113,108,.06)", color: "var(--color-expense, #ff716c)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
                                     🗑️
                                 </button>
                             </div>

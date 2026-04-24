@@ -157,21 +157,27 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
     const monthName     = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
     const cardStyle = {
-        background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)",
-        borderRadius: 16, padding: "20px 22px",
+        background: "var(--glass-1)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--glass-border)",
+        borderRadius: 20, padding: "22px 24px",
+        boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+        position: "relative", overflow: "hidden",
     };
 
     if (!hasData) {
         return (
             <div style={{ animation: "fadeIn .4s" }}>
                 <div style={{ marginBottom: 24 }}>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("pred.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>{t("pred.subtitle")}</p>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PREDICTION</div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("pred.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>{t("pred.subtitle")}</p>
                 </div>
                 <div style={{ ...cardStyle, textAlign: "center", padding: "48px 24px" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🔮</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("pred.noData")}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-subtle)" }}>{t("pred.noDataSub")}</div>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.4 }}>🔮</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", marginBottom: 6, letterSpacing: "-.01em" }}>{t("pred.noData")}</div>
+                    <div style={{ fontSize: 13, color: "var(--color-muted)" }}>{t("pred.noDataSub")}</div>
                 </div>
             </div>
         );
@@ -180,24 +186,36 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
-            <div style={{ marginBottom: 20 }}>
-                <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("pred.title")}</h1>
-                <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
-                    {t("pred.subtitle")} · {monthName}
-                </p>
+            <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PREDICTION</div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("pred.title")}</h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        {t("pred.subtitle")} · {monthName}
+                    </p>
+                </div>
+                <span className="chip chip-blue" style={{ fontSize: 11, fontWeight: 800 }}>✨ AI Prediction</span>
             </div>
 
             {/* Info banner — metode prediksi */}
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "rgba(96,252,198,.06)", border: "1px solid rgba(96,252,198,.15)", borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
+            <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                background: "var(--color-primary-soft)",
+                backdropFilter: "var(--glass-blur)",
+                WebkitBackdropFilter: "var(--glass-blur)",
+                border: "1px solid var(--glass-border)",
+                borderRadius: 14, padding: "12px 16px", marginBottom: 20,
+                boxShadow: "var(--glass-highlight)",
+            }}>
                 <span style={{ fontSize: 16, flexShrink: 0 }}>🧮</span>
                 <div style={{ fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
                     <strong style={{ color: "var(--color-primary)" }}>{t("pred.methodTitle")}</strong>
                     {" "}— {t("pred.methodDesc")}{" "}
-                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{t("pred.fixed")}</span> {t("pred.methodFixedDesc")}
+                    <span style={{ color: "var(--color-text)", fontWeight: 700 }}>{t("pred.fixed")}</span> {t("pred.methodFixedDesc")}
                     {" "}{t("pred.methodAnd")}{" "}
-                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{t("pred.variable")}</span> {t("pred.methodVariableDesc")}.
-                    {" "}{t("pred.fixedLabel")} <strong style={{ color: "#4FC3F7" }}>{fmtRp(fixedTotal)}</strong> ·
-                    {t("pred.variablePerDay")} <strong style={{ color: "#f59e0b" }}>{fmtRp(variableDailyRate)}</strong>
+                    <span style={{ color: "var(--color-text)", fontWeight: 700 }}>{t("pred.variable")}</span> {t("pred.methodVariableDesc")}.
+                    {" "}{t("pred.fixedLabel")} <strong className="num-tight mono" style={{ color: "var(--color-transfer)" }}>{fmtRp(fixedTotal)}</strong> ·
+                    {t("pred.variablePerDay")} <strong className="num-tight mono" style={{ color: "var(--color-amber)" }}>{fmtRp(variableDailyRate)}</strong>
                     <span style={{ display: "block", marginTop: 4, color: "var(--color-subtle)" }}>
                         💡 {t("pred.aiTip")} <strong>AI Coach</strong>.
                     </span>
@@ -205,80 +223,93 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
             </div>
 
             {/* Top 2 cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 16, marginBottom: 20 }}>
 
-                {/* Prediksi Pengeluaran */}
-                <div style={{ ...cardStyle, position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", right: -20, top: -20, width: 100, height: 100, borderRadius: "50%", background: "rgba(96,252,198,.06)", pointerEvents: "none" }} />
+                {/* Prediksi Pengeluaran — Hero */}
+                <div style={{ ...cardStyle, background: "var(--glass-hero)", padding: "24px 22px" }}>
+                    <div style={{ position: "absolute", right: -40, top: -40, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle, var(--color-primary-soft), transparent 70%)", pointerEvents: "none" }} />
 
                     {/* Label + konteks */}
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1, marginBottom: 2 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", letterSpacing: 1.6, marginBottom: 2, textTransform: "uppercase" }}>
                         {t("pred.estTotalExpense")}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 10 }}>
                         📅 {t("pred.endOf")} {monthName} ({t("pred.dayOf")}{todayDay} {t("pred.dari")} {daysInMonth})
                     </div>
 
-                    <div style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", marginBottom: 12 }}>
+                    <div className="num-tight mono" style={{
+                        fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 900,
+                        background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
+                        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                        marginBottom: 14, letterSpacing: "-.03em", lineHeight: 1,
+                    }}>
                         {fmtRp(predictedTotal)}
                     </div>
 
                     {/* Rumus prediksi yang transparan */}
-                    <div style={{ background: "var(--bg-surface-low)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <div style={{
+                        background: "var(--glass-2)",
+                        backdropFilter: "var(--glass-blur)",
+                        WebkitBackdropFilter: "var(--glass-blur)",
+                        border: "1px solid var(--glass-border)",
+                        borderRadius: 12, padding: "10px 14px", marginBottom: 12,
+                        display: "flex", flexDirection: "column", gap: 6,
+                    }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, gap: 8, flexWrap: "wrap" }}>
                             <span style={{ color: "var(--color-muted)" }}>✅ {t("pred.alreadySpent")}</span>
-                            <strong style={{ color: "var(--color-text)" }}>{fmtRp(spentThisMonth)}</strong>
+                            <strong className="num-tight mono" style={{ color: "var(--color-text)" }}>{fmtRp(spentThisMonth)}</strong>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, gap: 8, flexWrap: "wrap" }}>
                             <span style={{ color: "var(--color-muted)" }}>📈 + {t("pred.projRemaining")} {remainingDays} {t("pred.daysLeft")}</span>
-                            <strong style={{ color: "#f59e0b" }}>+{fmtRp(remainingPredicted)}</strong>
+                            <strong className="num-tight mono" style={{ color: "var(--color-amber)" }}>+{fmtRp(remainingPredicted)}</strong>
                         </div>
-                        <div style={{ borderTop: "1px solid var(--color-border-soft)", paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                            <span style={{ color: "var(--color-muted)", fontWeight: 600 }}>= {t("pred.totalMonthEnd")}</span>
-                            <strong style={{ color: "var(--color-primary)" }}>{fmtRp(predictedTotal)}</strong>
+                        <div style={{ borderTop: "1px solid var(--color-border-soft)", paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 12, gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ color: "var(--color-muted)", fontWeight: 700 }}>= {t("pred.totalMonthEnd")}</span>
+                            <strong className="num-tight mono" style={{ color: "var(--color-primary)" }}>{fmtRp(predictedTotal)}</strong>
                         </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                            🔒 {t("pred.fixedLabel")} <strong style={{ color: "#4FC3F7" }}>{fmtRp(fixedTotal)}</strong>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <span className="chip chip-blue" style={{ fontSize: 11 }}>
+                            🔒 {t("pred.fixedLabel")} <strong className="mono">{fmtRp(fixedTotal)}</strong>
                         </span>
-                        <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                            📈 {t("pred.variablePerDay")} <strong style={{ color: "#f59e0b" }}>{fmtRp(variableDailyRate)}</strong>
+                        <span className="chip chip-amber" style={{ fontSize: 11 }}>
+                            📈 {t("pred.variablePerDay")} <strong className="mono">{fmtRp(variableDailyRate)}</strong>
                         </span>
                     </div>
 
                     {avgTotal3m > 0 && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: trendUp ? "rgba(255,113,108,.12)" : "rgba(96,252,198,.12)", color: trendUp ? "#ff716c" : "var(--color-primary)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                            <span className={trendUp ? "chip chip-red" : "chip chip-mint"} style={{ fontWeight: 800 }}>
                                 {trendUp ? "▲" : "▼"} {Math.abs(trendPct)}%
                             </span>
                             <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>{t("pred.vsLastMonth")}</span>
                         </div>
                     )}
 
-                    <div style={{ height: 4, borderRadius: 2, background: "var(--color-border-soft)", marginTop: 12 }}>
-                        <div style={{ height: "100%", borderRadius: 2, background: "linear-gradient(90deg,#60fcc6,#4FC3F7)", width: `${Math.min(100, (todayDay / daysInMonth) * 100)}%` }} />
+                    <div style={{ height: 6, borderRadius: 99, background: "var(--color-border-soft)", marginTop: 14, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 99, background: "linear-gradient(90deg,var(--color-primary),var(--color-transfer))", width: `${Math.min(100, (todayDay / daysInMonth) * 100)}%`, transition: "width .6s" }} />
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 4 }}>
+                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 6 }}>
                         {t("pred.monthProgress")}: {todayDay}/{daysInMonth} {t("pred.days")} ({Math.round((todayDay/daysInMonth)*100)}%)
                     </div>
                 </div>
 
                 {/* Estimasi Saldo */}
-                <div style={{ ...cardStyle, position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", right: -20, top: -20, width: 100, height: 100, borderRadius: "50%", background: "rgba(79,195,247,.06)", pointerEvents: "none" }} />
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-subtle)", letterSpacing: 1, marginBottom: 10 }}>
-                        {t("pred.estimatedBalance").toUpperCase()}
+                <div style={{ ...cardStyle }}>
+                    <div style={{ position: "absolute", right: -20, top: -20, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, var(--color-transfer-soft), transparent 70%)", pointerEvents: "none" }} />
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", letterSpacing: 1.6, marginBottom: 10, textTransform: "uppercase" }}>
+                        {t("pred.estimatedBalance")}
                     </div>
-                    <div style={{ fontSize: 26, fontWeight: 800, color: estimatedEndBalance >= 0 ? "var(--color-text)" : "#ff716c", marginBottom: 4 }}>
+                    <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3.5vw, 30px)", fontWeight: 900, color: estimatedEndBalance >= 0 ? "var(--color-text)" : "var(--color-expense)", marginBottom: 8, letterSpacing: "-.03em", lineHeight: 1 }}>
                         {fmtRp(estimatedEndBalance)}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
-                        {t("pred.currentBalance")}: <strong style={{ color: "var(--color-text)" }}>{fmtRp(totalBalance)}</strong>
+                        {t("pred.currentBalance")}: <strong className="num-tight mono" style={{ color: "var(--color-text)" }}>{fmtRp(totalBalance)}</strong>
                     </div>
                     <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
-                        {t("pred.projVariableRem")}: <strong style={{ color: "#ff716c" }}>−{fmtRp(remainingPredicted)}</strong>
+                        {t("pred.projVariableRem")}: <strong className="num-tight mono" style={{ color: "var(--color-expense)" }}>−{fmtRp(remainingPredicted)}</strong>
                     </div>
                     <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 10 }}>
                         {remainingDays} {t("pred.daysRemaining")} @ {fmtRp(variableDailyRate)}{t("pred.perDayVar")}
@@ -289,28 +320,34 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
             {/* Alert Kategori */}
             {alertCategories.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: 20 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 14, display: "flex", alignItems: "center", gap: 8, letterSpacing: "-.01em" }}>
                         <span>⚠️</span> {t("pred.alertCategories")}
-                        <span style={{ fontSize: 11, background: "rgba(255,113,108,.12)", color: "#ff716c", borderRadius: 6, padding: "2px 8px", fontWeight: 700 }}>
+                        <span className="chip chip-red" style={{ fontWeight: 800 }}>
                             {alertCategories.length}
                         </span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {alertCategories.map(a => (
-                            <div key={a.category} style={{ padding: "12px 14px", borderRadius: 12, background: a.status === "danger" ? "rgba(255,113,108,.06)" : "rgba(245,158,11,.06)", border: `1px solid ${a.status === "danger" ? "rgba(255,113,108,.2)" : "rgba(245,158,11,.2)"}` }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                            <div key={a.category} style={{
+                                padding: "12px 14px", borderRadius: 14,
+                                background: a.status === "danger" ? "var(--color-expense-soft)" : "var(--color-amber-soft)",
+                                backdropFilter: "var(--glass-blur)",
+                                WebkitBackdropFilter: "var(--glass-blur)",
+                                border: `1px solid ${a.status === "danger" ? "var(--color-expense-soft)" : "var(--color-amber-soft)"}`,
+                            }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8, flexWrap: "wrap" }}>
                                     <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>{a.category}</span>
-                                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${a.status === "danger" ? "#ff716c" : "#f59e0b"}18`, color: a.status === "danger" ? "#ff716c" : "#f59e0b" }}>
+                                    <span className={a.status === "danger" ? "chip chip-red" : "chip chip-amber"} style={{ fontWeight: 800 }}>
                                         {a.status === "danger" ? t("pred.danger") : t("pred.warning")} {a.pct}%
                                     </span>
                                 </div>
-                                <div style={{ height: 6, borderRadius: 3, background: "var(--color-border-soft)", marginBottom: 6 }}>
-                                    <div style={{ height: "100%", borderRadius: 3, background: a.status === "danger" ? "#ff716c" : "#f59e0b", width: `${Math.min(100, a.pct)}%`, transition: "width .5s" }} />
+                                <div style={{ height: 6, borderRadius: 99, background: "var(--color-border-soft)", marginBottom: 6, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", borderRadius: 99, background: a.status === "danger" ? "var(--color-expense)" : "var(--color-amber)", width: `${Math.min(100, a.pct)}%`, transition: "width .5s" }} />
                                 </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-subtle)" }}>
-                                    <span>{t("pred.labelSpent")}: {fmtRp(a.spent)}</span>
-                                    <span>{t("pred.labelPredicted")}: {fmtRp(a.predicted)}</span>
-                                    <span>{t("pred.labelBudget")}: {fmtRp(a.budget)}</span>
+                                <div className="num-tight" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-subtle)", gap: 8, flexWrap: "wrap" }}>
+                                    <span>{t("pred.labelSpent")}: <span className="mono">{fmtRp(a.spent)}</span></span>
+                                    <span>{t("pred.labelPredicted")}: <span className="mono">{fmtRp(a.predicted)}</span></span>
+                                    <span>{t("pred.labelBudget")}: <span className="mono">{fmtRp(a.budget)}</span></span>
                                 </div>
                             </div>
                         ))}
@@ -320,11 +357,11 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
 
             {/* Tren per Kategori */}
             <div style={cardStyle}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 16, letterSpacing: "-.01em" }}>
                     📊 {t("pred.trendCategories")}
                 </div>
-                <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <div style={{ overflowX: "auto", margin: "0 -22px", padding: "0 22px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 560 }}>
                         <thead>
                             <tr style={{ borderBottom: "1px solid var(--color-border-soft)" }}>
                                 {[
@@ -335,7 +372,7 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                                     { k: "pred.colPrediction",align: "right" },
                                     { k: "pred.colStatus",    align: "right" },
                                 ].map(h => (
-                                    <th key={h.k} style={{ padding: "8px 10px", textAlign: h.align, color: "var(--color-subtle)", fontWeight: 700, fontSize: 10, letterSpacing: .5, whiteSpace: "nowrap" }}>
+                                    <th key={h.k} style={{ padding: "10px 10px", textAlign: h.align, color: "var(--color-subtle)", fontWeight: 800, fontSize: 10, letterSpacing: 1.4, whiteSpace: "nowrap", textTransform: "uppercase" }}>
                                         {t(h.k)}
                                     </th>
                                 ))}
@@ -352,29 +389,29 @@ const PrediksiView = ({ transactions, budgets, accounts }) => {
                                     const diff      = avg > 0 ? ((predicted - avg) / avg) * 100 : 0;
                                     const statusStr = isFixed ? "fixed"
                                         : diff > 20 ? "danger" : diff > -10 ? "warning" : "safe";
-                                    const statusClr = statusStr === "fixed"   ? "#4FC3F7"
-                                        : statusStr === "safe"    ? "var(--color-primary)"
-                                        : statusStr === "warning" ? "#f59e0b" : "#ff716c";
+                                    const statusChip = statusStr === "fixed"   ? "chip chip-blue"
+                                        : statusStr === "safe"    ? "chip chip-mint"
+                                        : statusStr === "warning" ? "chip chip-amber" : "chip chip-red";
                                     const statusLbl = statusStr === "fixed"   ? t("pred.statusFixed")
                                         : statusStr === "safe"    ? t("pred.safe")
                                         : statusStr === "warning" ? t("pred.warning") : t("pred.danger");
 
                                     return (
                                         <tr key={cat} style={{ borderBottom: "1px solid var(--color-border-soft)" }}>
-                                            <td style={{ padding: "10px 10px", color: "var(--color-text)", fontWeight: 600 }}>{cat}</td>
-                                            <td style={{ padding: "10px 10px" }}>
-                                                <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: isFixed ? "rgba(79,195,247,.12)" : "rgba(245,158,11,.1)", color: isFixed ? "#4FC3F7" : "#f59e0b" }}>
+                                            <td style={{ padding: "12px 10px", color: "var(--color-text)", fontWeight: 700 }}>{cat}</td>
+                                            <td style={{ padding: "12px 10px" }}>
+                                                <span className={isFixed ? "chip chip-blue" : "chip chip-amber"} style={{ fontSize: 10 }}>
                                                     {isFixed ? t("pred.typeFixed") : t("pred.typeVariable")}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--color-text)" }}>{fmtRp(spent)}</td>
-                                            <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--color-muted)" }}>{avg > 0 ? fmtRp(avg) : "—"}</td>
-                                            <td style={{ padding: "10px 10px", textAlign: "right", fontWeight: 600, color: isFixed ? "var(--color-muted)" : (predicted > avg * 1.2 && avg > 0 ? "#ff716c" : "var(--color-text)") }}>
+                                            <td className="num-tight mono" style={{ padding: "12px 10px", textAlign: "right", color: "var(--color-text)" }}>{fmtRp(spent)}</td>
+                                            <td className="num-tight mono" style={{ padding: "12px 10px", textAlign: "right", color: "var(--color-muted)" }}>{avg > 0 ? fmtRp(avg) : "—"}</td>
+                                            <td className="num-tight mono" style={{ padding: "12px 10px", textAlign: "right", fontWeight: 700, color: isFixed ? "var(--color-muted)" : (predicted > avg * 1.2 && avg > 0 ? "var(--color-expense)" : "var(--color-text)") }}>
                                                 {fmtRp(predicted)}
-                                                {isFixed && <span style={{ fontSize: 9, color: "var(--color-subtle)", display: "block" }}>{t("pred.labelActual")}</span>}
+                                                {isFixed && <span style={{ fontSize: 9, color: "var(--color-subtle)", display: "block", fontFamily: "inherit" }}>{t("pred.labelActual")}</span>}
                                             </td>
-                                            <td style={{ padding: "10px 10px", textAlign: "right" }}>
-                                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${statusClr}18`, color: statusClr, whiteSpace: "nowrap" }}>
+                                            <td style={{ padding: "12px 10px", textAlign: "right" }}>
+                                                <span className={statusChip} style={{ whiteSpace: "nowrap" }}>
                                                     {statusLbl}
                                                 </span>
                                             </td>

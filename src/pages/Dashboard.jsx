@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { fetchGoldPrices } from "../services/goldPrice";
 import { sendAiMessage, buildSystemPrompt } from "../services/aiService";
 import { APP_AI_NAME } from "../config/app";
@@ -13,25 +13,28 @@ import { useDebts } from "../hooks/useDebts";
 import { usePiutang } from "../hooks/usePiutang";
 import { useRecurrings } from "../hooks/useRecurrings";
 import { useSplitBills } from "../hooks/useSplitBills";
-import AddTransactionModal from "../components/dashboard/AddTransactionModal";
-import AddAccountModal from "../components/dashboard/AddAccountModal";
+/* ═══ Eager: Dashboard landing view (first screen after login) ═══ */
 import DasborView from "../components/dashboard/views/DasborView";
-import TransaksiView from "../components/dashboard/views/TransaksiView";
-import AkunView from "../components/dashboard/views/AkunView";
-import KategoriView from "../components/dashboard/views/KategoriView";
-import BerulangView from "../components/dashboard/views/BerulangView";
-import GoalsView from "../components/dashboard/views/GoalsView";
-import HutangView from "../components/dashboard/views/HutangView";
-import PiutangView from "../components/dashboard/views/PiutangView";
-import InvestasiView from "../components/dashboard/views/InvestasiView";
-import LaporanView from "../components/dashboard/views/LaporanView";
-import AiView from "../components/dashboard/views/AiView";
-import AnggaranView from "../components/dashboard/views/AnggaranView";
-import SplitBillView from "../components/dashboard/views/SplitBillView";
-import PrediksiView from "../components/dashboard/views/PrediksiView";
+/* ═══ Lazy: the other 12 views + heavy modals ═══ */
+const TransaksiView = lazy(() => import("../components/dashboard/views/TransaksiView"));
+const AkunView = lazy(() => import("../components/dashboard/views/AkunView"));
+const KategoriView = lazy(() => import("../components/dashboard/views/KategoriView"));
+const BerulangView = lazy(() => import("../components/dashboard/views/BerulangView"));
+const GoalsView = lazy(() => import("../components/dashboard/views/GoalsView"));
+const HutangView = lazy(() => import("../components/dashboard/views/HutangView"));
+const PiutangView = lazy(() => import("../components/dashboard/views/PiutangView"));
+const InvestasiView = lazy(() => import("../components/dashboard/views/InvestasiView"));
+const LaporanView = lazy(() => import("../components/dashboard/views/LaporanView"));
+const AiView = lazy(() => import("../components/dashboard/views/AiView"));
+const AnggaranView = lazy(() => import("../components/dashboard/views/AnggaranView"));
+const SplitBillView = lazy(() => import("../components/dashboard/views/SplitBillView"));
+const PrediksiView = lazy(() => import("../components/dashboard/views/PrediksiView"));
+const AddTransactionModal = lazy(() => import("../components/dashboard/AddTransactionModal"));
+const AddAccountModal = lazy(() => import("../components/dashboard/AddAccountModal"));
 import { categoryIcons } from "../constants/categories";
 import { toLocalDateStr } from "../utils/dateHelpers";
 import { supabase } from "../lib/supabase";
+import { DashboardSkeleton, BentoSkeleton } from "../components/ui/Skeleton";
 
 const NAV_LABELS = {
     dasbor: "nav.dashboard", transaksi: "nav.transaction", akun: "nav.accounts",
@@ -662,22 +665,17 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const activeLabel = t(NAV_LABELS[activeMenu] || "nav.dashboard");
     const sharedProps = { totalBalance, totalIncome, totalExpense, netBalance, savingRate, expenseRate, sortedCats, catTotals };
 
-    if (loading) {
-        return (
-            <div style={{ minHeight: "100vh", background: "var(--bg-app)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ textAlign: "center" }}>
-                    <div style={{ width: 40, height: 40, border: "3px solid rgba(96,252,198,.25)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
-                    <div style={{ color: "var(--color-muted)", fontSize: 13 }}>{t("common.loading")}</div>
-                </div>
-            </div>
-        );
+    if (loading || session === undefined) {
+        return <DashboardSkeleton />;
     }
 
     return (
         <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-app)", color: "var(--color-text)", fontFamily: "'Plus Jakarta Sans',-apple-system,sans-serif" }}>
-            <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} aiConfig={aiConfig} onSubmitMultiple={addMultipleTx} />
-            <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} isSaving={isSavingTx} aiConfig={aiConfig} />
-            <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />
+            <Suspense fallback={null}>
+                {showAddTx && <AddTransactionModal open={showAddTx} onClose={() => setShowAddTx(false)} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} isSaving={isSavingTx} aiConfig={aiConfig} onSubmitMultiple={addMultipleTx} />}
+                {showEditTx && <AddTransactionModal open={showEditTx} onClose={() => { setShowEditTx(false); setEditingTx(null); }} txForm={txForm} setTxForm={setTxForm} onSubmit={addTx} onTransfer={addTransfer} accounts={accounts} customCategories={customCategories} editMode={true} onUpdate={editTx} isSaving={isSavingTx} aiConfig={aiConfig} />}
+                {showAddAccount && <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} accForm={accForm} setAccForm={setAccForm} onSubmit={addAccount} />}
+            </Suspense>
             <Sidebar
                 open={sidebarOpen}
                 activeMenu={activeMenu}
@@ -702,17 +700,28 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 49, backdropFilter: "blur(2px)" }} />
             )}
 
-            <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 260 : 0), transition: "margin-left .3s", minHeight: "100vh", minWidth: 0 }}>
-                <header style={{ position: "sticky", top: 0, zIndex: 40, padding: isMobile ? "12px 16px" : "14px 28px", background: "var(--bg-glass)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <button onClick={() => setSidebarOpen(p => !p)} style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 34, height: 34, borderRadius: 8, cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{sidebarOpen ? "☰" : "☰"}</button>
-                        <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? 120 : "none" }}>{activeLabel}</h1>
+            <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 248 : 0), transition: "margin-left .35s cubic-bezier(.2,.8,.2,1)", minHeight: "100vh", minWidth: 0, width: "100%" }}>
+                <header style={{ position: "sticky", top: 0, zIndex: 40, padding: isMobile ? "10px 14px" : "14px 28px", background: "var(--glass-2, var(--bg-glass))", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)", borderBottom: "1px solid var(--glass-border, var(--color-border-soft))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                        <button onClick={() => setSidebarOpen(p => !p)} aria-label="Toggle sidebar" style={{ background: "var(--color-border-soft)", border: "1px solid var(--glass-border)", color: "var(--color-muted)", width: 36, height: 36, borderRadius: 10, cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>☰</button>
+                        <h1 style={{ fontSize: isMobile ? 16 : 19, fontWeight: 800, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.02em", margin: 0, minWidth: 0 }}>{activeLabel}</h1>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
-                        <button onClick={() => setShowAddTx(true)} style={{ padding: isMobile ? "8px 12px" : "8px 16px", borderRadius: 9999, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>+ {isMobile ? "" : t("nav.transaction")}{isMobile ? "Tx" : ""}</button>
-                        {!isMobile && <button onClick={onLogout} style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("common.logout")}</button>}
+                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10, flexShrink: 0 }}>
+                        <button onClick={() => setShowAddTx(true)} style={{
+                            padding: isMobile ? "8px 14px" : "9px 18px",
+                            borderRadius: 9999, border: "none",
+                            background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))",
+                            color: "var(--color-on-primary)",
+                            fontSize: isMobile ? 12 : 13, fontWeight: 700,
+                            cursor: "pointer", fontFamily: "inherit",
+                            whiteSpace: "nowrap", letterSpacing: "-.01em",
+                            boxShadow: "0 4px 14px rgba(96,252,198,.2), inset 0 1px 0 rgba(255,255,255,.25)",
+                        }}>
+                            + {isMobile ? "Tx" : t("nav.transaction")}
+                        </button>
+                        {!isMobile && <button onClick={onLogout} style={{ padding: "9px 16px", borderRadius: 9999, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.18)", color: "#ff716c", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t("common.logout")}</button>}
                         {isMobile && (
-                            <button onClick={onLogout} title="Logout" style={{ padding: "7px 9px", borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.15)", color: "#ff716c", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <button onClick={onLogout} aria-label="Logout" style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.18)", color: "#ff716c", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                                     <polyline points="16 17 21 12 16 7" />
@@ -723,22 +732,23 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                     </div>
                 </header>
 
-                <div style={{ padding: isMobile ? "16px 12px" : 28 }}>
-
-                    {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} investments={investments} debts={debts} budgets={budgets} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
-                    {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} accounts={accounts} initialCategory={initialCategoryFilter} onClearInitialCategory={() => setInitialCategoryFilter("")} initialAccount={initialAccountFilter} onClearInitialAccount={() => setInitialAccountFilter("")} />}
-                    {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} onViewAccount={(accName) => { setInitialAccountFilter(accName); setActiveMenu("transaksi"); }} />}
-                    {activeMenu === "kategori" && <KategoriView transactions={transactions} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} onViewCategory={(catName) => { setInitialCategoryFilter(catName); setActiveMenu("transaksi"); }} />}
-                    {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
-                    {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={handleTopupGoal} />}
-                    {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={handlePayDebt} accounts={accounts} />}
-                    {activeMenu === "piutang" && <PiutangView piutang={piutang} onAdd={handleAddPiutang} onEdit={editPiutang} onDelete={deletePiutang} onTerima={handleTerimaPiutang} accounts={accounts} />}
-                    {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
-                    {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
-                    {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
-                    {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} aiConfig={aiConfig} onOpenAiSettings={() => { setSidebarOpen(true); setAiSettingsTrigger(p => p + 1); }} />}
-                    {activeMenu === "splitbill" && <SplitBillView splitBills={splitBills} onAdd={addSplitBill} onDelete={deleteSplitBill} onTogglePaid={toggleMemberPaid} />}
-                    {activeMenu === "prediksi" && <PrediksiView transactions={transactions} budgets={budgets} accounts={accounts} />}
+                <div style={{ padding: isMobile ? "14px 12px calc(20px + env(safe-area-inset-bottom))" : "28px", maxWidth: "100%", overflow: "hidden" }}>
+                    <Suspense fallback={<BentoSkeleton />}>
+                        {activeMenu === "dasbor" && <DasborView accounts={accounts} transactions={transactions} goals={goals} investments={investments} debts={debts} budgets={budgets} setActiveMenu={setActiveMenu} setShowAddAccount={setShowAddAccount} setShowAddTx={setShowAddTx} customCategories={customCategories} {...sharedProps} />}
+                        {activeMenu === "transaksi" && <TransaksiView transactions={transactions} onEdit={openEditTx} onDelete={deleteTx} accounts={accounts} initialCategory={initialCategoryFilter} onClearInitialCategory={() => setInitialCategoryFilter("")} initialAccount={initialAccountFilter} onClearInitialAccount={() => setInitialAccountFilter("")} />}
+                        {activeMenu === "akun" && <AkunView accounts={accounts} transactions={transactions} setShowAddAccount={setShowAddAccount} setActiveMenu={setActiveMenu} onAdjustBalance={handleAdjustBalance} onViewAccount={(accName) => { setInitialAccountFilter(accName); setActiveMenu("transaksi"); }} />}
+                        {activeMenu === "kategori" && <KategoriView transactions={transactions} customCategories={customCategories} onAddCategory={addCategory} onEditCategory={editCategory} onDeleteCategory={deleteCategory} onViewCategory={(catName) => { setInitialCategoryFilter(catName); setActiveMenu("transaksi"); }} />}
+                        {activeMenu === "berulang" && <BerulangView recurrings={recurrings} accounts={accounts} debts={debts} onAdd={addRecurring} onEdit={editRecurring} onDelete={deleteRecurring} customCategories={customCategories} />}
+                        {activeMenu === "goals" && <GoalsView goals={goals} accounts={accounts} onAdd={addGoal} onEdit={editGoal} onDelete={deleteGoal} onTopup={handleTopupGoal} />}
+                        {activeMenu === "hutang" && <HutangView debts={debts} onAdd={addDebt} onEdit={editDebt} onDelete={deleteDebt} onPayDebt={handlePayDebt} accounts={accounts} />}
+                        {activeMenu === "piutang" && <PiutangView piutang={piutang} onAdd={handleAddPiutang} onEdit={editPiutang} onDelete={deletePiutang} onTerima={handleTerimaPiutang} accounts={accounts} />}
+                        {activeMenu === "investasi" && <InvestasiView investments={investments} onAdd={addInvestment} onEdit={editInvestment} onDelete={deleteInvestment} goldPrices={goldPrices} onRefreshGold={refreshGoldPrices} refreshingGold={refreshingGold} />}
+                        {activeMenu === "anggaran" && <AnggaranView budgets={budgets} transactions={transactions} onAdd={addBudget} onEdit={editBudget} onDelete={deleteBudget} onCopyMonth={copyBudgetMonth} customCategories={customCategories} />}
+                        {activeMenu === "laporan" && <LaporanView transactions={transactions} />}
+                        {activeMenu === "ai" && <AiView aiChat={aiChat} aiTyping={aiTyping} aiInput={aiInput} setAiInput={setAiInput} handleAi={handleAi} aiConfig={aiConfig} onOpenAiSettings={() => { setSidebarOpen(true); setAiSettingsTrigger(p => p + 1); }} />}
+                        {activeMenu === "splitbill" && <SplitBillView splitBills={splitBills} onAdd={addSplitBill} onDelete={deleteSplitBill} onTogglePaid={toggleMemberPaid} />}
+                        {activeMenu === "prediksi" && <PrediksiView transactions={transactions} budgets={budgets} accounts={accounts} />}
+                    </Suspense>
                 </div>
             </main>
         </div>

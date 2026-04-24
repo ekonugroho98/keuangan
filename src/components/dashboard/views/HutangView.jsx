@@ -51,101 +51,125 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete, onPayDebt, accounts = [] }
     const totalSisa = debts.reduce((a, d) => a + d.remaining, 0);
     const totalCicilan = debts.reduce((a, d) => a + (d.monthly || 0), 0);
 
+    // Due date helpers
+    const today = new Date().toISOString().slice(0, 10);
+
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: "clamp(24px,4vw,34px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 4px", letterSpacing: "-0.5px" }}>{t("debt.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0 }}>
-                        {debts.length} {t("debt.active")} · {t("debt.totalSisa")} {fmtRp(totalSisa)}
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>KEWAJIBAN</div>
+                    <h2 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("debt.title")}</h2>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        {debts.length} {t("debt.active")} · {t("debt.totalSisa")} <span className="num-tight mono">{fmtRp(totalSisa)}</span>
                     </p>
                 </div>
-                <button
-                    onClick={openAdd}
-                    style={{
-                        padding: "9px 18px", borderRadius: 10, border: "none",
-                        background: "linear-gradient(135deg,#ff716c,#e04f4f)",
-                        color: "var(--color-text)", fontSize: 13, fontWeight: 600,
-                        cursor: "pointer", fontFamily: "inherit",
-                    }}
-                >
+                <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 18px", fontSize: 13, minHeight: 42 }}>
                     {t("debt.addNew")}
                 </button>
             </div>
 
             {/* Summary cards */}
             {debts.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-                    <div style={{ background: "rgba(255,113,108,.08)", border: "1px solid rgba(255,113,108,.2)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("debt.totalSisa")}</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#ff716c" }}>{fmtRp(totalSisa)}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 20 }}>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("debt.totalSisa")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(22px, 2.8vw, 30px)", fontWeight: 900, color: "var(--color-expense, #ff716c)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalSisa)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Sisa pokok seluruh hutang</div>
                     </div>
-                    <div style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)", borderRadius: 12, padding: "14px 18px" }}>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 4 }}>{t("debt.totalCicilan")}</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>{fmtRp(totalCicilan)}</div>
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("debt.totalCicilan")}</div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(22px, 2.8vw, 30px)", fontWeight: 900, color: "var(--color-amber, #f59e0b)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalCicilan)}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>Beban cicilan per bulan</div>
                     </div>
                 </div>
             )}
 
             {/* Empty state */}
             {debts.length === 0 && (
-                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>{t("debt.noData")}</div>
-                    <div style={{ fontSize: 13, color: "#48474f", marginBottom: 20 }}>{t("debt.noDataSub")}</div>
-                    <button onClick={openAdd} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                        {t("debt.addFirst")}
+                <div style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border-soft)", borderRadius: 20, padding: "48px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>🎉</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("debt.noData")}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 16 }}>{t("debt.noDataSub")}</div>
+                    <button onClick={openAdd} className="btn-primary" style={{ padding: "10px 24px", fontSize: 13 }}>
+                        + {t("debt.addFirst")}
                     </button>
                 </div>
             )}
 
             {/* Debts grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 }}>
                 {debts.map(d => {
                     const paid = d.total - d.remaining;
                     const pct = d.total > 0 ? Math.min(100, Math.round((paid / d.total) * 100)) : 0;
                     const lunas = d.remaining <= 0;
+
+                    // Due status
+                    const overdue = !lunas && d.due_date && d.due_date < today;
+                    const dueSoon = !lunas && !overdue && d.due_date && (new Date(d.due_date) - new Date(today)) / 86400000 <= 7;
+
                     return (
                         <div key={d.id} style={{
-                            background: "var(--bg-surface)",
-                            border: `1px solid ${lunas ? "#60fcc633" : d.color + "22"}`,
-                            borderRadius: 16, padding: 24, position: "relative",
+                            background: "var(--glass-1)",
+                            backdropFilter: "var(--glass-blur)",
+                            WebkitBackdropFilter: "var(--glass-blur)",
+                            border: `1px solid ${lunas ? "rgba(96,252,198,.4)" : overdue ? "rgba(255,113,108,.35)" : "var(--glass-border)"}`,
+                            borderRadius: 20, padding: 22, position: "relative", overflow: "hidden",
+                            boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
                         }}>
                             {lunas && (
-                                <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 8, padding: "3px 10px", fontSize: 10, fontWeight: 700, color: "var(--color-primary)" }}>
+                                <span className="chip chip-mint" style={{ position: "absolute", top: 14, right: 14 }}>
                                     {t("debt.paid_badge")}
-                                </div>
+                                </span>
                             )}
-                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                                <div style={{ width: 48, height: 48, borderRadius: 14, background: d.color + "18", border: `1px solid ${d.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{d.icon}</div>
-                                <div>
-                                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{d.name}</div>
-                                    {d.monthly > 0 && <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>{t("debt.monthly")}: {fmtRp(d.monthly)}/bln</div>}
-                                    {d.due_date ? <div style={{ fontSize: 11, color: "var(--color-muted)" }}>{t("debt.dueDate")}: {d.due_date}</div> : null}
+                            {!lunas && overdue && (
+                                <span className="chip chip-red" style={{ position: "absolute", top: 14, right: 14 }}>
+                                    Jatuh tempo
+                                </span>
+                            )}
+                            {!lunas && !overdue && dueSoon && (
+                                <span className="chip chip-amber" style={{ position: "absolute", top: 14, right: 14 }}>
+                                    Segera bayar
+                                </span>
+                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingRight: lunas || overdue || dueSoon ? 80 : 0 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 14, background: d.color + "18", border: `1px solid ${d.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{d.icon}</div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</div>
+                                    {d.monthly > 0 && (
+                                        <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                                            <span className="chip chip-amber">{fmtRp(d.monthly)} / bln</span>
+                                            {d.due_date && <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>· {t("debt.dueDate")}: {d.due_date}</span>}
+                                        </div>
+                                    )}
+                                    {(!d.monthly || d.monthly <= 0) && d.due_date && (
+                                        <div style={{ fontSize: 11, color: "var(--color-muted)" }}>{t("debt.dueDate")}: {d.due_date}</div>
+                                    )}
                                 </div>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                                <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{t("debt.paid")} {pct}%</span>
-                                <span style={{ fontSize: 12, color: d.color, fontWeight: 600 }}>{fmtRp(paid)} / {fmtRp(d.total)}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{t("debt.paid")} <span className="num-tight">{pct}%</span></span>
+                                <span className="num-tight mono" style={{ fontSize: 12, color: d.color, fontWeight: 600 }}>{fmtRp(paid)} / {fmtRp(d.total)}</span>
                             </div>
-                            <div style={{ height: 8, borderRadius: 4, background: "var(--color-border-soft)", marginBottom: 12 }}>
-                                <div style={{ height: "100%", borderRadius: 4, background: lunas ? "var(--color-primary)" : d.color, width: `${pct}%`, transition: "width 1s" }} />
+                            <div style={{ height: 8, borderRadius: 4, background: "var(--bg-sunk, var(--color-border-soft))", marginBottom: 12, overflow: "hidden" }}>
+                                <div style={{ height: "100%", borderRadius: 4, background: lunas ? "var(--color-primary)" : d.color, width: `${pct}%`, transition: "width 1s", boxShadow: `0 0 10px ${lunas ? "var(--color-primary)" : d.color}55` }} />
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 14 }}>
-                                <span style={{ color: "var(--color-subtle)" }}>{t("debt.total")}: {fmtRp(d.total)}</span>
-                                <span style={{ color: lunas ? "var(--color-primary)" : "#ff716c", fontWeight: 700 }}>{t("debt.remaining")}: {fmtRp(d.remaining)}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ color: "var(--color-subtle)" }}>{t("debt.total")}: <span className="num-tight mono">{fmtRp(d.total)}</span></span>
+                                <span className="num-tight mono" style={{ color: lunas ? "var(--color-primary)" : "var(--color-expense, #ff716c)", fontWeight: 700 }}>{t("debt.remaining")}: {fmtRp(d.remaining)}</span>
                             </div>
                             {/* Actions */}
-                            <div style={{ display: "flex", gap: 8 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                 {!lunas && (
                                     <button
                                         onClick={() => { setPayTarget(d); setPayAmount(d.monthly > 0 ? String(d.monthly) : ""); setPayAccount(accounts[0]?.name || ""); }}
-                                        style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                                    >💳 Bayar</button>
+                                        className="btn-primary"
+                                        style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}
+                                    >Bayar</button>
                                 )}
-                                <button onClick={() => openEdit(d)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--color-border)", background: "rgba(96,252,198,.08)", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✏️ {t("common.edit")}</button>
-                                <button onClick={() => setConfirmDelete(d)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,113,108,.15)", background: "rgba(255,113,108,.06)", color: "#ff716c", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
+                                <button onClick={() => openEdit(d)} className="btn-ghost" style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}>{t("common.edit")}</button>
+                                <button onClick={() => setConfirmDelete(d)} aria-label="Delete debt" style={{ minHeight: 42, minWidth: 42, padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,113,108,.18)", background: "rgba(255,113,108,.06)", color: "var(--color-expense, #ff716c)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>🗑️</button>
                             </div>
                         </div>
                     );
