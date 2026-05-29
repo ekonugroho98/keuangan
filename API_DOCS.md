@@ -4,19 +4,70 @@ Base URL: `https://twcrflhvxzatpfrjmqzi.supabase.co/functions/v1`
 
 ## Authentication
 
-Semua request membutuhkan JWT token dari Supabase Auth.
+Base Auth URL: `https://twcrflhvxzatpfrjmqzi.supabase.co/auth/v1`
+
+Semua request ke edge function membutuhkan JWT token. Dapat token via Register atau Login.
+
+### Register (Daftar User Baru)
 
 ```bash
-# Login untuk dapat token
+curl -s "$BASE_URL/auth/v1/signup" \
+  -H "apikey: <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@email.com",
+    "password": "password123",
+    "data": { "full_name": "Nama Lengkap" }
+  }'
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "xxx...",
+  "user": {
+    "id": "91c69204-...",
+    "email": "newuser@email.com",
+    "user_metadata": { "full_name": "Nama Lengkap" }
+  }
+}
+```
+
+> Catatan: Jika email confirmation aktif, user perlu verifikasi email dulu sebelum dapat token.
+
+### Login
+
+```bash
 curl -s "$BASE_URL/auth/v1/token?grant_type=password" \
   -H "apikey: <ANON_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"email":"user@email.com","password":"password"}'
 ```
 
-Response: `{ "access_token": "eyJ...", ... }`
+**Response:**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "xxx...",
+  "expires_in": 3600
+}
+```
 
-Gunakan token di header setiap request:
+### Refresh Token (Perpanjang Session)
+
+Token berlaku ~1 jam. Gunakan refresh token untuk dapat token baru tanpa login ulang:
+
+```bash
+curl -s "$BASE_URL/auth/v1/token?grant_type=refresh_token" \
+  -H "apikey: <ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"xxx..."}'
+```
+
+### Pakai Token
+
+Gunakan `access_token` di header setiap request ke edge function:
 ```
 Authorization: Bearer <access_token>
 ```
