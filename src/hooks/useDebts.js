@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { callEdge } from "../services/api";
 import { toLocalDateStr } from "../utils/dateHelpers";
 
 export function useDebts(userId, showToast) {
@@ -16,7 +17,7 @@ export function useDebts(userId, showToast) {
       return;
     }
     setDebts((p) => [...p, data]);
-    showToast(`📋 Hutang "${data.name}" berhasil dicatat!`);
+    showToast(`Hutang "${data.name}" berhasil dicatat!`);
   };
 
   const editDebt = async (id, payload) => {
@@ -31,7 +32,7 @@ export function useDebts(userId, showToast) {
       return;
     }
     setDebts((p) => p.map((d) => (d.id === id ? data : d)));
-    showToast(`✅ Hutang "${data.name}" diperbarui!`);
+    showToast(`Hutang "${data.name}" diperbarui!`);
   };
 
   const deleteDebt = async (id) => {
@@ -50,96 +51,23 @@ export function useDebts(userId, showToast) {
     accountName,
     { accounts, setAccounts, setTransactions },
   ) => {
-    // 1. Validate: account harus ada
-    const acc = accounts.find((a) => a.name === accountName);
-    if (!acc) {
-      showToast("Akun tidak ditemukan. Pilih akun yang valid.", "error");
-      return;
-    }
-
-    // 2. Refetch saldo terbaru dari DB untuk hindari race condition
-    const { data: freshAcc, error: fetchErr } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("id", acc.id)
-      .single();
-    if (fetchErr || !freshAcc) {
-      showToast("Gagal membaca saldo akun. Coba lagi.", "error");
-      return;
-    }
-
-    // 3. Cek saldo cukup
-    if (freshAcc.balance < amount) {
+    try {
+      const result = await callEdge("financial-ops", {
+        action: "pay-debt",
+        debt_id: debt.id,
+        amount,
+        account_name: accountName,
+        date: toLocalDateStr(),
+      });
+      setTransactions((p) => [result.transaction, ...p]);
+      setAccounts((p) => p.map((a) => (a.id === result.account.id ? result.account : a)));
+      setDebts((p) => p.map((d) => (d.id === debt.id ? result.debt : d)));
       showToast(
-        `⚠️ Saldo ${accountName} (Rp ${freshAcc.balance.toLocaleString("id-ID")}) tidak cukup untuk cicilan Rp ${amount.toLocaleString("id-ID")}`,
-        "error",
+        `Cicilan ${debt.name} Rp ${amount.toLocaleString("id-ID")} berhasil dicatat!`,
       );
-      return;
+    } catch (err) {
+      showToast(err.message || "Gagal bayar cicilan", "error");
     }
-
-    // 4. Insert transaksi
-    const today = toLocalDateStr();
-    const tx = {
-      user_id: userId,
-      type: "expense",
-      amount,
-      category: "Hutang & Cicilan",
-      note: `Cicilan ${debt.name}`,
-      date: today,
-      account_name: accountName,
-      icon: "📋",
-    };
-    const { data: newTx, error: txErr } = await supabase
-      .from("transactions")
-      .insert(tx)
-      .select()
-      .single();
-    if (txErr || !newTx) {
-      showToast("Gagal menyimpan transaksi cicilan", "error");
-      return;
-    }
-
-    // 5. Update saldo akun (gunakan saldo fresh)
-    const newBal = freshAcc.balance - amount;
-    const { data: updAcc, error: accErr } = await supabase
-      .from("accounts")
-      .update({ balance: newBal })
-      .eq("id", acc.id)
-      .select()
-      .single();
-    if (accErr || !updAcc) {
-      // Rollback: hapus transaksi
-      await supabase.from("transactions").delete().eq("id", newTx.id);
-      showToast("Gagal update saldo. Transaksi dibatalkan.", "error");
-      return;
-    }
-
-    // 6. Update sisa hutang
-    const newRemaining = Math.max(0, debt.remaining - amount);
-    const { data: updDebt, error: debtErr } = await supabase
-      .from("debts")
-      .update({ remaining: newRemaining })
-      .eq("id", debt.id)
-      .select()
-      .single();
-    if (debtErr || !updDebt) {
-      // Rollback: kembalikan saldo & hapus transaksi
-      await supabase
-        .from("accounts")
-        .update({ balance: freshAcc.balance })
-        .eq("id", acc.id);
-      await supabase.from("transactions").delete().eq("id", newTx.id);
-      showToast("Gagal update hutang. Transaksi dibatalkan.", "error");
-      return;
-    }
-
-    // 7. Semua berhasil — update state
-    setTransactions((p) => [newTx, ...p]);
-    setAccounts((p) => p.map((a) => (a.id === acc.id ? updAcc : a)));
-    setDebts((p) => p.map((d) => (d.id === debt.id ? updDebt : d)));
-    showToast(
-      `✅ Cicilan ${debt.name} Rp ${amount.toLocaleString("id-ID")} berhasil dicatat!`,
-    );
   };
 
   return { debts, setDebts, addDebt, editDebt, deleteDebt, payDebt };

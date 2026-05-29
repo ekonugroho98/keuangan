@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { toLocalDateStr } from "../utils/dateHelpers";
+import { callEdge } from "../services/api";
 
 export function usePiutang(userId, showToast) {
   const [piutang, setPiutang] = useState([]);
@@ -9,108 +9,22 @@ export function usePiutang(userId, showToast) {
     payload,
     { accounts, setAccounts, setTransactions },
   ) => {
-    if (payload.from_account) {
-      const acc = accounts.find((a) => a.name === payload.from_account);
-      if (!acc) {
-        showToast(
-          `Akun "${payload.from_account}" tidak ditemukan.`,
-          "error",
-        );
-        return;
+    try {
+      const result = await callEdge("financial-ops", {
+        action: "add-piutang",
+        payload,
+        from_account: payload.from_account || null,
+      });
+      setPiutang((p) => [...p, result.piutang]);
+      if (result.account) {
+        setAccounts((p) => p.map((a) => (a.id === result.account.id ? result.account : a)));
       }
-
-      // 1. Refetch saldo terbaru
-      const { data: freshAcc, error: fetchErr } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("id", acc.id)
-        .single();
-      if (fetchErr || !freshAcc) {
-        showToast("Gagal membaca saldo akun. Coba lagi.", "error");
-        return;
+      if (result.transaction && setTransactions) {
+        setTransactions((p) => [result.transaction, ...p]);
       }
-
-      if (freshAcc.balance < payload.total) {
-        showToast(
-          `⚠️ Saldo ${payload.from_account} (Rp ${freshAcc.balance.toLocaleString("id-ID")}) tidak cukup untuk piutang Rp ${payload.total.toLocaleString("id-ID")}`,
-          "error",
-        );
-        return;
-      }
-
-      // 2. Insert piutang
-      const { data, error } = await supabase
-        .from("piutang")
-        .insert({ user_id: userId, ...payload })
-        .select()
-        .single();
-      if (error) {
-        showToast("Gagal menyimpan piutang", "error");
-        return;
-      }
-
-      // 3. Update saldo
-      const newBal = freshAcc.balance - payload.total;
-      const { data: updAcc, error: accErr } = await supabase
-        .from("accounts")
-        .update({ balance: newBal })
-        .eq("id", acc.id)
-        .select()
-        .single();
-      if (accErr || !updAcc) {
-        // Rollback: hapus piutang
-        await supabase.from("piutang").delete().eq("id", data.id);
-        showToast("Gagal update saldo. Piutang dibatalkan.", "error");
-        return;
-      }
-      setAccounts((p) => p.map((a) => (a.id === acc.id ? updAcc : a)));
-
-      // 4. Buat record transaksi untuk audit trail
-      const tx = {
-        user_id: userId,
-        type: "expense",
-        amount: payload.total,
-        category: "Piutang",
-        note: `Piutang ke ${payload.borrower_name || "seseorang"}`,
-        date: toLocalDateStr(),
-        account_name: payload.from_account,
-        icon: "🤝",
-      };
-      const { data: newTx, error: txErr } = await supabase
-        .from("transactions")
-        .insert(tx)
-        .select()
-        .single();
-      if (txErr) {
-        // Rollback: kembalikan saldo & hapus piutang
-        await supabase
-          .from("accounts")
-          .update({ balance: freshAcc.balance })
-          .eq("id", acc.id);
-        await supabase.from("piutang").delete().eq("id", data.id);
-        setAccounts((p) =>
-          p.map((a) => (a.id === acc.id ? { ...a, balance: freshAcc.balance } : a)),
-        );
-        showToast("Gagal membuat transaksi. Piutang dibatalkan.", "error");
-        return;
-      }
-      if (newTx && setTransactions) setTransactions((p) => [newTx, ...p]);
-
-      setPiutang((p) => [...p, data]);
-      showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
-    } else {
-      // Piutang tanpa potong akun
-      const { data, error } = await supabase
-        .from("piutang")
-        .insert({ user_id: userId, ...payload })
-        .select()
-        .single();
-      if (error) {
-        showToast("Gagal menyimpan piutang", "error");
-        return;
-      }
-      setPiutang((p) => [...p, data]);
-      showToast(`🤝 Piutang ke "${data.borrower_name}" berhasil dicatat!`);
+      showToast(`Piutang ke "${result.piutang.borrower_name}" berhasil dicatat!`);
+    } catch (err) {
+      showToast(err.message || "Gagal menyimpan piutang", "error");
     }
   };
 
@@ -126,7 +40,7 @@ export function usePiutang(userId, showToast) {
       return;
     }
     setPiutang((p) => p.map((d) => (d.id === id ? data : d)));
-    showToast(`✅ Piutang "${data.borrower_name}" diperbarui!`);
+    showToast(`Piutang "${data.borrower_name}" diperbarui!`);
   };
 
   const deletePiutang = async (id) => {
@@ -145,79 +59,24 @@ export function usePiutang(userId, showToast) {
     accountName,
     { accounts, setAccounts, setTransactions },
   ) => {
-    // 1. Validate akun
-    const acc = accounts.find((a) => a.name === accountName);
-    if (!acc) {
-      showToast("Akun tidak ditemukan. Pilih akun yang valid.", "error");
-      return;
+    try {
+      const result = await callEdge("financial-ops", {
+        action: "terima-piutang",
+        piutang_id: item.id,
+        amount,
+        account_name: accountName,
+      });
+      setAccounts((p) => p.map((a) => (a.id === result.account.id ? result.account : a)));
+      setPiutang((p) => p.map((d) => (d.id === item.id ? result.piutang : d)));
+      if (result.transaction && setTransactions) {
+        setTransactions((p) => [result.transaction, ...p]);
+      }
+      showToast(
+        `Terima Rp ${amount.toLocaleString("id-ID")} dari ${item.borrower_name} berhasil!`,
+      );
+    } catch (err) {
+      showToast(err.message || "Gagal terima piutang", "error");
     }
-
-    // 2. Refetch saldo terbaru
-    const { data: freshAcc, error: fetchErr } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("id", acc.id)
-      .single();
-    if (fetchErr || !freshAcc) {
-      showToast("Gagal membaca saldo akun. Coba lagi.", "error");
-      return;
-    }
-
-    // 3. Update saldo akun (income — tambah)
-    const newBal = freshAcc.balance + amount;
-    const { data: updAcc, error: accErr } = await supabase
-      .from("accounts")
-      .update({ balance: newBal })
-      .eq("id", acc.id)
-      .select()
-      .single();
-    if (accErr || !updAcc) {
-      showToast("Gagal update saldo akun.", "error");
-      return;
-    }
-
-    // 4. Update sisa piutang
-    const newRemaining = Math.max(0, item.remaining - amount);
-    const { data: updPiu, error: piuErr } = await supabase
-      .from("piutang")
-      .update({ remaining: newRemaining })
-      .eq("id", item.id)
-      .select()
-      .single();
-    if (piuErr || !updPiu) {
-      // Rollback saldo
-      await supabase
-        .from("accounts")
-        .update({ balance: freshAcc.balance })
-        .eq("id", acc.id);
-      showToast("Gagal update piutang. Saldo dikembalikan.", "error");
-      return;
-    }
-
-    // 5. Buat record transaksi untuk audit trail
-    const tx = {
-      user_id: userId,
-      type: "income",
-      amount,
-      category: "Piutang",
-      note: `Terima piutang dari ${item.borrower_name || "seseorang"}`,
-      date: toLocalDateStr(),
-      account_name: accountName,
-      icon: "🤝",
-    };
-    const { data: newTx } = await supabase
-      .from("transactions")
-      .insert(tx)
-      .select()
-      .single();
-    if (newTx && setTransactions) setTransactions((p) => [newTx, ...p]);
-
-    // 6. Update state
-    setAccounts((p) => p.map((a) => (a.id === acc.id ? updAcc : a)));
-    setPiutang((p) => p.map((d) => (d.id === item.id ? updPiu : d)));
-    showToast(
-      `✅ Terima Rp ${amount.toLocaleString("id-ID")} dari ${item.borrower_name} berhasil dicatat!`,
-    );
   };
 
   return {
