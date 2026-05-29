@@ -7,8 +7,8 @@ import {
   Suspense,
 } from "react";
 import { fetchGoldPrices } from "../services/goldPrice";
-import { sendAiMessage, buildSystemPrompt } from "../services/aiService";
 import { APP_AI_NAME } from "../config/app";
+import { callEdge } from "../services/api";
 import Sidebar from "../components/dashboard/Sidebar";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -365,122 +365,6 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     fetchAll();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const autoExecuteRecurrings = async (
-    recurringsData,
-    accountsData,
-    debtsData,
-  ) => {
-    const todayStr = new Date().toLocaleDateString("en-CA");
-    const due = recurringsData.filter(
-      (r) => r.active && r.next_date <= todayStr,
-    );
-    if (due.length === 0)
-      return {
-        accounts: accountsData,
-        recurrings: recurringsData,
-        debts: debtsData,
-        executed: 0,
-      };
-
-    const calcNextDate = (freq, from) => {
-      const d = new Date(from);
-      if (freq === "daily") d.setDate(d.getDate() + 1);
-      if (freq === "weekly") d.setDate(d.getDate() + 7);
-      if (freq === "monthly") d.setMonth(d.getMonth() + 1);
-      if (freq === "yearly") d.setFullYear(d.getFullYear() + 1);
-      return d.toISOString().slice(0, 10);
-    };
-
-    const { data: existingAuto } = await supabase
-      .from("transactions")
-      .select("note, date")
-      .eq("user_id", user.id)
-      .like("note", "[Auto]%")
-      .gte("date", todayStr);
-    const alreadyInserted = new Set(
-      (existingAuto || []).map((t) => `${t.note}|${t.date}`),
-    );
-    const dueToInsert = due.filter(
-      (r) => !alreadyInserted.has(`[Auto] ${r.name}|${r.next_date}`),
-    );
-
-    const newTxs = dueToInsert.map((r) => ({
-      user_id: user.id,
-      type: "expense",
-      amount: r.amount,
-      category: r.category || "Lainnya",
-      note: `[Auto] ${r.name}`,
-      date: new Date(r.next_date).toISOString().slice(0, 10),
-      account_name: r.account_name,
-      icon: r.icon || "🔄",
-    }));
-    if (dueToInsert.length > 0) {
-      const { error: insertErr } = await supabase
-        .from("transactions")
-        .insert(newTxs)
-        .select();
-      if (insertErr) {
-        console.error("Auto-recurring insert failed:", insertErr);
-        return {
-          accounts: accountsData,
-          recurrings: recurringsData,
-          debts: debtsData,
-          executed: 0,
-        };
-      }
-    }
-
-    const updatedDebts = [...debtsData];
-    for (const r of dueToInsert) {
-      const acc = accountsData.find((a) => a.name === r.account_name);
-      if (acc) {
-        // Refetch saldo terbaru dari DB untuk hindari stale balance
-        const { data: freshAcc } = await supabase
-          .from("accounts")
-          .select("*")
-          .eq("id", acc.id)
-          .single();
-        const currentBal = freshAcc ? freshAcc.balance : acc.balance;
-        const newBal = Math.max(0, currentBal - r.amount);
-        await supabase
-          .from("accounts")
-          .update({ balance: newBal })
-          .eq("id", acc.id);
-        acc.balance = newBal;
-      }
-      if (r.debt_id) {
-        const debtIdx = updatedDebts.findIndex((d) => d.id === r.debt_id);
-        if (debtIdx !== -1) {
-          const newRemaining = Math.max(
-            0,
-            updatedDebts[debtIdx].remaining - r.amount,
-          );
-          await supabase
-            .from("debts")
-            .update({ remaining: newRemaining })
-            .eq("id", r.debt_id);
-          updatedDebts[debtIdx] = {
-            ...updatedDebts[debtIdx],
-            remaining: newRemaining,
-          };
-        }
-      }
-      const newNext = calcNextDate(r.frequency, r.next_date);
-      await supabase
-        .from("recurring_transactions")
-        .update({ next_date: newNext })
-        .eq("id", r.id);
-      r.next_date = newNext;
-    }
-
-    return {
-      accounts: accountsData,
-      recurrings: recurringsData,
-      debts: updatedDebts,
-      executed: dueToInsert.length,
-    };
-  };
-
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -507,44 +391,35 @@ const Dashboard = ({ session, onLogout, showToast }) => {
           supabase.from("piutang").select("*").order("created_at"),
         ]);
 
-      const accountsData = accs.data || [];
-      const recurringsData = recs.data || [];
-      const debtsData = dbs.data || [];
-
-      const result = await autoExecuteRecurrings(
-        recurringsData,
-        accountsData,
-        debtsData,
-      );
-
-      if (result.executed > 0) {
-        const [freshAccs, freshTxs] = await Promise.all([
-          supabase.from("accounts").select("*").order("created_at"),
-          supabase
-            .from("transactions")
-            .select("*")
-            .order("date", { ascending: false }),
-        ]);
-        if (freshAccs.data) setAccounts(freshAccs.data);
-        if (freshTxs.data) setTransactions(freshTxs.data);
-        setRecurrings([...recurringsData]);
-        setDebts(result.debts);
-        showToast(
-          `🔄 ${result.executed} transaksi berulang dijalankan otomatis!`,
-        );
-      } else {
-        if (accs.data) setAccounts(accs.data);
-        if (txs.data) setTransactions(txs.data);
-      }
-
+      if (accs.data) setAccounts(accs.data);
+      if (txs.data) setTransactions(txs.data);
       if (gls.data) setGoals(gls.data);
-      if (!result.executed && dbs.data) setDebts(dbs.data);
+      if (dbs.data) setDebts(dbs.data);
       if (cats.data) setCustomCategories(cats.data);
-      if (recs.data && !result.executed) setRecurrings(recs.data);
+      if (recs.data) setRecurrings(recs.data);
       if (invs.data) setInvestments(invs.data);
       if (buds.data) setBudgets(buds.data);
       if (splits.data) setSplitBills(splits.data);
       if (piu.data) setPiutang(piu.data);
+
+      // Auto-execute recurring transactions via edge function
+      try {
+        const result = await callEdge("auto-recurrings", {
+          today: toLocalDateStr(),
+        });
+        if (result.executed > 0) {
+          setAccounts(result.accounts);
+          setTransactions(result.transactions);
+          setRecurrings(result.recurrings);
+          setDebts(result.debts);
+          showToast(
+            `🔄 ${result.executed} transaksi berulang dijalankan otomatis!`,
+          );
+        }
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("auto-recurrings:", e.message);
+      }
+
       setLoading(false);
     } catch (err) {
       if (import.meta.env.DEV) console.error("fetchAll error:", err);
@@ -574,193 +449,57 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   });
   const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
 
-  // ── ADD TRANSACTION ────────────────────
+  // ── ADD TRANSACTION (via Edge Function) ────────────────────
   const addTx = async () => {
     if (!txForm.amount || isSavingTx) return;
-
-    // Validasi: akun harus dipilih
     const accountName = txForm.account || accounts[0]?.name || "";
-    if (!accountName) {
-      showToast("Pilih akun terlebih dahulu", "error");
-      return;
-    }
-    const acc = accounts.find((a) => a.name === accountName);
-    if (!acc) {
-      showToast("Akun tidak ditemukan. Pilih akun yang valid.", "error");
-      return;
-    }
+    if (!accountName) { showToast("Pilih akun terlebih dahulu", "error"); return; }
 
     setIsSavingTx(true);
-
-    // Refetch saldo terbaru dari DB untuk hindari race condition
-    const { data: freshAcc, error: fetchErr } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("id", acc.id)
-      .single();
-    if (fetchErr || !freshAcc) {
-      showToast("Gagal membaca saldo akun. Coba lagi.", "error");
+    try {
+      const result = await callEdge("transactions", {
+        action: "add",
+        type: txForm.type,
+        amount: parseInt(txForm.amount),
+        category: txForm.category,
+        note: txForm.note || txForm.category,
+        date: txForm.date || toLocalDateStr(),
+        account_name: accountName,
+        icon: categoryIcons[txForm.category] || "📦",
+      });
+      setAccounts((p) => p.map((a) => (a.id === result.account.id ? result.account : a)));
+      setTransactions((p) => [result.transaction, ...p]);
+      setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
+      setShowAddTx(false);
+      showToast("Transaksi berhasil ditambahkan!");
+    } catch (err) {
+      showToast(err.message || "Gagal menyimpan transaksi", "error");
+    } finally {
       setIsSavingTx(false);
-      return;
     }
-
-    const amount = parseInt(txForm.amount);
-
-    // Cek saldo cukup untuk pengeluaran
-    if (txForm.type === "expense" && freshAcc.balance < amount) {
-      showToast(
-        `⚠️ Saldo ${accountName} (Rp ${freshAcc.balance.toLocaleString("id-ID")}) tidak cukup untuk pengeluaran Rp ${amount.toLocaleString("id-ID")}`,
-        "error",
-      );
-      setIsSavingTx(false);
-      return;
-    }
-
-    const newTx = {
-      user_id: user.id,
-      type: txForm.type,
-      amount,
-      category: txForm.category,
-      note: txForm.note || txForm.category,
-      date: txForm.date || toLocalDateStr(),
-      account_name: accountName,
-      icon: categoryIcons[txForm.category] || "📦",
-    };
-
-    // 1. Insert transaksi
-    const { data, error } = await supabase
-      .from("transactions")
-      .insert(newTx)
-      .select()
-      .single();
-    if (error) {
-      showToast("Gagal menyimpan transaksi", "error");
-      setIsSavingTx(false);
-      return;
-    }
-
-    // 2. Update saldo akun (gunakan saldo fresh dari DB)
-    const newBalance =
-      newTx.type === "income"
-        ? freshAcc.balance + newTx.amount
-        : freshAcc.balance - newTx.amount;
-    const { data: updatedAcc, error: accErr } = await supabase
-      .from("accounts")
-      .update({ balance: newBalance })
-      .eq("id", acc.id)
-      .select()
-      .single();
-    if (accErr || !updatedAcc) {
-      // Rollback: hapus transaksi yang baru di-insert
-      await supabase.from("transactions").delete().eq("id", data.id);
-      showToast("Gagal update saldo akun. Transaksi dibatalkan.", "error");
-      setIsSavingTx(false);
-      return;
-    }
-
-    // 3. Semua berhasil — update state
-    setAccounts((p) => p.map((a) => (a.id === acc.id ? updatedAcc : a)));
-    setTransactions((p) => [data, ...p]);
-    setTxForm({
-      type: "expense",
-      amount: "",
-      category: "Makanan",
-      note: "",
-      account: accounts[0]?.name ?? "",
-      toAccount: "",
-      date: toLocalDateStr(),
-    });
-    setIsSavingTx(false);
-    setShowAddTx(false);
-    showToast("Transaksi berhasil ditambahkan!");
   };
 
   const addMultipleTx = async (items, accountName, date) => {
     if (!items.length || isSavingTx) return;
-
-    // Validasi akun
-    if (!accountName) {
-      showToast("Pilih akun terlebih dahulu", "error");
-      return;
-    }
-    const acc = accounts.find((a) => a.name === accountName);
-    if (!acc) {
-      showToast("Akun tidak ditemukan. Pilih akun yang valid.", "error");
-      return;
-    }
+    if (!accountName) { showToast("Pilih akun terlebih dahulu", "error"); return; }
 
     setIsSavingTx(true);
-
-    // Refetch saldo terbaru
-    const { data: freshAcc, error: fetchErr } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("id", acc.id)
-      .single();
-    if (fetchErr || !freshAcc) {
-      showToast("Gagal membaca saldo akun. Coba lagi.", "error");
+    try {
+      const result = await callEdge("transactions", {
+        action: "add-multiple",
+        items: items.map((i) => ({ ...i, icon: categoryIcons[i.category] || "📦" })),
+        account_name: accountName,
+        date: date || toLocalDateStr(),
+      });
+      setAccounts((p) => p.map((a) => (a.id === result.account.id ? result.account : a)));
+      setTransactions((p) => [...[...result.transactions].reverse(), ...p]);
+      setShowAddTx(false);
+      showToast(`${result.transactions.length} transaksi berhasil disimpan!`);
+    } catch (err) {
+      showToast(err.message || "Gagal menyimpan transaksi", "error");
+    } finally {
       setIsSavingTx(false);
-      return;
     }
-
-    const total = items.reduce((s, i) => s + i.amount, 0);
-
-    // Cek saldo cukup
-    if (freshAcc.balance < total) {
-      showToast(
-        `⚠️ Saldo ${accountName} (Rp ${freshAcc.balance.toLocaleString("id-ID")}) tidak cukup untuk total Rp ${total.toLocaleString("id-ID")}`,
-        "error",
-      );
-      setIsSavingTx(false);
-      return;
-    }
-
-    const today = toLocalDateStr();
-    const txsToInsert = items.map((item) => ({
-      user_id: user.id,
-      type: "expense",
-      amount: item.amount,
-      category: item.category,
-      note: item.note,
-      date: date || today,
-      account_name: accountName,
-      icon: categoryIcons[item.category] || "📦",
-    }));
-
-    // 1. Insert semua transaksi
-    const { data, error } = await supabase
-      .from("transactions")
-      .insert(txsToInsert)
-      .select();
-    if (error) {
-      showToast("Gagal menyimpan transaksi", "error");
-      setIsSavingTx(false);
-      return;
-    }
-
-    // 2. Update saldo akun (fresh balance)
-    const { data: updatedAcc, error: accErr } = await supabase
-      .from("accounts")
-      .update({ balance: freshAcc.balance - total })
-      .eq("id", acc.id)
-      .select()
-      .single();
-    if (accErr || !updatedAcc) {
-      // Rollback: hapus transaksi yang baru di-insert
-      const ids = (data || []).map((t) => t.id);
-      if (ids.length)
-        await supabase.from("transactions").delete().in("id", ids);
-      showToast("Gagal update saldo. Transaksi dibatalkan.", "error");
-      setIsSavingTx(false);
-      return;
-    }
-
-    // 3. Semua berhasil
-    setAccounts((p) => p.map((a) => (a.id === acc.id ? updatedAcc : a)));
-    setTransactions((p) => [...[...data].reverse(), ...p]);
-    setIsSavingTx(false);
-    setShowAddTx(false);
-    showToast(`${data.length} transaksi berhasil disimpan! ✅`);
   };
 
   // ── EDIT TRANSAKSI ───────────────────────────────────────
@@ -784,460 +523,80 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     if (!newAmount && editingTx.type !== "transfer") return;
 
     setIsSavingTx(true);
-
-    // Transfer: hanya bisa edit note & date
-    if (editingTx.type === "transfer") {
-      const { data, error } = await supabase
-        .from("transactions")
-        .update({ note: txForm.note, date: txForm.date || editingTx.date })
-        .eq("id", editingTx.id)
-        .select()
-        .single();
-      setIsSavingTx(false);
-      if (error) {
-        showToast("Gagal mengubah transaksi", "error");
-        return;
+    try {
+      const result = await callEdge("transactions", {
+        action: "edit",
+        id: editingTx.id,
+        type: txForm.type,
+        amount: newAmount,
+        category: txForm.category,
+        note: txForm.note || txForm.category,
+        date: txForm.date || editingTx.date,
+        account_name: txForm.account || editingTx.account_name,
+        icon: categoryIcons[txForm.category] || editingTx.icon || "📦",
+      });
+      if (result.accounts?.length) {
+        setAccounts((p) => p.map((a) => {
+          const upd = result.accounts.find((u) => u.id === a.id);
+          return upd || a;
+        }));
       }
-      setTransactions((p) => p.map((t) => (t.id === editingTx.id ? data : t)));
+      setTransactions((p) => p.map((t) => (t.id === editingTx.id ? result.transaction : t)));
       setShowEditTx(false);
       setEditingTx(null);
-      showToast("Transfer diperbarui ✅");
-      return;
-    }
-
-    const newAccountName = txForm.account || editingTx.account_name;
-    const oldAcc = accounts.find((a) => a.name === editingTx.account_name);
-    const targetAcc = accounts.find((a) => a.name === newAccountName) || oldAcc;
-    const isSameAcc = targetAcc?.id === oldAcc?.id;
-
-    // Refetch saldo terbaru kedua akun dari DB
-    let freshOldAcc = null,
-      freshTargetAcc = null;
-    if (oldAcc) {
-      const { data } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("id", oldAcc.id)
-        .single();
-      freshOldAcc = data;
-    }
-    if (targetAcc && !isSameAcc) {
-      const { data } = await supabase
-        .from("accounts")
-        .select("*")
-        .eq("id", targetAcc.id)
-        .single();
-      freshTargetAcc = data;
-    } else {
-      freshTargetAcc = freshOldAcc;
-    }
-
-    // Hitung saldo baru: revert old tx di akun lama, apply new tx di akun target
-    // Hitung sekaligus agar bisa atomic check sebelum write
-    let oldAccFinalBalance = null;
-    let targetAccFinalBalance = null;
-
-    if (freshOldAcc) {
-      const revertedBalance =
-        editingTx.type === "income"
-          ? freshOldAcc.balance - editingTx.amount
-          : freshOldAcc.balance + editingTx.amount;
-
-      if (isSameAcc) {
-        // Akun sama: revert + apply sekaligus
-        targetAccFinalBalance =
-          txForm.type === "income"
-            ? revertedBalance + newAmount
-            : revertedBalance - newAmount;
-        oldAccFinalBalance = targetAccFinalBalance;
-      } else {
-        oldAccFinalBalance = revertedBalance;
-        if (freshTargetAcc) {
-          targetAccFinalBalance =
-            txForm.type === "income"
-              ? freshTargetAcc.balance + newAmount
-              : freshTargetAcc.balance - newAmount;
-        }
-      }
-    }
-
-    // Update saldo akun lama
-    let updatedOldAcc = null;
-    if (freshOldAcc && oldAccFinalBalance !== null) {
-      const { data, error: revErr } = await supabase
-        .from("accounts")
-        .update({ balance: oldAccFinalBalance })
-        .eq("id", oldAcc.id)
-        .select()
-        .single();
-      if (revErr) {
-        showToast("Gagal update saldo akun lama", "error");
-        setIsSavingTx(false);
-        return;
-      }
-      updatedOldAcc = data;
-    }
-
-    // Update saldo akun target (hanya jika beda akun)
-    let updatedTargetAcc = null;
-    if (!isSameAcc && freshTargetAcc && targetAccFinalBalance !== null) {
-      const { data, error: updErr } = await supabase
-        .from("accounts")
-        .update({ balance: targetAccFinalBalance })
-        .eq("id", targetAcc.id)
-        .select()
-        .single();
-      if (updErr) {
-        // Rollback akun lama
-        if (freshOldAcc)
-          await supabase
-            .from("accounts")
-            .update({ balance: freshOldAcc.balance })
-            .eq("id", oldAcc.id);
-        showToast("Gagal update saldo. Edit dibatalkan.", "error");
-        setIsSavingTx(false);
-        return;
-      }
-      updatedTargetAcc = data;
-    }
-
-    // Update transaksi di DB
-    const updatedFields = {
-      type: txForm.type,
-      amount: newAmount,
-      category: txForm.category,
-      note: txForm.note || txForm.category,
-      account_name: newAccountName,
-      icon: categoryIcons[txForm.category] || editingTx.icon || "📦",
-      date: txForm.date || editingTx.date,
-    };
-    const { data, error } = await supabase
-      .from("transactions")
-      .update(updatedFields)
-      .eq("id", editingTx.id)
-      .select()
-      .single();
-    if (error) {
-      // Rollback SEMUA balance changes (termasuk akun sama)
-      if (freshOldAcc)
-        await supabase
-          .from("accounts")
-          .update({ balance: freshOldAcc.balance })
-          .eq("id", oldAcc.id);
-      if (!isSameAcc && freshTargetAcc)
-        await supabase
-          .from("accounts")
-          .update({ balance: freshTargetAcc.balance })
-          .eq("id", targetAcc.id);
-      showToast("Gagal mengubah transaksi. Saldo dikembalikan.", "error");
+      showToast("Transaksi berhasil diperbarui");
+    } catch (err) {
+      showToast(err.message || "Gagal mengubah transaksi", "error");
+    } finally {
       setIsSavingTx(false);
-      return;
     }
-
-    // Semua berhasil — update state sekali di akhir
-    setAccounts((p) =>
-      p.map((a) => {
-        if (updatedOldAcc && a.id === oldAcc.id) return updatedOldAcc;
-        if (updatedTargetAcc && a.id === targetAcc.id) return updatedTargetAcc;
-        return a;
-      }),
-    );
-    setTransactions((p) => p.map((t) => (t.id === editingTx.id ? data : t)));
-    setShowEditTx(false);
-    setEditingTx(null);
-    setIsSavingTx(false);
-    showToast("Transaksi berhasil diperbarui ✅");
   };
 
-  // ── DELETE TRANSAKSI ─────────────────────────────
+  // ── DELETE TRANSAKSI (via Edge Function) ─────────────────────
   const deleteTx = async (tx) => {
-    // 1. Kembalikan saldo DULU sebelum hapus transaksi (agar bisa rollback)
-    if (tx.type === "transfer") {
-      const fromAcc = accounts.find((a) => a.name === tx.account_name);
-      const toAcc = tx.to_account
-        ? accounts.find((a) => a.name === tx.to_account)
-        : null;
-
-      // Refetch saldo terbaru
-      let freshFrom = null,
-        freshTo = null;
-      if (fromAcc) {
-        const { data } = await supabase
-          .from("accounts")
-          .select("*")
-          .eq("id", fromAcc.id)
-          .single();
-        freshFrom = data;
+    try {
+      const result = await callEdge("transactions", { action: "delete", id: tx.id });
+      if (result.accounts?.length) {
+        setAccounts((p) => p.map((a) => {
+          const upd = result.accounts.find((u) => u.id === a.id);
+          return upd || a;
+        }));
       }
-      if (toAcc) {
-        const { data } = await supabase
-          .from("accounts")
-          .select("*")
-          .eq("id", toAcc.id)
-          .single();
-        freshTo = data;
-      }
-
-      const updates = [];
-      if (freshFrom)
-        updates.push(
-          supabase
-            .from("accounts")
-            .update({ balance: freshFrom.balance + tx.amount })
-            .eq("id", fromAcc.id)
-            .select()
-            .single(),
-        );
-      if (freshTo)
-        updates.push(
-          supabase
-            .from("accounts")
-            .update({ balance: freshTo.balance - tx.amount })
-            .eq("id", toAcc.id)
-            .select()
-            .single(),
-        );
-      const results = await Promise.all(updates);
-      const anyBalErr = results.some((r) => r.error);
-      if (anyBalErr) {
-        // Rollback: kembalikan saldo yang sudah terupdate
-        if (freshFrom && !results[0]?.error)
-          await supabase
-            .from("accounts")
-            .update({ balance: freshFrom.balance })
-            .eq("id", fromAcc.id);
-        if (freshTo && !results[freshFrom ? 1 : 0]?.error)
-          await supabase
-            .from("accounts")
-            .update({ balance: freshTo.balance })
-            .eq("id", toAcc.id);
-        showToast("Gagal update saldo. Hapus dibatalkan.", "error");
-        return;
-      }
-
-      // 2. Saldo berhasil di-revert, sekarang hapus transaksi
-      const { error } = await supabase
-        .from("transactions")
-        .delete()
-        .eq("id", tx.id);
-      if (error) {
-        // Rollback: kembalikan saldo ke nilai setelah revert gagal
-        if (freshFrom)
-          await supabase
-            .from("accounts")
-            .update({ balance: freshFrom.balance })
-            .eq("id", fromAcc.id);
-        if (freshTo)
-          await supabase
-            .from("accounts")
-            .update({ balance: freshTo.balance })
-            .eq("id", toAcc.id);
-        showToast("Gagal menghapus transaksi", "error");
-        return;
-      }
-
-      setAccounts((p) =>
-        p.map((a) => {
-          if (freshFrom && a.id === fromAcc.id)
-            return results[0]?.data || {
-              ...a,
-              balance: freshFrom.balance + tx.amount,
-            };
-          if (freshTo && a.id === toAcc.id)
-            return results[freshFrom ? 1 : 0]?.data || {
-              ...a,
-              balance: freshTo.balance - tx.amount,
-            };
-          return a;
-        }),
-      );
-    } else {
-      const acc = accounts.find((a) => a.name === tx.account_name);
-      if (acc) {
-        // Refetch saldo terbaru
-        const { data: freshAcc } = await supabase
-          .from("accounts")
-          .select("*")
-          .eq("id", acc.id)
-          .single();
-        if (freshAcc) {
-          const revertedBalance =
-            tx.type === "income"
-              ? freshAcc.balance - tx.amount
-              : freshAcc.balance + tx.amount;
-          const { data: updatedAcc, error: balErr } = await supabase
-            .from("accounts")
-            .update({ balance: revertedBalance })
-            .eq("id", acc.id)
-            .select()
-            .single();
-          if (balErr) {
-            showToast("Gagal update saldo. Hapus dibatalkan.", "error");
-            return;
-          }
-
-          // Saldo berhasil di-revert, sekarang hapus transaksi
-          const { error } = await supabase
-            .from("transactions")
-            .delete()
-            .eq("id", tx.id);
-          if (error) {
-            // Rollback: kembalikan saldo asli
-            await supabase
-              .from("accounts")
-              .update({ balance: freshAcc.balance })
-              .eq("id", acc.id);
-            showToast("Gagal menghapus transaksi", "error");
-            return;
-          }
-
-          setAccounts((p) =>
-            p.map((a) =>
-              a.id === acc.id
-                ? updatedAcc || { ...a, balance: revertedBalance }
-                : a,
-            ),
-          );
-        }
-      } else {
-        // Akun tidak ditemukan — langsung hapus transaksi saja
-        const { error } = await supabase
-          .from("transactions")
-          .delete()
-          .eq("id", tx.id);
-        if (error) {
-          showToast("Gagal menghapus transaksi", "error");
-          return;
-        }
-      }
+      setTransactions((p) => p.filter((t) => t.id !== tx.id));
+      showToast("Transaksi dihapus", "info");
+    } catch (err) {
+      showToast(err.message || "Gagal menghapus transaksi", "error");
     }
-
-    setTransactions((p) => p.filter((t) => t.id !== tx.id));
-    showToast("Transaksi dihapus 🗑️", "info");
   };
 
-  // ── TRANSFER DANA ────────────────────────────
+  // ── TRANSFER DANA (via Edge Function) ────────────────────────
   const addTransfer = async () => {
     const amount = parseInt(txForm.amount);
-    const fromAcc = accounts.find((a) => a.name === txForm.account);
-    const toAcc = accounts.find((a) => a.name === txForm.toAccount);
-    if (!amount || !fromAcc || !toAcc || fromAcc.id === toAcc.id || isSavingTx)
-      return;
+    if (!amount || !txForm.account || !txForm.toAccount || txForm.account === txForm.toAccount || isSavingTx) return;
 
     setIsSavingTx(true);
-
-    // Refetch saldo terbaru kedua akun
-    const [freshFromRes, freshToRes] = await Promise.all([
-      supabase.from("accounts").select("*").eq("id", fromAcc.id).single(),
-      supabase.from("accounts").select("*").eq("id", toAcc.id).single(),
-    ]);
-    if (
-      freshFromRes.error ||
-      freshToRes.error ||
-      !freshFromRes.data ||
-      !freshToRes.data
-    ) {
-      showToast("Gagal membaca saldo akun. Coba lagi.", "error");
+    try {
+      const result = await callEdge("transactions", {
+        action: "transfer",
+        amount,
+        from_account: txForm.account,
+        to_account: txForm.toAccount,
+        date: txForm.date || toLocalDateStr(),
+        note: txForm.note || `Transfer ${txForm.account} \u2192 ${txForm.toAccount}`,
+      });
+      setTransactions((p) => [result.transaction, ...p]);
+      setAccounts((p) => p.map((a) => {
+        const upd = result.accounts.find((u) => u.id === a.id);
+        return upd || a;
+      }));
+      setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
+      setShowAddTx(false);
+      showToast(`Transfer Rp ${amount.toLocaleString("id-ID")} berhasil!`);
+    } catch (err) {
+      showToast(err.message || "Gagal transfer", "error");
+    } finally {
       setIsSavingTx(false);
-      return;
     }
-    const freshFrom = freshFromRes.data;
-    const freshTo = freshToRes.data;
-
-    // Cek saldo cukup
-    if (freshFrom.balance < amount) {
-      showToast(
-        `⚠️ Saldo ${fromAcc.name} (Rp ${freshFrom.balance.toLocaleString("id-ID")}) tidak cukup untuk transfer Rp ${amount.toLocaleString("id-ID")}`,
-        "error",
-      );
-      setIsSavingTx(false);
-      return;
-    }
-
-    const date = txForm.date || toLocalDateStr();
-    const note = txForm.note || `Transfer ${fromAcc.name} → ${toAcc.name}`;
-
-    // 1. Insert transaksi
-    const { data: txData, error: txError } = await supabase
-      .from("transactions")
-      .insert([
-        {
-          user_id: user.id,
-          type: "transfer",
-          amount,
-          category: "Transfer",
-          note,
-          date,
-          account_name: fromAcc.name,
-          to_account: toAcc.name,
-          icon: "🔄",
-        },
-      ])
-      .select();
-    if (txError) {
-      showToast("Gagal menyimpan transfer", "error");
-      setIsSavingTx(false);
-      return;
-    }
-
-    // 2. Update saldo kedua akun (fresh balance)
-    const [resFrom, resTo] = await Promise.all([
-      supabase
-        .from("accounts")
-        .update({ balance: freshFrom.balance - amount })
-        .eq("id", fromAcc.id)
-        .select()
-        .single(),
-      supabase
-        .from("accounts")
-        .update({ balance: freshTo.balance + amount })
-        .eq("id", toAcc.id)
-        .select()
-        .single(),
-    ]);
-    if (resFrom.error || resTo.error) {
-      // Rollback: hapus transaksi & kembalikan saldo yang sudah terupdate
-      const txIds = (txData || []).map((t) => t.id);
-      if (txIds.length)
-        await supabase.from("transactions").delete().in("id", txIds);
-      if (!resFrom.error && resFrom.data)
-        await supabase
-          .from("accounts")
-          .update({ balance: freshFrom.balance })
-          .eq("id", fromAcc.id);
-      if (!resTo.error && resTo.data)
-        await supabase
-          .from("accounts")
-          .update({ balance: freshTo.balance })
-          .eq("id", toAcc.id);
-      showToast("Gagal update saldo. Transfer dibatalkan.", "error");
-      setIsSavingTx(false);
-      return;
-    }
-
-    // 3. Semua berhasil
-    setTransactions((p) => [...(txData || []).reverse(), ...p]);
-    setAccounts((p) =>
-      p.map((a) => {
-        if (a.id === fromAcc.id) return resFrom.data;
-        if (a.id === toAcc.id) return resTo.data;
-        return a;
-      }),
-    );
-    setTxForm({
-      type: "expense",
-      amount: "",
-      category: "Makanan",
-      note: "",
-      account: accounts[0]?.name ?? "",
-      toAccount: "",
-      date: toLocalDateStr(),
-    });
-    setIsSavingTx(false);
-    setShowAddTx(false);
-    showToast(
-      `✅ Transfer Rp ${amount.toLocaleString("id-ID")} dari ${fromAcc.name} ke ${toAcc.name} berhasil!`,
-    );
   };
 
   // ── ADD ACCOUNT ──────────────────────────────────────────
@@ -1284,37 +643,19 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
   // ── ADJUST BALANCE ───────────────────────────────────────
   const handleAdjustBalance = async (account, newBalance) => {
-    const diff = newBalance - account.balance;
-    if (diff === 0) return;
-    const { data: updatedAcc, error: accErr } = await supabase
-      .from("accounts")
-      .update({ balance: newBalance })
-      .eq("id", account.id)
-      .select()
-      .single();
-    if (accErr) {
-      showToast("Gagal update saldo", "info");
-      return;
+    if (newBalance === account.balance) return;
+    try {
+      const result = await callEdge("transactions", {
+        action: "adjust-balance",
+        account_id: account.id,
+        new_balance: newBalance,
+      });
+      setAccounts((p) => p.map((a) => (a.id === account.id ? result.account : a)));
+      if (result.transaction) setTransactions((p) => [result.transaction, ...p]);
+      showToast(`Saldo ${account.name} diperbarui`);
+    } catch (err) {
+      showToast(err.message || "Gagal update saldo", "error");
     }
-    const adjTx = {
-      user_id: user.id,
-      account_id: account.id,
-      account_name: account.name,
-      type: diff > 0 ? "income" : "expense",
-      amount: Math.abs(diff),
-      category: "Koreksi Saldo",
-      note: `Koreksi saldo ${account.name}`,
-      icon: "⚖️",
-      date: toLocalDateStr(),
-    };
-    const { data: newTx } = await supabase
-      .from("transactions")
-      .insert(adjTx)
-      .select()
-      .single();
-    setAccounts((p) => p.map((a) => (a.id === account.id ? updatedAcc : a)));
-    if (newTx) setTransactions((p) => [newTx, ...p]);
-    showToast(`Saldo ${account.name} diperbarui`);
   };
 
   // ── AI HANDLER ───────────────────────────────────────────
@@ -1341,10 +682,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     if (!aiConfig?.apiKey) {
       setAiChat((p) => [
         ...p,
-        {
-          role: "error",
-          text: "⚙️ API key belum diatur. Buka Settings → AI Coach untuk mengatur.",
-        },
+        { role: "error", text: "API key belum diatur. Buka Settings > AI Coach." },
       ]);
       return;
     }
@@ -1354,38 +692,15 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     setAiInput("");
     setAiTyping(true);
     try {
-      const systemPrompt = buildSystemPrompt(userName.split(" ")[0]);
-      const reply = await sendAiMessage({
-        aiConfig,
-        messages: updatedChat,
-        systemPrompt,
-        financialData: {
-          accounts,
-          transactions,
-          goals,
-          debts,
-          investments,
-          recurrings,
-        },
-        userName: userName.split(" ")[0],
-        onThinking: (msg) =>
-          setAiChat((p) => {
-            const last = p[p.length - 1];
-            if (last?.role === "thinking")
-              return [...p.slice(0, -1), { role: "thinking", text: msg }];
-            return [...p, { role: "thinking", text: msg }];
-          }),
+      const result = await callEdge("ai-chat", {
+        messages: updatedChat.filter((m) => m.role === "user" || m.role === "ai"),
       });
       setAiChat((p) =>
-        p
-          .filter((m) => m.role !== "thinking")
-          .concat({ role: "ai", text: reply }),
+        p.filter((m) => m.role !== "thinking").concat({ role: "ai", text: result.reply }),
       );
     } catch (err) {
       setAiChat((p) =>
-        p
-          .filter((m) => m.role !== "thinking")
-          .concat({ role: "error", text: `❌ ${err.message}` }),
+        p.filter((m) => m.role !== "thinking").concat({ role: "error", text: err.message }),
       );
     } finally {
       setAiTyping(false);
