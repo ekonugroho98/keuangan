@@ -599,46 +599,23 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     }
   };
 
-  // ── ADD ACCOUNT ──────────────────────────────────────────
+  // ── ADD ACCOUNT (via Edge Function) ─────────────────────
   const addAccount = async () => {
     if (!accForm.name || !accForm.balance) return;
-    const icons = {
-      bank: "🏦",
-      ewallet: "📱",
-      cash: "💵",
-      crypto: "₿",
-      investasi: "📈",
-      tabungan: "🪙",
-    };
-    const colors = [
-      "#6366f1",
-      "#8b5cf6",
-      "#06b6d4",
-      "#10b981",
-      "#f59e0b",
-      "#ef4444",
-    ];
-    const newAcc = {
-      user_id: user.id,
-      name: accForm.name,
-      type: accForm.type,
-      balance: parseInt(accForm.balance),
-      icon: icons[accForm.type] || "💰",
-      color: colors[accounts.length % colors.length],
-    };
-    const { data, error } = await supabase
-      .from("accounts")
-      .insert(newAcc)
-      .select()
-      .single();
-    if (error) {
-      showToast("Gagal menyimpan akun", "info");
-      return;
+    try {
+      const result = await callEdge("transactions", {
+        action: "add-account",
+        name: accForm.name,
+        type: accForm.type,
+        balance: parseInt(accForm.balance),
+      });
+      setAccounts((p) => [...p, result.account]);
+      setAccForm({ name: "", type: "bank", balance: "" });
+      setShowAddAccount(false);
+      showToast("Akun berhasil ditambahkan!");
+    } catch (err) {
+      showToast(err.message || "Gagal menyimpan akun", "error");
     }
-    setAccounts((p) => [...p, data]);
-    setAccForm({ name: "", type: "bank", balance: "" });
-    setShowAddAccount(false);
-    showToast("Akun berhasil ditambahkan!");
   };
 
   // ── ADJUST BALANCE ───────────────────────────────────────

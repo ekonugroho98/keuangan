@@ -53,6 +53,14 @@ serve(async (req) => {
         return await handleTransfer(supabase, user.id, body);
       case "adjust-balance":
         return await handleAdjustBalance(supabase, user.id, body);
+      case "add-account":
+        return await handleAddAccount(supabase, user.id, body);
+      case "edit-account":
+        return await handleEditAccount(supabase, user.id, body);
+      case "delete-account":
+        return await handleDeleteAccount(supabase, user.id, body);
+      case "list-accounts":
+        return await handleListAccounts(supabase, user.id);
       default:
         return jsonRes({ error: `Unknown action: ${body.action}` }, 400);
     }
@@ -585,4 +593,126 @@ async function handleAdjustBalance(supabase: any, userId: string, body: any) {
   }
 
   return jsonRes({ account: updAcc, transaction: tx });
+}
+
+// ── ADD ACCOUNT ──────────────────────────────────────────────────
+const ACCOUNT_ICONS: Record<string, string> = {
+  bank: "\u{1F3E6}",
+  ewallet: "\u{1F4F1}",
+  cash: "\u{1F4B5}",
+  crypto: "\u20BF",
+  investasi: "\u{1F4C8}",
+  tabungan: "\u{1FA99}",
+};
+const ACCOUNT_COLORS = [
+  "#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444",
+];
+
+async function handleAddAccount(supabase: any, userId: string, body: any) {
+  const { name, type, balance } = body;
+  if (!name || type === undefined || balance === undefined)
+    return jsonRes({ error: "name, type, balance wajib" }, 400);
+
+  // Check duplicate name
+  const { data: existing } = await supabase
+    .from("accounts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("name", name)
+    .maybeSingle();
+  if (existing)
+    return jsonRes({ error: `Akun "${name}" sudah ada` }, 400);
+
+  // Count existing accounts for color rotation
+  const { count } = await supabase
+    .from("accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  const { data: acc, error } = await supabase
+    .from("accounts")
+    .insert({
+      user_id: userId,
+      name,
+      type: type || "bank",
+      balance: parseInt(balance) || 0,
+      icon: ACCOUNT_ICONS[type] || "\u{1F4B0}",
+      color: ACCOUNT_COLORS[(count || 0) % ACCOUNT_COLORS.length],
+    })
+    .select()
+    .single();
+  if (error) return jsonRes({ error: "Gagal menyimpan akun" }, 500);
+
+  return jsonRes({ account: acc });
+}
+
+// ── EDIT ACCOUNT ─────────────────────────────────────────────────
+async function handleEditAccount(supabase: any, userId: string, body: any) {
+  const { id, name, type, icon, color } = body;
+  if (!id) return jsonRes({ error: "id wajib" }, 400);
+
+  const updates: any = {};
+  if (name !== undefined) updates.name = name;
+  if (type !== undefined) {
+    updates.type = type;
+    updates.icon = ACCOUNT_ICONS[type] || icon || "\u{1F4B0}";
+  }
+  if (icon !== undefined) updates.icon = icon;
+  if (color !== undefined) updates.color = color;
+
+  if (Object.keys(updates).length === 0)
+    return jsonRes({ error: "Tidak ada field yang diubah" }, 400);
+
+  const { data: acc, error } = await supabase
+    .from("accounts")
+    .update(updates)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+  if (error) return jsonRes({ error: "Gagal mengubah akun" }, 500);
+
+  return jsonRes({ account: acc });
+}
+
+// ── DELETE ACCOUNT ───────────────────────────────────────────────
+async function handleDeleteAccount(supabase: any, userId: string, body: any) {
+  const { id } = body;
+  if (!id) return jsonRes({ error: "id wajib" }, 400);
+
+  // Check if account has transactions
+  const { count } = await supabase
+    .from("transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("account_name", (
+      await supabase.from("accounts").select("name").eq("id", id).eq("user_id", userId).single()
+    ).data?.name || "");
+
+  if ((count || 0) > 0)
+    return jsonRes(
+      { error: `Akun masih punya ${count} transaksi. Hapus transaksi dulu atau pindahkan ke akun lain.` },
+      400
+    );
+
+  const { error } = await supabase
+    .from("accounts")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) return jsonRes({ error: "Gagal menghapus akun" }, 500);
+
+  return jsonRes({ success: true, deletedId: id });
+}
+
+// ── LIST ACCOUNTS ────────────────────────────────────────────────
+async function handleListAccounts(supabase: any, userId: string) {
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (error) return jsonRes({ error: "Gagal memuat akun" }, 500);
+
+  return jsonRes({ accounts: data || [] });
 }

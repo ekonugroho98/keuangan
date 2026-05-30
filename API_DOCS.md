@@ -74,13 +74,125 @@ Authorization: Bearer <access_token>
 
 ---
 
-## 1. Transactions
+## Flow User Baru (Penting!)
+
+Urutan yang HARUS diikuti untuk user baru:
+
+```
+1. Register    → POST /auth/v1/signup
+2. Login       → POST /auth/v1/token?grant_type=password  (dapat token)
+3. Buat Akun   → POST /functions/v1/transactions { action: "add-account" }
+4. Transaksi   → POST /functions/v1/transactions { action: "add", ... }
+```
+
+User HARUS punya minimal 1 akun sebelum bisa add transaksi.
+
+**Tipe akun yang tersedia:** `bank`, `ewallet`, `cash`, `crypto`, `investasi`, `tabungan`
+
+---
+
+## 1. Accounts (CRUD Akun Keuangan)
+
+**Endpoint:** `POST /functions/v1/transactions`
+
+Kelola akun keuangan user (bank, e-wallet, cash, dll).
+
+### 1.1 Add Account (Buat Akun Baru)
+
+```json
+{
+  "action": "add-account",
+  "name": "BCA",
+  "type": "bank",
+  "balance": 5000000
+}
+```
+
+**Tipe:** `bank` | `ewallet` | `cash` | `crypto` | `investasi` | `tabungan`
+
+**Response:**
+```json
+{
+  "account": {
+    "id": "...",
+    "name": "BCA",
+    "type": "bank",
+    "balance": 5000000,
+    "icon": "🏦",
+    "color": "#6366f1"
+  }
+}
+```
+
+**Validasi:**
+- Nama akun tidak boleh duplikat
+- Icon & color otomatis berdasarkan tipe
+
+### 1.2 Edit Account
+
+```json
+{
+  "action": "edit-account",
+  "id": "<account_id>",
+  "name": "BCA Utama",
+  "type": "bank"
+}
+```
+
+**Response:**
+```json
+{
+  "account": { "id": "...", "name": "BCA Utama", ... }
+}
+```
+
+### 1.3 Delete Account
+
+```json
+{
+  "action": "delete-account",
+  "id": "<account_id>"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "deletedId": "<account_id>"
+}
+```
+
+**Validasi:**
+- Akun yang masih punya transaksi TIDAK bisa dihapus (harus hapus/pindah transaksi dulu)
+
+### 1.4 List Accounts
+
+```json
+{
+  "action": "list-accounts"
+}
+```
+
+**Response:**
+```json
+{
+  "accounts": [
+    { "id": "...", "name": "BCA", "type": "bank", "balance": 5000000, ... },
+    { "id": "...", "name": "GOPAY", "type": "ewallet", "balance": 200000, ... }
+  ]
+}
+```
+
+---
+
+## 2. Transactions (CRUD Transaksi)
 
 **Endpoint:** `POST /functions/v1/transactions`
 
 Semua operasi transaksi + update saldo akun otomatis dengan rollback jika gagal.
 
-### 1.1 Add (Tambah Transaksi)
+### 2.1 Add (Tambah Transaksi)
 
 Tambah 1 transaksi. Saldo akun otomatis berkurang (expense) atau bertambah (income).
 
@@ -111,7 +223,7 @@ Tambah 1 transaksi. Saldo akun otomatis berkurang (expense) atau bertambah (inco
 
 ---
 
-### 1.2 Add Multiple (Batch Insert)
+### 2.2 Add Multiple (Batch Insert)
 
 Tambah beberapa transaksi sekaligus (misal dari scan struk). Semua bertipe expense.
 
@@ -141,7 +253,7 @@ Tambah beberapa transaksi sekaligus (misal dari scan struk). Semua bertipe expen
 
 ---
 
-### 1.3 Edit (Ubah Transaksi)
+### 2.3 Edit (Ubah Transaksi)
 
 Edit transaksi yang sudah ada. Saldo otomatis di-revert dari nilai lama lalu di-apply dengan nilai baru. Mendukung pindah akun.
 
@@ -174,7 +286,7 @@ Edit transaksi yang sudah ada. Saldo otomatis di-revert dari nilai lama lalu di-
 
 ---
 
-### 1.4 Delete (Hapus Transaksi)
+### 2.4 Delete (Hapus Transaksi)
 
 Hapus transaksi dan rollback saldo akun ke sebelum transaksi tersebut.
 
@@ -201,7 +313,7 @@ Hapus transaksi dan rollback saldo akun ke sebelum transaksi tersebut.
 
 ---
 
-### 1.5 Transfer (Pindah Dana Antar Akun)
+### 2.5 Transfer (Pindah Dana Antar Akun)
 
 Transfer dana dari satu akun ke akun lain. Saldo asal berkurang, tujuan bertambah.
 
@@ -233,7 +345,7 @@ Transfer dana dari satu akun ke akun lain. Saldo asal berkurang, tujuan bertamba
 
 ---
 
-### 1.6 Adjust Balance (Koreksi Saldo)
+### 2.6 Adjust Balance (Koreksi Saldo)
 
 Koreksi saldo akun secara manual. Otomatis membuat transaksi "Koreksi Saldo" sebagai audit trail.
 
@@ -255,13 +367,13 @@ Koreksi saldo akun secara manual. Otomatis membuat transaksi "Koreksi Saldo" seb
 
 ---
 
-## 2. Financial Operations
+## 3. Financial Operations
 
 **Endpoint:** `POST /functions/v1/financial-ops`
 
 Operasi keuangan yang melibatkan update multi-tabel (akun + hutang/goal/piutang).
 
-### 2.1 Pay Debt (Bayar Cicilan)
+### 3.1 Pay Debt (Bayar Cicilan)
 
 Bayar cicilan hutang. Saldo akun berkurang, sisa hutang berkurang, transaksi tercatat.
 
@@ -286,7 +398,7 @@ Bayar cicilan hutang. Saldo akun berkurang, sisa hutang berkurang, transaksi ter
 
 ---
 
-### 2.2 Topup Goal (Tambah Dana Target)
+### 3.2 Topup Goal (Tambah Dana Target)
 
 Tambah dana ke target tabungan. Bisa dengan atau tanpa potong saldo akun.
 
@@ -322,7 +434,7 @@ Tanpa potong akun (hanya update goal):
 
 ---
 
-### 2.3 Add Piutang (Catat Piutang)
+### 3.3 Add Piutang (Catat Piutang)
 
 Catat piutang (uang dipinjamkan ke orang). Opsional potong saldo akun.
 
@@ -361,7 +473,7 @@ Tanpa potong akun (hanya catat):
 
 ---
 
-### 2.4 Terima Piutang (Terima Pembayaran)
+### 3.4 Terima Piutang (Terima Pembayaran)
 
 Terima pembayaran piutang. Saldo akun bertambah, sisa piutang berkurang.
 
@@ -385,7 +497,7 @@ Terima pembayaran piutang. Saldo akun bertambah, sisa piutang berkurang.
 
 ---
 
-## 3. Auto Recurrings
+## 4. Auto Recurrings
 
 **Endpoint:** `POST /functions/v1/auto-recurrings`
 
@@ -417,7 +529,7 @@ Eksekusi transaksi berulang yang sudah jatuh tempo. Biasanya dipanggil saat dash
 
 ---
 
-## 4. AI Chat
+## 5. AI Chat
 
 **Endpoint:** `POST /functions/v1/ai-chat`
 
