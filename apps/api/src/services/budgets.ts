@@ -3,10 +3,21 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolveCategoryRef, resolveMemberRef } from './resolver'
 
+// resolveMemberRef() sendiri sengaja TIDAK menangani literal "me" (itu level lebih rendah, murni
+// resolusi nama/alias/uuid ke member_id) — konvensi "me" => actor.memberId ditangani tiap
+// pemanggil, sama seperti resolveOwnerMemberId()/createApiKey(). Bug nyata ditemukan saat migrasi
+// data: POST /v1/budgets dengan {"member":"me"} gagal 404 member_not_found karena resolveMemberRef
+// mencoba resolve_member(household_id, "me") ke SQL, bukan jatuh ke fallback actor.memberId
+// (fallback itu hanya aktif kalau field member SAMA SEKALI tidak dikirim, bukan saat berisi "me").
+async function resolveMemberRefWithMe(tx: Parameters<typeof resolveMemberRef>[0], actor: Actor, ref?: { member_id?: string; member?: string }) {
+  if (ref?.member === 'me') return actor.memberId
+  return resolveMemberRef(tx, actor, ref ?? {})
+}
+
 export async function listBudgets(actor: Actor, month: string, scope: 'household' | 'member', memberRef?: { member_id?: string; member?: string }) {
   return withActor(actor, async (tx) => {
     const periodStart = `${month}-01`
-    const memberId = scope === 'member' ? (await resolveMemberRef(tx, actor, memberRef ?? {})) ?? actor.memberId : null
+    const memberId = scope === 'member' ? (await resolveMemberRefWithMe(tx, actor, memberRef)) ?? actor.memberId : null
     const rows = await tx<{ id: string; category_id: string; category_name: string; member_id: string | null; member_name: string | null; period_start: string; amount: string }[]>`
       select b.id, c.id as category_id, c.name as category_name, m.id as member_id, m.display_name as member_name,
              b.period_start::text, b.amount::text
@@ -28,7 +39,7 @@ export async function listBudgets(actor: Actor, month: string, scope: 'household
 export async function getBudgetStatus(actor: Actor, month: string, scope: 'household' | 'member', memberRef?: { member_id?: string; member?: string }) {
   return withActor(actor, async (tx) => {
     const periodStart = `${month}-01`
-    const memberId = scope === 'member' ? (await resolveMemberRef(tx, actor, memberRef ?? {})) ?? actor.memberId : null
+    const memberId = scope === 'member' ? (await resolveMemberRefWithMe(tx, actor, memberRef)) ?? actor.memberId : null
 
     const rows = await tx<{ budget_id: string; category_id: string; category_name: string; category_icon: string; amount: string; spent: string }[]>`
       select b.id as budget_id, c.id as category_id, c.name as category_name, c.icon as category_icon, b.amount::text,
@@ -62,7 +73,7 @@ export async function getBudgetStatus(actor: Actor, month: string, scope: 'house
 export async function createBudget(actor: Actor, input: { category_id?: string; category?: string; amount: number; month: string; member_id?: string; member?: string }) {
   return withActor(actor, async (tx) => {
     const categoryId = await resolveCategoryRef(tx, actor, input)
-    const memberId = await resolveMemberRef(tx, actor, input)
+    const memberId = await resolveMemberRefWithMe(tx, actor, input)
     try {
       const [row] = await tx<{ id: string }[]>`
         insert into budgets (household_id, category_id, member_id, period_start, amount)

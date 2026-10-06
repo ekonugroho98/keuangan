@@ -13894,10 +13894,14 @@ transfersApp.openapi(
 );
 
 // src/services/budgets.ts
+async function resolveMemberRefWithMe(tx, actor, ref) {
+  if (ref?.member === "me") return actor.memberId;
+  return resolveMemberRef(tx, actor, ref ?? {});
+}
 async function listBudgets(actor, month, scope, memberRef) {
   return withActor(actor, async (tx) => {
     const periodStart = `${month}-01`;
-    const memberId = scope === "member" ? await resolveMemberRef(tx, actor, memberRef ?? {}) ?? actor.memberId : null;
+    const memberId = scope === "member" ? await resolveMemberRefWithMe(tx, actor, memberRef) ?? actor.memberId : null;
     const rows = await tx`
       select b.id, c.id as category_id, c.name as category_name, m.id as member_id, m.display_name as member_name,
              b.period_start::text, b.amount::text
@@ -13918,7 +13922,7 @@ async function listBudgets(actor, month, scope, memberRef) {
 async function getBudgetStatus(actor, month, scope, memberRef) {
   return withActor(actor, async (tx) => {
     const periodStart = `${month}-01`;
-    const memberId = scope === "member" ? await resolveMemberRef(tx, actor, memberRef ?? {}) ?? actor.memberId : null;
+    const memberId = scope === "member" ? await resolveMemberRefWithMe(tx, actor, memberRef) ?? actor.memberId : null;
     const rows = await tx`
       select b.id as budget_id, c.id as category_id, c.name as category_name, c.icon as category_icon, b.amount::text,
         coalesce((
@@ -13953,7 +13957,7 @@ async function getBudgetStatus(actor, month, scope, memberRef) {
 async function createBudget(actor, input) {
   return withActor(actor, async (tx) => {
     const categoryId = await resolveCategoryRef(tx, actor, input);
-    const memberId = await resolveMemberRef(tx, actor, input);
+    const memberId = await resolveMemberRefWithMe(tx, actor, input);
     try {
       const [row] = await tx`
         insert into budgets (household_id, category_id, member_id, period_start, amount)
