@@ -258,6 +258,18 @@ const DasborView = ({
     const [scope, setScope] = useState({ scope: "household" });
     const { summary: scopedSummary, summaryLoading: scopedSummaryLoading } = useSummary({ period: "this_month", ...scope });
 
+    // Bug ditemukan: section "Portofolio/Akun Anda" di bawah selalu menampilkan SEMUA akun
+    // household apa adanya (arsitektur lama household-wide), tidak ikut berubah saat
+    // ScopeSwitcher pindah ke tab per-anggota — padahal section itu ada TEPAT di sebelah kartu
+    // ringkasan yang SUDAH benar ter-scope (scopedSummary di atas), jadi kelihatan tidak
+    // konsisten/salah meski datanya sendiri bukan salah ambil. Filter accounts di sini supaya
+    // "Akun Anda" benar-benar akun milik scope yang sedang aktif.
+    const displayAccounts = scope.scope === "member"
+        ? accounts.filter(a => a.owner?.display_name === scope.member)
+        : scope.scope === "account"
+            ? accounts.filter(a => a.name === scope.account)
+            : accounts;
+
     const now = new Date();
     const m = now.getMonth(), y = now.getFullYear();
     const lm = m === 0 ? 11 : m - 1, ly = m === 0 ? y - 1 : y;
@@ -655,7 +667,7 @@ const DasborView = ({
                 <div className="b-accounts" style={{ ...glassCard, padding: "22px 26px", borderRadius: 24 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                         <div>
-                            <div style={eyebrow}>Portofolio · {accounts.length} akun</div>
+                            <div style={eyebrow}>Portofolio · {displayAccounts.length} akun</div>
                             <h3 style={{ ...sectionTitle, fontSize: 18, marginTop: 6 }}>{t("dash.yourAccounts")}</h3>
                         </div>
                         <button onClick={() => setActiveMenu("akun")} className="link-btn" style={{ fontSize: 12 }}>{t("dash.viewAll")} →</button>
@@ -667,7 +679,7 @@ const DasborView = ({
                         maskImage: "linear-gradient(to right, black calc(100% - 30px), transparent)",
                         WebkitMaskImage: "linear-gradient(to right, black calc(100% - 30px), transparent)",
                     }}>
-                        {accounts.map(a => {
+                        {displayAccounts.map(a => {
                             const accent = acctAccent(a);
                             return (
                                 <div key={a.id} style={{
