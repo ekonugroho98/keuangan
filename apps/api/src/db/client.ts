@@ -9,7 +9,7 @@ import { env } from '../env'
  * itu sendiri (yang hanya pintu masuk, RLS tetap ditegakkan sebagai `authenticated`).
  */
 export const sql = env.DATABASE_URL
-  ? postgres(env.DATABASE_URL, { prepare: false, max: 10, idle_timeout: 20 })
+  ? postgres(env.DATABASE_URL, { prepare: false, max: 10, idle_timeout: 20, connect_timeout: 10 })
   : null
 
 export function requireSql(): postgres.Sql {

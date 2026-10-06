@@ -11909,7 +11909,7 @@ function osUsername() {
 }
 
 // src/db/client.ts
-var sql = env.DATABASE_URL ? src_default(env.DATABASE_URL, { prepare: false, max: 10, idle_timeout: 20 }) : null;
+var sql = env.DATABASE_URL ? src_default(env.DATABASE_URL, { prepare: false, max: 10, idle_timeout: 20, connect_timeout: 10 }) : null;
 function requireSql() {
   if (!sql) {
     throw new Error("DATABASE_URL belum diatur. Lihat apps/api/.env.example.");
