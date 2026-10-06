@@ -1,0 +1,535 @@
+import { useState } from "react";
+import { fmtRp, fmtDate } from "../../../utils/formatters";
+import { useLanguage } from "../../../i18n/LanguageContext";
+import AmountInput from "../../ui/AmountInput";
+import { useAccounts } from "../../../hooks/useAccounts";
+import { useMembers } from "../../../hooks/useMembers";
+import OwnerBadge from "../../household/OwnerBadge";
+import OwnerSelect from "../../household/OwnerSelect";
+import VisibilitySelect from "../../household/VisibilitySelect";
+
+/* ── helpers ── */
+const accentColor = (type) => {
+    if (type === "bank")     return "var(--color-primary)";
+    if (type === "ewallet")  return "#a78bfa";
+    if (type === "cash")     return "#f59e0b";
+    if (type === "tabungan") return "#38bdf8";
+    if (type === "crypto")   return "#fb923c";
+    return "var(--color-primary)";
+};
+
+const typeLabel = (type) => {
+    if (type === "bank")     return "BANK";
+    if (type === "ewallet")  return "E-WALLET";
+    if (type === "cash")     return "CASH";
+    if (type === "tabungan") return "TABUNGAN";
+    if (type === "crypto")   return "CRYPTO";
+    return type?.toUpperCase() || "AKUN";
+};
+
+const typeBadgeStyle = (type) => {
+    const color = accentColor(type);
+    return {
+        fontSize: 9, fontWeight: 700, letterSpacing: 1.2,
+        textTransform: "uppercase", padding: "3px 8px",
+        borderRadius: 6,
+        background: `${color}18`,
+        color,
+        border: `1px solid ${color}30`,
+    };
+};
+
+const card = {
+    background: "var(--glass-1)",
+    backdropFilter: "var(--glass-blur)",
+    WebkitBackdropFilter: "var(--glass-blur)",
+    borderRadius: 20,
+    padding: "22px 22px 18px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    transition: "transform .25s, box-shadow .25s, border-color .25s",
+    border: "1px solid var(--glass-border)",
+    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)",
+    cursor: "default",
+    position: "relative",
+    overflow: "hidden",
+};
+
+/* ── component ── */
+const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, onAdjustBalance, onViewAccount }) => {
+    const { t } = useLanguage();
+    const { updateAccount } = useAccounts();
+    const { members } = useMembers();
+    const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
+    const [activeTab, setActiveTab] = useState(accounts[0]?.id || null);
+    const [editBalanceAcc, setEditBalanceAcc] = useState(null); // account being edited
+    const [newBalanceInput, setNewBalanceInput] = useState("");
+    const [editOwnerAcc, setEditOwnerAcc] = useState(null); // account whose owner/visibility is being edited
+    const [ownerDraft, setOwnerDraft] = useState("joint");
+    const [visibilityDraft, setVisibilityDraft] = useState("shared");
+    const [savingOwner, setSavingOwner] = useState(false);
+    const [ownerEditError, setOwnerEditError] = useState("");
+
+    const openOwnerEdit = (a) => {
+        setEditOwnerAcc(a);
+        setOwnerDraft(a.owner?.member_id ?? "joint");
+        setVisibilityDraft(a.visibility ?? "shared");
+        setOwnerEditError("");
+    };
+
+    const saveOwnerEdit = async () => {
+        if (!editOwnerAcc) return;
+        setSavingOwner(true);
+        setOwnerEditError("");
+        try {
+            await updateAccount(editOwnerAcc.id, { owner: ownerDraft, visibility: ownerDraft === "joint" ? "shared" : visibilityDraft });
+            setEditOwnerAcc(null);
+        } catch (err) {
+            // Form dibiarkan terbuka (bukan toast — AkunView tidak menerima prop showToast) supaya
+            // user bisa lihat pesan error (mis. forbidden_owner) dan coba lagi.
+            setOwnerEditError(err.message || "Gagal menyimpan perubahan pemilik");
+        } finally {
+            setSavingOwner(false);
+        }
+    };
+
+    const totalBalance    = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const bankCount       = accounts.filter(a => a.type === "bank").length;
+    const ewalletCount    = accounts.filter(a => a.type === "ewallet").length;
+    const cashCount       = accounts.filter(a => a.type === "cash").length;
+    const tabunganCount   = accounts.filter(a => a.type === "tabungan").length;
+    const tabunganBalance = accounts.filter(a => a.type === "tabungan").reduce((s, a) => s + a.balance, 0);
+
+    const activeAccount = accounts.find(a => a.id === activeTab) || accounts[0];
+    const recentTx = activeAccount
+        ? transactions
+            .filter(tx => tx.account_name === activeAccount.name)
+            .slice(0, 5)
+        : [];
+
+    return (
+        <>
+        <div style={{ animation: "fadeIn .4s", display: "flex", flexDirection: "column", gap: 22 }}>
+
+            {/* ── Page Header ── */}
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+                <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>
+                        AKUN &amp; REKENING
+                    </div>
+                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>
+                        {t("acc.title") || "Akun & Saldo"}
+                    </h1>
+                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        {t("acc.subtitle") || "Kelola rekening dan pantau saldo Anda."}
+                    </p>
+                </div>
+                <div style={{ background: "var(--color-primary-soft)", border: "1px solid var(--color-border)", borderRadius: 14, padding: "10px 18px", textAlign: "right" }}>
+                    <div className="eyebrow" style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", marginBottom: 2 }}>
+                        {t("dash.totalBalance") || "Total Saldo"}
+                    </div>
+                    <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 22px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em" }}>{fmtRp(totalBalance)}</div>
+                </div>
+            </div>
+
+            {/* ── Summary Cards ── */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
+                {/* Total Saldo */}
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-primary)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>
+                        {t("dash.totalBalance") || "Total Saldo"}
+                    </div>
+                    <div className="num-tight mono" style={{ fontSize: "clamp(18px, 2.4vw, 22px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(totalBalance)}</div>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
+                        {accounts.length} {t("dash.accountsCount") || "rekening"}
+                    </div>
+                </div>
+                {/* Jumlah Rekening */}
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-purple)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>
+                        {t("acc.totalAccounts") || "Jumlah Rekening"}
+                    </div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-purple)", letterSpacing: "-.03em", lineHeight: 1 }}>{accounts.length}</div>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
+                        {t("acc.allTypes") || "Bank, E-Wallet, Tunai"}
+                    </div>
+                </div>
+                {/* Bank */}
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-primary)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>Bank</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>{bankCount}</div>
+                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
+                        {fmtRp(accounts.filter(a => a.type === "bank").reduce((s, a) => s + a.balance, 0))}
+                    </div>
+                </div>
+                {/* E-Wallet */}
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-purple)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>E-Wallet</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-purple)", letterSpacing: "-.03em", lineHeight: 1 }}>{ewalletCount}</div>
+                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
+                        {fmtRp(accounts.filter(a => a.type === "ewallet").reduce((s, a) => s + a.balance, 0))}
+                    </div>
+                </div>
+                {/* Tunai */}
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-amber)", position: "relative", overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>{t("acc.cash") || "Tunai"}</div>
+                    <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-amber)", letterSpacing: "-.03em", lineHeight: 1 }}>{cashCount}</div>
+                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>
+                        {fmtRp(accounts.filter(a => a.type === "cash").reduce((s, a) => s + a.balance, 0))}
+                    </div>
+                </div>
+                {/* Tabungan — hanya tampil jika ada */}
+                {tabunganCount > 0 && (
+                    <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)", borderRadius: 20, padding: "22px 24px", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)", borderLeft: "4px solid var(--color-transfer)", position: "relative", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6, marginBottom: 8 }}>Tabungan</div>
+                        <div className="num-tight" style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-transfer)", letterSpacing: "-.03em", lineHeight: 1 }}>{tabunganCount}</div>
+                        <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{fmtRp(tabunganBalance)}</div>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Account Cards Grid ── */}
+            <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: "0 0 14px" }}>
+                    {t("acc.allAccounts") || "Semua Rekening"}
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))", gap: 16 }}>
+                    {accounts.map(a => {
+                        const color   = accentColor(a.type);
+                        const txCount = transactions.filter(tx => tx.account_name === a.name).length;
+                        const acctBalance = accounts.find(ac => ac.id === a.id)?.balance || 0;
+                        return (
+                            <div
+                                key={a.id}
+                                style={{ ...card, borderLeft: `4px solid ${color}` }}
+                                onMouseOver={e => {
+                                    e.currentTarget.style.transform = "translateY(-3px)";
+                                    e.currentTarget.style.boxShadow = `var(--glass-highlight), 0 12px 40px ${color}22`;
+                                    e.currentTarget.style.borderColor = `${color}40`;
+                                }}
+                                onMouseOut={e => {
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)";
+                                    e.currentTarget.style.borderColor = "var(--glass-border)";
+                                }}
+                            >
+                                {/* Top: badge + icon */}
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                                    <span style={typeBadgeStyle(a.type)}>{typeLabel(a.type)}</span>
+                                    <div style={{
+                                        width: 48, height: 48, borderRadius: 14,
+                                        background: `${color}15`,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 24,
+                                    }}>
+                                        {a.icon}
+                                    </div>
+                                </div>
+
+                                {/* Middle: name */}
+                                <div style={{ marginBottom: 14 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)" }}>{a.name}</div>
+                                        {members.length > 1 && <OwnerBadge owner={a.owner} />}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
+                                        {txCount} {t("tx.summary") || "transaksi"}
+                                    </div>
+                                </div>
+
+                                {/* Balance */}
+                                <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 900, color, letterSpacing: "-.03em", marginBottom: 16, lineHeight: 1 }}>
+                                    {fmtRp(acctBalance)}
+                                </div>
+
+                                {/* Bottom: action buttons */}
+                                <div style={{ display: "flex", gap: 8, borderTop: "1px solid var(--color-border-soft)", paddingTop: 14 }}>
+                                    <button
+                                        onClick={() => onViewAccount ? onViewAccount(a.name) : setActiveMenu?.("transaksi")}
+                                        style={{
+                                            flex: 1, padding: "10px 0", borderRadius: 10,
+                                            border: `1px solid ${color}30`,
+                                            background: "transparent",
+                                            color, fontSize: 12, fontWeight: 700, minHeight: 42,
+                                            cursor: "pointer", fontFamily: "inherit",
+                                            transition: "background .15s",
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                        onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                    >
+                                        {t("acc.viewTx") || "Lihat Transaksi"}
+                                    </button>
+                                    <button
+                                        onClick={() => { setEditBalanceAcc(a); setNewBalanceInput(String(acctBalance)); }}
+                                        aria-label="Edit Saldo"
+                                        title="Edit Saldo"
+                                        style={{
+                                            padding: "10px 12px", borderRadius: 10,
+                                            border: `1px solid ${color}30`,
+                                            background: "transparent",
+                                            color, fontSize: 13, minHeight: 42,
+                                            cursor: "pointer", fontFamily: "inherit",
+                                            transition: "background .15s",
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                        onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                    >
+                                        ✏️
+                                    </button>
+                                    {members.length > 1 && (
+                                        <button
+                                            onClick={() => openOwnerEdit(a)}
+                                            aria-label="Pemilik & Visibilitas"
+                                            title="Pemilik & Visibilitas"
+                                            style={{
+                                                padding: "10px 12px", borderRadius: 10,
+                                                border: `1px solid ${color}30`,
+                                                background: "transparent",
+                                                color, fontSize: 13, minHeight: 42,
+                                                cursor: "pointer", fontFamily: "inherit",
+                                                transition: "background .15s",
+                                            }}
+                                            onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                            onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                        >
+                                            ⚙️
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {/* ── Add Account Card ── */}
+                    <div
+                        onClick={() => setShowAddAccount(true)}
+                        style={{
+                            minHeight: 210, borderRadius: 18,
+                            border: "2px dashed rgba(96,252,198,.2)",
+                            background: "transparent",
+                            display: "flex", flexDirection: "column",
+                            alignItems: "center", justifyContent: "center",
+                            cursor: "pointer", gap: 10,
+                            transition: "border-color .2s, background .2s",
+                        }}
+                        onMouseOver={e => {
+                            e.currentTarget.style.borderColor = "rgba(96,252,198,.45)";
+                            e.currentTarget.style.background = "rgba(96,252,198,.03)";
+                        }}
+                        onMouseOut={e => {
+                            e.currentTarget.style.borderColor = "rgba(96,252,198,.2)";
+                            e.currentTarget.style.background = "transparent";
+                        }}
+                    >
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "var(--color-primary)" }}>+</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary)" }}>{t("acc.addNew")?.replace("+ ", "") || "Tambah Rekening"}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)" }}>{t("acc.addNewSub") || "Bank, e-wallet, atau tunai"}</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Recent Transactions per Account ── */}
+            {accounts.length > 0 && (
+                <div style={{ background: "var(--glass-1)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)", borderRadius: 20, padding: "22px 22px 18px", border: "1px solid var(--glass-border)", boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.05)" }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: "0 0 16px" }}>
+                        {t("acc.recentTxPerAccount") || "Transaksi Terbaru per Rekening"}
+                    </h3>
+
+                    {/* Account tabs */}
+                    <div style={{ display: "flex", gap: 6, marginBottom: 18, overflowX: "auto", paddingBottom: 4, flexWrap: "wrap" }}>
+                        {accounts.map(a => {
+                            const isActive = activeTab === a.id;
+                            const color = accentColor(a.type);
+                            return (
+                                <button
+                                    key={a.id}
+                                    onClick={() => setActiveTab(a.id)}
+                                    style={{
+                                        padding: "7px 16px", borderRadius: 9999,
+                                        border: isActive ? `1px solid ${color}50` : "1px solid var(--color-border)",
+                                        background: isActive ? `${color}15` : "transparent",
+                                        color: isActive ? color : "var(--color-muted)",
+                                        fontSize: 12, fontWeight: isActive ? 700 : 400,
+                                        cursor: "pointer", fontFamily: "inherit",
+                                        transition: "all .15s",
+                                        whiteSpace: "nowrap",
+                                        display: "flex", alignItems: "center", gap: 6,
+                                    }}
+                                >
+                                    <span style={{ fontSize: 14 }}>{a.icon}</span>
+                                    <span>{a.name}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Transactions list */}
+                    {recentTx.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-subtle)" }}>
+                            <div style={{ fontSize: 40, marginBottom: 12, opacity: .4 }}>💳</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>{t("tx.noTxPeriod") || "Belum ada transaksi"}</div>
+                            <div style={{ fontSize: 12, color: "var(--color-muted)" }}>Transaksi pada rekening ini akan tampil di sini</div>
+                        </div>
+                    ) : (
+                        <>
+                            {recentTx.map((tx, idx) => {
+                                const isIncome   = tx.type === "income";
+                                const isTransfer = tx.type === "transfer";
+                                const amtColor   = isIncome ? "var(--color-primary)" : isTransfer ? "#4FC3F7" : "#ff716c";
+                                const sign       = isIncome ? "+" : isTransfer ? "↔ " : "-";
+                                const iconBg     = isIncome ? "rgba(96,252,198,.1)" : isTransfer ? "rgba(79,195,247,.1)" : "rgba(255,113,108,.08)";
+                                return (
+                                    <div key={tx.id} style={{
+                                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                                        padding: "11px 10px", borderRadius: 10,
+                                        background: idx % 2 === 0 ? "var(--bg-surface-low)" : "var(--bg-alt-row)",
+                                        marginBottom: 2, gap: 10,
+                                    }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                                            <div style={{ width: 38, height: 38, borderRadius: 11, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+                                                {tx.icon}
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.note}</div>
+                                                <div style={{ fontSize: 10, color: "var(--color-subtle)" }}>{fmtDate(tx.date)} · {tCat(tx.category)}</div>
+                                            </div>
+                                        </div>
+                                        <div className="num-tight mono" style={{ fontSize: 13, fontWeight: 800, color: amtColor, flexShrink: 0, whiteSpace: "nowrap", letterSpacing: "-.02em" }}>
+                                            {sign}{fmtRp(tx.amount)}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <button
+                                onClick={() => onViewAccount ? onViewAccount(activeAccount.name) : setActiveMenu?.("transaksi")}
+                                style={{ width: "100%", marginTop: 12, padding: "9px 0", borderRadius: 10, border: "1px dashed rgba(96,252,198,.2)", background: "transparent", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                            >
+                                {t("dash.viewAll") || "Lihat Semua"} →
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+        {/* ── Edit Saldo Modal ── */}
+        {editBalanceAcc && (
+            <div
+                onClick={() => setEditBalanceAcc(null)}
+                style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(0,0,0,.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            >
+                <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 400 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${accentColor(editBalanceAcc.type)}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                            {editBalanceAcc.icon}
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{editBalanceAcc.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--color-muted)" }}>
+                                Saldo saat ini: <span style={{ fontWeight: 700, color: accentColor(editBalanceAcc.type) }}>{fmtRp(editBalanceAcc.balance)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>
+                        Saldo Baru
+                    </label>
+                    <AmountInput
+                        value={newBalanceInput}
+                        onChange={v => setNewBalanceInput(v)}
+                        placeholder="Masukkan saldo baru..."
+                        autoFocus
+                        inputStyle={{
+                            padding: "12px 14px",
+                            background: "var(--bg-surface-low)", border: "1px solid var(--color-border)",
+                            borderRadius: 12, fontSize: 16, fontWeight: 700,
+                            marginBottom: 8,
+                        }}
+                    />
+
+                    {/* Selisih preview */}
+                    {newBalanceInput !== "" && parseInt(newBalanceInput) !== editBalanceAcc.balance && (
+                        <div style={{
+                            padding: "8px 14px", borderRadius: 10, marginBottom: 16,
+                            background: parseInt(newBalanceInput) > editBalanceAcc.balance ? "rgba(5,150,105,.08)" : "rgba(220,38,38,.08)",
+                            border: `1px solid ${parseInt(newBalanceInput) > editBalanceAcc.balance ? "rgba(5,150,105,.2)" : "rgba(220,38,38,.2)"}`,
+                            fontSize: 12, color: "var(--color-muted)",
+                        }}>
+                            Selisih:{" "}
+                            <span style={{ fontWeight: 700, color: parseInt(newBalanceInput) > editBalanceAcc.balance ? "var(--color-primary)" : "var(--color-expense)" }}>
+                                {parseInt(newBalanceInput) > editBalanceAcc.balance ? "+" : ""}{fmtRp(parseInt(newBalanceInput || 0) - editBalanceAcc.balance)}
+                            </span>
+                            {" "}→ transaksi koreksi otomatis dibuat
+                        </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                            onClick={() => setEditBalanceAcc(null)}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={() => {
+                                const nb = parseInt(newBalanceInput);
+                                if (isNaN(nb) || nb < 0) return;
+                                onAdjustBalance && onAdjustBalance(editBalanceAcc, nb);
+                                setEditBalanceAcc(null);
+                            }}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                            Simpan Saldo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        {/* ── Pemilik & Visibilitas Modal (F5-T4) ── */}
+        {editOwnerAcc && (
+            <div
+                onClick={() => setEditOwnerAcc(null)}
+                style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(0,0,0,.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            >
+                <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 400 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${accentColor(editOwnerAcc.type)}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                            {editOwnerAcc.icon}
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)" }}>{editOwnerAcc.name}</div>
+                    </div>
+
+                    <OwnerSelect value={ownerDraft} onChange={setOwnerDraft} />
+                    {ownerDraft !== "joint" && (
+                        <VisibilitySelect value={visibilityDraft} onChange={setVisibilityDraft} />
+                    )}
+
+                    {ownerEditError && (
+                        <div style={{ padding: "8px 14px", borderRadius: 10, marginBottom: 16, background: "rgba(220,38,38,.08)", border: "1px solid rgba(220,38,38,.2)", fontSize: 12, color: "var(--color-expense)" }}>
+                            {ownerEditError}
+                        </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                            onClick={() => setEditOwnerAcc(null)}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={saveOwnerEdit}
+                            disabled={savingOwner}
+                            style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 13, fontWeight: 700, cursor: savingOwner ? "default" : "pointer", fontFamily: "inherit", opacity: savingOwner ? 0.7 : 1 }}
+                        >
+                            {savingOwner ? "Menyimpan..." : "Simpan"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
+    );
+};
+
+export default AkunView;

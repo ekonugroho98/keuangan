@@ -1,0 +1,112 @@
+const fmtRp = (n: unknown) => `Rp ${Number(n ?? 0).toLocaleString('id-ID')}`
+
+interface Acc { id: string; name: string; icon?: string; type: string; balance: number | null }
+interface Tx { id: string; type: string; amount: number; date: string; note: string; category?: { name: string }; account?: { name: string } }
+
+/**
+ * Format hasil tool (object dari service layer, bukan HTTP) jadi teks Bahasa Indonesia untuk
+ * dibacakan LLM (06-agent-integration.md §3 aturan 4: "konfirmasi dengan saldo baru dari respons").
+ * Tool baca yang sering dipakai (list_accounts/get_summary/search_transactions/list_debts/
+ * list_goals/list_piutang) dapat format rapi khusus; sisanya (termasuk semua tool tulis) pakai
+ * formatter generik yang mengambil field umum (amount/balance/remaining/note) — cukup untuk LLM
+ * menyusun kalimat konfirmasi tanpa perlu tahu bentuk persis tiap endpoint.
+ */
+export function formatToolResult(name: string, result: unknown): string {
+  switch (name) {
+    case 'list_accounts': {
+      const { data, totals } = result as { data: Acc[]; totals: { visible_balance: number } }
+      const rows = data.map((a) => `  ${a.icon || '💳'} ${a.name} (${a.type}): ${a.balance !== null ? fmtRp(a.balance) : 'privat'}`).join('\n')
+      return `Akun keuangan (total saldo terlihat: ${fmtRp(totals.visible_balance)}):\n${rows || '  (belum ada akun)'}`
+    }
+    case 'get_summary': {
+      const s = result as { period: { label: string; from: string; to: string }; totals: { income: number; expense: number; net: number; saving_rate_pct: number }; top_categories: Array<{ category: string; spent: number }> }
+      const cats = s.top_categories.map((c) => `  ${c.category}: ${fmtRp(c.spent)}`).join('\n')
+      return `Ringkasan ${s.period.label} (${s.period.from} s/d ${s.period.to}):\nPemasukan: ${fmtRp(s.totals.income)}\nPengeluaran: ${fmtRp(s.totals.expense)}\nSisa: ${fmtRp(s.totals.net)}\nSaving rate: ${s.totals.saving_rate_pct}%\nTop pengeluaran:\n${cats || '  (tidak ada)'}`
+    }
+    case 'search_transactions': {
+      const { data } = result as { data: Tx[] }
+      if (!data.length) return 'Tidak ada transaksi yang cocok dengan filter itu.'
+      const rows = data
+        .map((t) => `${t.date} | ${t.type === 'income' ? 'Pemasukan' : t.type === 'transfer' ? 'Transfer' : 'Pengeluaran'} | ${fmtRp(t.amount)} | ${t.category?.name ?? '-'} | ${t.note || '-'} | ${t.account?.name ?? '-'}`)
+        .join('\n')
+      return `${data.length} transaksi ditemukan:\n${rows}`
+    }
+    case 'list_debts': {
+      const debts = result as Array<{ name: string; remaining: number; total: number; monthly: number; due_date: string | null }>
+      if (!debts.length) return 'Tidak ada hutang yang tercatat.'
+      const total = debts.reduce((a, d) => a + d.remaining, 0)
+      const rows = debts.map((d) => `  ${d.name}: sisa ${fmtRp(d.remaining)} dari ${fmtRp(d.total)} | cicilan ${fmtRp(d.monthly)}/bln | jatuh tempo: ${d.due_date ?? '-'}`).join('\n')
+      return `Hutang & cicilan (total sisa: ${fmtRp(total)}):\n${rows}`
+    }
+    case 'list_goals': {
+      const goals = result as Array<{ name: string; current: number; target: number; pct: number }>
+      if (!goals.length) return 'Belum ada target finansial.'
+      const rows = goals.map((g) => `  ${g.name}: ${fmtRp(g.current)} / ${fmtRp(g.target)} (${g.pct}%)`).join('\n')
+      return `Target finansial (${goals.length} goal):\n${rows}`
+    }
+    case 'list_piutang': {
+      const items = result as Array<{ borrower_name: string; remaining: number; total: number; due_date: string | null }>
+      if (!items.length) return 'Tidak ada piutang yang tercatat.'
+      const total = items.reduce((a, p) => a + p.remaining, 0)
+      const rows = items.map((p) => `  ${p.borrower_name}: sisa ${fmtRp(p.remaining)} dari ${fmtRp(p.total)}${p.due_date ? ` | jatuh tempo ${p.due_date}` : ''}`).join('\n')
+      return `Piutang (total sisa: ${fmtRp(total)}):\n${rows}`
+    }
+    case 'list_recurrings': {
+      const items = result as Array<{ name: string; amount: number; frequency: string; next_date: string; status: string }>
+      if (!items.length) return 'Tidak ada transaksi berulang yang tercatat.'
+      const rows = items.map((r) => `  ${r.name}: ${fmtRp(r.amount)} / ${r.frequency} | berikutnya ${r.next_date} (${r.status})`).join('\n')
+      return `Transaksi berulang:\n${rows}`
+    }
+    case 'run_recurrings': {
+      const r = result as { executed: number; skipped: unknown[] }
+      return r.executed > 0 ? `${r.executed} transaksi berulang berhasil dijalankan.` : 'Tidak ada transaksi berulang yang jatuh tempo sekarang.'
+    }
+    case 'list_members': {
+      const members = result as Array<{ display_name: string; role: string; aliases: string[] }>
+      return members.map((m) => `  ${m.display_name} (${m.role})${m.aliases.length ? `, alias: ${m.aliases.join(', ')}` : ''}`).join('\n')
+    }
+    case 'list_categories': {
+      const cats = result as Array<{ name: string; type: string }>
+      return cats.map((c) => `  ${c.name} (${c.type})`).join('\n')
+    }
+    case 'get_budget_status': {
+      const s = result as { period?: { label?: string }; items?: Array<{ category: { name: string }; amount: number; spent: number; remaining: number; pct: number }> }
+      const items = s.items ?? []
+      if (!items.length) return 'Belum ada anggaran untuk bulan ini.'
+      const rows = items.map((i) => `  ${i.category.name}: terpakai ${fmtRp(i.spent)} dari ${fmtRp(i.amount)}, sisa ${fmtRp(i.remaining)} (${i.pct}%)`).join('\n')
+      return `Status anggaran ${s.period?.label ?? ''}:\n${rows}`
+    }
+    default:
+      return formatGenericWriteResult(result)
+  }
+}
+
+/** Fallback untuk resolve_name dan semua tool TULIS (record_*, update_*, delete_*, pay_debt, dst.). */
+function formatGenericWriteResult(result: unknown): string {
+  if (result === null || result === undefined) return 'Berhasil.'
+  if (typeof result !== 'object') return String(result)
+  const r = result as Record<string, unknown>
+
+  if ('status' in r) {
+    // bentuk resolve_name: {status, match?, candidates?}
+    if (r.status === 'ok') return `Ditemukan: ${JSON.stringify(r.match)}`
+    if (r.status === 'ambiguous') return `Ambigu, ada beberapa kandidat: ${JSON.stringify(r.candidates)}`
+    return `Tidak ditemukan.${r.candidates ? ` Saran: ${JSON.stringify(r.candidates)}` : ''}`
+  }
+
+  const parts: string[] = []
+  if (r.success === true && Object.keys(r).length === 1) return 'Berhasil.'
+  for (const [key, val] of Object.entries(r)) {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const nested = val as Record<string, unknown>
+      const bits: string[] = []
+      if (typeof nested.balance === 'number') bits.push(`saldo ${fmtRp(nested.balance)}`)
+      if (typeof nested.remaining === 'number') bits.push(`sisa ${fmtRp(nested.remaining)}`)
+      if (typeof nested.current === 'number') bits.push(`progres ${fmtRp(nested.current)}`)
+      if (typeof nested.amount === 'number') bits.push(`nominal ${fmtRp(nested.amount)}`)
+      if (typeof nested.note === 'string' && nested.note) bits.push(`catatan "${nested.note}"`)
+      if (bits.length) parts.push(`${key}: ${bits.join(', ')}`)
+    }
+  }
+  return parts.length ? `Berhasil. ${parts.join('; ')}.` : 'Berhasil.'
+}

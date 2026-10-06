@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  # Fase 6: regenerate hermes-tools.json dan api-client/schema.d.ts, gagal kalau ada diff
+  # (02-monorepo.md §4, §10). Dinonaktifkan sampai apps/api punya route sungguhan.
+  # tools-manifest-check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: pnpm gen:api-client && pnpm gen:tools
+  #     - run: git diff --exit-code packages/shared/src/api-client/schema.d.ts apps/api/tools/hermes-tools.json
