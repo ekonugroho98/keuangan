@@ -1,0 +1,691 @@
+[
+  {
+    "name": "list_accounts",
+    "description": "Daftar akun dengan saldo dan pemilik. Pakai untuk \"saldo kita berapa?\", \"akun apa saja yang ada\", \"BCA istri sisa berapa\".",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/accounts"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "list_members",
+    "description": "Anggota household dan alias mereka. Jarang dipakai langsung oleh user; berguna saat agent perlu tahu nama/alias member yang valid sebelum memanggil tool lain.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/members"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "list_categories",
+    "description": "Daftar kategori beserta alias. Panggil sebelum mencatat transaksi kalau ragu kategori mana yang valid.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Filter tipe kategori",
+          "enum": [
+            "income",
+            "expense",
+            "all"
+          ]
+        }
+      }
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/categories"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "resolve_name",
+    "description": "Cocokkan nama akun/kategori/member/hutang/goal/piutang yang disebut user ke entitas sebenarnya. Dipakai internal agent saat perlu id pasti sebelum memanggil tool aksi (mis. \"cicilan motor itu hutang yang mana\").",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Jenis entitas yang dicari",
+          "enum": [
+            "account",
+            "category",
+            "member",
+            "debt",
+            "goal",
+            "piutang"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "description": "Nama seperti disebut user, mis. \"BCA istri\", \"cicilan motor\""
+        },
+        "type": {
+          "type": "string",
+          "description": "Hanya untuk kind=category: filter income/expense",
+          "enum": [
+            "income",
+            "expense"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "query"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/resolve"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "get_summary",
+    "description": "Ringkasan keuangan periode tertentu: total masuk/keluar, kategori teratas, saldo. Pakai untuk \"gimana keuangan bulan ini\", \"pengeluaran istri bulan lalu berapa\", \"bulan ini hemat gak\". Jangan jumlahkan manual dari search_transactions, selalu pakai tool ini untuk ringkasan.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "string",
+          "description": "Periode ringkasan",
+          "enum": [
+            "today",
+            "yesterday",
+            "this_week",
+            "last_week",
+            "this_month",
+            "last_month",
+            "this_year",
+            "all"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "description": "Lingkup: seluruh household atau satu anggota",
+          "enum": [
+            "household",
+            "member"
+          ]
+        },
+        "member": {
+          "type": "string",
+          "description": "Nama/alias anggota (hanya kalau scope=member), mis. \"istri\", \"Eko\""
+        }
+      },
+      "required": [
+        "period"
+      ]
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/summary"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "get_budget_status",
+    "description": "Sisa anggaran per kategori untuk satu bulan. Pakai untuk \"sisa anggaran makan bulan ini\", \"budget transport masih ada?\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "month": {
+          "type": "string",
+          "description": "Bulan format YYYY-MM, default bulan berjalan"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Lingkup anggaran",
+          "enum": [
+            "household",
+            "member"
+          ]
+        }
+      }
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/budgets/status"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "search_transactions",
+    "description": "Cari transaksi dengan filter tanggal/tipe/kategori/akun/member. Pakai untuk \"pengeluaran di atas 500rb minggu ini\", \"transaksi BCA suami kemarin\", \"belanja apa aja di Indomaret\" (cari di catatan).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "string",
+          "description": "Periode cepat, alternatif dari from/to",
+          "enum": [
+            "today",
+            "yesterday",
+            "this_week",
+            "last_week",
+            "this_month",
+            "last_month",
+            "this_year"
+          ]
+        },
+        "from": {
+          "type": "string",
+          "description": "Tanggal mulai YYYY-MM-DD (dipakai kalau period tidak diisi)"
+        },
+        "to": {
+          "type": "string",
+          "description": "Tanggal akhir YYYY-MM-DD"
+        },
+        "type": {
+          "type": "string",
+          "description": "Tipe transaksi",
+          "enum": [
+            "income",
+            "expense",
+            "transfer"
+          ]
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID"
+        },
+        "category": {
+          "type": "string",
+          "description": "Nama kategori atau UUID"
+        },
+        "member": {
+          "type": "string",
+          "description": "Nama/alias anggota pemilik akun"
+        },
+        "q": {
+          "type": "string",
+          "description": "Cari di catatan/note, mis. \"indomaret\""
+        },
+        "min_amount": {
+          "type": "number",
+          "description": "Nominal minimum"
+        },
+        "max_amount": {
+          "type": "number",
+          "description": "Nominal maksimum"
+        }
+      }
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/transactions"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "record_expense",
+    "description": "Catat PENGELUARAN dari satu akun. Gunakan saat user menyebut belanja/bayar/beli. Sebutkan akun persis seperti kata user (mis. \"BCA istri\", \"cash\", \"gopay suami\"). Kalau user tidak menyebut akun, tanya dulu, jangan menebak. Kategori pilih dari list_categories; kalau tidak yakin pakai nama yang paling dekat, API akan mencocokkan alias. Contoh: \"catat belanja sayur 45rb dari BCA istri\" → {amount_text:\"45rb\", account:\"BCA istri\", category:\"Makanan\", note:\"belanja sayur\"}.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal seperti diucapkan: \"45rb\", \"1,2 juta\", \"45000\""
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID. Boleh mengandung pemilik: \"BCA istri\"."
+        },
+        "category": {
+          "type": "string",
+          "description": "Nama kategori atau UUID"
+        },
+        "note": {
+          "type": "string",
+          "description": "Keterangan singkat, mis. \"belanja sayur\""
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini (WIB). \"kemarin\" → isi tanggal kemarin.",
+          "format": "date"
+        }
+      },
+      "required": [
+        "amount_text",
+        "account",
+        "category"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/transactions",
+      "body": {
+        "type": "expense"
+      }
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "record_income",
+    "description": "Catat PEMASUKAN ke satu akun. Gunakan saat user menyebut gaji/terima/dapat. Contoh: \"gaji masuk 12 juta ke BCA suami\" → {amount_text:\"12 juta\", account:\"BCA suami\", category:\"Gaji\"}.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal seperti diucapkan"
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID tujuan dana masuk"
+        },
+        "category": {
+          "type": "string",
+          "description": "Nama kategori atau UUID, mis. \"Gaji\", \"Freelance\""
+        },
+        "note": {
+          "type": "string",
+          "description": "Keterangan singkat"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini",
+          "format": "date"
+        }
+      },
+      "required": [
+        "amount_text",
+        "account",
+        "category"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/transactions",
+      "body": {
+        "type": "income"
+      }
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "record_expense_batch",
+    "description": "Catat BEBERAPA pengeluaran sekaligus dari SATU akun yang sama. Pakai saat user menyebut beberapa belanja dalam satu kalimat. Contoh: \"tadi di pasar: sayur 20rb, ayam 45rb, buah 30rb, semua dari cash istri\" → account:\"cash istri\", items:[{amount_text:\"20rb\",category:\"Makanan\",note:\"sayur\"},…].",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID, berlaku untuk SEMUA item"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini",
+          "format": "date"
+        },
+        "items": {
+          "type": "array",
+          "description": "Daftar item pengeluaran",
+          "items": {
+            "type": "object",
+            "properties": {
+              "amount_text": {
+                "type": "string",
+                "description": "Nominal item"
+              },
+              "category": {
+                "type": "string",
+                "description": "Kategori item"
+              },
+              "note": {
+                "type": "string",
+                "description": "Keterangan item"
+              }
+            },
+            "required": [
+              "amount_text",
+              "category"
+            ]
+          }
+        }
+      },
+      "required": [
+        "account",
+        "items"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/transactions/batch"
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "record_transfer",
+    "description": "Pindah dana antar akun milik household sendiri. Pakai untuk \"transfer 2 juta dari BCA suami ke tabungan bersama\", \"topup gopay 100rb dari BCA\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal transfer"
+        },
+        "from_account": {
+          "type": "string",
+          "description": "Nama akun atau UUID sumber dana"
+        },
+        "to_account": {
+          "type": "string",
+          "description": "Nama akun atau UUID tujuan dana"
+        },
+        "note": {
+          "type": "string",
+          "description": "Keterangan singkat"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini",
+          "format": "date"
+        }
+      },
+      "required": [
+        "amount_text",
+        "from_account",
+        "to_account"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/transfers"
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "update_transaction",
+    "description": "Ubah transaksi yang SUDAH tercatat (biasanya yang baru saja dicatat pada balasan sebelumnya). Perlu transaction_id dari hasil tool sebelumnya. Contoh: \"eh salah, yang tadi 54rb bukan 45rb\", \"ganti kategorinya jadi Transport\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "description": "UUID transaksi yang mau diubah, dari respons tool sebelumnya"
+        },
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal baru (opsional)"
+        },
+        "category": {
+          "type": "string",
+          "description": "Kategori baru (opsional)"
+        },
+        "note": {
+          "type": "string",
+          "description": "Catatan baru (opsional)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Tanggal baru YYYY-MM-DD (opsional)",
+          "format": "date"
+        }
+      },
+      "required": [
+        "transaction_id"
+      ]
+    },
+    "endpoint": {
+      "method": "PATCH",
+      "path": "/v1/transactions/{transaction_id}"
+    },
+    "scope": "write",
+    "idempotent": false
+  },
+  {
+    "name": "delete_transaction",
+    "description": "Hapus (soft-delete) satu transaksi. Perlu transaction_id. Pakai untuk \"hapus transaksi terakhir\", \"batalkan yang tadi\" (gabungkan dengan search_transactions dulu kalau id belum diketahui).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "description": "UUID transaksi yang mau dihapus"
+        }
+      },
+      "required": [
+        "transaction_id"
+      ]
+    },
+    "endpoint": {
+      "method": "DELETE",
+      "path": "/v1/transactions/{transaction_id}"
+    },
+    "scope": "write",
+    "idempotent": false
+  },
+  {
+    "name": "adjust_balance",
+    "description": "Set saldo akun ke nominal aktual (koreksi, bukan transaksi baru). Pakai untuk \"saldo BCA istri sekarang 3.250.000\", \"koreksi saldo cash jadi 150rb\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID yang mau dikoreksi"
+        },
+        "new_balance": {
+          "type": "number",
+          "description": "Saldo aktual yang benar sekarang"
+        },
+        "note": {
+          "type": "string",
+          "description": "Keterangan opsional"
+        }
+      },
+      "required": [
+        "account",
+        "new_balance"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/accounts/{account_id}/adjust-balance"
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "list_debts",
+    "description": "Hutang dan sisa cicilan. Pakai untuk \"hutang kita tinggal berapa\", \"cicilan apa saja bulan ini\".",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/debts"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "pay_debt",
+    "description": "Bayar cicilan hutang. Perlu debt_id (pakai resolve_name kind=debt dulu kalau belum tahu). Pakai untuk \"bayar cicilan motor 1,2 juta dari BCA suami\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "debt_id": {
+          "type": "string",
+          "description": "UUID hutang, dari resolve_name kind=debt"
+        },
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal pembayaran"
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID sumber dana"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini",
+          "format": "date"
+        }
+      },
+      "required": [
+        "debt_id",
+        "amount_text",
+        "account"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/debts/{debt_id}/payments"
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "list_goals",
+    "description": "Target tabungan dan progresnya. Pakai untuk \"tabungan liburan sudah berapa\".",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/goals"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "contribute_goal",
+    "description": "Tambah tabungan ke target. Perlu goal_id (pakai resolve_name kind=goal dulu kalau belum tahu). Pakai untuk \"nabung 500rb ke dana darurat dari BCA bersama\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "goal_id": {
+          "type": "string",
+          "description": "UUID goal, dari resolve_name kind=goal"
+        },
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal setoran"
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID sumber dana (opsional — kosongkan kalau cuma mencatat progres tanpa potong saldo)"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini",
+          "format": "date"
+        }
+      },
+      "required": [
+        "goal_id",
+        "amount_text"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/goals/{goal_id}/contributions"
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "list_piutang",
+    "description": "Piutang (uang yang dipinjamkan ke orang lain) dan sisanya. Pakai untuk \"si Budi masih utang berapa ke kita\".",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/piutang"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "receive_piutang",
+    "description": "Catat penerimaan pembayaran piutang dari orang lain. Perlu piutang_id (pakai resolve_name kind=piutang dulu kalau belum tahu). Pakai untuk \"Budi bayar 250rb ke BCA suami\".",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "piutang_id": {
+          "type": "string",
+          "description": "UUID piutang, dari resolve_name kind=piutang"
+        },
+        "amount_text": {
+          "type": "string",
+          "description": "Nominal yang diterima"
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun atau UUID tujuan dana"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD; default hari ini",
+          "format": "date"
+        }
+      },
+      "required": [
+        "piutang_id",
+        "amount_text",
+        "account"
+      ]
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/piutang/{piutang_id}/receipts"
+    },
+    "scope": "write",
+    "idempotent": true
+  },
+  {
+    "name": "list_recurrings",
+    "description": "Tagihan rutin dan jatuh temponya. Pakai untuk \"tagihan apa yang jatuh tempo minggu ini\".",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/recurrings"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
+    "name": "run_recurrings",
+    "description": "Jalankan semua tagihan rutin yang sudah jatuh tempo sekarang. Pakai untuk \"jalankan tagihan rutin sekarang\". Biasanya tidak perlu dipanggil manual (ada fallback otomatis), tapi boleh dipakai kalau user minta eksplisit.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "endpoint": {
+      "method": "POST",
+      "path": "/v1/recurrings/run"
+    },
+    "scope": "write",
+    "idempotent": true
+  }
+]

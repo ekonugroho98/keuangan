@@ -1,7 +1,23 @@
+# Dependencies & build output
 node_modules
 dist
+dist_*
+.vercel/
+*.tsbuildinfo
+
+# Env & secrets
 .env
 .env.local
 .env.*.local
+backups/
+
+# Tooling
 .claude/
 supabase/.temp/
+supabase/.branches/
+
+# Generated artifacts (dicek diff-nya di CI, tapi di-gitignore dari commit biasa)
+# packages/shared/src/api-client/schema.d.ts  -- di-track (lihat 02-monorepo.md §4), bukan ignore
+
+# OS
+.DS_Store
