@@ -1,4 +1,1 @@
 .vercel
-# Dibuat scripts/build-function.mjs saat deploy; src/vercel-handler.ts adalah sumbernya.
-api/index.js
-api/index.js.map
