@@ -66,12 +66,29 @@ export default function HouseholdPanel({ onBack, showToast }) {
         setBusy(true);
         try {
             const inv = await createInvitation({ role: inviteRole });
-            await navigator.clipboard?.writeText(`${window.location.origin}${inv.accept_url}`).catch(() => {});
-            toast?.(`✅ Kode undangan: ${inv.code} (link disalin)`);
+            const link = `${window.location.origin}${inv.accept_url}`;
+            let copied = false;
+            try {
+                await navigator.clipboard.writeText(link);
+                copied = true;
+            } catch {
+                copied = false;
+            }
+            toast?.(copied ? `✅ Link disalin: ${link}` : `✅ Undangan dibuat (gagal auto-copy): ${link}`);
         } catch (err) {
             toast?.(err.message || "Gagal membuat undangan", "error");
         } finally {
             setBusy(false);
+        }
+    };
+
+    const copyInviteLink = async (inv) => {
+        const link = `${window.location.origin}${inv.accept_url}`;
+        try {
+            await navigator.clipboard.writeText(link);
+            toast?.(`✅ Link disalin: ${link}`);
+        } catch {
+            toast?.(`Link undangan: ${link}`);
         }
     };
 
@@ -199,10 +216,16 @@ export default function HouseholdPanel({ onBack, showToast }) {
                         <button style={smallBtn()} onClick={handleInvite} disabled={busy}>+ Buat</button>
                     </div>
                     {invitations.filter((i) => i.status === "pending").map((inv) => (
-                        <div key={inv.id} style={rowCard}>
-                            <span style={{ flex: 1, fontSize: 12, fontFamily: "monospace", color: "var(--color-text)" }}>{inv.code}</span>
-                            <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{inv.role}</span>
-                            <button style={smallBtn(true)} onClick={() => revokeInvitation(inv.id)}>Cabut</button>
+                        <div key={inv.id} style={{ ...rowCard, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ flex: 1, fontSize: 12, fontFamily: "monospace", color: "var(--color-text)" }}>{inv.code}</span>
+                                <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{inv.role}</span>
+                                <button style={smallBtn()} onClick={() => copyInviteLink(inv)}>Salin link</button>
+                                <button style={smallBtn(true)} onClick={() => revokeInvitation(inv.id)}>Cabut</button>
+                            </div>
+                            <div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--color-muted)", wordBreak: "break-all", userSelect: "all" }}>
+                                {window.location.origin}{inv.accept_url}
+                            </div>
                         </div>
                     ))}
                     {invitations.filter((i) => i.status === "pending").length === 0 && (
