@@ -1244,11 +1244,6 @@ var require_dist = __commonJS({
   }
 });
 
-// ../../node_modules/.pnpm/hono@4.13.13/node_modules/hono/dist/adapter/vercel/handler.js
-var handle = (app2) => (req) => {
-  return app2.fetch(req);
-};
-
 // ../../node_modules/.pnpm/@hono+zod-openapi@0.18.4_hono@4.13.13_zod@3.25.76/node_modules/@hono/zod-openapi/dist/index.mjs
 var import_zod_to_openapi = __toESM(require_dist(), 1);
 
@@ -6397,13 +6392,13 @@ var compose = (middleware, onError, onNotFound) => {
       index = i;
       let res;
       let isError = false;
-      let handler;
+      let handler2;
       if (middleware[i]) {
-        handler = middleware[i][0][0];
+        handler2 = middleware[i][0][0];
         context.req.routeIndex = i;
-      } else handler = i === middleware.length && next || void 0;
-      if (handler) try {
-        res = await handler(context, () => dispatch(i + 1));
+      } else handler2 = i === middleware.length && next || void 0;
+      if (handler2) try {
+        res = await handler2(context, () => dispatch(i + 1));
       } catch (err) {
         if (err instanceof Error && onError) {
           context.error = err;
@@ -6469,8 +6464,8 @@ var Hono = class Hono2 {
         const methodName = method.toUpperCase();
         if (typeof args1 === "string") this.#path = args1;
         else this.#addRoute(methodName, this.#path, args1);
-        args.forEach((handler) => {
-          this.#addRoute(methodName, this.#path, handler);
+        args.forEach((handler2) => {
+          this.#addRoute(methodName, this.#path, handler2);
         });
         return this;
       };
@@ -6480,7 +6475,7 @@ var Hono = class Hono2 {
         this.#path = p;
         for (const m of [method].flat()) {
           const methodName = m.toUpperCase();
-          for (const handler of handlers) this.#addRoute(methodName, this.#path, handler);
+          for (const handler2 of handlers) this.#addRoute(methodName, this.#path, handler2);
         }
       }
       return this;
@@ -6491,8 +6486,8 @@ var Hono = class Hono2 {
         this.#path = "*";
         handlers.unshift(arg1);
       }
-      handlers.forEach((handler) => {
-        this.#addRoute("ALL", this.#path, handler);
+      handlers.forEach((handler2) => {
+        this.#addRoute("ALL", this.#path, handler2);
       });
       return this;
     };
@@ -6533,13 +6528,13 @@ var Hono = class Hono2 {
   route(path, app2) {
     const subApp = this.basePath(path);
     app2.routes.map((r) => {
-      let handler;
-      if (app2.errorHandler === errorHandler) handler = r.handler;
+      let handler2;
+      if (app2.errorHandler === errorHandler) handler2 = r.handler;
       else {
-        handler = async (c, next) => (await compose([], app2.errorHandler)(c, () => r.handler(c, next))).res;
-        handler[COMPOSED_HANDLER] = r.handler;
+        handler2 = async (c, next) => (await compose([], app2.errorHandler)(c, () => r.handler(c, next))).res;
+        handler2[COMPOSED_HANDLER] = r.handler;
       }
-      subApp.#addRoute(r.method, r.path, handler, r.basePath);
+      subApp.#addRoute(r.method, r.path, handler2, r.basePath);
     });
     return this;
   }
@@ -6577,8 +6572,8 @@ var Hono = class Hono2 {
   * })
   * ```
   */
-  onError = (handler) => {
-    this.errorHandler = handler;
+  onError = (handler2) => {
+    this.errorHandler = handler2;
     return this;
   };
   /**
@@ -6596,8 +6591,8 @@ var Hono = class Hono2 {
   * })
   * ```
   */
-  notFound = (handler) => {
-    this.#notFoundHandler = handler;
+  notFound = (handler2) => {
+    this.#notFoundHandler = handler2;
     return this;
   };
   /**
@@ -6665,23 +6660,23 @@ var Hono = class Hono2 {
         return new Request(url, request);
       };
     })();
-    const handler = async (c, next) => {
+    const handler2 = async (c, next) => {
       const res = await applicationHandler(replaceRequest(c.req.raw), ...getOptions(c));
       if (res) return res;
       await next();
     };
-    this.#addRoute("ALL", mergePath(path, "*"), handler);
+    this.#addRoute("ALL", mergePath(path, "*"), handler2);
     return this;
   }
-  #addRoute(method, path, handler, baseRoutePath) {
+  #addRoute(method, path, handler2, baseRoutePath) {
     path = mergePath(this._basePath, path);
     const r = {
       basePath: baseRoutePath !== void 0 ? mergePath(this._basePath, baseRoutePath) : this._basePath,
       path,
       method,
-      handler
+      handler: handler2
     };
-    this.router.add(method, path, [handler, r]);
+    this.router.add(method, path, [handler2, r]);
     this.routes.push(r);
   }
   #handleError(err, c) {
@@ -6967,7 +6962,7 @@ var RegExpRouter = class {
       throw e === PATH_ERROR ? new UnsupportedPathError(path) : e;
     }
   }
-  add(method, path, handler) {
+  add(method, path, handler2) {
     const middleware = this.#middleware;
     const routes = this.#routes;
     if (!middleware) throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
@@ -6989,7 +6984,7 @@ var RegExpRouter = class {
         this.#insertPath(m, path);
         middleware[m][path] = findMiddleware(middleware[m], path) || findMiddleware(middleware["ALL"], path) || [];
       }
-      for (const handlerMap of [middleware, routes]) for (const m of methods) for (const p in handlerMap[m]) re.test(p) && handlerMap[m][p].push([handler, path]);
+      for (const handlerMap of [middleware, routes]) for (const m of methods) for (const p in handlerMap[m]) re.test(p) && handlerMap[m][p].push([handler2, path]);
       return;
     }
     const paths = checkOptionalParameter(path) || [path];
@@ -6998,7 +6993,7 @@ var RegExpRouter = class {
         this.#insertPath(m, path2);
         routes[m][path2] = findMiddleware(middleware[m], path2) || findMiddleware(middleware["ALL"], path2) || [];
       }
-      routes[m][path2].push([handler, path2]);
+      routes[m][path2].push([handler2, path2]);
     }
   }
   match = match;
@@ -7044,12 +7039,12 @@ var SmartRouter = class {
   constructor(init) {
     this.#routers = init.routers;
   }
-  add(method, path, handler) {
+  add(method, path, handler2) {
     if (!this.#routes) throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
     this.#routes.push([
       method,
       path,
-      handler
+      handler2
     ]);
   }
   match(method, path) {
@@ -7092,7 +7087,7 @@ var Node3 = class Node4 {
   #patterns = [];
   #pattern;
   #params = emptyParams;
-  insert(method, path, handler) {
+  insert(method, path, handler2) {
     let curNode = this;
     const parts2 = splitRoutingPath(path);
     const possibleKeys = /* @__PURE__ */ new Set();
@@ -7111,7 +7106,7 @@ var Node3 = class Node4 {
       if (isParam) possibleKeys.add(pattern[1]);
     }
     curNode.#methods.push({ [method]: {
-      handler,
+      handler: handler2,
       possibleKeys: [...possibleKeys],
       score: ++order
     } });
@@ -7209,7 +7204,7 @@ var Node3 = class Node4 {
     if (handlerSets[1]) handlerSets.sort((a, b2) => {
       return a.score - b2.score;
     });
-    return [handlerSets.map(({ handler, params }) => [handler, params])];
+    return [handlerSets.map(({ handler: handler2, params }) => [handler2, params])];
   }
 };
 
@@ -7217,8 +7212,8 @@ var Node3 = class Node4 {
 var TrieRouter = class {
   name = "TrieRouter";
   #node = new Node3();
-  add(method, path, handler) {
-    for (const result of checkOptionalParameter(path) || [path]) this.#node.insert(method, result, handler);
+  add(method, path, handler2) {
+    for (const result of checkOptionalParameter(path) || [path]) this.#node.insert(method, result, handler2);
   }
   match(method, path) {
     return this.#node.search(method, path);
@@ -7278,7 +7273,7 @@ var OpenAPIHono = class _OpenAPIHono extends Hono3 {
    *  }
    *)
    */
-  openapi = ({ middleware: routeMiddleware, ...route }, handler, hook = this.defaultHook) => {
+  openapi = ({ middleware: routeMiddleware, ...route }, handler2, hook = this.defaultHook) => {
     this.openAPIRegistry.registerPath(route);
     const validators = [];
     if (route.request?.query) {
@@ -7349,7 +7344,7 @@ var OpenAPIHono = class _OpenAPIHono extends Hono3 {
       route.path.replaceAll(/\/{(.+?)}/g, "/:$1"),
       ...middleware,
       ...validators,
-      handler
+      handler2
     );
     return this;
   };
@@ -9796,7 +9791,7 @@ var originStackCache = /* @__PURE__ */ new Map();
 var originError = /* @__PURE__ */ Symbol("OriginError");
 var CLOSE = {};
 var Query = class extends Promise {
-  constructor(strings, args, handler, canceller, options = {}) {
+  constructor(strings, args, handler2, canceller, options = {}) {
     let resolve, reject;
     super((a, b2) => {
       resolve = a;
@@ -9805,7 +9800,7 @@ var Query = class extends Promise {
     this.tagged = Array.isArray(strings.raw);
     this.strings = strings;
     this.args = args;
-    this.handler = handler;
+    this.handler = handler2;
     this.canceller = canceller;
     this.options = options;
     this.state = null;
@@ -10616,7 +10611,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         break;
       }
       try {
-        handle2(incoming.subarray(0, length + 1));
+        handle(incoming.subarray(0, length + 1));
       } catch (e) {
         query && (query.cursorFn || query.describeFirst) && write(Sync);
         errored(e);
@@ -10723,7 +10718,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     delay = (typeof backoff2 === "function" ? backoff2(options.shared.retries) : backoff2) * 1e3;
     onclose(connection2, Errors.connection("CONNECTION_CLOSED", options, socket));
   }
-  function handle2(xs, x = xs[0]) {
+  function handle(xs, x = xs[0]) {
     (x === 68 ? DataRow : (
       // D
       x === 100 ? CopyData : (
@@ -11309,13 +11304,13 @@ function Subscribe(postgres2, options) {
     }
     function data(x2) {
       if (x2[0] === 119) {
-        parse3(x2.subarray(25), state2, sql3.options.parsers, handle2, options.transform);
+        parse3(x2.subarray(25), state2, sql3.options.parsers, handle, options.transform);
       } else if (x2[0] === 107 && x2[17]) {
         state2.lsn = x2.subarray(1, 9);
         pong();
       }
     }
-    function handle2(a, b2) {
+    function handle(a, b2) {
       const path = b2.relation.schema + "." + b2.relation.table;
       call("*", a, b2);
       call("*:" + path, a, b2);
@@ -11339,7 +11334,7 @@ function Subscribe(postgres2, options) {
 function Time(x) {
   return new Date(Date.UTC(2e3, 0, 1) + Number(x / BigInt(1e3)));
 }
-function parse3(x, state, parsers2, handle2, transform) {
+function parse3(x, state, parsers2, handle, transform) {
   const char = (acc, [k, v]) => (acc[k.charCodeAt(0)] = v, acc);
   Object.entries({
     R: (x2) => {
@@ -11378,7 +11373,7 @@ function parse3(x, state, parsers2, handle2, transform) {
       let i = 1;
       const relation = state[x2.readUInt32BE(i)];
       const { row } = tuples(x2, relation.columns, i += 7, transform);
-      handle2(row, {
+      handle(row, {
         command: "insert",
         relation
       });
@@ -11388,7 +11383,7 @@ function parse3(x, state, parsers2, handle2, transform) {
       const relation = state[x2.readUInt32BE(i)];
       i += 4;
       const key = x2[i] === 75;
-      handle2(
+      handle(
         key || x2[i] === 79 ? tuples(x2, relation.columns, i += 3, transform).row : null,
         {
           command: "delete",
@@ -11405,7 +11400,7 @@ function parse3(x, state, parsers2, handle2, transform) {
       const xs = key || x2[i] === 79 ? tuples(x2, relation.columns, i += 3, transform) : null;
       xs && (i = xs.i);
       const { row } = tuples(x2, relation.columns, i + 3, transform);
-      handle2(row, {
+      handle(row, {
         command: "update",
         relation,
         key,
@@ -11531,7 +11526,7 @@ function Postgres(a, b2) {
   let ending = false;
   const queries = queue_default(), connecting = queue_default(), reserved = queue_default(), closed = queue_default(), ended = queue_default(), open = queue_default(), busy = queue_default(), full = queue_default(), queues = { connecting, reserved, closed, ended, open, busy, full };
   const connections = [...Array(options.max)].map(() => connection_default(options, queues, { onopen, onend, onclose }));
-  const sql2 = Sql(handler);
+  const sql2 = Sql(handler2);
   Object.assign(sql2, {
     get parameters() {
       return options.parameters;
@@ -11549,8 +11544,8 @@ function Postgres(a, b2) {
     end
   });
   return sql2;
-  function Sql(handler2) {
-    handler2.debug = options.debug;
+  function Sql(handler3) {
+    handler3.debug = options.debug;
     Object.entries(options.types).reduce((acc, [name, type]) => {
       acc[name] = (x) => new Parameter(x, type.to);
       return acc;
@@ -11569,12 +11564,12 @@ function Postgres(a, b2) {
       return new Parameter(value, type);
     }
     function sql3(strings, ...args) {
-      const query = strings && Array.isArray(strings.raw) ? new Query(strings, args, handler2, cancel) : typeof strings === "string" && !args.length ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings) : new Builder(strings, args);
+      const query = strings && Array.isArray(strings.raw) ? new Query(strings, args, handler3, cancel) : typeof strings === "string" && !args.length ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings) : new Builder(strings, args);
       return query;
     }
     function unsafe(string, args = [], options2 = {}) {
       arguments.length === 2 && !Array.isArray(args) && (options2 = args, args = []);
-      const query = new Query([string], args, handler2, cancel, {
+      const query = new Query([string], args, handler3, cancel, {
         prepare: false,
         ...options2,
         simple: "simple" in options2 ? options2.simple : args.length === 0
@@ -11588,7 +11583,7 @@ function Postgres(a, b2) {
           if (err)
             return query2.reject(err);
           query2.strings = [string];
-          handler2(query2);
+          handler3(query2);
         });
       }, cancel, {
         ...options2,
@@ -11650,13 +11645,13 @@ function Postgres(a, b2) {
     move(c, reserved);
     c.reserved = () => queue.length ? c.execute(queue.shift()) : move(c, reserved);
     c.reserved.release = true;
-    const sql3 = Sql(handler2);
+    const sql3 = Sql(handler3);
     sql3.release = () => {
       c.reserved = null;
       onopen(c);
     };
     return sql3;
-    function handler2(q) {
+    function handler3(q) {
       c.queue === full ? queue.push(q) : c.execute(q) || move(c, full);
     }
   }
@@ -11674,7 +11669,7 @@ function Postgres(a, b2) {
       throw error;
     }
     async function scope(c, fn2, name) {
-      const sql3 = Sql(handler2);
+      const sql3 = Sql(handler3);
       sql3.savepoint = savepoint;
       sql3.prepare = (x) => prepare = x.replace(/[^a-z0-9$-_. ]/gi);
       let uncaughtError, result;
@@ -11700,7 +11695,7 @@ function Postgres(a, b2) {
         arguments.length === 1 && (fn3 = name2, name2 = null);
         return scope(c, fn3, "s" + savepoints++ + (name2 ? "_" + name2 : ""));
       }
-      function handler2(q) {
+      function handler3(q) {
         q.catch((e) => uncaughtError || (uncaughtError = e));
         c.queue === full ? queries2.push(q) : c.execute(q) || move(c, full);
       }
@@ -11726,7 +11721,7 @@ function Postgres(a, b2) {
       return array(Array.from(arguments));
     return new Parameter(x, type || (x.length ? inferType(x) || 25 : 0), options.shared.typeArrayMap);
   }
-  function handler(query) {
+  function handler2(query) {
     if (ending)
       return query.reject(Errors.connection("CONNECTION_ENDED", options, options));
     if (open.length)
@@ -16814,7 +16809,20 @@ function buildApp() {
 
 // src/vercel-handler.ts
 var app = buildApp();
-var vercel_handler_default = handle(app);
+var handler = app.fetch.bind(app);
+var GET = handler;
+var POST = handler;
+var PUT = handler;
+var PATCH = handler;
+var DELETE = handler;
+var OPTIONS = handler;
+var HEAD = handler;
 export {
-  vercel_handler_default as default
+  DELETE,
+  GET,
+  HEAD,
+  OPTIONS,
+  PATCH,
+  POST,
+  PUT
 };
