@@ -6,6 +6,7 @@ import { AI_PROVIDERS, PROVIDER_ORDER, DEFAULT_MODEL } from "../../services/aiSe
 import { APP_NAME, APP_TAGLINE } from "../../config/app";
 import { PASSWORD_MIN_LENGTH } from "../../constants/validation";
 import HouseholdPanel from "../household/HouseholdPanel";
+import ApiKeysPanel from "../household/ApiKeysPanel";
 
 const AVATAR_COLORS = [
     "#60fcc6","#4FC3F7","#f59e0b","#ff716c",
@@ -233,6 +234,11 @@ const Sidebar = ({
         /* ── Household: anggota & undangan ── */
         if (profileView === "household") return (
             <HouseholdPanel onBack={() => setProfileView("menu")} showToast={showToast} />
+        );
+
+        /* ── API Key (F6-T1/T3) ── */
+        if (profileView === "apikeys") return (
+            <ApiKeysPanel onBack={() => setProfileView("menu")} showToast={showToast} />
         );
 
         /* ── Ganti Nama ── */
@@ -505,6 +511,16 @@ const Sidebar = ({
                 iconColor: "#002b3d",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12 12 3l9 9" /><path d="M5 10v10h14V10" /></svg>),
                 action: () => setProfileView("household"),
+            },
+            {
+                id: "apikeys",
+                label: "API Key",
+                sub: "Agent & Hermes",
+                grad: "linear-gradient(135deg, #fbbf24, #d97706)",
+                tint: "rgba(251,191,36,.12)",
+                iconColor: "#3b2300",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5 19 4M17 6l2 2M14 9l2 2"/></svg>),
+                action: () => setProfileView("apikeys"),
             },
             {
                 id: "name",
