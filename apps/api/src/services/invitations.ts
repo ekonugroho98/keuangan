@@ -13,7 +13,11 @@ export async function listInvitations(actor: Actor) {
       select id, email, code, role, display_name_suggestion, status, expires_at::text, created_at::text
       from household_invitations where household_id = ${actor.householdId} order by created_at desc
     `
-    return rows
+    // accept_url tidak disimpan di DB, sama seperti di createInvitation() — dihitung dari code di
+    // kedua tempat. Bug ditemukan: endpoint ini sebelumnya TIDAK menyertakan accept_url sama
+    // sekali, jadi re-fetch daftar undangan (setelah createInvitation awal) membuat frontend
+    // merangkai "undefined" ke URL saat user klik "Salin link" pada undangan yang sudah ada.
+    return rows.map((row) => ({ ...row, accept_url: `/join/${row.code}` }))
   })
 }
 
