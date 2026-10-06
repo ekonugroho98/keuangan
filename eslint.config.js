@@ -17,6 +17,8 @@ export default [
       'apps/web/public/**',
       'packages/shared/src/api-client/schema.d.ts',
       'apps/api/tools/hermes-tools.json',
+      // Bundle hasil esbuild (scripts/build-function.mjs), bukan kode sumber — lihat src/vercel-handler.ts.
+      'apps/api/api/index.js',
       // Edge function LAMA: runtime Deno (import URL, global Deno), bukan Node/bundler.
       // Linting/typecheck-nya di luar toolchain pnpm ini; dihapus Fase 4/6 (lihat CLAUDE.md).
       'supabase/functions/**',
@@ -77,7 +79,7 @@ export default [
   },
   // Node (apps/api)
   {
-    files: ['apps/api/**/*.{js,ts}'],
+    files: ['apps/api/**/*.{js,mjs,ts}'],
     languageOptions: { globals: { ...globals.node } },
   },
   // Fase 4 (F4-T6): apps/web tidak boleh lagi query tabel Supabase atau panggil edge function
