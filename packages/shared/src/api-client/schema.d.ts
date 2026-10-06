@@ -2722,6 +2722,192 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar API key (milik sendiri; owner lihat semua) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Buat API key */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateApiKeyBody"];
+                };
+            };
+            responses: {
+                /** @description Dibuat — secret HANYA muncul di respons ini */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cabut API key */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-keys/{id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate API key */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Riwayat tindakan (admin) */
+        get: {
+            parameters: {
+                query?: {
+                    api_key_id?: string;
+                    member_id?: string;
+                    action?: string;
+                    from?: string;
+                    to?: string;
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: unknown[];
+                            next_cursor: string | null;
+                            has_more: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3231,6 +3417,11 @@ export interface components {
                 role: "user" | "ai";
                 text: string;
             }[];
+            /**
+             * @description Izinkan AI memanggil tool TULIS (catat transaksi, dst.) lewat chat, bukan cuma baca. Default false (06-agent-integration.md §2, Fase 6 F6-T5) — belum ada toggle UI untuk ini di web, disediakan untuk klien lain (mis. Hermes/MCP) yang eksplisit mengaktifkannya.
+             * @default false
+             */
+            allow_write: boolean;
         };
         ScanReceiptResponse: {
             merchant?: string;
@@ -3264,6 +3455,17 @@ export interface components {
             color?: string;
             /** @enum {string} */
             role?: "owner" | "member" | "viewer";
+        };
+        CreateApiKeyBody: {
+            name: string;
+            /**
+             * @default write
+             * @enum {string}
+             */
+            scope: "read" | "write" | "admin";
+            /** @description "me" (default) atau nama/alias/uuid member lain (owner saja). */
+            member?: string;
+            expires_in_days?: number;
         };
     };
     responses: never;
