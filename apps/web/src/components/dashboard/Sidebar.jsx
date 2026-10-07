@@ -7,6 +7,7 @@ import { APP_NAME, APP_TAGLINE } from "../../config/app";
 import { PASSWORD_MIN_LENGTH } from "../../constants/validation";
 import HouseholdPanel from "../household/HouseholdPanel";
 import ApiKeysPanel from "../household/ApiKeysPanel";
+import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
 
 const AVATAR_COLORS = [
     "#60fcc6","#4FC3F7","#f59e0b","#ff716c",
@@ -22,6 +23,11 @@ const Sidebar = ({
     aiSettingsTrigger, showToast,
 }) => {
     const { t, lang, setLang, languages } = useLanguage();
+    // 10-fitur-opsional-keluarga.md §2.3.1: grup "Rumah" hanya muncul kalau flag shopping_stock
+    // aktif. react-query dedupe dengan panggilan yang sama di HouseholdPanel (queryKey sama), jadi
+    // ini TIDAK menambah request baru di layar yang sudah membuka HouseholdPanel.
+    const { household } = useHouseholdInfo();
+    const features = household?.features;
     const { themeId, toggleTheme } = useTheme();
     const isMobile = useIsMobile();
     const [installPrompt, setInstallPrompt] = useState(null);
@@ -176,6 +182,13 @@ const Sidebar = ({
             { id: "ai",        label: t("nav.ai"),           icon: "🤖" },
             { id: "prediksi",  label: t("nav.prediksi"),     icon: "🔮" },
         ]},
+        // Grup "Rumah" (F-D, 10-fitur-opsional-keluarga.md §2.3.1): paling bawah, HANYA ada kalau
+        // flag household menyalakannya — flag mati berarti array items kosong, difilter habis oleh
+        // `.filter(g => g.items.length > 0)` di bawah, jadi sidebar identik seperti sebelum fitur ini ada.
+        { group: t("nav.home"), items: features?.shopping_stock?.enabled ? [
+            { id: "belanja",   label: t("nav.shopping"),     icon: "🛒" },
+            { id: "pantry",    label: t("nav.pantry"),       icon: "🥫" },
+        ] : []},
     ];
 
     const sidebarItems = allSidebarItems.map(g => ({
