@@ -6,6 +6,7 @@ import {
 } from "../../constants/categories";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { api, unwrap } from "../../api/client";
+import { useBeneficiaries } from "../../hooks/useBeneficiaries";
 
 /* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ── */
 const SCAN_CATEGORIES = [
@@ -407,8 +408,12 @@ const AddTransactionModal = ({
   aiConfig = null,
   onSubmitMultiple,
   autoSelectAccount = false,
+  beneficiaryEnabled = false,
 }) => {
   const { t } = useLanguage();
+  // F-A (10-fitur-opsional-keluarga.md §3.5): hook di-gate oleh `enabled` supaya household yang
+  // belum mengaktifkan fitur ini tidak pernah memicu GET /v1/beneficiaries (403 feature_disabled).
+  const { beneficiaries } = useBeneficiaries(beneficiaryEnabled);
 
   // Auto-select akun pertama jika belum ada yang dipilih
   useEffect(() => {
@@ -1776,6 +1781,29 @@ const AddTransactionModal = ({
                   )}
                 </div>
               </div>
+
+              {beneficiaryEnabled && (
+                <div style={{ marginBottom: 16 }}>
+                  <FieldLabel>UNTUK</FieldLabel>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <Chip
+                      active={!txForm.beneficiary}
+                      onClick={() => setTxForm((p) => ({ ...p, beneficiary: "" }))}
+                    >
+                      👪 Bersama
+                    </Chip>
+                    {beneficiaries.map((b) => (
+                      <Chip
+                        key={b.id}
+                        active={txForm.beneficiary === b.name}
+                        onClick={() => setTxForm((p) => ({ ...p, beneficiary: b.name }))}
+                      >
+                        {b.icon} {b.name}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div style={{ marginBottom: 16 }}>
                 <FieldLabel>AKUN SUMBER</FieldLabel>

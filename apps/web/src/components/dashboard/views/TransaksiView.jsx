@@ -3,6 +3,7 @@ import { useIsMobile } from "../../../hooks/useIsMobile";
 import { fmtRp, fmtDate } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useMembers } from "../../../hooks/useMembers";
+import { useBeneficiaries } from "../../../hooks/useBeneficiaries";
 import RecordedByChip from "../../household/RecordedByChip";
 
 const MONTHS_ID = [
@@ -50,10 +51,17 @@ const MONTH_NAMES_ID  = ["","Januari","Februari","Maret","April","Mei","Juni","J
 const MONTH_NAMES_EN  = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTH_NAMES_MAP = { id: MONTH_NAMES_ID, en: MONTH_NAMES_EN };
 
-const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialCategory = "", onClearInitialCategory, initialAccount = "", onClearInitialAccount }) => {
+const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialCategory = "", onClearInitialCategory, initialAccount = "", onClearInitialAccount, beneficiaryEnabled = false }) => {
     const { t, lang } = useLanguage();
     const isMobile = useIsMobile();
     const { members } = useMembers();
+    const { beneficiaries } = useBeneficiaries(beneficiaryEnabled); // F-A, 10-fitur-opsional-keluarga.md §3
+    // Fitur bisa dimatikan dari sesi/perangkat LAIN sementara halaman ini terbuka (polling 30 detik,
+    // main.jsx) — tanpa ini, filter beneficiary lama tetap menyembunyikan transaksi diam-diam
+    // setelah kontrol filternya sendiri sudah hilang dari UI (review 2026-10-07).
+    useEffect(() => {
+        if (!beneficiaryEnabled) setFilterBeneficiary("");
+    }, [beneficiaryEnabled]);
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_ID;
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
@@ -66,6 +74,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
     const [filterAccount,  setFilterAccount]  = useState(initialAccount);
     const [filterCategory, setFilterCategory] = useState(initialCategory);
     const [filterMember,   setFilterMember]   = useState("");
+    const [filterBeneficiary, setFilterBeneficiary] = useState("");
     const [search,         setSearch]         = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -119,6 +128,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
         if (filterAccount && !involvesAccount(tx, filterAccount)) return false;
         if (filterCategory && tx.category !== filterCategory) return false;
         if (filterMember && tx.recorded_by?.member_id !== filterMember) return false;
+        if (filterBeneficiary === "none" && tx.beneficiary) return false;
+        if (filterBeneficiary && filterBeneficiary !== "none" && tx.beneficiary !== filterBeneficiary) return false;
         if (search) {
             const q = search.toLowerCase();
             return (
@@ -153,6 +164,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
         setFilterAccount("");
         setFilterCategory("");
         setFilterMember("");
+        setFilterBeneficiary("");
         setPage(1);
     };
 
@@ -507,6 +519,35 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                             </select>
                         </>
                     )}
+
+                    {/* Beneficiary filter — F-A (10-fitur-opsional-keluarga.md §3.5), hanya tampil kalau fitur aktif & ada datanya */}
+                    {beneficiaryEnabled && beneficiaries.length > 0 && (
+                        <>
+                            <div style={{ width: 1, height: 24, background: "rgba(72,71,79,.3)" }} />
+                            <select
+                                value={filterBeneficiary}
+                                onChange={e => { setFilterBeneficiary(e.target.value); setPage(1); }}
+                                style={{
+                                    background: filterBeneficiary ? "rgba(96,252,198,.1)" : "transparent",
+                                    border: filterBeneficiary ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    borderRadius: 8,
+                                    color: filterBeneficiary ? "var(--color-primary)" : "var(--color-muted)",
+                                    fontSize: 12, fontWeight: filterBeneficiary ? 700 : 500,
+                                    fontFamily: "inherit", cursor: "pointer", outline: "none",
+                                    padding: filterBeneficiary ? "4px 8px" : "0",
+                                    transition: "all .2s",
+                                }}
+                            >
+                                <option value="" style={{ background: "var(--bg-surface)" }}>Semua (Untuk)</option>
+                                <option value="none" style={{ background: "var(--bg-surface)" }}>👪 Bersama saja</option>
+                                {beneficiaries.map(b => (
+                                    <option key={b.id} value={b.name} style={{ background: "var(--bg-surface)" }}>
+                                        {b.icon} {b.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    )}
                 </div>
 
                 {/* Right: search + date + reset */}
@@ -536,7 +577,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                     />
 
                     {/* Reset */}
-                    {(filterDate || search || filterType !== "all" || filterAccount || filterCategory || filterMember) && (
+                    {(filterDate || search || filterType !== "all" || filterAccount || filterCategory || filterMember || filterBeneficiary) && (
                         <button onClick={handleReset}
                             className="chip chip-red"
                             style={{ cursor: "pointer", border: "none", fontFamily: "inherit", minHeight: 32, whiteSpace: "nowrap" }}>
@@ -626,6 +667,15 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                                 {typeText(tx.type)}
                                             </span>
                                             {members.length > 1 && <RecordedByChip recordedBy={tx.recorded_by} />}
+                                            {beneficiaryEnabled && tx.beneficiary && (
+                                                <span style={{
+                                                    fontSize: 9, padding: "2px 8px", borderRadius: 9999,
+                                                    background: "rgba(96,252,198,.1)", color: "var(--color-primary)",
+                                                    fontWeight: 700, whiteSpace: "nowrap",
+                                                }}>
+                                                    untuk: {tx.beneficiary}
+                                                </span>
+                                            )}
                                         </div>
                                         <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0 }}>
                                             {fmtDate(tx.date)} · {tCat(tx.category)} ·{" "}

@@ -23,6 +23,7 @@ import { usePiutang } from "../hooks/usePiutang";
 import { useRecurrings } from "../hooks/useRecurrings";
 import { useSplitBills } from "../hooks/useSplitBills";
 import { useSettings } from "../hooks/useSettings";
+import { useHouseholdInfo } from "../hooks/useHouseholdInfo";
 /* ═══ Eager: Dashboard landing view (first screen after login) ═══ */
 import DasborView from "../components/dashboard/views/DasborView";
 /* ═══ Lazy: the other 12 views + heavy modals ═══ */
@@ -59,6 +60,15 @@ const SplitBillView = lazy(
 const PrediksiView = lazy(
   () => import("../components/dashboard/views/PrediksiView"),
 );
+// F-D (10-fitur-opsional-keluarga.md §6): hanya di-load kalau household menyalakan
+// features.shopping_stock (Sidebar.jsx menyembunyikan menunya kalau mati) — lazy import tetap
+// aman diimpor di sini walau tidak pernah dirender.
+const BelanjaView = lazy(
+  () => import("../components/dashboard/views/BelanjaView"),
+);
+const PantryView = lazy(
+  () => import("../components/dashboard/views/PantryView"),
+);
 const AddTransactionModal = lazy(
   () => import("../components/dashboard/AddTransactionModal"),
 );
@@ -83,6 +93,8 @@ const NAV_LABELS = {
   ai: "nav.ai",
   splitbill: "nav.splitbill",
   prediksi: "nav.prediksi",
+  belanja: "nav.shopping",
+  pantry: "nav.pantry",
 };
 
 const Dashboard = ({ session, onLogout, showToast }) => {
@@ -110,6 +122,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     account: "",
     toAccount: "",
     date: toLocalDateStr(),
+    beneficiary: "", // F-A (10-fitur-opsional-keluarga.md §3) — "" = Bersama, hanya terpakai kalau feature aktif
   });
 
   // Auto-select akun pertama saat modal dibuka agar tidak pernah kosong
@@ -139,6 +152,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const { recurrings, addRecurring, editRecurring, deleteRecurring, runDueRecurrings } = useRecurrings();
   const { splitBills, addSplitBill, deleteSplitBill, toggleMemberPaid } = useSplitBills();
   const { userSettings, aiConfig, saveSettings, saveAiConfig } = useSettings();
+  const { household } = useHouseholdInfo(); // F-0/F-A: gate field "Untuk" dari features.beneficiary.enabled
+  const beneficiaryEnabled = !!household?.features?.beneficiary?.enabled;
 
   const loading = accountsLoading || transactionsLoading;
 
@@ -305,8 +320,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         note: txForm.note || txForm.category,
         date: txForm.date || toLocalDateStr(),
         account: accountName,
+        // Gate dengan beneficiaryEnabled (bukan selalu kirim txForm.beneficiary) — review 2026-10-07:
+        // kalau user sempat pilih chip beneficiary lalu fiturnya dimatikan dari sesi lain SEBELUM
+        // submit, txForm.beneficiary masih terisi walau pickernya sudah hilang dari layar; tanpa
+        // gate ini nilai lama tetap terkirim dan ditolak backend (400) alih-alih diam-diam dibuang.
+        ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),
       });
-      setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
+      setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr(), beneficiary: "" });
       setShowAddTx(false);
       showToast("Transaksi berhasil ditambahkan!");
     } catch (err) {
@@ -343,6 +363,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       account: tx.account_name,
       toAccount: "",
       date: tx.date || toLocalDateStr(),
+      beneficiary: tx.beneficiary || "",
     });
     setShowEditTx(true);
   };
@@ -361,6 +382,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         note: txForm.note || txForm.category,
         date: txForm.date || editingTx.date,
         account: txForm.account || editingTx.account_name,
+        // Hanya ikut kalau fitur aktif — lihat catatan panjang di editTx (useTransactions.js) soal
+        // kenapa "" di sini beda arti dari key yang tidak ada sama sekali.
+        ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),
       });
       setShowEditTx(false);
       setEditingTx(null);
@@ -505,6 +529,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             aiConfig={aiConfig}
             onSubmitMultiple={addMultipleTx_}
             autoSelectAccount
+            beneficiaryEnabled={beneficiaryEnabled}
           />
         )}
         {showEditTx && (
@@ -524,6 +549,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             onUpdate={editTx_}
             isSaving={isSavingTx}
             aiConfig={aiConfig}
+            beneficiaryEnabled={beneficiaryEnabled}
           />
         )}
         {showAddAccount && (
@@ -765,6 +791,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 onClearInitialCategory={() => setInitialCategoryFilter("")}
                 initialAccount={initialAccountFilter}
                 onClearInitialAccount={() => setInitialAccountFilter("")}
+                beneficiaryEnabled={beneficiaryEnabled}
               />
             )}
             {activeMenu === "akun" && (
@@ -889,6 +916,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 accounts={accounts}
               />
             )}
+            {activeMenu === "belanja" && <BelanjaView showToast={showToast} />}
+            {activeMenu === "pantry" && <PantryView showToast={showToast} />}
           </Suspense>
         </div>
       </main>

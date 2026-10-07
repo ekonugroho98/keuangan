@@ -12,6 +12,7 @@ function flatten(tx) {
         note: tx.note,
         category: tx.category?.name,
         icon: tx.category?.icon || categoryIcons[tx.category?.name] || "📦",
+        beneficiary: tx.beneficiary?.name ?? null, // F-A, 10-fitur-opsional-keluarga.md §3 — null = bersama
         account_name: tx.account?.name,
         to_account_name: tx.to_account?.name,
         recorded_by: tx.recorded_by,
@@ -56,9 +57,12 @@ export function useTransactions() {
         queryClient.invalidateQueries({ queryKey: ["summary"] });
     };
 
-    const addTx = async ({ type, amount, category, note, account, date }) => {
+    const addTx = async ({ type, amount, category, note, account, date, beneficiary }) => {
         const result = await unwrap(
-            await api.POST("/v1/transactions", { body: { type, amount, category, note, account, date } }),
+            // beneficiary HANYA dikirim kalau terisi (F-A, feature opsional) — field yang tidak
+            // pernah disentuh harus tidak ada di body sama sekali, bukan string kosong, supaya
+            // household yang belum mengaktifkan fitur ini tidak pernah memicu gate 400 di backend.
+            await api.POST("/v1/transactions", { body: { type, amount, category, note, account, date, beneficiary: beneficiary || undefined } }),
         );
         invalidateMoney();
         return { transaction: flatten(result.transaction), account: result.account };
@@ -74,9 +78,19 @@ export function useTransactions() {
         return { transactions: result.transactions.map(flatten), account: result.account };
     };
 
-    const editTx = async (id, { type, amount, category, note, account, date }) => {
+    const editTx = async (id, { type, amount, category, note, account, date, beneficiary }) => {
+        const body = { type, amount, category, note, account, date };
+        // `beneficiary` key HARUS tidak ada sama sekali di objek yang dioper kalau caller tidak
+        // ikut mengirimnya (household belum aktifkan F-A) — beda dari string kosong ("" = user
+        // sengaja pilih "Bersama" di form, yang justru WAJIB jadi beneficiary_id:null eksplisit
+        // supaya backend tahu ini "kosongkan", bukan "jangan disentuh"). Caller (Dashboard.jsx)
+        // yang memutuskan: hanya spread `beneficiary` ke argumen ini kalau fitur aktif.
+        if (beneficiary !== undefined) {
+            if (beneficiary) body.beneficiary = beneficiary;
+            else body.beneficiary_id = null;
+        }
         const result = await unwrap(
-            await api.PATCH("/v1/transactions/{id}", { params: { path: { id } }, body: { type, amount, category, note, account, date } }),
+            await api.PATCH("/v1/transactions/{id}", { params: { path: { id } }, body }),
         );
         invalidateMoney();
         return flatten(result);

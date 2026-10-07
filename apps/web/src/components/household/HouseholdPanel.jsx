@@ -26,6 +26,17 @@ const smallBtn = (danger = false) => ({
     background: danger ? "rgba(255,113,108,.08)" : "var(--color-border-soft)",
     color: danger ? "#ff716c" : "var(--color-text)",
 });
+const toggleTrack = (on) => ({
+    width: 36, height: 20, borderRadius: 999, padding: 2, cursor: "pointer", flexShrink: 0,
+    background: on ? "var(--color-primary)" : "var(--color-border-soft)",
+    border: "1px solid " + (on ? "transparent" : "var(--glass-border)"),
+    transition: "background .15s", display: "flex", justifyContent: on ? "flex-end" : "flex-start",
+});
+const toggleThumb = { width: 14, height: 14, borderRadius: "50%", background: "#fff" };
+const featureCard = {
+    padding: "12px 12px", borderRadius: 12, background: "rgba(255,255,255,.03)",
+    border: "1px solid var(--glass-border)", marginBottom: 10,
+};
 
 /**
  * Panel Settings → Household (F5-T3): switcher (kalau >1 membership), ubah nama/timezone (owner),
@@ -112,6 +123,20 @@ export default function HouseholdPanel({ onBack, showToast }) {
         }
     };
 
+    // Fitur opsional (10-fitur-opsional-keluarga.md §2.3): PATCH partial-merge per fitur, bukan
+    // replace total — menyalakan beneficiary tidak menyentuh monthly_report/shopping_stock dkk.
+    const [featureBusy, setFeatureBusy] = useState(null);
+    const patchFeature = async (key, patch) => {
+        setFeatureBusy(key);
+        try {
+            await updateHouseholdInfo({ features: { [key]: patch } });
+        } catch (err) {
+            toast?.(err.message || "Gagal mengubah fitur", "error");
+        } finally {
+            setFeatureBusy(null);
+        }
+    };
+
     const handleLeave = async () => {
         try {
             await leaveHousehold();
@@ -158,11 +183,12 @@ export default function HouseholdPanel({ onBack, showToast }) {
                 </div>
             )}
 
-            <div style={{ display: "flex", gap: 6, marginTop: 16 }}>
+            <div style={{ display: "flex", gap: 6, marginTop: 16, flexWrap: "wrap" }}>
                 <button style={{ ...smallBtn(), flex: 1, background: tab === "members" ? "var(--color-primary-soft)" : "var(--color-border-soft)" }} onClick={() => setTab("members")}>Anggota ({members.length})</button>
                 {isOwner && (
                     <button style={{ ...smallBtn(), flex: 1, background: tab === "invite" ? "var(--color-primary-soft)" : "var(--color-border-soft)" }} onClick={() => setTab("invite")}>Undangan</button>
                 )}
+                <button style={{ ...smallBtn(), flex: 1, background: tab === "fitur" ? "var(--color-primary-soft)" : "var(--color-border-soft)" }} onClick={() => setTab("fitur")}>Fitur opsional</button>
             </div>
 
             {tab === "members" && (
@@ -233,6 +259,138 @@ export default function HouseholdPanel({ onBack, showToast }) {
                     )}
                 </div>
             )}
+
+            {tab === "fitur" && (
+                <FeaturesTab
+                    features={household?.features}
+                    isOwner={isOwner}
+                    busy={featureBusy}
+                    onPatch={patchFeature}
+                />
+            )}
+        </div>
+    );
+}
+
+function Toggle({ on, disabled, onClick }) {
+    return (
+        <div
+            role="switch" aria-checked={on}
+            onClick={disabled ? undefined : onClick}
+            style={{ ...toggleTrack(on), opacity: disabled ? .5 : 1, cursor: disabled ? "default" : "pointer" }}
+        >
+            <div style={toggleThumb} />
+        </div>
+    );
+}
+
+const fieldLabel = { fontSize: 11, color: "var(--color-muted)", marginBottom: 4, display: "block" };
+const miniInputSt = { ...inputSt, padding: "6px 8px", fontSize: 12 };
+
+/**
+ * Tab "Fitur opsional" (10-fitur-opsional-keluarga.md §2.3): toggle per-fitur, PARTIAL merge
+ * (setiap onPatch hanya mengirim satu fitur, backend menjaga yang lain tidak ikut berubah).
+ * `reconciliation` (F-C) SENGAJA tidak ditampilkan — belum ada implementasinya sama sekali
+ * (backend-nya pun belum dibangun, lihat PROGRESS.md), jadi toggle untuk itu hanya akan membingungkan.
+ * Teks di tab ini (dan BelanjaView/PantryView) sengaja hardcode Bahasa Indonesia, BUKAN lewat t() —
+ * mengikuti pola HouseholdPanel/ApiKeysPanel yang sudah ada (i18n 6 bahasa untuk UI household/fitur
+ * baru dicatat sebagai utang teknis di PROGRESS.md, bukan konvensi baru yang disengaja di sini).
+ */
+function FeaturesTab({ features, isOwner, busy, onPatch }) {
+    if (!features) return <div style={{ fontSize: 12, color: "var(--color-muted)", textAlign: "center", padding: 10 }}>Memuat...</div>;
+
+    const ben = features.beneficiary ?? { enabled: false };
+    const report = features.monthly_report ?? { enabled: false, day: 1, hour: 8, channel: "both" };
+    const stock = features.shopping_stock ?? { enabled: false, expiry_reminder: { enabled: false, hour: 7, days_before: 2 } };
+    const expiry = stock.expiry_reminder ?? { enabled: false, hour: 7, days_before: 2 };
+
+    return (
+        <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+                Fitur tambahan di luar keuangan inti. Mati = tidak ada yang berubah dari biasanya.
+                {!isOwner && " Hanya owner yang bisa mengubah."}
+            </div>
+
+            <div style={featureCard}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>👪 Untuk siapa (beneficiary)</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>Catat pengeluaran untuk anak, orang tua, dst. Bisa dilihat per penerima di Laporan.</div>
+                    </div>
+                    <Toggle on={ben.enabled} disabled={!isOwner || busy === "beneficiary"} onClick={() => onPatch("beneficiary", { enabled: !ben.enabled })} />
+                </div>
+            </div>
+
+            <div style={featureCard}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>📊 Laporan bulanan otomatis</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>Hermes kirim ringkasan ke chat tiap bulan (perlu Hermes dikonfigurasi terpisah).</div>
+                    </div>
+                    <Toggle on={report.enabled} disabled={!isOwner || busy === "monthly_report"} onClick={() => onPatch("monthly_report", { enabled: !report.enabled })} />
+                </div>
+                {report.enabled && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={fieldLabel}>Tanggal kirim</label>
+                            <select disabled={!isOwner || busy === "monthly_report"} style={miniInputSt} value={report.day} onChange={(e) => onPatch("monthly_report", { day: Number(e.target.value) })}>
+                                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <label style={fieldLabel}>Jam (WIB)</label>
+                            <select disabled={!isOwner || busy === "monthly_report"} style={miniInputSt} value={report.hour} onChange={(e) => onPatch("monthly_report", { hour: Number(e.target.value) })}>
+                                {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+                            </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <label style={fieldLabel}>Kanal</label>
+                            <select disabled={!isOwner || busy === "monthly_report"} style={miniInputSt} value={report.channel} onChange={(e) => onPatch("monthly_report", { channel: e.target.value })}>
+                                <option value="both">Telegram + WA</option>
+                                <option value="telegram">Telegram</option>
+                                <option value="whatsapp">WhatsApp</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div style={featureCard}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>🛒 Belanja & Stok</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>Daftar belanja + stok rumah (kulkas/freezer/lemari). Menu "Rumah" muncul di sidebar saat aktif.</div>
+                    </div>
+                    <Toggle on={stock.enabled} disabled={!isOwner || busy === "shopping_stock"} onClick={() => onPatch("shopping_stock", { enabled: !stock.enabled })} />
+                </div>
+                {stock.enabled && (
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--glass-border)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ flex: 1, fontSize: 12, color: "var(--color-text)" }}>Pengingat kedaluwarsa harian</div>
+                            <Toggle
+                                on={expiry.enabled} disabled={!isOwner || busy === "shopping_stock"}
+                                onClick={() => onPatch("shopping_stock", { expiry_reminder: { ...expiry, enabled: !expiry.enabled } })}
+                            />
+                        </div>
+                        {expiry.enabled && (
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={fieldLabel}>Jam (WIB)</label>
+                                    <select disabled={!isOwner || busy === "shopping_stock"} style={miniInputSt} value={expiry.hour} onChange={(e) => onPatch("shopping_stock", { expiry_reminder: { ...expiry, hour: Number(e.target.value) } })}>
+                                        {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <label style={fieldLabel}>Ingatkan (hari sebelum)</label>
+                                    <select disabled={!isOwner || busy === "shopping_stock"} style={miniInputSt} value={expiry.days_before} onChange={(e) => onPatch("shopping_stock", { expiry_reminder: { ...expiry, days_before: Number(e.target.value) } })}>
+                                        {[0, 1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d} hari</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
