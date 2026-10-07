@@ -2,6 +2,8 @@ import { z } from '@hono/zod-openapi'
 import { UuidSchema, DateStringSchema } from './common'
 import { MemberSummarySchema } from './accounts'
 
+export const BeneficiaryRefOutSchema = z.object({ id: UuidSchema, name: z.string(), kind: z.string() }).nullable()
+
 export const TxTypeSchema = z.enum(['income', 'expense', 'transfer'])
 export const TxSourceSchema = z.enum(['web', 'api_key', 'recurring', 'system', 'import', 'migration'])
 
@@ -21,6 +23,7 @@ export const TransactionSchema = z
     account: TransactionAccountRefSchema,
     to_account: TransactionAccountRefSchema,
     category: CategoryRefOutSchema,
+    beneficiary: BeneficiaryRefOutSchema,
     recorded_by: z.object({ member_id: UuidSchema, display_name: z.string() }),
     source: TxSourceSchema,
     recurring_id: UuidSchema.nullable(),
@@ -41,6 +44,8 @@ export const CreateTransactionBodySchema = z
     category: z.string().optional(),
     date: DateStringSchema.optional(),
     note: z.string().max(500).optional(),
+    beneficiary_id: UuidSchema.optional(),
+    beneficiary: z.string().optional().openapi({ description: 'F-A (10-fitur-opsional-keluarga.md §3), hanya berlaku kalau feature beneficiary aktif.' }),
   })
   .openapi('CreateTransactionBody')
 
@@ -50,6 +55,8 @@ export const BatchItemSchema = z.object({
   category_id: UuidSchema.optional(),
   category: z.string().optional(),
   note: z.string().optional(),
+  beneficiary_id: UuidSchema.optional(),
+  beneficiary: z.string().optional(),
 })
 
 export const CreateTransactionBatchBodySchema = z
@@ -71,6 +78,8 @@ export const UpdateTransactionBodySchema = z
     category: z.string().optional(),
     date: DateStringSchema.optional(),
     note: z.string().max(500).optional(),
+    beneficiary_id: UuidSchema.nullable().optional(),
+    beneficiary: z.string().optional().openapi({ description: 'null eksplisit pada beneficiary_id = kembali ke bersama.' }),
   })
   .openapi('UpdateTransactionBody')
 
@@ -98,6 +107,8 @@ export const TransactionListQuerySchema = z.object({
   category: z.string().optional(),
   member_id: UuidSchema.optional(),
   member: z.string().optional(),
+  beneficiary_id: UuidSchema.optional(),
+  beneficiary: z.string().optional().openapi({ description: '"none" = hanya transaksi bersama (beneficiary_id null). Hanya berlaku kalau feature beneficiary aktif.' }),
   attribution: z.enum(['owner', 'recorded_by']).default('owner'),
   q: z.string().optional(),
   min_amount: z.coerce.number().int().optional(),

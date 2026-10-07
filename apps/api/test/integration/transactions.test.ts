@@ -92,6 +92,31 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('transactions integra
     expect(body.error.candidates).toHaveLength(2)
   })
 
+  it('POST /v1/transactions/batch mencatat beberapa item sekaligus (regresi bug jsonb ganda-encoded di post_transactions_batch)', async () => {
+    // Endpoint ini TIDAK PERNAH ada test sebelum F-A (10-fitur-opsional-keluarga.md) — bug nyata
+    // ditemukan saat implementasi: `${JSON.stringify(items)}::jsonb` di tagged template postgres.js
+    // membuat parameter di-stringify DUA KALI, jadi p_items jadi jsonb STRING SCALAR (bukan ARRAY),
+    // dan post_transactions_batch gagal di jsonb_array_length(). Diperbaiki pakai tx.json(items).
+    const app = buildApp()
+    const token = await mintJwt(EKO_USER_ID)
+    const res = await app.request('/v1/transactions/batch', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        account: 'BCA suami',
+        items: [
+          { amount: 5000, category: 'Makanan', note: 'item batch 1' },
+          { amount: 3000, category: 'Makanan', note: 'item batch 2' },
+        ],
+      }),
+    })
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.transactions).toHaveLength(2)
+    expect(body.transactions.map((t: { note: string }) => t.note).sort()).toEqual(['item batch 1', 'item batch 2'])
+    expect(typeof body.account.balance).toBe('number')
+  })
+
   it('GET /v1/summary mengembalikan totals numerik untuk periode ini_bulan', async () => {
     const app = buildApp()
     const token = await mintJwt(EKO_USER_ID)

@@ -26,6 +26,11 @@ import { membersApp } from './routes/members'
 import { apiKeysApp } from './routes/api-keys'
 import { auditLogApp } from './routes/audit-log'
 import { toolsApp } from './routes/tools'
+import { beneficiariesApp } from './routes/beneficiaries'
+import { reportsApp } from './routes/reports'
+import { shoppingApp } from './routes/shopping'
+import { pantryApp } from './routes/pantry'
+import { receiptsApp } from './routes/receipts'
 import { auditMiddleware } from './middleware/audit'
 
 export function buildApp() {
@@ -139,6 +144,11 @@ export function buildApp() {
   app.route('/', membersApp)
   app.route('/', apiKeysApp)
   app.route('/', auditLogApp)
+  app.route('/', beneficiariesApp)
+  app.route('/', reportsApp)
+  app.route('/', shoppingApp)
+  app.route('/', pantryApp)
+  app.route('/', receiptsApp)
 
   return app
 }

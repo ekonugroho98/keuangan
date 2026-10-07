@@ -1,15 +1,17 @@
 import type postgres from 'postgres'
+import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolvePeriod } from './period'
-import { resolveAccountRef, resolveMemberRef } from './resolver'
+import { resolveAccountRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
+import { parseHouseholdFeatures } from './features'
 
 interface ScopeFilter {
   accountClause: string
   params: postgres.ParameterOrJSON<never>[]
 }
 
-function buildScopeFilter(scope: string, accountId?: string, memberId?: string, attribution: 'owner' | 'recorded_by' = 'owner'): ScopeFilter {
+function buildScopeFilter(scope: string, accountId?: string, memberId?: string, attribution: 'owner' | 'recorded_by' = 'owner', beneficiaryId?: string): ScopeFilter {
   const params: postgres.ParameterOrJSON<never>[] = []
   if (scope === 'account' && accountId) {
     params.push(accountId)
@@ -20,32 +22,68 @@ function buildScopeFilter(scope: string, accountId?: string, memberId?: string, 
     const clause = attribution === 'recorded_by' ? `t.recorded_by_member_id = $${params.length}` : `(a.owner_member_id = $${params.length} or ta.owner_member_id = $${params.length})`
     return { accountClause: `and ${clause}`, params }
   }
+  if (scope === 'beneficiary') {
+    if (beneficiaryId === 'none') return { accountClause: 'and t.beneficiary_id is null', params: [] }
+    if (beneficiaryId) {
+      params.push(beneficiaryId)
+      return { accountClause: `and t.beneficiary_id = $${params.length}`, params }
+    }
+    return { accountClause: 'and false', params: [] } // tidak pernah tercapai: getSummary menolak ref kosong
+  }
   return { accountClause: '', params: [] }
 }
 
 export async function getSummary(
   actor: Actor,
-  opts: { period: string; from?: string; to?: string; scope: 'household' | 'member' | 'account'; memberRef?: { member_id?: string; member?: string }; accountRef?: { account_id?: string; account?: string }; attribution: 'owner' | 'recorded_by'; compare: boolean },
+  opts: {
+    period: string; from?: string; to?: string; scope: 'household' | 'member' | 'account' | 'beneficiary'
+    memberRef?: { member_id?: string; member?: string }; accountRef?: { account_id?: string; account?: string }
+    beneficiaryRef?: { beneficiary_id?: string; beneficiary?: string }
+    attribution: 'owner' | 'recorded_by'; compare: boolean
+  },
 ) {
   return withActor(actor, async (tx) => {
-    const [hh] = await tx<{ timezone: string }[]>`select timezone from households where id = ${actor.householdId}`
+    // timezone + features dari SATU query baris yang sama (bukan dua round-trip) — features dibaca
+    // di setiap panggilan summary untuk memutuskan `by_beneficiary`.
+    const [hh] = await tx<{ timezone: string; features: unknown }[]>`select timezone, features from households where id = ${actor.householdId}`
     const timezone = hh?.timezone ?? 'Asia/Jakarta'
     const period = resolvePeriod(opts.period, timezone, opts.from, opts.to)
+    const features = parseHouseholdFeatures(hh?.features)
 
     let accountId: string | undefined
     let memberId: string | undefined
+    let beneficiaryId: string | undefined
     if (opts.scope === 'account' && opts.accountRef) accountId = await resolveAccountRef(tx, actor, opts.accountRef)
     if (opts.scope === 'member' && opts.memberRef) memberId = (await resolveMemberRef(tx, actor, opts.memberRef)) ?? actor.memberId
     if (opts.scope === 'member' && !opts.memberRef) memberId = actor.memberId
+    if (opts.scope === 'beneficiary') {
+      // Kontrak SAMA dengan GET /v1/transactions?beneficiary=: nama/alias/uuid, atau sentinel
+      // "none" = hanya transaksi bersama. Tanpa referensi sama sekali -> ditolak, bukan diam-diam
+      // dibaca sebagai "bersama" (agent akan salah mengira itu total household).
+      if (!features.beneficiary.enabled) {
+        throw ApiError.fromCode('validation_error', {
+          message: 'scope=beneficiary belum aktif untuk household ini.',
+          hint: 'Aktifkan di Settings > Household > Fitur opsional.',
+          details: { field: 'scope' },
+        })
+      }
+      if (!opts.beneficiaryRef) {
+        throw ApiError.fromCode('validation_error', {
+          message: 'scope=beneficiary butuh beneficiary (nama/alias/uuid) atau beneficiary=none untuk transaksi bersama.',
+          details: { field: 'beneficiary' },
+        })
+      }
+      beneficiaryId = opts.beneficiaryRef.beneficiary === 'none' ? 'none' : await resolveBeneficiaryRef(tx, actor, opts.beneficiaryRef)
+    }
 
-    const totals = await computeTotals(tx, actor.householdId, period.from, period.to, opts.scope, accountId, memberId, opts.attribution)
+    const totals = await computeTotals(tx, actor.householdId, period.from, period.to, opts.scope, accountId, memberId, opts.attribution, beneficiaryId)
 
     let compare: { income_delta_pct: number | null; expense_delta_pct: number | null } | undefined
     if (opts.compare) {
       const spanDays = (new Date(period.to).getTime() - new Date(period.from).getTime()) / 86400000 + 1
       const prevTo = new Date(new Date(period.from).getTime() - 86400000).toISOString().slice(0, 10)
       const prevFrom = new Date(new Date(prevTo).getTime() - (spanDays - 1) * 86400000).toISOString().slice(0, 10)
-      const prevTotals = await computeTotals(tx, actor.householdId, prevFrom, prevTo, opts.scope, accountId, memberId, opts.attribution)
+      const prevTotals = await computeTotals(tx, actor.householdId, prevFrom, prevTo, opts.scope, accountId, memberId, opts.attribution, beneficiaryId)
       compare = {
         income_delta_pct: pctDelta(prevTotals.income, totals.income),
         expense_delta_pct: pctDelta(prevTotals.expense, totals.expense),
@@ -108,6 +146,24 @@ export async function getSummary(
       where household_id = ${actor.householdId} and deleted_at is null order by date desc, created_at desc limit 5
     `
 
+    // F-A (10-fitur-opsional-keluarga.md §4.3): by_beneficiary SELALU ikut di respons saat flag
+    // aktif (tidak bergantung pada `scope`), null kalau mati — query dilewati sama sekali kalau
+    // fiturnya tidak dipakai, supaya household yang tidak pakai F-A tidak membayar join ekstra ini.
+    let byBeneficiary: { beneficiary: string; income: number; expense: number }[] | undefined
+    if (features.beneficiary.enabled) {
+      const rows = await tx<{ beneficiary: string | null; income: string; expense: string }[]>`
+        select coalesce(bm.display_name, b.name) as beneficiary,
+          sum(case when t.type='income' then t.amount else 0 end)::text as income,
+          sum(case when t.type='expense' then t.amount else 0 end)::text as expense
+        from transactions t
+        left join beneficiaries b on b.id = t.beneficiary_id
+        left join household_members bm on bm.id = b.member_id and bm.deleted_at is null
+        where t.household_id = ${actor.householdId} and t.deleted_at is null and t.date between ${period.from} and ${period.to}
+        group by coalesce(bm.display_name, b.name)
+      `
+      byBeneficiary = rows.map((r) => ({ beneficiary: r.beneficiary ?? 'Bersama', income: Number(r.income), expense: Number(r.expense) }))
+    }
+
     return {
       period: { label: period.label, from: period.from, to: period.to },
       scope: opts.scope,
@@ -120,6 +176,7 @@ export async function getSummary(
       balance: { total_visible: Number(balanceRow!.total), hidden_private_accounts: Number(balanceRow!.hidden) },
       top_categories: topCategories.map((r) => ({ category: r.category, icon: r.icon, spent: Number(r.spent), pct: totalExpenseForPct > 0 ? Math.round((Number(r.spent) / totalExpenseForPct) * 1000) / 10 : 0 })),
       by_member: byMember.map((r) => ({ member: r.member ?? 'Bersama', income: Number(r.income), expense: Number(r.expense) })),
+      ...(byBeneficiary ? { by_beneficiary: byBeneficiary } : {}),
       budgets: { over: Number(budgetRow?.over ?? 0), warning: Number(budgetRow?.warning ?? 0), total: Number(budgetRow?.total ?? 0) },
       goals: { active: Number(goalsRow?.active ?? 0), reached: Number(goalsRow?.reached ?? 0) },
       debts: { active: Number(debtsRow?.active ?? 0), total_remaining: Number(debtsRow?.total_remaining ?? 0), overdue: Number(debtsRow?.overdue ?? 0) },
@@ -128,8 +185,8 @@ export async function getSummary(
   })
 }
 
-async function computeTotals(tx: postgres.TransactionSql, householdId: string, from: string, to: string, scope: string, accountId: string | undefined, memberId: string | undefined, attribution: 'owner' | 'recorded_by') {
-  const { accountClause, params } = buildScopeFilter(scope, accountId, memberId, attribution)
+async function computeTotals(tx: postgres.TransactionSql, householdId: string, from: string, to: string, scope: string, accountId: string | undefined, memberId: string | undefined, attribution: 'owner' | 'recorded_by', beneficiaryId?: string) {
+  const { accountClause, params } = buildScopeFilter(scope, accountId, memberId, attribution, beneficiaryId)
   const [row] = await tx.unsafe<{ income: string; expense: string; transfer: string }[]>(
     `select
        coalesce(sum(case when t.type='income' then t.amount end),0)::text as income,
