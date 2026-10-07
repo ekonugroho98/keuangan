@@ -1,10 +1,12 @@
 Status: draft
-Terakhir diubah: 2026-10-04
+Terakhir diubah: 2026-10-07
 Bergantung pada: 03-database.md
 
 > **Riwayat perubahan**
 > | Tanggal | Bagian | Perubahan | Alasan |
 > |---|---|---|---|
+> | 2026-10-07 | §4 (baru) | **F-D**: `GET/POST /v1/shopping`, `PATCH/DELETE /v1/shopping/{id}`, `GET /v1/shopping/suggestions`, `GET/POST /v1/pantry`, `PATCH/DELETE /v1/pantry/{id}`, `POST /v1/pantry/{id}/movements`, `GET /v1/pantry/expiring` (+`exclude_acked`), `POST /v1/pantry/expiring/ack`, `POST /v1/receipts/ingest`. Error baru: `shopping_item_not_found` (404), `pantry_item_not_found` (404), `receipt_total_mismatch` (422). Juga `GET /v1/reports/monthly` (F-B, selalu tersedia). Detail: `10-fitur-opsional-keluarga.md` §4, §6. | Implementasi F-B/F-D. |
+> | 2026-10-07 | §4 (baru), §2.4, §2.6 | **F-0+F-A**: `features` field baru di `GET/PATCH /v1/households/current` (sudah `both` jwt+api_key, bukan endpoint `/v1/features` terpisah); `GET/POST /v1/beneficiaries`, `PATCH/DELETE /v1/beneficiaries/{id}`; `POST/PATCH /v1/transactions(+/batch)` tambah `beneficiary_id`/`beneficiary` opsional; `GET /v1/transactions` tambah filter `beneficiary`; `GET /v1/summary` tambah `scope=beneficiary` + `by_beneficiary[]`. Field opsional ini saat fitur mati → `400 validation_error` (BUKAN 403 `feature_disabled` — itu untuk endpoint `/v1/beneficiaries` sendiri). Error code baru: `feature_disabled` (403), `beneficiary_not_found` (404), `ambiguous_beneficiary` (409). Detail lengkap: `10-fitur-opsional-keluarga.md`. | Implementasi F-0/F-A, spec ditulis 2026-10-07. |
 > | 2026-10-04 | §4.12 `/v1/ai/chat` | Request `{messages:[{role,content}]}`→`{reply, tool_calls_made}` diganti `{messages:[{role:"user"\|"ai", text}]}`→`{reply}`; tool read-only household-scoped, bukan registry tool publik §4.11; `allow_write` (tool tulis via chat) tidak diimplementasikan | Dibangun di Fase 4 (F4-T2) sebagai pengganti edge function `ai-chat` lama, yang sudah memakai bentuk pesan `{role:"user"\|"ai", text}` di `AiView`/`Dashboard.jsx` — mengikuti bentuk asli menghindari refactor frontend yang tidak perlu. Tool tulis-via-chat adalah fitur baru yang lebih besar dari sekadar migrasi, sengaja di luar scope Fase 4. |
 > | 2026-10-04 | §4.12 `/v1/ai/scan-receipt` | `multipart/form-data` dihapus (JSON saja); tambah mode `{ocr_text}` untuk parse teks OCR client-side; `category_suggestion` → `category` | Dibangun di Fase 4 (F4-T4) menggantikan pemanggilan provider AI langsung dari browser di `AddTransactionModal.jsx` (API key sempat terekspos di network tab client). Frontend punya dua alur: vision (foto struk) dan OCR teks (tesseract.js lalu AI merapikan teks) — keduanya butuh endpoint ini karena sama-sama memakai API key tersimpan di server. `category` dipakai karena itu field asli yang dibaca `sanitizeScanResult` di frontend. |
 > | 2026-10-04 | §4.6 `DELETE /v1/me` | Implementasi Fase 4 TIDAK memakai Admin API/service role seperti didokumentasikan — hanya menghapus household (cascade semua data domain) lewat RLS biasa (`households_delete` policy, owner-only), TANPA menghapus baris `auth.users`. Ditolak `409 last_owner_with_members` bila household beranggota >1 (alur reassign/leave adalah Fase 5). | `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_URL` belum dikonfigurasi di `apps/api/.env.local` sesi ini (hanya `SUPABASE_JWT_SECRET`, cukup untuk verifikasi JWT HS256 tapi tidak untuk Admin API). Mengejar service role key di luar scope "migrasi frontend ke apps/api". Efek praktis: user bisa login lagi dan data tetap bersih (household & seluruh isinya benar-benar hilang), tapi baris auth-nya bertahan. Perlu diselesaikan sebelum fitur ini dianggap tuntas 100% — lihat PROGRESS.md. |
@@ -335,14 +337,18 @@ Section ini sebelumnya mendeskripsikan `GET /v1/me/subscription`, `POST /v1/webh
 | 403 | `private_scope` | summary member lain yang punya akun privat | |
 | 403 | `scope_exceeds_role` | | |
 | 403 | `invitation_email_mismatch` | | Login dengan email yang diundang |
+| 403 | `feature_disabled` | endpoint fitur opsional (`/v1/beneficiaries`, `/v1/shopping`, `/v1/pantry`, `/v1/receipts/ingest`) saat flag household mati; `details.feature` | Aktifkan di Settings → Household → Fitur opsional |
 | 404 | `not_found` | resource umum | |
 | 404 | `account_not_found` | + `candidates` saran | Lihat GET /v1/accounts |
 | 404 | `category_not_found` | + `candidates` | Lihat GET /v1/categories atau buat kategori |
 | 404 | `member_not_found` | | |
 | 404 | `transaction_not_found`, `debt_not_found`, `goal_not_found`, `piutang_not_found`, `recurring_not_found`, `budget_not_found` | | |
 | 404 | `invitation_invalid` | code tidak ada / sudah revoke | |
+| 404 | `beneficiary_not_found` | + `candidates` (F-A) | Lihat GET /v1/beneficiaries atau buat baru |
+| 404 | `shopping_item_not_found`, `pantry_item_not_found` | (F-D) | |
 | 409 | `ambiguous_account` | + `candidates` | Sebut pemilik ("BCA suami") atau kirim account_id |
 | 409 | `ambiguous_category`, `ambiguous_member`, `ambiguous_debt`, `ambiguous_goal`, `ambiguous_piutang` | | |
+| 409 | `ambiguous_beneficiary` | + `candidates` (F-A) | Pilih kandidat atau kirim beneficiary_id |
 | 409 | `duplicate_account_name` | nama sama untuk pemilik sama | |
 | 409 | `duplicate_category_name`, `duplicate_budget` | | |
 | 409 | `already_member` | | |
@@ -354,6 +360,7 @@ Section ini sebelumnya mendeskripsikan `GET /v1/me/subscription`, `POST /v1/webh
 | 410 | `invitation_expired` | | Minta undangan baru |
 | 413 | `payload_too_large` | body > 1 MB, gambar > 5 MB | |
 | 422 | `insufficient_funds` | `{balance, needed, account_name}` | Pilih akun lain, kurangi nominal, atau koreksi saldo |
+| 422 | `receipt_total_mismatch` | `sum(items.amount) != total` di `POST /v1/receipts/ingest`; `details.{sum_items,total}` (F-D) | Alokasikan diskon ke item, kirim total yang sama |
 | 422 | `same_account_transfer` | | |
 | 422 | `category_type_mismatch` | kategori income untuk expense | |
 | 422 | `category_reserved` | mengubah/menghapus kategori sistem, atau memakai "Transfer" di POST /transactions | Gunakan POST /v1/transfers |

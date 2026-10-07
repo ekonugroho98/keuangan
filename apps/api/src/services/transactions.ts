@@ -3,8 +3,15 @@ import { ApiError } from '@karaya/shared/errors'
 import { parseAmountId, AmountParseError } from '@karaya/shared/format'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
-import { resolveAccountRef, resolveCategoryRef, resolveMemberRef } from './resolver'
+import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
+import { assertBeneficiaryFieldAllowed } from './features'
+
+// Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
+// tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
+function touchesBeneficiary(ref: { beneficiary_id?: string | null; beneficiary?: string }): boolean {
+  return ref.beneficiary_id !== undefined || ref.beneficiary !== undefined
+}
 
 function parseAmount(input: { amount?: number; amount_text?: string }): number {
   try {
@@ -18,7 +25,7 @@ function parseAmount(input: { amount?: number; amount_text?: string }): number {
   }
 }
 
-interface TxRow {
+export interface TxRow {
   id: string
   type: string
   amount: string
@@ -36,6 +43,9 @@ interface TxRow {
   category_name: string
   category_icon: string
   category_color: string
+  beneficiary_id: string | null
+  beneficiary_name: string | null
+  beneficiary_kind: string | null
   recorded_by_member_id: string
   recorded_by_display_name: string
   source: string
@@ -45,7 +55,7 @@ interface TxRow {
   deleted_at: string | null
 }
 
-function mapTx(r: TxRow) {
+export function mapTx(r: TxRow) {
   return {
     id: r.id,
     type: r.type,
@@ -55,6 +65,7 @@ function mapTx(r: TxRow) {
     account: { id: r.account_id, name: r.account_name, owner: r.account_owner_member_id ? { member_id: r.account_owner_member_id, display_name: r.account_owner_display_name } : null },
     to_account: r.to_account_id ? { id: r.to_account_id, name: r.to_account_name, owner: r.to_account_owner_member_id ? { member_id: r.to_account_owner_member_id, display_name: r.to_account_owner_display_name } : null } : null,
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
+    beneficiary: r.beneficiary_id ? { id: r.beneficiary_id, name: r.beneficiary_name!, kind: r.beneficiary_kind! } : null,
     recorded_by: { member_id: r.recorded_by_member_id, display_name: r.recorded_by_display_name },
     source: r.source,
     recurring_id: r.recurring_id,
@@ -64,11 +75,12 @@ function mapTx(r: TxRow) {
   }
 }
 
-const TX_SELECT = `
+export const TX_SELECT = `
   select t.id, t.type, t.amount::text, t.date::text, t.note,
          t.account_id, a.name as account_name, a.owner_member_id as account_owner_member_id, am.display_name as account_owner_display_name,
          t.to_account_id, ta.name as to_account_name, ta.owner_member_id as to_account_owner_member_id, tam.display_name as to_account_owner_display_name,
          t.category_id, c.name as category_name, c.icon as category_icon, c.color as category_color,
+         t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
          t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at
   from transactions t
@@ -77,6 +89,8 @@ const TX_SELECT = `
   left join accounts ta on ta.id = t.to_account_id
   left join household_members tam on tam.id = ta.owner_member_id
   join categories c on c.id = t.category_id
+  left join beneficiaries b on b.id = t.beneficiary_id
+  left join household_members bm on bm.id = b.member_id and bm.deleted_at is null
   join household_members rm on rm.id = t.recorded_by_member_id
 `
 
@@ -91,6 +105,8 @@ export interface TransactionListQuery {
   category?: string
   member_id?: string
   member?: string
+  beneficiary_id?: string
+  beneficiary?: string
   attribution: 'owner' | 'recorded_by'
   q?: string
   min_amount?: number
@@ -118,7 +134,7 @@ function encodeCursor(date: string, createdAt: string, id: string): string {
 function buildTxFilter(
   actor: Actor,
   query: TransactionListQuery,
-  resolved: { dateFrom?: string; dateTo?: string; accountId?: string; categoryId?: string; memberId?: string },
+  resolved: { dateFrom?: string; dateTo?: string; accountId?: string; categoryId?: string; memberId?: string; beneficiaryId?: string | 'none' },
   cur: { date: string; createdAt: string; id: string } | null,
 ): { where: string; params: postgres.ParameterOrJSON<never>[] } {
   const params: postgres.ParameterOrJSON<never>[] = [actor.householdId]
@@ -137,6 +153,11 @@ function buildTxFilter(
   if (resolved.memberId) {
     const p = push(resolved.memberId)
     clauses.push(query.attribution === 'recorded_by' ? `t.recorded_by_member_id = ${p}` : `(a.owner_member_id = ${p} or ta.owner_member_id = ${p})`)
+  }
+  if (resolved.beneficiaryId === 'none') {
+    clauses.push('t.beneficiary_id is null')
+  } else if (resolved.beneficiaryId) {
+    clauses.push(`t.beneficiary_id = ${push(resolved.beneficiaryId)}`)
   }
   if (query.q) clauses.push(`t.note ilike ${push(`%${query.q}%`)}`)
   if (query.min_amount !== undefined) clauses.push(`t.amount >= ${push(query.min_amount)}`)
@@ -163,8 +184,15 @@ export async function listTransactions(actor: Actor, query: TransactionListQuery
     const accountId = query.account_id || query.account ? await resolveAccountRef(tx, actor, query, 'account') : undefined
     const categoryId = query.category_id || query.category ? await resolveCategoryRef(tx, actor, query) : undefined
     const memberId = query.member_id || query.member ? await resolveMemberRef(tx, actor, query) : undefined
+    let beneficiaryId: string | 'none' | undefined
+    if (query.beneficiary === 'none') {
+      await assertBeneficiaryFieldAllowed(tx, actor) // sentinel tidak lewat resolver, gate manual
+      beneficiaryId = 'none'
+    } else if (touchesBeneficiary(query)) {
+      beneficiaryId = await resolveBeneficiaryRef(tx, actor, query)
+    }
     const cur = decodeCursor(query.cursor)
-    const resolved = { dateFrom, dateTo, accountId, categoryId, memberId }
+    const resolved = { dateFrom, dateTo, accountId, categoryId, memberId, beneficiaryId }
 
     const { where, params } = buildTxFilter(actor, query, resolved, cur)
     const limitParam = params.length + 1
@@ -222,6 +250,8 @@ export interface CreateTransactionInput {
   category?: string
   date?: string
   note?: string
+  beneficiary_id?: string
+  beneficiary?: string
 }
 
 export async function createTransaction(actor: Actor, input: CreateTransactionInput, timezone: string) {
@@ -229,10 +259,11 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
     const categoryId = await resolveCategoryRef(tx, actor, input, input.type)
+    const beneficiaryId = (await resolveBeneficiaryRef(tx, actor, input)) ?? null
     const [row] = await tx<{ id: string }[]>`
       select id from post_transaction(
         ${actor.householdId}, ${actor.memberId}, ${input.type}, ${accountId}, ${categoryId},
-        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ''}, 'web', null
+        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ''}, 'web', null, ${beneficiaryId}
       )
     `
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [row!.id])
@@ -241,7 +272,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   })
 }
 
-export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; category_id?: string; category?: string; note?: string }> }, timezone: string) {
+export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string }> }, timezone: string) {
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
     const items = await Promise.all(
@@ -249,12 +280,18 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
         amount: parseAmount(item),
         category_id: await resolveCategoryRef(tx, actor, item, 'expense'),
         note: item.note ?? '',
+        beneficiary_id: (await resolveBeneficiaryRef(tx, actor, item)) ?? null,
       })),
     )
     const date = input.date ?? todayInTz(timezone)
-    const itemsJson = JSON.stringify(items)
+    // BUG NYATA ditemukan saat implementasi F-A (belum pernah ketahuan — tidak ada test yang
+    // memanggil /v1/transactions/batch sebelumnya): `${JSON.stringify(items)}::jsonb` membuat
+    // postgres.js men-stringify ULANG nilai yang sudah string karena melihat cast `::jsonb` di
+    // tagged template, menghasilkan jsonb STRING SCALAR (bukan ARRAY) -> post_transactions_batch
+    // akan gagal di `jsonb_array_length(p_items)`. `tx.json(items)` adalah satu-satunya cara aman
+    // (pola sama dengan routes/me.ts).
     const createdRows = await tx<{ id: string }[]>`
-      select id from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${itemsJson}::jsonb, 'web')
+      select id from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items as unknown as postgres.JSONValue)}, 'web')
     `
     const ids = createdRows.map((r) => r.id)
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
@@ -273,6 +310,8 @@ export interface UpdateTransactionInput {
   category?: string
   date?: string
   note?: string
+  beneficiary_id?: string | null
+  beneficiary?: string
 }
 
 export async function updateTransaction(actor: Actor, id: string, input: UpdateTransactionInput) {
@@ -284,6 +323,12 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
     if (input.category_id || input.category) patch.category_id = await resolveCategoryRef(tx, actor, input)
     if (input.date !== undefined) patch.date = input.date
     if (input.note !== undefined) patch.note = input.note
+    if (touchesBeneficiary(input)) {
+      // null eksplisit di body -> resolveBeneficiaryRef mengembalikan undefined -> ?? null di sini
+      // sengaja menulis KEY `beneficiary_id` dengan nilai jsonb null (bukan key dihilangkan) supaya
+      // update_transaction (p_patch ? 'beneficiary_id') membedakan "tidak disentuh" vs "dikosongkan".
+      patch.beneficiary_id = (await resolveBeneficiaryRef(tx, actor, input)) ?? null
+    }
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])

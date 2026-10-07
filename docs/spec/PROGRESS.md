@@ -32,6 +32,7 @@ Terakhir diperbarui: 2026-10-07
 | **F6-T7 (bersihkan docs)** | **DONE** | **2026-10-06** | `API_DOCS.md` dihapus, README arahkan ke `/v1/docs`, `docs/hermes/SYSTEM_PROMPT.md` dibuat. |
 | F7-T1 … F7-T5 (Hermes) | todo | | |
 | **Spec `10-fitur-opsional-keluarga.md` (F-0, F-A, F-B, F-C, F-D)** | **spec ditulis, implementasi belum** | **2026-10-07** | Spec saja atas permintaan pemilik produk ("buat spec-nya dulu aja"). Implementasi menunggu keputusan urutan + jawaban Q-F1..Q-F10 di file itu (Q-F4 memblokir F-C: butuh file contoh ekspor mutasi bank asli). |
+| **F-0 + F-A + F-B + F-D (belanja & pantry)** | **backend DONE, teruji lokal** | **2026-10-07** | Migrasi `00000000000021`, `00000000000022` diterapkan ke DB lokal (`supabase start`, fresh volume, bukan container `karaya-test-pg` lama). 37 test baru (12+3 di `features-beneficiaries.test.ts`, 4 di `reports.test.ts`, 13+4 di `shopping-pantry.test.ts`, 1 regresi batch) (`features-beneficiaries.test.ts` 12, `reports.test.ts` 4, regresi batch di `transactions.test.ts` 1) — total 67/67 lulus (2× berturut, termasuk tanpa reset), `pnpm lint` 0 error, `pnpm typecheck` bersih. **2 bug nyata ditemukan & diperbaiki**: (1) `beneficiaries.member_id` FK tanpa `on delete set null` membuat `remove_member()` gagal FK violation begitu household punya beneficiary `kind=member` — ketahuan dari `household.test.ts` gagal setelah DB di-reset dengan migrasi F-A; (2) postgres.js men-dobel-encode `${JSON.stringify(x)}::jsonb` jadi jsonb STRING SCALAR, bukan OBJECT/ARRAY — menimpa `post_transactions_batch` (`/v1/transactions/batch` TIDAK PERNAH punya test sebelumnya, jadi bug ini laten sejak Fase 3) dan kode baru `updateHousehold`; diperbaiki pakai `tx.json(value)`. Frontend (Settings toggle, Sidebar grup "Rumah", form "Untuk") **BELUM dikerjakan** — lihat §"F-0/F-A: apa yang selesai" di bawah untuk daftar lengkap. Belum di-commit/push (instruksi: test lokal dulu). |
 
 ## F2 — Detail lengkap apa yang sudah dibangun dan diuji
 
@@ -555,6 +556,77 @@ Setelah F6-T6 selesai dibangun dan diverifikasi (lihat riwayat di atas), pemilik
 - `lp.hero.cta` dan `lp.cta.desc` di 5 bahasa (en/ar/es/zh/ja) juga diseragamkan ke "gratis selamanya" — sebelumnya masih bilang "free 14 days"/"14-day trial" yang menyiratkan ada masa berakhir, padahal produk gratis selamanya.
 - `apps/web/src/constants/faqs.js` (dead code, tidak pernah di-import — `FaqSection.jsx` memakai key `lp.faq.{1..5}q/a` langsung, bukan file ini) **dihapus**, isinya murni tentang harga paket.
 - Verifikasi: `node --check` sintaks valid, `pnpm lint` (0 error, 26 warning pre-existing sama), `pnpm typecheck` bersih, `pnpm test` 30/30, `pnpm --filter @karaya/web build` sukses (bundle `index-*.js` turun dari 415.00 kB → 409.13 kB, konsisten dengan kode mati yang terhapus).
+
+## F-0/F-A/F-B/F-D: apa yang selesai (2026-10-07) — backend saja, belum commit
+
+Migrasi: `00000000000021_household_features.sql` (`households.features jsonb default '{}'`),
+`00000000000022_beneficiaries.sql` (tabel `beneficiaries`, `transactions.beneficiary_id`, `resolve_beneficiary()`,
+`enable_beneficiary_feature()`, `post_transaction`/`post_transactions_batch`/`update_transaction` diubah).
+
+Kode `apps/api`: `services/features.ts` (baru), `services/beneficiaries.ts` + `routes/beneficiaries.ts` (baru),
+`services/households.ts`/`services/transactions.ts`/`services/summary.ts`/`services/resolver.ts` diubah,
+`routes/summary.ts` tambah `scope=beneficiary`. `packages/shared`: `errors.ts` (+7 kode: `feature_disabled`,
+`beneficiary_not_found`, `ambiguous_beneficiary`, `shopping_item_not_found`, `pantry_item_not_found`,
+`receipt_total_mismatch` — 3 terakhir disiapkan untuk F-D), `schemas/household.ts` (`HouseholdFeaturesSchema` dkk.),
+`schemas/beneficiaries.ts` (baru), `schemas/transactions.ts` diubah.
+
+**Diverifikasi** (lokal, `supabase start` fresh volume, bukan `karaya-test-pg` lama — lihat catatan DB di bawah):
+toggle flag partial-merge, seeding otomatis 2 member saat beneficiary pertama kali ON, CRUD beneficiary,
+`feature_disabled` utk tulis DAN baca, `400 validation_error` utk field opsional di endpoint inti saat fitur mati,
+transaksi dengan `beneficiary` (nama) ter-resolve, filter `GET /v1/transactions?beneficiary=`,
+`GET /v1/summary?scope=beneficiary`, `PATCH .../transactions/{id} {beneficiary_id:null}` kembali ke bersama,
+soft-delete beneficiary. 43/43 test (`pnpm test`), `pnpm lint` 0 error, `pnpm typecheck` bersih kedua paket.
+
+**F-B** (`services/reports.ts`, `routes/reports.ts`): `GET /v1/reports/monthly?month=YYYY-MM`, selalu
+tersedia (tidak digate flag — flag `monthly_report` hanya untuk jadwal kirim Hermes nanti). Totals/kategori/
+member/beneficiary/budget/goals dihitung lewat `getSummary()` yang SAMA dengan `/v1/summary` (identik by
+construction). `text_id` ringkasan Bahasa Indonesia ≤1300 karakter.
+
+**F-D** (migrasi `00000000000023`): tabel `shopping_items`, `pantry_items` (+ `location`, `expires_at`,
+`expires_estimated`, `expiry_notified_on`), `pantry_movements`; fungsi `apply_pantry_movement`,
+`find_pantry_match`/`find_shopping_match` (pencocokan longgar, BUKAN pola `resolve_*`). Kode: `services/{shopping,
+pantry,receipts}.ts`, `routes/{shopping,pantry,receipts}.ts`. Endpoint: `GET/POST /v1/shopping`,
+`PATCH/DELETE /v1/shopping/{id}`, `GET /v1/shopping/suggestions`, `GET/POST /v1/pantry`,
+`PATCH/DELETE /v1/pantry/{id}`, `POST /v1/pantry/{id}/movements`, `GET /v1/pantry/expiring` (+`exclude_acked`,
+celah desain diperbaiki — lihat changelog spec), `POST /v1/pantry/expiring/ack`, dan **`POST /v1/receipts/ingest`**
+(satu struk -> `post_transactions_batch` + coret belanja + tambah stok, dalam satu transaksi DB).
+
+**Code review sebelum commit (2026-10-07, `/code-review high` + review sendiri)**: 13 temuan, semua diperbaiki
+dan diuji — daftar lengkap di riwayat perubahan `10-fitur-opsional-keluarga.md` rev. 10. Yang paling penting:
+gate fitur beneficiary bisa dilewati lewat `receipts/ingest items[].for` (gate dipindah ke dalam
+`resolveBeneficiaryRef`); skema penyimpanan `features` yang `.strict()` akan membuat SEMUA endpoint inti 500
+begitu ada kunci asing di jsonb (rollback deploy/edit Studio) — sekarang strip + fallback; `enable_beneficiary_feature()`
+SECURITY DEFINER tanpa guard terekspos lewat PostgREST RPC; dan `fileParallelism:false` di `apps/api/vitest.config.ts`
+ternyata TIDAK berlaku saat `pnpm test` dari root (workspace) — dipindah ke `vitest.config.ts` root (itu sebabnya
+race antar file test sempat muncul lagi).
+
+**Bug ke-3 ditemukan**: `current_date + ${jsNumber}` tanpa cast eksplisit -> Postgres `operator is not unique:
+date + unknown` (parameter postgres.js tanpa tipe eksplisit ambigu antara overload `date+integer` vs
+`date+interval`). Diperbaiki `${withinDays}::int`.
+
+**Belum dikerjakan** (bukan lupa — di luar scope sesi backend-first ini, lihat `10-fitur-opsional-keluarga.md` §2.3/§3.5):
+- Frontend: tab "Fitur opsional" di `HouseholdPanel.jsx`, gating sidebar (`Sidebar.jsx` §2.3.1 spec, termasuk
+  grup baru "Rumah" utk F-D), field "Untuk" di `AddTransactionModal.jsx`, chip+filter di `TransaksiView.jsx`,
+  kartu "Per penerima" di `LaporanView.jsx`, tab "Ringkasan bulanan" di `LaporanView.jsx` (F-B), halaman
+  Belanja/Stok (F-D).
+- Hermes: tool baru (`list_beneficiaries`, `add_beneficiary`, `get_monthly_report`, `ingest_receipt`,
+  `list_shopping`, `add_shopping_item`, `mark_bought`, `list_pantry`, `adjust_pantry`, `shopping_suggestions`)
+  belum ditambah ke `tools/registry.ts` (kontrak "22 tool" akan berubah, lihat `10-fitur-opsional-keluarga.md`
+  §2.4); update skill VPS (`karaya-finance-api/SKILL.md`) juga belum — SENGAJA belum disentuh keduanya, itu
+  mengubah agent produksi/kontrak Hermes, bukan sekadar kode lokal.
+- Cron Hermes utk laporan bulanan (F-B) dan pengingat kedaluwarsa (F-D §6.6) — bergantung pada tool registry di atas.
+- Migrasi `belanja.db`/`kulkas.db` dari container Hermes (F-D §6.7) — butuh API produksi yang sudah punya migrasi ini.
+- Backfill `scripts/backfill-beneficiary.ts` (96 transaksi migrasi `[untuk: ...]`) — belum ditulis, butuh API
+  produksi yang sudah punya migrasi ini dulu.
+- F-A §3.6 Fase 2 (`budgets.beneficiary_id`) — sengaja dilewati sesuai spec ("baru kalau user memang menganggarkan").
+
+**Catatan setup DB lokal (beda dari sesi sebelumnya)**: `supabase start` (bukan container `karaya-test-pg` manual)
+berhasil kali ini — stack penuh jalan di `127.0.0.1:54322` (direct Postgres, pooler `[db.pooler] enabled=false` di
+`config.toml`), BUKAN port `54329` yang jadi default di `vitest.config.ts`/`.env.local` lama (asumsi lama: pooler
+manual via `docker run karaya-test-pg -p 54329:5432`, lihat entri F2/F3 di atas). `apps/api/.env.local` sudah
+diarahkan ke `54322`; menjalankan `pnpm test` perlu override `DATABASE_URL`/`TEST_ADMIN_DATABASE_URL` env var ke
+`54322` juga (keduanya TIDAK di-commit, gitignored — sesi baru perlu set ulang atau `supabase start` lagi dari
+volume yang sama kalau Docker belum dibuang).
 
 ## Spec fitur opsional "kelola keluarga" (2026-10-07) — belum diimplementasi
 

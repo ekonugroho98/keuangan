@@ -1,7 +1,10 @@
 import type postgres from 'postgres'
 import { ApiError } from '@karaya/shared/errors'
+import { HouseholdFeaturesSchema, type UpdateHouseholdFeaturesBodySchema } from '@karaya/shared/schemas'
+import type { z } from '@hono/zod-openapi'
 import type { Actor } from '../auth/actor'
 import { withActor, withUserClaims } from '../db/tx'
+import { parseHouseholdFeatures, invalidateFeaturesCache } from './features'
 
 interface HouseholdRow {
   id: string
@@ -9,7 +12,30 @@ interface HouseholdRow {
   timezone: string
   default_account_visibility: string
   owners_can_view_private_totals: boolean
+  features: unknown
   member_count: string
+}
+
+type FeaturesPatch = z.infer<typeof UpdateHouseholdFeaturesBodySchema>
+
+/**
+ * Merge PARTIAL per-fitur (10-fitur-opsional-keluarga.md §2.2: `{"beneficiary":{"enabled":true}}`
+ * tidak mereset fitur lain) di atas nilai yang sudah tervalidasi penuh. Tiap level di-strict-kan
+ * ulang lewat HouseholdFeaturesSchema.parse supaya hasil merge tidak pernah lolos tanpa validasi.
+ */
+function mergeFeatures(current: ReturnType<typeof parseHouseholdFeatures>, patch?: FeaturesPatch) {
+  if (!patch) return current
+  const next = {
+    beneficiary: { ...current.beneficiary, ...(patch.beneficiary ?? {}) },
+    monthly_report: { ...current.monthly_report, ...(patch.monthly_report ?? {}) },
+    reconciliation: { ...current.reconciliation, ...(patch.reconciliation ?? {}) },
+    shopping_stock: {
+      ...current.shopping_stock,
+      ...(patch.shopping_stock ?? {}),
+      expiry_reminder: { ...current.shopping_stock.expiry_reminder, ...(patch.shopping_stock?.expiry_reminder ?? {}) },
+    },
+  }
+  return HouseholdFeaturesSchema.parse(next)
 }
 
 // Cache in-memory ringan per proses: timezone jarang berubah, dipanggil di hampir setiap request
@@ -40,7 +66,7 @@ export async function getHouseholdTimezone(actor: Actor): Promise<string> {
  */
 async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: string) {
   const [row] = await tx<HouseholdRow[]>`
-    select h.id, h.name, h.timezone, h.default_account_visibility::text, h.owners_can_view_private_totals,
+    select h.id, h.name, h.timezone, h.default_account_visibility::text, h.owners_can_view_private_totals, h.features,
            (select count(*) from household_members m where m.household_id = h.id and m.deleted_at is null)::text as member_count
     from households h where h.id = ${householdId}
   `
@@ -48,6 +74,7 @@ async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: 
   return {
     id: row.id, name: row.name, timezone: row.timezone,
     settings: { default_account_visibility: row.default_account_visibility, owners_can_view_private_totals: row.owners_can_view_private_totals },
+    features: parseHouseholdFeatures(row.features),
     member_count: Number(row.member_count),
   }
 }
@@ -56,9 +83,24 @@ export async function getCurrentHousehold(actor: Actor) {
   return withActor(actor, (tx) => selectCurrentHousehold(tx, actor.householdId))
 }
 
-export async function updateHousehold(actor: Actor, patch: { name?: string; timezone?: string; settings?: { default_account_visibility?: 'shared' | 'private'; owners_can_view_private_totals?: boolean } }) {
+export async function updateHousehold(actor: Actor, patch: { name?: string; timezone?: string; settings?: { default_account_visibility?: 'shared' | 'private'; owners_can_view_private_totals?: boolean }; features?: FeaturesPatch }) {
   if (actor.role !== 'owner') throw ApiError.fromCode('insufficient_scope')
   return withActor(actor, async (tx) => {
+    // Selalu baca+tulis `features` (bukan coalesce dengan jsonb null) — postgres.js men-DOBEL
+    // encode JS string yang diikuti `::jsonb` di tagged template (bug nyata ditemukan saat
+    // menguji F-0: `${JSON.stringify(x)}::jsonb` menghasilkan jsonb STRING SCALAR berisi teks
+    // JSON, bukan OBJECT, karena postgres.js men-stringify ULANG nilai yang sudah string begitu
+    // melihat cast `::jsonb`). `tx.json(obj)` adalah satu-satunya cara aman mengirim jsonb lewat
+    // postgres.js (pola yang sama dipakai `routes/me.ts` untuk `hidden_menus`/`ai_config`).
+    // `for update`: read-modify-write features harus di-lock, kalau tidak dua PATCH owner bersamaan
+    // (A toggle fitur, B ganti nama) bisa saling menimpa — B membaca features lama lalu menulisnya
+    // kembali. Kolom features HANYA ditulis kalau patch memang menyentuhnya (PATCH nama saja tidak
+    // boleh ikut menulis ulang features).
+    const [current] = await tx<{ features: unknown }[]>`select features from households where id = ${actor.householdId} for update`
+    const currentFeatures = parseHouseholdFeatures(current?.features)
+    const nextFeatures = patch.features ? mergeFeatures(currentFeatures, patch.features) : null
+    const justEnabledBeneficiary = !!nextFeatures && !currentFeatures.beneficiary.enabled && nextFeatures.beneficiary.enabled
+
     await tx`
       update households set
         name = coalesce(${patch.name ?? null}, name),
@@ -67,7 +109,17 @@ export async function updateHousehold(actor: Actor, patch: { name?: string; time
         owners_can_view_private_totals = coalesce(${patch.settings?.owners_can_view_private_totals ?? null}, owners_can_view_private_totals)
       where id = ${actor.householdId}
     `
+    if (nextFeatures) {
+      await tx`update households set features = ${tx.json(nextFeatures as unknown as postgres.JSONValue)} where id = ${actor.householdId}`
+    }
+    // Seeding satu kali saat beneficiary PERTAMA KALI dinyalakan (10-fitur-opsional-keluarga.md
+    // §3.2) — dipanggil setelah UPDATE supaya enable_beneficiary_feature (SECURITY DEFINER) tidak
+    // bergantung pada urutan transaksi yang belum commit.
+    if (justEnabledBeneficiary) {
+      await tx`select enable_beneficiary_feature(${actor.householdId})`
+    }
     tzCache.delete(actor.householdId)
+    invalidateFeaturesCache(actor.householdId)
     return selectCurrentHousehold(tx, actor.householdId)
   })
 }

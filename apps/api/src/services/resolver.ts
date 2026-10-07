@@ -1,6 +1,7 @@
 import type postgres from 'postgres'
 import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
+import { assertBeneficiaryFieldAllowed } from './features'
 
 interface ResolveResult {
   status: 'ok' | 'ambiguous' | 'not_found'
@@ -98,4 +99,34 @@ export async function resolveOwnerMemberId(tx: postgres.TransactionSql, actor: A
   const resolved = await resolveMemberRef(tx, actor, { member: owner })
   if (!resolved) throw ApiError.fromCode('member_not_found', { details: { query: owner } })
   return resolved
+}
+
+/**
+ * F-A (10-fitur-opsional-keluarga.md §3.3): resolve_beneficiary mengikuti pola resolve_member
+ * (exact match nama/alias, tanpa fuzzy trgm). `undefined` berarti "tidak disebut" (bersama/keluarga
+ * — TIDAK melempar error), beda dari resolveMemberRef yang juga mengembalikan undefined untuk
+ * kasus yang sama tapi field ini sengaja tidak wajib di endpoint manapun.
+ */
+export async function resolveBeneficiaryRef(
+  tx: postgres.TransactionSql,
+  actor: Actor,
+  ref: { beneficiary_id?: string | null; beneficiary?: string },
+): Promise<string | undefined> {
+  if (ref.beneficiary_id === undefined && ref.beneficiary === undefined) return undefined
+  // Gate fitur ada DI SINI (satu tempat), bukan diulang di tiap pemanggil — lihat catatan di
+  // features.ts. Berlaku juga untuk `beneficiary_id: null` (mengosongkan) — menyentuh field saat
+  // fitur mati tetap ditolak eksplisit.
+  await assertBeneficiaryFieldAllowed(tx, actor)
+  if (ref.beneficiary_id === null) return undefined
+  if (ref.beneficiary_id) return ref.beneficiary_id
+  if (!ref.beneficiary) return undefined
+  if (looksLikeUuid(ref.beneficiary)) return ref.beneficiary
+
+  const [row] = await tx<[{ result: ResolveResult }]>`
+    select resolve_beneficiary(${actor.householdId}, ${ref.beneficiary}) as result
+  `
+  const result = row!.result
+  if (result.status === 'ok') return result.match!.id as string
+  if (result.status === 'ambiguous') throw ApiError.fromCode('ambiguous_beneficiary', { candidates: result.candidates })
+  throw ApiError.fromCode('beneficiary_not_found', { candidates: result.candidates, details: { query: ref.beneficiary } })
 }

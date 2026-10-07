@@ -1,0 +1,25 @@
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
+import { IngestReceiptBodySchema } from '@karaya/shared/schemas'
+import { assertScope } from '../auth/middleware'
+import { ingestReceipt } from '../services/receipts'
+
+// F-D alur struk (10-fitur-opsional-keluarga.md §6.3): satu endpoint yang MEMBUNGKUS
+// post_transactions_batch (endpoint /v1/transactions/batch sendiri TIDAK berubah).
+export const receiptsApp = new OpenAPIHono()
+
+receiptsApp.openapi(
+  createRoute({
+    method: 'post', path: '/v1/receipts/ingest', tags: ['receipts'], summary: 'Catat struk: transaksi + coret belanja + tambah stok sekaligus',
+    security: [{ bearerJwt: [] }],
+    request: { body: { content: { 'application/json': { schema: IngestReceiptBodySchema } } } },
+    responses: {
+      201: { content: { 'application/json': { schema: z.any() } }, description: 'Dibuat' },
+      422: { content: { 'application/json': { schema: z.any() } }, description: 'receipt_total_mismatch / insufficient_funds' },
+    },
+  }),
+  async (c) => {
+    assertScope(c.get('actor'), 'write')
+    const result = await ingestReceipt(c.get('actor'), c.req.valid('json'))
+    return c.json(result, 201)
+  },
+)

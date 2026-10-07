@@ -1,5 +1,5 @@
 Status: draft (spec saja, belum ada implementasi)
-Terakhir diubah: 2026-10-07 (rev. 5, hasil review)
+Terakhir diubah: 2026-10-07 (rev. 10, hasil code review)
 Bergantung pada: 03-database.md, 05-api.md, 06-agent-integration.md, 07-frontend.md
 
 > **Riwayat perubahan**
@@ -10,6 +10,13 @@ Bergantung pada: 03-database.md, 05-api.md, 06-agent-integration.md, 07-frontend
 > | 2026-10-07 | §2.1, §6.2, §6.4, §6.6 (baru), §8, §9 | Pengingat kedaluwarsa: kolom `expires_estimated`, `GET /v1/pantry/expiring`, konfigurasi `features.shopping_stock.expiry_reminder`, cron harian Hermes; Q-F9, Q-F10 | Permintaan pemilik produk ("tambahin pengingat kedaluwarsa juga"). |
 > | 2026-10-07 | §2.3 | Keputusan navigasi: **tidak ada switch keuangan↔rumah**; fitur opsional masuk sidebar yang sama (grup baru "Rumah" di paling bawah, menu Rekonsiliasi di grup Transaksi), F-A/F-B tanpa menu baru, kartu ringkas di Dasbor | Disetujui pemilik produk: halaman baru hanya 2–3, switch menambah klik dan membuat pantry terasa aplikasi terpisah; keuangan tetap utama. |
 > | 2026-10-07 | §2.1, §2.2, §2.4, §3.2, §3.7, §4.4, §5.3, §5.5, §6.2, §7 | **Review silang dengan kode**: referensi salah diperbaiki (cek 22 tool ada di `08` kriteria F6, bukan CI; `PORT-REQUEST.md` tidak ada di repo); fingerprint statement ditambah `seq` (dua baris bank identik tanpa ref_no sebelumnya saling menimpa); `pantry_items` unique jadi partial (`deleted_at is null`) + `created_at` + `shopping_items.pantry_item_id`; `beneficiaries` unique per `member_id`; laporan bulanan **selalu bulan sebelumnya**; penerima tanpa API key di Hermes dilewati; `features` zod `.strict()`; filter query fitur mati → 422; backfill di-throttle (rate limit); batas body Vercel 4,5 MB untuk impor file. | Hasil `review specnya` 2026-10-07 — lihat ringkasan di PROGRESS.md. |
+> | 2026-10-07 | §2.2, §2.4, §4.4, §6.5, §6.6, §8 | **Koreksi saat mulai implementasi**: `GET/PATCH /v1/households/current` TERNYATA sudah `both` (jwt + api_key) di `05-api.md` §4.1 dan di kode (`householdApp` di-mount setelah `requireAuth()` tanpa `requireJwtOnly`) — bukan jwt-only seperti ditulis sebelumnya. Endpoint `GET /v1/features` terpisah **dihapus**; `features` cukup jadi field baru di `GET/PATCH /v1/households/current` yang sudah ada, dibaca Hermes langsung (pola sama dengan piutang: dipanggil manual, tidak perlu masuk daftar 22 tool). | Ditemukan saat baca kode `apps/api/src/routes/me.ts` sebelum menulis migrasi F-0, CLAUDE.md aturan 2 (perbaiki spec dulu). |
+> | 2026-10-07 | §2.2, §8 | `validation_error` konsisten **400** (bukan 422) di seluruh codebase (`packages/shared/src/errors.ts` `ERROR_HTTP_STATUS`, satu status tetap per code) — field `beneficiary` yang disentuh saat fitur mati memakai 400, bukan 422 | Salah tulis di draft awal, ketahuan dari test integrasi gagal (`expected 400 to be 422`) saat implementasi F-A; selaras dengan konvensi error code yang sudah ada, bukan dibuat pengecualian baru. |
+> | 2026-10-07 | §3.2 | `beneficiaries.member_id` FK ditambah `on delete set null` (bukan default `no action`) | Bug nyata: tanpa ini, `remove_member()` (Fase 5) gagal FK violation begitu household punya beneficiary `kind=member` — ketahuan dari `household.test.ts` gagal setelah F-A diaktifkan di household seed yang sama. |
+> | 2026-10-07 | §4.3 (implisit) | F-B diimplementasikan dengan memanggil `getSummary()` yang SAMA persis untuk `totals`/`top_categories`/`by_member`/`by_beneficiary`/`budgets`/`goals` (bukan query paralel terpisah) — identik BY CONSTRUCTION, bukan "seharusnya sama" | Lebih kuat dari sekadar uji `diff`; juga menghindari duplikasi logika agregasi. |
+> | 2026-10-07 | §6.4, §6.6 | `GET /v1/pantry/expiring` tambah query `exclude_acked` (default false) — draft awal tidak membedakan "mode cron" (harus skip yang sudah di-ack hari ini) vs "pertanyaan manual" (selalu lihat semua) pada endpoint yang sama, padahal keduanya dinyatakan eksplisit di §6.6 | Gap desain ketahuan saat menulis test; cron Hermes nanti HARUS memanggil dengan `exclude_acked=true`, chat manual TIDAK. |
+> | 2026-10-07 | §6.2 | `find_pantry_match`/`find_shopping_match` (fungsi SQL baru, bukan pola `resolve_*` jsonb) untuk pencocokan longgar nama item struk ke pantry/shopping | `resolve_*` melempar error utk ambiguous/not_found (cocok untuk validasi keras); alur struk butuh "tebakan terbaik atau tidak sama sekali" best-effort, beda kontrak. |
+> | 2026-10-07 | §2.1, §2.2, §3.4, §6.3, §6.4 | **Code review sebelum commit** (10 temuan + 3 temuan sendiri, semua diperbaiki & diuji): (1) gate beneficiary bocor lewat `receipts/ingest items[].for` → gate dipindah ke DALAM `resolveBeneficiaryRef` (satu tempat); (2) skema penyimpanan `features` tidak lagi `.strict()` (strip kunci asing + fallback semua-mati, bukan 500 di semua endpoint inti) — strict hanya di body PATCH; (3) `exclude_acked` sekarang persis aturan §6.4 (sekali, sekali lagi hari H, lalu berhenti); (4) `updateHousehold` `select … for update` + `features` hanya ditulis kalau disentuh; (5) rename beneficiary/pantry ke nama yang sudah ada → 400, bukan 500; (6) `GET /v1/summary?scope=beneficiary` menerima `beneficiary=none` dan MENOLAK tanpa referensi (kontrak sama dengan `/v1/transactions`); (7) `PATCH /v1/shopping/{id} transaction_id` divalidasi milik household; (8) `fmtRp` dari `@karaya/shared/format`; (9) 6 error code baru masuk tabel `05-api.md` §7; (10) `/v1/summary` baca timezone+features satu query, `reports` tidak buka koneksi kedua; (11) `enable_beneficiary_feature()` dapat guard owner (terekspos PostgREST RPC); (12) `receipts/ingest` menyimpan `merchant`/`ref_no` ke note (`Nama — Merchant [ref: X]`); (13) `fileParallelism:false` dipindah ke `vitest.config.ts` ROOT (di project config tidak berlaku saat workspace). | `/code-review high` + review sendiri 2026-10-07; 7 test baru (67/67). |
 
 # 10 — Fitur Opsional "Kelola Keluarga" (feature flag per household)
 
@@ -68,10 +75,12 @@ memakai flag-nya sendiri.
 
 | Method | Path | Auth | Scope | Keterangan |
 |---|---|---|---|---|
-| GET | `/v1/features` | both (jwt **dan** api_key) | read | Flag yang sudah di-resolve dengan default terisi. Satu-satunya endpoint bab ini yang **tidak** pernah 403. Dibuat terpisah dari `GET /v1/households/current` karena itu jwt-only (API key Hermes tidak bisa membacanya). |
-| PATCH | `/v1/households/current` | jwt | admin (owner) | Body ditambah `features` (partial merge per fitur; `{"beneficiary":{"enabled":true}}` tidak mereset fitur lain). |
+| GET | `/v1/households/current` | **both** (jwt dan api_key — sudah begitu sejak `05-api.md` §4.1, dikonfirmasi di kode) | read | Field baru `features`, flag yang sudah di-resolve dengan default terisi. **Tidak pernah 403** — household tanpa flag sama sekali tetap mengembalikan semua `enabled:false`. |
+| PATCH | `/v1/households/current` | both | admin (owner; `assertScope` di handler menolak non-admin, berlaku sama untuk API key admin-scope kalau ada) | Body ditambah `features` (partial merge per fitur; `{"beneficiary":{"enabled":true}}` tidak mereset fitur lain). |
 
-`GET /v1/me` ikut menyertakan `household.features` supaya frontend tidak perlu request tambahan.
+Tidak ada endpoint `/v1/features` terpisah (lihat baris riwayat perubahan di atas) — satu endpoint yang sudah ada
+cukup untuk jwt maupun api_key. Hermes memanggilnya langsung lewat HTTP (pola yang sama dengan piutang: tidak
+perlu masuk daftar 22 tool bawaan).
 
 Guard di service layer, bukan middleware: `requireFeature(actor, 'beneficiary')` dipanggil di awal fungsi
 service yang bersangkutan → `ApiError 403 feature_disabled` dengan `details: { feature }` dan `hint:
@@ -81,7 +90,8 @@ service yang bersangkutan → `ApiError 403 feature_disabled` dengan `details: {
 Aturan guard: **tulis** ke fitur yang mati selalu 403. **Baca** ke fitur yang mati juga 403 (bukan array kosong),
 supaya agent tidak salah simpul "datanya kosong" padahal fiturnya mati. Pengecualian: field/filter opsional di
 endpoint inti (mis. `beneficiary` di `POST /v1/transactions`, `?beneficiary=` di `GET /v1/transactions`,
-`scope=beneficiary` di `GET /v1/summary`) saat fitur mati → `422 validation_error` dengan hint yang sama, bukan
+`scope=beneficiary` di `GET /v1/summary`) saat fitur mati → `400 validation_error` dengan hint yang sama (status `validation_error` TETAP 400
+seperti semua pemakaian lain, bukan dibuat pengecualian 422 khusus di sini), bukan
 diam-diam diabaikan.
 
 Error code baru (wajib ditambah ke `05-api.md` §7 **dan** `packages/shared/src/errors.ts` sekaligus, aturan
@@ -89,7 +99,8 @@ CLAUDE.md): `feature_disabled` (403).
 
 ### 2.3 Frontend
 
-- `HouseholdProvider` mengekspos `features` (dari `GET /v1/me`).
+- `useHouseholdInfo()` (sudah ada, membungkus `GET/PATCH /v1/households/current`) mengekspos `features` — dipakai
+  langsung di Sidebar/Settings, tidak perlu hook baru.
 - Settings → Household (`HouseholdPanel.jsx`) tab baru **"Fitur opsional"**: daftar toggle + deskripsi satu
   kalimat + field konfigurasi (jadwal laporan). Owner bisa ubah; member melihat read-only (API-nya memang
   owner-only). Ini pola yang sama dengan tab Undangan yang sudah ada.
@@ -133,12 +144,14 @@ Aturan:
 
 ### 2.4 Hermes
 
-- Skill `karaya-finance-api` tambah langkah awal sesi: `GET /v1/features` sekali, simpan di konteks.
+- Skill `karaya-finance-api` tambah langkah awal sesi: `GET /v1/households/current` sekali, ambil field
+  `features`, simpan di konteks.
 - Tool yang terkait fitur mati **tidak ditawarkan** ke model; kalau user minta eksplisit, jawab "fitur X belum
   aktif, nyalakan di Settings → Household → Fitur opsional" (jangan coba panggil lalu dapat 403).
 - `tools/registry.ts`: `ToolDefinition` dapat field opsional `feature?: 'beneficiary' | 'monthly_report' |
   'reconciliation' | 'shopping_stock'`, ikut ke-emit di `hermes-tools.json`. Manifest tetap statis/publik
-  (berisi semua tool); penyaringan dilakukan agent berdasarkan `/v1/features`. **Konsekuensi**: kontrak
+  (berisi semua tool); penyaringan dilakukan agent berdasarkan `features` dari `GET /v1/households/current`.
+  **Konsekuensi**: kontrak
   "total 22 tool" (`06` §2 dan kriteria selesai F6 di `08-rencana-implementasi.md`: `jq -e 'length==22'`) berubah —
   angka di kedua spec itu harus diperbarui bersamaan dengan tiap fitur yang menambah tool. (Tidak ada cek jumlah
   tool di CI/test saat ini — kalau mau dijaga otomatis, tambah test di `apps/api/test/` saat F-0.)
@@ -269,7 +282,7 @@ masalahnya justru tidak ada yang ingat bertanya (sama pola dengan piutang yang l
   tidak memanggil Hermes (gateway Hermes tidak terbuka dari internet, hanya localhost di dalam container), jadi
   alternatif "pg_cron → webhook ke Hermes" ditolak.
 - **Konfigurasi jadwal disimpan di Karaya** (`features.monthly_report`) supaya kedua anggota melihat/mengubah di
-  satu tempat; skill Hermes menyinkronkan cron-nya dari `GET /v1/features` (idempoten: buat/ubah/hapus job
+  satu tempat; skill Hermes menyinkronkan cron-nya dari `GET /v1/households/current` (idempoten: buat/ubah/hapus job
   bernama tetap `karaya-monthly-report`).
 
 ### 4.3 API
@@ -527,7 +540,7 @@ Error code baru: `shopping_item_not_found`, `pantry_item_not_found`, `receipt_to
 
 - Skill `groceries-shopping` dan `fridge-stock` → mengarah ke API ini saat flag aktif (pola deprecation yang
   sama dengan `budget-tracker` 2026-10-06; saat flag mati, skill lama tetap pakai SQLite — jadi deprecation
-  **bersyarat**, dicek lewat `/v1/features`). Aturan disambiguasi harga/nada-sudah-terjadi yang ditulis
+  **bersyarat**, dicek lewat `features` di `GET /v1/households/current`). Aturan disambiguasi harga/nada-sudah-terjadi yang ditulis
   2026-10-07 tetap berlaku.
 - Lokasi: Hermes **menebak** `location` saat barang pertama kali masuk pantry (susu/telur/sayur/buah → `fridge`; daging/ikan/es krim/frozen food → `freezer`; beras/minyak/gula/mie/bumbu kering/popok/sabun → `shelf`; tidak yakin → `other`) dan menyebutkannya di balasan ("telur masuk Kulkas") supaya user bisa koreksi. Barang yang sudah ada di pantry memakai lokasi yang tersimpan, tidak ditebak ulang. "Isi kulkas apa aja?" → `GET /v1/pantry?location=fridge`.
 - Tool: `ingest_receipt`, `list_shopping`, `add_shopping_item`, `mark_bought`, `list_pantry`, `adjust_pantry`,
@@ -556,7 +569,7 @@ dipertahankan (yang diingatkan adalah yang paling dulu basi). Batch terpisah = Q
 **Jadwal**: konfigurasi `features.shopping_stock.expiry_reminder` (`enabled`, `hour` WIB, `days_before` 0–7,
 `recipients`). Pola persis laporan bulanan (§4.2): Karaya menyimpan konfigurasi dan menyediakan
 `GET /v1/pantry/expiring`; Hermes memiliki cron harian `karaya-expiry-reminder` yang disinkronkan dari
-`GET /v1/features`. Tiap hari jam `hour`: panggil `/expiring` → kalau `text_id` kosong, **diam** (jangan kirim "tidak
+`GET /v1/households/current`. Tiap hari jam `hour`: panggil `/expiring` → kalau `text_id` kosong, **diam** (jangan kirim "tidak
 ada yang kedaluwarsa") → kalau ada, kirim lalu `POST /expiring/ack`. Contoh pesan:
 
 ```
@@ -602,7 +615,7 @@ Hal inti yang ikut tersentuh dan harus dicatat sebagai riwayat perubahan di spec
 
 ```bash
 # F-0
-curl -s -H "Authorization: Bearer $KEY" $API/v1/features | jq -e '.beneficiary.enabled==false'
+curl -s -H "Authorization: Bearer $KEY" $API/v1/households/current | jq -e '.features.beneficiary.enabled==false'
 curl -s -X PATCH -H "Authorization: Bearer $JWT" $API/v1/households/current -d '{"features":{"beneficiary":{"enabled":true}}}' | jq -e '.features.beneficiary.enabled==true'
 curl -s -X POST -H "Authorization: Bearer $KEY" $API/v1/beneficiaries -d '{"name":"Anak"}' -o /dev/null -w '%{http_code}'   # 201; ulangi setelah toggle off → 403 feature_disabled
 # F-A
