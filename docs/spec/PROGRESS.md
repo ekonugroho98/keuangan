@@ -1,7 +1,7 @@
 # PROGRESS
 
-Fase aktif: F6-T1..T5 dan F6-T7 selesai dan terverifikasi. Migrasi `00000000000019` (api keys dkk.) sudah diterapkan ke produksi. **F6-T6 (webhook Midtrans) DIBATALKAN atas instruksi pemilik produk 2026-10-06**: project ini tidak pernah punya pembayaran sungguhan, fitur subscription/Midtrans dihapus total (kode, edge function lama, UI pricing) — lihat entri "Fase 6 — pembatalan subscription/Midtrans" di bawah. **Migrasi `00000000000020_drop_subscriptions.sql` (hapus tabel `subscriptions` + fungsi `upsert_subscription`) sudah diterapkan & DIVERIFIKASI DI PRODUKSI** (pemilik produk menjalankan lewat SQL Editor Supabase dashboard; `to_regclass('public.subscriptions')` → null, `pg_proc` untuk `upsert_subscription` → 0 baris). Fase 6 (F6-T1..T5, T7) kini selesai dan deployed penuh; F6-T6 dibatalkan permanen. F3-T9, F4-T7 (deploy Vercel) belum dikerjakan.
-Terakhir diperbarui: 2026-10-06
+Fase aktif: F6-T1..T5 dan F6-T7 selesai dan terverifikasi. Migrasi `00000000000019` (api keys dkk.) sudah diterapkan ke produksi. **F6-T6 (webhook Midtrans) DIBATALKAN atas instruksi pemilik produk 2026-10-06**: project ini tidak pernah punya pembayaran sungguhan, fitur subscription/Midtrans dihapus total (kode, edge function lama, UI pricing) — lihat entri "Fase 6 — pembatalan subscription/Midtrans" di bawah. **Migrasi `00000000000020_drop_subscriptions.sql` (hapus tabel `subscriptions` + fungsi `upsert_subscription`) sudah diterapkan & DIVERIFIKASI DI PRODUKSI** (pemilik produk menjalankan lewat SQL Editor Supabase dashboard; `to_regclass('public.subscriptions')` → null, `pg_proc` untuk `upsert_subscription` → 0 baris). Fase 6 (F6-T1..T5, T7) kini selesai dan deployed penuh; F6-T6 dibatalkan permanen. F3-T9, F4-T7 (deploy Vercel) belum dikerjakan. **2026-10-07: spec `10-fitur-opsional-keluarga.md` ditulis (F-0 feature flag, F-A beneficiary, F-B laporan bulanan, F-C rekonsiliasi bank, F-D belanja & stok) — SPEC SAJA, belum ada implementasi dan belum diputuskan mulai dari mana; lihat §"Spec fitur opsional" di bawah.**
+Terakhir diperbarui: 2026-10-07
 
 ## Sedang dikerjakan
 (kosong — F0, F1, F2, F3-T1..T8, F4-T1..T6, F5-T1..T5 selesai dan terverifikasi)
@@ -31,6 +31,7 @@ Terakhir diperbarui: 2026-10-06
 | F6-T6 (webhook Midtrans) | **DIBATALKAN** | **2026-10-06** | Project tidak pernah punya pembayaran sungguhan. Semua kode/migrasi/tabel DB/edge function/UI terkait subscription dihapus total — lihat entri khusus di bawah, bukan sekadar "tidak dikerjakan". |
 | **F6-T7 (bersihkan docs)** | **DONE** | **2026-10-06** | `API_DOCS.md` dihapus, README arahkan ke `/v1/docs`, `docs/hermes/SYSTEM_PROMPT.md` dibuat. |
 | F7-T1 … F7-T5 (Hermes) | todo | | |
+| **Spec `10-fitur-opsional-keluarga.md` (F-0, F-A, F-B, F-C, F-D)** | **spec ditulis, implementasi belum** | **2026-10-07** | Spec saja atas permintaan pemilik produk ("buat spec-nya dulu aja"). Implementasi menunggu keputusan urutan + jawaban Q-F1..Q-F10 di file itu (Q-F4 memblokir F-C: butuh file contoh ekspor mutasi bank asli). |
 
 ## F2 — Detail lengkap apa yang sudah dibangun dan diuji
 
@@ -554,3 +555,32 @@ Setelah F6-T6 selesai dibangun dan diverifikasi (lihat riwayat di atas), pemilik
 - `lp.hero.cta` dan `lp.cta.desc` di 5 bahasa (en/ar/es/zh/ja) juga diseragamkan ke "gratis selamanya" — sebelumnya masih bilang "free 14 days"/"14-day trial" yang menyiratkan ada masa berakhir, padahal produk gratis selamanya.
 - `apps/web/src/constants/faqs.js` (dead code, tidak pernah di-import — `FaqSection.jsx` memakai key `lp.faq.{1..5}q/a` langsung, bukan file ini) **dihapus**, isinya murni tentang harga paket.
 - Verifikasi: `node --check` sintaks valid, `pnpm lint` (0 error, 26 warning pre-existing sama), `pnpm typecheck` bersih, `pnpm test` 30/30, `pnpm --filter @karaya/web build` sukses (bundle `index-*.js` turun dari 415.00 kB → 409.13 kB, konsisten dengan kode mati yang terhapus).
+
+## Spec fitur opsional "kelola keluarga" (2026-10-07) — belum diimplementasi
+
+File: `docs/spec/10-fitur-opsional-keluarga.md`. Konteks: setelah migrasi data Hermes (2026-10-06) dan
+pemakaian nyata via Telegram (2026-10-07), pemilik produk minta ide fitur "kelola keluarga" tapi dengan syarat
+**inti tetap keuangan** dan fitur baru **bisa diaktifkan/dimatikan**. Yang dispesifikasikan:
+
+- **F-0** mekanisme flag: `households.features jsonb` (migrasi `00000000000021`, belum dibuat), `GET /v1/features`
+  (bisa dibaca API key — `households/current` jwt-only), toggle owner via `PATCH /v1/households/current`, error
+  baru `feature_disabled` (403) yang **wajib** ditambah ke `05-api.md` §7 + `errors.ts` saat dikerjakan,
+  `ToolDefinition.feature` di registry (→ kontrak "22 tool" di `06` dan CI harus diubah bersamaan).
+- **F-A** beneficiary "untuk siapa" (`beneficiaries` + `transactions.beneficiary_id`, resolver, filter summary;
+  backfill dari `[untuk: …]` di note 96 transaksi migrasi).
+- **F-B** `GET /v1/reports/monthly` dengan `text_id` siap kirim; Hermes cron per penerima dengan key masing-masing
+  (privasi akun privat).
+- **F-C** rekonsiliasi mutasi bank (`statement_imports`/`statement_lines`, fingerprint idempoten, skor pencocokan
+  deterministik, `accept` memakai `tx_source='import'` — perlu `createTransaction` berhenti hardcode `'web'`).
+- **F-D** belanja & stok: `POST /v1/receipts/ingest` membungkus `post_transactions_batch` + coret shopping list +
+  tambah stok dalam satu transaksi DB; migrasi `belanja.db`/`kulkas.db` dari container Hermes.
+  Rev. 2–3 (2026-10-07): pantry punya `location` (kulkas/freezer/lemari/lainnya) dan pengingat kedaluwarsa harian
+  via Hermes cron (`GET /v1/pantry/expiring`, diam kalau tidak ada yang basi).
+
+Rev. 5 (2026-10-07, hasil review silang dengan kode): referensi salah diperbaiki (cek 22 tool ada di `08`, bukan CI;
+`PORT-REQUEST.md` tidak ada di repo), fingerprint statement + `seq`, `pantry_items` unique partial, `beneficiaries`
+unique per member, laporan bulanan selalu bulan sebelumnya, penerima tanpa key dilewati, backfill di-throttle.
+
+Tidak ada kode, migrasi, atau skill Hermes yang berubah pada 2026-10-07 untuk ini. Pertanyaan terbuka Q-F1..Q-F10
+ada di §9 file spec. Urutan rekomendasi: F-0 → F-A → F-B → F-C → F-D.
+

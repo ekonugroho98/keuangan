@@ -7,6 +7,7 @@ Bergantung pada: (tidak ada; file ini adalah pintu masuk)
 > |---|---|---|---|
 > | 2026-10-04 | §4 ADR-19 | ADR-12 (expand/contract) digantikan ADR-19 (greenfield) | DB produksi dikosongkan atas permintaan pemilik produk (4 user, 1.393 transaksi, 13 tabel domain di-drop; `gold_prices` dipertahankan untuk karaya-api). Backup: `backups/pre-wipe-*.sql` (lokal, gitignored), skema di `docs/reference/legacy-schema-live-2026-10-04.sql`. |
 > | 2026-10-06 | §2, ADR-07 | **Fitur subscription/payment/Midtrans DIHAPUS TOTAL**, bukan "dipindah apa adanya" seperti baris non-tujuan di bawah — kode, migrasi, tabel DB (`subscriptions`), edge function lama, dan UI (`PricingModal`/`PricingSection`/`plans.js`) semua dihapus | Pemilik produk mengonfirmasi project ini tidak pernah punya pembayaran sungguhan (tidak ada integrasi Midtrans aktif, tidak ada user yang pernah bayar; tombol beli di UI hanya `alert(...)`, lihat `01-kondisi-saat-ini.md` T5). Detail penghapusan: `docs/spec/PROGRESS.md` §"Pembatalan total subscription/Midtrans". |
+> | 2026-10-07 | §6 (indeks spec) | Tambah `10-fitur-opsional-keluarga.md`: spec (belum implementasi) 4 fitur "kelola keluarga" opsional — beneficiary "untuk siapa", laporan bulanan otomatis ke chat, rekonsiliasi mutasi bank, belanja & stok — di atas mekanisme feature flag per household (`households.features` jsonb, default semua mati). | Pemilik produk ingin aplikasi berkembang ke "kelola keluarga" tapi **inti tetap keuangan**; fitur tambahan harus bisa diaktifkan/dimatikan per household tanpa mengubah perilaku inti. Ide dipilih dari lubang nyata saat migrasi Hermes 2026-10-06/07. |
 
 # 00 — Ringkasan: Karaya Finance → Platform Keuangan Keluarga
 
@@ -95,6 +96,7 @@ Merombak Karaya Finance dari aplikasi pencatatan keuangan **satu orang** menjadi
 | `07-frontend.md` | Migrasi web, komponen baru, pemetaan view | Fase 1, 4, 5 |
 | `08-rencana-implementasi.md` | Fase, kriteria selesai, rollback, cara lanjut di sesi baru | Setiap awal sesi |
 | `09-pertanyaan-terbuka.md` | Asumsi dan pertanyaan | Saat ragu |
+| `10-fitur-opsional-keluarga.md` | Fitur opsional "kelola keluarga" (feature flag per household): beneficiary, laporan bulanan, rekonsiliasi bank, belanja & stok — **spec saja, belum diimplementasi** | Saat mengerjakan fitur di luar inti keuangan |
 | `PROGRESS.md` | Status fase dan tugas, diperbarui setiap tugas selesai | Setiap awal sesi |
 
 ## 6. Prinsip yang berlaku di semua bab
