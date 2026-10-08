@@ -1,7 +1,7 @@
 # PROGRESS
 
 Fase aktif: F6-T1..T5 dan F6-T7 selesai dan terverifikasi. Migrasi `00000000000019` (api keys dkk.) sudah diterapkan ke produksi. **F6-T6 (webhook Midtrans) DIBATALKAN atas instruksi pemilik produk 2026-10-06**: project ini tidak pernah punya pembayaran sungguhan, fitur subscription/Midtrans dihapus total (kode, edge function lama, UI pricing) — lihat entri "Fase 6 — pembatalan subscription/Midtrans" di bawah. **Migrasi `00000000000020_drop_subscriptions.sql` (hapus tabel `subscriptions` + fungsi `upsert_subscription`) sudah diterapkan & DIVERIFIKASI DI PRODUKSI** (pemilik produk menjalankan lewat SQL Editor Supabase dashboard; `to_regclass('public.subscriptions')` → null, `pg_proc` untuk `upsert_subscription` → 0 baris). Fase 6 (F6-T1..T5, T7) kini selesai dan deployed penuh; F6-T6 dibatalkan permanen. F3-T9, F4-T7 (deploy Vercel) belum dikerjakan. **2026-10-07: spec `10-fitur-opsional-keluarga.md` ditulis (F-0 feature flag, F-A beneficiary, F-B laporan bulanan, F-C rekonsiliasi bank, F-D belanja & stok) — SPEC SAJA, belum ada implementasi dan belum diputuskan mulai dari mana; lihat §"Spec fitur opsional" di bawah.**
-Terakhir diperbarui: 2026-10-07
+Terakhir diperbarui: 2026-10-08
 
 ## Sedang dikerjakan
 (kosong — F0, F1, F2, F3-T1..T8, F4-T1..T6, F5-T1..T5 selesai dan terverifikasi)
@@ -18,9 +18,9 @@ Terakhir diperbarui: 2026-10-07
 | **F2 (revisi greenfield, lihat `08` blok "Revisi 2026-10-04")** | **DONE & DEPLOYED** | **2026-10-04** | **Lihat detail lengkap di bawah** |
 | **F1-T1 … F1-T7 (monorepo)** | **DONE** | **2026-10-04** | **Lihat detail lengkap di bawah.** Dikerjakan setelah F2 (DB duluan karena user minta "sampe buat tabel di supabase" dulu) |
 | **F3-T1 … F3-T8 (apps/api)** | **DONE** | **2026-10-04** | **Lihat detail lengkap di bawah.** |
-| F3-T9 (deploy Vercel) | todo | | Belum dikerjakan — perlu akses dashboard Vercel untuk membuat project `karaya-api-v1` dan mengisi env produksi |
+| F3-T9 (deploy Vercel) | **DONE** | 2026-10-06 | `karaya-api-v1.vercel.app` live (lihat Fase 6 deploy di bawah) — baris ini basi, dikoreksi 2026-10-08 |
 | **F4-T1 … F4-T6 (frontend cutover)** | **DONE** | **2026-10-04** | **Lihat detail lengkap di bawah.** |
-| F4-T7 (deploy web ke api produksi) | todo | | Sama seperti F3-T9: butuh akses dashboard Vercel |
+| F4-T7 (deploy web ke api produksi) | **DONE** | 2026-10-06 | `keuangan-eta.vercel.app` live, `VITE_API_BASE_URL` arah ke `karaya-api-v1` — baris ini basi, dikoreksi 2026-10-08 |
 | F4-T8 (contract: drop kolom legacy) | n/a | | Tidak berlaku — greenfield (ADR-19), tidak ada kolom legacy yang perlu di-drop |
 | **F5-T1, F5-T2, F5-T7 (backend: undangan, anggota, merge, scope)** | **DONE** | **2026-10-04** | **Lihat detail lengkap di bawah.** F5-T2 (accounts owner/visibility, summary scope, transactions filter) ternyata sudah dibangun sejak Fase 3 — hanya diverifikasi ulang. F5-T7 (pg_cron) juga sudah aktif sejak F2. |
 | **F5-T3 … F5-T5 (frontend: household UI, owner/visibility, scope)** | **DONE** | **2026-10-04** | **Lihat detail lengkap di bawah.** |
@@ -30,9 +30,9 @@ Terakhir diperbarui: 2026-10-07
 | **F6-T5 (ai/chat pakai tool registry)** | **DONE** | **2026-10-06** | `ai/chat.ts` pakai `TOOLS` registry + `allow_write` di `AiChatBodySchema`. |
 | F6-T6 (webhook Midtrans) | **DIBATALKAN** | **2026-10-06** | Project tidak pernah punya pembayaran sungguhan. Semua kode/migrasi/tabel DB/edge function/UI terkait subscription dihapus total — lihat entri khusus di bawah, bukan sekadar "tidak dikerjakan". |
 | **F6-T7 (bersihkan docs)** | **DONE** | **2026-10-06** | `API_DOCS.md` dihapus, README arahkan ke `/v1/docs`, `docs/hermes/SYSTEM_PROMPT.md` dibuat. |
-| F7-T1 … F7-T5 (Hermes) | todo | | |
+| F7-T1 … F7-T5 (Hermes) | **sebagian DONE** | 2026-10-08 | Tool registry (32 tool) + skill VPS `karaya-finance-api`/`groceries-shopping` untuk F-A/F-B/F-D sudah jalan. Scope asli F7 (kalau ada tugas lain di luar ini) tidak dirinci di sini — lihat riwayat chat kalau perlu detail. |
 | **Spec `10-fitur-opsional-keluarga.md` (F-0, F-A, F-B, F-C, F-D)** | **spec ditulis, implementasi belum** | **2026-10-07** | Spec saja atas permintaan pemilik produk ("buat spec-nya dulu aja"). Implementasi menunggu keputusan urutan + jawaban Q-F1..Q-F10 di file itu (Q-F4 memblokir F-C: butuh file contoh ekspor mutasi bank asli). |
-| **F-0 + F-A + F-B + F-D (belanja & pantry)** | **backend DONE, teruji lokal** | **2026-10-07** | Migrasi `00000000000021`, `00000000000022` diterapkan ke DB lokal (`supabase start`, fresh volume, bukan container `karaya-test-pg` lama). 37 test baru (12+3 di `features-beneficiaries.test.ts`, 4 di `reports.test.ts`, 13+4 di `shopping-pantry.test.ts`, 1 regresi batch) (`features-beneficiaries.test.ts` 12, `reports.test.ts` 4, regresi batch di `transactions.test.ts` 1) — total 67/67 lulus (2× berturut, termasuk tanpa reset), `pnpm lint` 0 error, `pnpm typecheck` bersih. **2 bug nyata ditemukan & diperbaiki**: (1) `beneficiaries.member_id` FK tanpa `on delete set null` membuat `remove_member()` gagal FK violation begitu household punya beneficiary `kind=member` — ketahuan dari `household.test.ts` gagal setelah DB di-reset dengan migrasi F-A; (2) postgres.js men-dobel-encode `${JSON.stringify(x)}::jsonb` jadi jsonb STRING SCALAR, bukan OBJECT/ARRAY — menimpa `post_transactions_batch` (`/v1/transactions/batch` TIDAK PERNAH punya test sebelumnya, jadi bug ini laten sejak Fase 3) dan kode baru `updateHousehold`; diperbaiki pakai `tx.json(value)`. Frontend (Settings toggle, Sidebar grup "Rumah", form "Untuk") **BELUM dikerjakan** — lihat §"F-0/F-A: apa yang selesai" di bawah untuk daftar lengkap. Belum di-commit/push (instruksi: test lokal dulu). |
+| **F-0 + F-A + F-B + F-D (belanja & pantry)** | **backend DONE, teruji lokal** | **2026-10-07** | Migrasi `00000000000021`, `00000000000022` diterapkan ke DB lokal (`supabase start`, fresh volume, bukan container `karaya-test-pg` lama). 37 test baru (12+3 di `features-beneficiaries.test.ts`, 4 di `reports.test.ts`, 13+4 di `shopping-pantry.test.ts`, 1 regresi batch) (`features-beneficiaries.test.ts` 12, `reports.test.ts` 4, regresi batch di `transactions.test.ts` 1) — total 67/67 lulus (2× berturut, termasuk tanpa reset), `pnpm lint` 0 error, `pnpm typecheck` bersih. **2 bug nyata ditemukan & diperbaiki**: (1) `beneficiaries.member_id` FK tanpa `on delete set null` membuat `remove_member()` gagal FK violation begitu household punya beneficiary `kind=member`; (2) postgres.js men-dobel-encode `${JSON.stringify(x)}::jsonb` jadi jsonb STRING SCALAR — menimpa `post_transactions_batch` dan `updateHousehold`; diperbaiki pakai `tx.json(value)`. **Update 2026-10-08**: frontend, tool Hermes, dan skill VPS semua sudah menyusul selesai (lihat 3 entri di bawah) — commit `5b02853`/`b019b99`/`d1b2641`, live di produksi. |
 
 ## F2 — Detail lengkap apa yang sudah dibangun dan diuji
 
@@ -607,16 +607,26 @@ date + unknown` (parameter postgres.js tanpa tipe eksplisit ambigu antara overlo
 **Update 2026-10-08 — selesai sejak catatan di atas**:
 - Frontend (tab Fitur opsional, sidebar grup Rumah, field Untuk, Belanja/Pantry view) — **DONE**, commit `b019b99`,
   deployed. Masih kurang: tab "Ringkasan bulanan" + kartu "Per penerima" di `LaporanView.jsx`.
-- Hermes tool registry — **DONE**, lihat §"Tool Hermes F-A/F-B/F-D" di bawah.
+- Hermes tool registry (32 tool) — **DONE**, commit `d1b2641`, deployed. Lihat §"Tool Hermes F-A/F-B/F-D" di bawah.
+- Skill VPS (`karaya-finance-api`, `groceries-shopping`) — **DONE**, diedit langsung di VPS (di luar repo git).
+  Lihat §"Skill Hermes di VPS" di bawah.
 
-**Belum dikerjakan** (bukan lupa — lihat `10-fitur-opsional-keluarga.md` §2.3/§3.5/§6.6):
-- Update skill VPS (`karaya-finance-api/SKILL.md`) supaya Hermes benar-benar MEMAKAI 10 tool baru — registry/
-  manifest sudah live di produksi, tapi skill (system prompt per-fitur, aturan "bersama", dsb.) belum ditulis.
-- Cron Hermes utk laporan bulanan (F-B) dan pengingat kedaluwarsa (F-D §6.6) — bergantung pada update skill di atas.
-- Migrasi `belanja.db`/`kulkas.db` dari container Hermes (F-D §6.7) — butuh API produksi yang sudah punya migrasi ini.
-- Backfill `scripts/backfill-beneficiary.ts` (96 transaksi migrasi `[untuk: ...]`) — belum ditulis, butuh API
-  produksi yang sudah punya migrasi ini dulu.
+**Masih belum dikerjakan** (bukan lupa):
+- **User perlu `/new` atau `/reset` di Telegram** supaya Hermes memuat skill yang baru, lalu dites dengan pesan
+  nyata (belum ada verifikasi end-to-end lewat Telegram untuk F-A/F-B/F-D, baru verifikasi API langsung).
+- Cron Hermes utk laporan bulanan (F-B, jadwal `features.monthly_report`) dan pengingat kedaluwarsa (F-D §6.6,
+  `features.shopping_stock.expiry_reminder`) — SKILL SUDAH bilang fitur ini "belum aktif di sisi aku" kalau
+  ditanya; benar-benar menjadwalkan cron belum dikerjakan sama sekali (bukan cuma belum, memang belum ada
+  rencana konkret caranya — Hermes jalan sebagai chat-triggered, bukan daemon terjadwal per-household).
+- Migrasi `belanja.db`/`kulkas.db` dari container Hermes (F-D §6.7) ke tabel `shopping_items`/`pantry_items`
+  — baru relevan KALAU `shopping_stock` dinyalakan; selama masih mati, data lama tetap di SQLite seperti biasa.
+- Backfill `scripts/backfill-beneficiary.ts` (96 transaksi migrasi 6 Oktober yang punya `[untuk: ...]` di note)
+  — belum ditulis; baru relevan kalau `beneficiary` dinyalakan dan user mau data lama ikut ter-tag.
+- Tab "Ringkasan bulanan" + kartu "Per penerima" di `LaporanView.jsx` (disebut di atas).
+- F-C rekonsiliasi mutasi bank — **masih terblokir Q-F4**, belum ada file contoh ekspor mutasi BCA/BRI/GoPay asli.
 - F-A §3.6 Fase 2 (`budgets.beneficiary_id`) — sengaja dilewati sesuai spec ("baru kalau user memang menganggarkan").
+- i18n 6 bahasa untuk semua UI baru sesi 2026-10-07/08 (tab Fitur opsional, Belanja, Pantry) — dicatat sebagai
+  utang teknis yang disengaja, konsisten dengan `HouseholdPanel`/`ApiKeysPanel`.
 
 **Catatan setup DB lokal (beda dari sesi sebelumnya)**: `supabase start` (bukan container `karaya-test-pg` manual)
 berhasil kali ini — stack penuh jalan di `127.0.0.1:54322` (direct Postgres, pooler `[db.pooler] enabled=false` di
@@ -628,8 +638,9 @@ volume yang sama kalau Docker belum dibuang).
 
 ## Tool Hermes F-A/F-B/F-D: registry & manifest (2026-10-08)
 
-Lanjutan sesi 2026-10-07 (backend+web) — sekarang sisi tool Hermes. **Kode lokal saja**; skill VPS
-BELUM disentuh (lihat §"Belum dikerjakan" di atas).
+Lanjutan sesi 2026-10-07 (backend+web) — sekarang sisi tool Hermes. **Update 2026-10-08 (sore)**:
+skill VPS (`karaya-finance-api`, `groceries-shopping`) JUGA sudah diperbarui langsung (di luar repo
+ini, tidak lewat commit) — lihat §"Skill Hermes di VPS" di bawah untuk detail. Commit kode lokal: `d1b2641`.
 
 `apps/api/src/tools/registry.ts`: +10 tool —
 `list_beneficiaries`/`add_beneficiary` (F-A, gate `feature:'beneficiary'`),
@@ -683,7 +694,24 @@ manifest ter-commit sinkron dengan registry, `get_monthly_report` tidak ter-gate
 `pnpm gen:tools --md` dijalankan ulang, `apps/api/tools/hermes-tools.json` 22→32 entri. `06-agent-integration.md`
 (tabel tool + total) dan `08-rencana-implementasi.md` (kriteria F6-T4 `length==22`→`length==32`) diperbarui.
 
-Belum di-commit/push (instruksi sesi ini: review dulu sebelum commit, sama seperti bagian sebelumnya).
+Di-commit & push sebagai `d1b2641` setelah `/code-review high` (10 temuan diperbaiki, lihat §"Spec fitur opsional" di bawah untuk detail), deployed ke produksi — `GET /v1/tools/hermes.json` menunjukkan 32 tool.
+
+### Skill Hermes di VPS (karaya-finance-api, groceries-shopping) — 2026-10-08
+
+Diedit langsung di `/home/hermes/.hermes/skills/productivity/{karaya-finance-api,groceries-shopping}/SKILL.md`
+(container `ws-001`, VPS 20.41.96.123) — file ini TIDAK ada di repo git, jadi perubahannya berlaku
+langsung di produksi tanpa commit/deploy, dan TIDAK ikut ter-track di `git log` project ini.
+
+`karaya-finance-api/SKILL.md` dapat 4 bagian baru: (1) cek `features` sekali di awal sesi lewat
+`GET /v1/households/current`; (2) "Untuk siapa" (beneficiary) — kapan isi field, kata "bersama"/
+"keluarga" untuk mengosongkan; (3) laporan bulanan (`get_monthly_report`, selalu tersedia); (4)
+Belanja & Stok — bersyarat: `features.shopping_stock` MATI (default sekarang) → tidak ada yang
+berubah, tetap pakai `belanja.db`/`kulkas.db` seperti biasa; NYALA → pindah total ke tool Karaya,
+berhenti pakai SQLite. `groceries-shopping/SKILL.md` dapat satu paragraf pointer ke aturan
+bersyarat yang sama.
+
+**Belum dites dengan pesan nyata dari Telegram** — perlu `/new` atau `/reset` dulu di sisi user
+(skill loader Hermes di-cache per sesi) sebelum skill baru benar-benar kepakai.
 
 ## Spec fitur opsional "kelola keluarga" (2026-10-07) — belum diimplementasi
 
