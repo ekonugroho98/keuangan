@@ -76,6 +76,63 @@ export function formatToolResult(name: string, result: unknown): string {
       const rows = items.map((i) => `  ${i.category.name}: terpakai ${fmtRp(i.spent)} dari ${fmtRp(i.amount)}, sisa ${fmtRp(i.remaining)} (${i.pct}%)`).join('\n')
       return `Status anggaran ${s.period?.label ?? ''}:\n${rows}`
     }
+    // ── F-A/F-B/F-D (10-fitur-opsional-keluarga.md), review 2026-10-08: tanpa case ini, tool
+    // BACA baru jatuh ke formatGenericWriteResult yang mengubah ARRAY jadi "Berhasil." — model
+    // tidak pernah melihat datanya lalu mengarang jawaban.
+    case 'list_beneficiaries': {
+      const items = result as Array<{ name: string; kind: string; aliases: string[] }>
+      if (!items.length) return 'Belum ada "untuk siapa" yang terdaftar.'
+      return `Daftar "untuk siapa":\n${items.map((b) => `  ${b.name} (${b.kind})${b.aliases.length ? `, alias: ${b.aliases.join(', ')}` : ''}`).join('\n')}`
+    }
+    case 'add_beneficiary': {
+      const b = result as { name: string; kind: string }
+      return `"${b.name}" (${b.kind}) ditambahkan sebagai penerima.`
+    }
+    case 'get_monthly_report': {
+      const r = result as { text_id: string; piutang_open?: unknown[]; largest_transactions?: Array<{ date: string; note: string; amount: number }> }
+      const largest = (r.largest_transactions ?? []).slice(0, 3).map((t) => `  ${t.date} ${fmtRp(t.amount)} ${t.note}`).join('\n')
+      return `${r.text_id}${largest ? `\nTransaksi terbesar:\n${largest}` : ''}`
+    }
+    case 'list_shopping': {
+      const items = result as Array<{ id: string; name: string; qty_text: string | null; notes: string }>
+      if (!items.length) return 'Daftar belanja kosong.'
+      return `Perlu dibeli (${items.length}):\n${items.map((i) => `  [${i.id}] ${i.name}${i.qty_text ? ` ${i.qty_text}` : ''}${i.notes ? ` — ${i.notes}` : ''}`).join('\n')}`
+    }
+    case 'add_shopping_item': {
+      const i = result as { name: string }
+      return `"${i.name}" ditambahkan ke daftar belanja.`
+    }
+    case 'mark_bought': {
+      const i = result as { name: string }
+      return `"${i.name}" ditandai sudah dibeli.`
+    }
+    case 'shopping_suggestions': {
+      const items = result as Array<{ pantry_item_id: string; name: string; qty: number; min_qty: number }>
+      if (!items.length) return 'Tidak ada stok yang menipis.'
+      return `Stok menipis, belum ada di daftar belanja:\n${items.map((s) => `  ${s.name} (sisa ${s.qty}, min ${s.min_qty})`).join('\n')}`
+    }
+    case 'list_pantry': {
+      const items = result as Array<{ id: string; name: string; qty: number; unit: string; location: string; expires_at: string | null; expires_estimated: boolean; min_qty: number | null }>
+      if (!items.length) return 'Stok rumah kosong.'
+      const label: Record<string, string> = { fridge: 'Kulkas', freezer: 'Freezer', shelf: 'Lemari', other: 'Lainnya' }
+      const byLoc = new Map<string, typeof items>()
+      for (const i of items) byLoc.set(i.location, [...(byLoc.get(i.location) ?? []), i])
+      return [...byLoc.entries()]
+        .map(([loc, list]) => `${label[loc] ?? loc}:\n${list.map((i) => `  [${i.id}] ${i.name}: ${i.qty} ${i.unit}${i.min_qty != null && i.qty <= i.min_qty ? ' (menipis)' : ''}${i.expires_at ? ` | exp ${i.expires_estimated ? '~' : ''}${i.expires_at}` : ''}`).join('\n')}`)
+        .join('\n')
+    }
+    case 'adjust_pantry': {
+      const i = result as { name: string; qty: number; unit: string }
+      return `Stok "${i.name}" sekarang ${i.qty} ${i.unit}.`
+    }
+    case 'ingest_receipt': {
+      const r = result as { transactions: Tx[]; account: { balance: number | null }; shopping?: { marked_bought: Array<{ name: string }>; unmatched: string[] }; pantry?: { updated: Array<{ name: string; qty_after: number }>; unmatched: string[] } }
+      const total = r.transactions.reduce((a, t) => a + Number(t.amount), 0)
+      const lines = [`${r.transactions.length} item dicatat, total ${fmtRp(total)}${r.account.balance !== null ? `, saldo akun sekarang ${fmtRp(r.account.balance)}` : ''}.`]
+      if (r.shopping) lines.push(`Belanja: ${r.shopping.marked_bought.length ? `dicoret ${r.shopping.marked_bought.map((s) => s.name).join(', ')}` : 'tidak ada yang cocok'}${r.shopping.unmatched.length ? ` (tidak di daftar: ${r.shopping.unmatched.join(', ')})` : ''}.`)
+      if (r.pantry) lines.push(`Stok: ${r.pantry.updated.length ? r.pantry.updated.map((p) => `${p.name} → ${p.qty_after}`).join(', ') : 'tidak ada yang cocok'}${r.pantry.unmatched.length ? ` (tidak di stok: ${r.pantry.unmatched.join(', ')})` : ''}.`)
+      return lines.join('\n')
+    }
     default:
       return formatGenericWriteResult(result)
   }

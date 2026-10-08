@@ -25,6 +25,11 @@ async function main() {
     endpoint: t.endpoint,
     scope: t.scope,
     idempotent: t.idempotent,
+    // Opsional (10-fitur-opsional-keluarga.md §2.4) — hanya ada untuk tool yang SELURUHNYA
+    // bergantung pada satu fitur opsional; lihat catatan di registry.ts. Dihilangkan dari output
+    // sama sekali (bukan `null`) untuk tool yang tidak punya, supaya manifest lama & baru tetap
+    // bisa di-diff rapi di git untuk tool yang tidak berubah.
+    ...(t.feature ? { feature: t.feature } : {}),
   }))
   writeFileSync(OUT_PATH, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
   console.log(`✅ ${OUT_PATH} ditulis ulang (${manifest.length} tool).`)

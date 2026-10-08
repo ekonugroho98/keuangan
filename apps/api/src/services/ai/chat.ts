@@ -8,6 +8,8 @@ import { listGoals } from '../goals'
 import { listInvestments } from '../investments'
 import { TOOLS, toolByName } from '../../tools/registry'
 import { formatToolResult } from './format-tool-result'
+import { getHouseholdFeatures } from '../features'
+import type { HouseholdFeatures } from '@karaya/shared/schemas'
 
 const APP_AI_NAME = 'Karaya AI'
 const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
@@ -61,13 +63,20 @@ function isToolsUnreliable(provider?: string, model?: string): boolean {
 // bedanya handler di sini dipanggil LANGSUNG ke service layer (bukan lewat HTTP). Tool baca
 // selalu tersedia; tool tulis hanya ikut kalau `allow_write` true (Fase 6 F6-T5) — belum ada
 // toggle UI untuk ini, jadi secara default chat tetap read-only seperti sebelumnya.
-// `get_investments` bukan bagian dari 22 tool Hermes (di luar scope agent eksternal per spec),
+// `get_investments` bukan bagian dari registry tool Hermes (32 sejak 2026-10-08; di luar scope agent eksternal per spec),
 // tapi sudah jadi fitur AI chat sejak Fase 4 — dipertahankan sebagai tool tambahan HANYA untuk
 // jalur internal ini supaya tidak jadi regresi fitur.
 const INVESTMENTS_TOOL_DEF = { name: 'get_investments', description: 'Ambil semua aset investasi (emas, saham, reksa dana, dll.) beserta modal, nilai sekarang, dan gain/loss.', parameters: { type: 'object', properties: {} } }
 
-function buildToolDefs(allowWrite: boolean) {
-  const fromRegistry = TOOLS.filter((t) => t.scope === 'read' || allowWrite).map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
+// `features` (10-fitur-opsional-keluarga.md §2.4): tool yang di-gate fitur opsional (`t.feature`)
+// hanya ditawarkan ke model kalau flag household-nya aktif — SAMA dengan aturan yang dipakai skill
+// Hermes. Tanpa ini, model AI Coach akan melihat `list_shopping` dkk. padahal household belum
+// menyalakannya, memanggilnya, lalu dapat 403 feature_disabled yang bocor ke chat sebagai "Gagal: …".
+export function buildToolDefs(allowWrite: boolean, features: HouseholdFeatures) {
+  const fromRegistry = TOOLS
+    .filter((t) => t.scope === 'read' || allowWrite)
+    .filter((t) => !t.feature || features[t.feature].enabled)
+    .map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
   return [...fromRegistry, INVESTMENTS_TOOL_DEF]
 }
 
@@ -176,10 +185,11 @@ async function callGoogle(apiKey: string, model: string, messages: Array<{ role:
 }
 
 export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 'ai'; text: string }>, allowWrite = false) {
-  const config = await getAiConfig(actor)
+  // Tiga query independen -> paralel, bukan tiga round-trip berurutan di jalur panas tiap pesan
+  // (review 2026-10-08).
+  const [config, userName, features] = await Promise.all([getAiConfig(actor), getUserName(actor), getHouseholdFeatures(actor)])
   const { provider, model, apiKey } = config as Required<AiConfig>
-  const userName = await getUserName(actor)
-  const toolDefs = buildToolDefs(allowWrite)
+  const toolDefs = buildToolDefs(allowWrite, features)
 
   const apiMessages: ChatMsg[] = messages.slice(-20).map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }))
 

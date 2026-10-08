@@ -220,6 +220,54 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('F-0 feature flag + F
     expect(patched.beneficiary).toBeNull()
   })
 
+  it('kata "bersama"/"keluarga" sebagai nama beneficiary = tanpa beneficiary (pola sama dgn resolve_account), berguna utk tool Hermes yang tidak bisa kirim JSON null', async () => {
+    const app = buildApp()
+    const token = await mintJwt(EKO_USER_ID)
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+
+    const createRes = await app.request('/v1/transactions', {
+      method: 'POST', headers,
+      body: JSON.stringify({ type: 'expense', amount: 4000, account: 'BCA suami', category: 'Makanan', beneficiary: 'Anak' }),
+    })
+    const created = await createRes.json()
+    expect(created.transaction.beneficiary.name).toBe('Anak')
+
+    const patchRes = await app.request(`/v1/transactions/${created.transaction.id}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({ beneficiary: 'bersama' }),
+    })
+    expect(patchRes.status).toBe(200)
+    expect((await patchRes.json()).beneficiary).toBeNull()
+
+    const filterRes = await app.request('/v1/transactions?beneficiary=keluarga', { headers })
+    expect(filterRes.status).toBe(200)
+    const filterBody = await filterRes.json()
+    expect(filterBody.data.every((t: { beneficiary: unknown }) => t.beneficiary === null)).toBe(true)
+
+    // Sentinel dengan spasi/kapital (review 2026-10-08: dulu lolos regex lalu diam-diam jadi "tanpa filter")
+    const padded = await app.request('/v1/transactions?beneficiary=%20Bersama%20', { headers })
+    expect(padded.status).toBe(200)
+    const paddedBody = await padded.json()
+    expect(paddedBody.data.length).toBe(filterBody.data.length)
+    expect(paddedBody.data.every((t: { beneficiary: unknown }) => t.beneficiary === null)).toBe(true)
+
+    const summaryPadded = await app.request('/v1/summary?period=this_month&scope=beneficiary&beneficiary=%20keluarga', { headers })
+    expect(summaryPadded.status).toBe(200)
+  })
+
+  it('kata sentinel ("bersama"/"keluarga"/"none") DITOLAK sebagai nama beneficiary (tidak akan pernah bisa dirujuk)', async () => {
+    const app = buildApp()
+    const token = await mintJwt(EKO_USER_ID)
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    for (const name of ['Keluarga', 'bersama', 'none']) {
+      const res = await app.request('/v1/beneficiaries', { method: 'POST', headers, body: JSON.stringify({ name, kind: 'other' }) })
+      expect(res.status).toBe(400)
+      expect((await res.json()).error.details.field).toBe('name')
+    }
+    const rename = await app.request(`/v1/beneficiaries/${anakId}`, { method: 'PATCH', headers, body: JSON.stringify({ name: 'Bersama' }) })
+    expect(rename.status).toBe(400)
+  })
+
   it('nama beneficiary yang tidak ada -> 404 beneficiary_not_found dengan candidates', async () => {
     const app = buildApp()
     const token = await mintJwt(EKO_USER_ID)

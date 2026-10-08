@@ -604,17 +604,15 @@ race antar file test sempat muncul lagi).
 date + unknown` (parameter postgres.js tanpa tipe eksplisit ambigu antara overload `date+integer` vs
 `date+interval`). Diperbaiki `${withinDays}::int`.
 
-**Belum dikerjakan** (bukan lupa — di luar scope sesi backend-first ini, lihat `10-fitur-opsional-keluarga.md` §2.3/§3.5):
-- Frontend: tab "Fitur opsional" di `HouseholdPanel.jsx`, gating sidebar (`Sidebar.jsx` §2.3.1 spec, termasuk
-  grup baru "Rumah" utk F-D), field "Untuk" di `AddTransactionModal.jsx`, chip+filter di `TransaksiView.jsx`,
-  kartu "Per penerima" di `LaporanView.jsx`, tab "Ringkasan bulanan" di `LaporanView.jsx` (F-B), halaman
-  Belanja/Stok (F-D).
-- Hermes: tool baru (`list_beneficiaries`, `add_beneficiary`, `get_monthly_report`, `ingest_receipt`,
-  `list_shopping`, `add_shopping_item`, `mark_bought`, `list_pantry`, `adjust_pantry`, `shopping_suggestions`)
-  belum ditambah ke `tools/registry.ts` (kontrak "22 tool" akan berubah, lihat `10-fitur-opsional-keluarga.md`
-  §2.4); update skill VPS (`karaya-finance-api/SKILL.md`) juga belum — SENGAJA belum disentuh keduanya, itu
-  mengubah agent produksi/kontrak Hermes, bukan sekadar kode lokal.
-- Cron Hermes utk laporan bulanan (F-B) dan pengingat kedaluwarsa (F-D §6.6) — bergantung pada tool registry di atas.
+**Update 2026-10-08 — selesai sejak catatan di atas**:
+- Frontend (tab Fitur opsional, sidebar grup Rumah, field Untuk, Belanja/Pantry view) — **DONE**, commit `b019b99`,
+  deployed. Masih kurang: tab "Ringkasan bulanan" + kartu "Per penerima" di `LaporanView.jsx`.
+- Hermes tool registry — **DONE**, lihat §"Tool Hermes F-A/F-B/F-D" di bawah.
+
+**Belum dikerjakan** (bukan lupa — lihat `10-fitur-opsional-keluarga.md` §2.3/§3.5/§6.6):
+- Update skill VPS (`karaya-finance-api/SKILL.md`) supaya Hermes benar-benar MEMAKAI 10 tool baru — registry/
+  manifest sudah live di produksi, tapi skill (system prompt per-fitur, aturan "bersama", dsb.) belum ditulis.
+- Cron Hermes utk laporan bulanan (F-B) dan pengingat kedaluwarsa (F-D §6.6) — bergantung pada update skill di atas.
 - Migrasi `belanja.db`/`kulkas.db` dari container Hermes (F-D §6.7) — butuh API produksi yang sudah punya migrasi ini.
 - Backfill `scripts/backfill-beneficiary.ts` (96 transaksi migrasi `[untuk: ...]`) — belum ditulis, butuh API
   produksi yang sudah punya migrasi ini dulu.
@@ -627,6 +625,65 @@ manual via `docker run karaya-test-pg -p 54329:5432`, lihat entri F2/F3 di atas)
 diarahkan ke `54322`; menjalankan `pnpm test` perlu override `DATABASE_URL`/`TEST_ADMIN_DATABASE_URL` env var ke
 `54322` juga (keduanya TIDAK di-commit, gitignored — sesi baru perlu set ulang atau `supabase start` lagi dari
 volume yang sama kalau Docker belum dibuang).
+
+## Tool Hermes F-A/F-B/F-D: registry & manifest (2026-10-08)
+
+Lanjutan sesi 2026-10-07 (backend+web) — sekarang sisi tool Hermes. **Kode lokal saja**; skill VPS
+BELUM disentuh (lihat §"Belum dikerjakan" di atas).
+
+`apps/api/src/tools/registry.ts`: +10 tool —
+`list_beneficiaries`/`add_beneficiary` (F-A, gate `feature:'beneficiary'`),
+`get_monthly_report` (F-B, SELALU tersedia, tanpa `feature`),
+`ingest_receipt`/`list_shopping`/`add_shopping_item`/`mark_bought`/`shopping_suggestions`/`list_pantry`/
+`adjust_pantry` (F-D, gate `feature:'shopping_stock'`). 5 tool inti (`record_expense`,
+`record_expense_batch`, `update_transaction`, `search_transactions`, `get_summary`) dapat parameter
+opsional `beneficiary` baru, TANPA diberi `feature` (tool-nya sendiri tetap berguna saat fitur mati,
+cuma param itu yang tidak boleh dipakai — dijelaskan di deskripsi parameter).
+
+`ToolDefinition.feature?: 'beneficiary'|'monthly_report'|'reconciliation'|'shopping_stock'` (field baru) —
+Hermes menyaring tool yang ditawarkan ke model berdasarkan `GET /v1/households/current`.features; manifest
+tetap statis/berisi semua 32 tool. `scripts/gen-tools.ts` diupdate ikut mengemit `feature` (dihilangkan dari
+output, bukan `null`, untuk tool yang tidak punya — supaya diff git rapi).
+
+**Bug kecil ke-5 ditemukan & diperbaiki**: kontrak `beneficiary_id` nullable di `PATCH /v1/transactions/{id}`
+tidak bisa dikirim Hermes (tool-calling function biasa tidak punya cara alami mengirim literal JSON `null`).
+Diperbaiki dengan menambah kata kunci **"bersama"/"keluarga"** di `resolveBeneficiaryRef` (apps/api/src/
+services/resolver.ts) yang berarti "tanpa beneficiary tertentu" — pola yang SAMA PERSIS dengan kata kunci
+`bersama`/`joint`/`keluarga`/`rumah`/`kita` yang sudah ada di `resolve_account` untuk akun joint. Sekarang
+Hermes cukup kirim `update_transaction{beneficiary:"bersama"}` untuk mengosongkan, dan filter
+`search_transactions`/`get_summary` juga menerima "bersama"/"keluarga" sebagai sinonim sentinel "none" yang
+sudah ada. Test baru: `features-beneficiaries.test.ts` ("kata bersama/keluarga...").
+
+**Bug ke-6 (ditemukan saat review sendiri sebelum `/code-review`)**: `/v1/ai/chat` (`services/ai/chat.ts`,
+`buildToolDefs`) memakai registry yang SAMA tapi hanya menyaring read/write — model AI Coach di web akan
+ditawari `list_shopping` dkk. walau household belum menyalakan fiturnya, memanggilnya, lalu 403
+`feature_disabled` bocor ke chat sebagai "Gagal: …". Sekarang `buildToolDefs(allowWrite, features)` ikut
+menyaring `t.feature` berdasarkan `getHouseholdFeatures(actor)` — aturan yang sama dengan skill Hermes.
+Diekspor + 3 unit test di `tools-registry.test.ts`.
+
+**Code review (`/code-review high`, 2026-10-08) — 10 temuan, semua diperbaiki+diuji** (detail: riwayat
+`10-fitur-opsional-keluarga.md` rev. 12). Yang paling penting: (1) sentinel "bersama/keluarga/none" tadinya
+tiga salinan regex di transactions/summary/resolver yang sudah saling menyimpang (trim vs tidak, 'none' vs
+tidak) → `?beneficiary=%20bersama` diam-diam jadi TANPA filter; sekarang satu helper `isNoBeneficiarySentinel()`
++ resolver mengembalikan `null` (eksplisit tanpa penerima) vs `undefined` (tidak disentuh), pemanggil tidak
+perlu pre-check lagi; (2) nama sentinel ditolak sebagai nama beneficiary; (3) handler tool menormalkan
+`beneficiary: null/""` dari model (umum untuk param opsional) jadi undefined — tanpa ini record_expense GAGAL
+400 di household yang F-A-nya mati; (4) `ingest_receipt` coerce Number + param `shopping`/`pantry` yang
+deskripsinya sudah menjanjikan; (5) `formatToolResult` case untuk 10 tool baru — ARRAY hasil tool baca
+tadinya jadi "Berhasil." dan model mengarang. Test: +2 integrasi (sentinel berspasi, nama reserved), +2 unit
+(formatToolResult). Total 89/89.
+
+`mark_bought`/`adjust_pantry` BUTUH id (`shopping_item_id`/`pantry_item_id`) dari `list_shopping`/`list_pantry`
+dulu — pola yang SAMA dengan `pay_debt`/`contribute_goal`/`receive_piutang` (bukan pencocokan nama fuzzy;
+`find_shopping_match`/`find_pantry_match` SQL cuma dipakai internal oleh `ingest_receipt`, tidak diekspos
+sebagai endpoint publik untuk lookup sembarangan).
+
+Diverifikasi: `apps/api/test/tools-registry.test.ts` (baru, unit test — 15 test, total tool, gate per fitur,
+manifest ter-commit sinkron dengan registry, `get_monthly_report` tidak ter-gate). Total `pnpm test`: 83/83.
+`pnpm gen:tools --md` dijalankan ulang, `apps/api/tools/hermes-tools.json` 22→32 entri. `06-agent-integration.md`
+(tabel tool + total) dan `08-rencana-implementasi.md` (kriteria F6-T4 `length==22`→`length==32`) diperbarui.
+
+Belum di-commit/push (instruksi sesi ini: review dulu sebelum commit, sama seperti bagian sebelumnya).
 
 ## Spec fitur opsional "kelola keluarga" (2026-10-07) — belum diimplementasi
 

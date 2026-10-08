@@ -1,5 +1,5 @@
 Status: draft
-Terakhir diubah: 2026-10-04
+Terakhir diubah: 2026-10-08
 Bergantung pada: semua bab 00–07
 
 > **Riwayat perubahan**
@@ -7,6 +7,7 @@ Bergantung pada: semua bab 00–07
 > |---|---|---|---|
 > | 2026-10-04 | Fase 0, 2, 4 | Revisi greenfield, lihat blok 'Revisi 2026-10-04' di bawah | DB produksi dikosongkan atas permintaan pemilik produk (4 user, 1.393 transaksi, 13 tabel domain di-drop; `gold_prices` dipertahankan untuk karaya-api). Backup: `backups/pre-wipe-*.sql` (lokal, gitignored), skema di `docs/reference/legacy-schema-live-2026-10-04.sql`. |
 > | 2026-10-06 | Fase 5, Fase 6 (F6-T6) | F6-T6 dibatalkan total, bukan dikerjakan | Pemilik produk mengonfirmasi project tidak pernah punya pembayaran sungguhan. Detail: `docs/spec/PROGRESS.md` §"Pembatalan total subscription/Midtrans". |
+> | 2026-10-08 | F6-T4 kriteria selesai | `length==22` → `length==32` | 10 tool baru F-A/F-B/F-D ditambah ke registry (10-fitur-opsional-keluarga.md §2.4), lihat `06-agent-integration.md` untuk daftar lengkap. |
 
 # 08 — Rencana Implementasi Bertahap
 
@@ -245,7 +246,7 @@ IK=$(uuidgen); for i in 1 2; do curl -s -X POST -H "Authorization: Bearer $KEY" 
 psql "$PROD_DB_URL" -c "SELECT count(*) FROM transactions WHERE note='idem' AND deleted_at IS NULL"   # 1
 for i in $(seq 1 70); do curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $KEY" https://<api>/v1/health?x=$i; done | sort | uniq -c   # ada 429 setelah 60
 curl -s -H "Authorization: Bearer $KEY" https://<api>/v1/me | jq -e '.error.code=="jwt_required"'
-curl -s https://<api>/v1/tools/hermes.json | jq -e 'length==22'
+curl -s https://<api>/v1/tools/hermes.json | jq -e 'length==32'   # 22 asli F6-T4 + 10 F-A/F-B/F-D (10-fitur-opsional-keluarga.md §2.4, 2026-10-08)
 pnpm gen:tools && git diff --exit-code apps/api/tools/hermes-tools.json
 curl -s -H "Authorization: Bearer $TOKEN" 'https://<api>/v1/audit-log?limit=5' | jq -e '.data[0].action'
 curl -s -X DELETE -H "Authorization: Bearer $TOKEN" https://<api>/v1/api-keys/<id> && curl -s -H "Authorization: Bearer $KEY" https://<api>/v1/accounts | jq -e '.error.code=="api_key_revoked"'

@@ -102,24 +102,39 @@ export async function resolveOwnerMemberId(tx: postgres.TransactionSql, actor: A
 }
 
 /**
+ * Kata yang berarti "TIDAK untuk siapa-siapa tertentu" sebagai nilai `beneficiary` (nama) — satu
+ * tempat untuk semua pemanggil (create/update/filter/summary), supaya sinonim & trim tidak pernah
+ * beda antar entry point (review 2026-10-08: tiga salinan regex sempat saling menyimpang). "none"
+ * = sentinel query lama (05-api.md), "bersama"/"keluarga" = kata manusia, pola sama dengan kata
+ * kunci akun joint di resolve_account (0009). Nama-nama ini DILARANG dipakai sebagai nama
+ * beneficiary sungguhan (lihat services/beneficiaries.ts).
+ */
+export function isNoBeneficiarySentinel(name: string | undefined | null): boolean {
+  return typeof name === 'string' && /^(none|bersama|keluarga)$/i.test(name.trim())
+}
+
+/**
  * F-A (10-fitur-opsional-keluarga.md §3.3): resolve_beneficiary mengikuti pola resolve_member
- * (exact match nama/alias, tanpa fuzzy trgm). `undefined` berarti "tidak disebut" (bersama/keluarga
- * — TIDAK melempar error), beda dari resolveMemberRef yang juga mengembalikan undefined untuk
- * kasus yang sama tapi field ini sengaja tidak wajib di endpoint manapun.
+ * (exact match nama/alias, tanpa fuzzy trgm). TIGA hasil yang berbeda arti:
+ *   - `undefined` : field TIDAK disentuh sama sekali (tidak ada gate, tidak ada query) — pemanggil
+ *                   yang menulis memperlakukannya "biarkan apa adanya", yang memfilter "tanpa filter".
+ *   - `null`      : EKSPLISIT "tidak untuk siapa-siapa" — lewat `beneficiary_id: null` atau kata
+ *                   sentinel (isNoBeneficiarySentinel). Pemanggil yang menulis -> kosongkan ke
+ *                   bersama; yang memfilter -> hanya transaksi dengan beneficiary_id IS NULL.
+ *   - string      : uuid beneficiary.
+ * Gate fitur dipanggil begitu field disentuh (termasuk null/sentinel) — satu tempat, lihat features.ts.
  */
 export async function resolveBeneficiaryRef(
   tx: postgres.TransactionSql,
   actor: Actor,
   ref: { beneficiary_id?: string | null; beneficiary?: string },
-): Promise<string | undefined> {
+): Promise<string | null | undefined> {
   if (ref.beneficiary_id === undefined && ref.beneficiary === undefined) return undefined
-  // Gate fitur ada DI SINI (satu tempat), bukan diulang di tiap pemanggil — lihat catatan di
-  // features.ts. Berlaku juga untuk `beneficiary_id: null` (mengosongkan) — menyentuh field saat
-  // fitur mati tetap ditolak eksplisit.
   await assertBeneficiaryFieldAllowed(tx, actor)
-  if (ref.beneficiary_id === null) return undefined
+  if (ref.beneficiary_id === null) return null
   if (ref.beneficiary_id) return ref.beneficiary_id
   if (!ref.beneficiary) return undefined
+  if (isNoBeneficiarySentinel(ref.beneficiary)) return null
   if (looksLikeUuid(ref.beneficiary)) return ref.beneficiary
 
   const [row] = await tx<[{ result: ResolveResult }]>`

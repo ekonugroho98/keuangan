@@ -5,7 +5,6 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
-import { assertBeneficiaryFieldAllowed } from './features'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -184,13 +183,10 @@ export async function listTransactions(actor: Actor, query: TransactionListQuery
     const accountId = query.account_id || query.account ? await resolveAccountRef(tx, actor, query, 'account') : undefined
     const categoryId = query.category_id || query.category ? await resolveCategoryRef(tx, actor, query) : undefined
     const memberId = query.member_id || query.member ? await resolveMemberRef(tx, actor, query) : undefined
-    let beneficiaryId: string | 'none' | undefined
-    if (query.beneficiary === 'none') {
-      await assertBeneficiaryFieldAllowed(tx, actor) // sentinel tidak lewat resolver, gate manual
-      beneficiaryId = 'none'
-    } else if (touchesBeneficiary(query)) {
-      beneficiaryId = await resolveBeneficiaryRef(tx, actor, query)
-    }
+    // null dari resolver = eksplisit "bersama"/"keluarga"/"none" -> hanya beneficiary_id IS NULL;
+    // undefined = tidak difilter. Sentinel & gate semuanya di dalam resolveBeneficiaryRef.
+    const resolvedBeneficiary = await resolveBeneficiaryRef(tx, actor, query)
+    const beneficiaryId: string | 'none' | undefined = resolvedBeneficiary === null ? 'none' : resolvedBeneficiary
     const cur = decodeCursor(query.cursor)
     const resolved = { dateFrom, dateTo, accountId, categoryId, memberId, beneficiaryId }
 

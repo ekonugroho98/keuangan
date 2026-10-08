@@ -14,10 +14,15 @@ import * as goalsSvc from '../services/goals'
 import * as piutangSvc from '../services/piutang'
 import * as recurringsSvc from '../services/recurrings'
 import { resolveName } from '../services/resolve'
+import * as beneficiariesSvc from '../services/beneficiaries'
+import * as reportsSvc from '../services/reports'
+import * as shoppingSvc from '../services/shopping'
+import * as pantrySvc from '../services/pantry'
+import { ingestReceipt } from '../services/receipts'
 
 /**
- * Registry tunggal 22 tool untuk Hermes/agent (06-agent-integration.md §2). Satu sumber
- * kebenaran yang menghasilkan TIGA bentuk berbeda:
+ * Registry tunggal untuk Hermes/agent (06-agent-integration.md §2). Satu sumber kebenaran yang
+ * menghasilkan TIGA bentuk berbeda:
  *   1. `apps/api/tools/hermes-tools.json` (lewat `pnpm gen:tools`, scripts/gen-tools.ts) — dibaca
  *      Hermes sebagai function-calling tools; tiap tool = satu panggilan HTTP (`endpoint`).
  *   2. Tool definitions untuk `/v1/ai/chat` internal (`handler` di bawah memanggil service layer
@@ -25,6 +30,14 @@ import { resolveName } from '../services/resolve'
  *   3. Tabel dokumentasi markdown (`pnpm gen:tools --md`).
  * `handler` TIDAK ikut di-emit ke hermes-tools.json (function tidak bisa di-JSON.stringify) —
  * lihat scripts/gen-tools.ts.
+ *
+ * `feature` (opsional, 10-fitur-opsional-keluarga.md §2.4): tool yang HANYA berguna kalau fitur
+ * opsional itu aktif (mis. list_beneficiaries tanpa beneficiary diaktifkan selalu 403). Hermes
+ * menyaring tool mana yang ditawarkan ke model berdasarkan `GET /v1/households/current` →
+ * `.features` — manifest ini tetap berisi SEMUA tool (statis/publik), penyaringan di sisi agent.
+ * Tool INTI yang cuma MENDAPAT satu parameter opsional baru saat fitur aktif (mis. `beneficiary`
+ * di record_expense) TIDAK diberi `feature` di sini — tool itu sendiri tetap berguna saat fitur
+ * mati, hanya param itu yang tidak boleh dipakai (dijelaskan di deskripsi parameter masing-masing).
  */
 export interface JsonSchema {
   type: string
@@ -42,6 +55,8 @@ export interface ToolDefinition {
   scope: 'read' | 'write'
   idempotent: boolean
   handler: (actor: Actor, args: Record<string, unknown>) => Promise<unknown>
+  /** Lihat catatan panjang di atas TOOLS soal kapan field ini diisi. */
+  feature?: 'beneficiary' | 'monthly_report' | 'reconciliation' | 'shopping_stock'
 }
 
 function str(description: string, extra?: Partial<JsonSchema & { enum?: string[]; format?: string }>): JsonSchema & { enum?: string[]; format?: string } {
@@ -49,6 +64,14 @@ function str(description: string, extra?: Partial<JsonSchema & { enum?: string[]
 }
 function num(description: string): JsonSchema {
   return { type: 'number', description } as JsonSchema
+}
+/**
+ * Model sering mengisi param opsional dengan `null`/"" (deskripsinya pun bilang "Kosongkan") —
+ * untuk `beneficiary` itu berbahaya: null !== undefined dianggap "disentuh" oleh resolver dan
+ * memicu gate 400 di household yang fiturnya mati. Normalkan ke undefined (review 2026-10-08).
+ */
+function optStr(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim() !== '' ? v : undefined
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -99,13 +122,14 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_summary',
-    description: 'Ringkasan keuangan periode tertentu: total masuk/keluar, kategori teratas, saldo. Pakai untuk "gimana keuangan bulan ini", "pengeluaran istri bulan lalu berapa", "bulan ini hemat gak". Jangan jumlahkan manual dari search_transactions, selalu pakai tool ini untuk ringkasan.',
+    description: 'Ringkasan keuangan periode tertentu: total masuk/keluar, kategori teratas, saldo. Pakai untuk "gimana keuangan bulan ini", "pengeluaran istri bulan lalu berapa", "bulan ini hemat gak", "bulan ini keluar buat anak berapa" (scope=beneficiary, hanya kalau fitur aktif). Jangan jumlahkan manual dari search_transactions, selalu pakai tool ini untuk ringkasan.',
     parameters: {
       type: 'object',
       properties: {
         period: str('Periode ringkasan', { enum: ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month', 'this_year', 'all'] }),
-        scope: str('Lingkup: seluruh household atau satu anggota', { enum: ['household', 'member'] }),
+        scope: str('Lingkup: seluruh household, satu anggota, atau satu penerima manfaat (F-A, hanya kalau fitur aktif)', { enum: ['household', 'member', 'beneficiary'] }),
         member: str('Nama/alias anggota (hanya kalau scope=member), mis. "istri", "Eko"'),
+        beneficiary: str('Nama penerima manfaat atau "bersama" (hanya kalau scope=beneficiary, F-A)'),
       },
       required: ['period'],
     },
@@ -115,10 +139,11 @@ export const TOOLS: ToolDefinition[] = [
     handler: async (actor, args) =>
       summarySvc.getSummary(actor, {
         period: String(args.period ?? 'this_month'),
-        scope: (args.scope as 'household' | 'member' | undefined) ?? 'household',
+        scope: (args.scope as 'household' | 'member' | 'beneficiary' | undefined) ?? 'household',
         attribution: 'owner',
         compare: false,
         memberRef: args.member ? { member: String(args.member) } : undefined,
+        beneficiaryRef: optStr(args.beneficiary) ? { beneficiary: optStr(args.beneficiary) } : undefined,
       }),
   },
   {
@@ -155,6 +180,7 @@ export const TOOLS: ToolDefinition[] = [
         q: str('Cari di catatan/note, mis. "indomaret"'),
         min_amount: num('Nominal minimum'),
         max_amount: num('Nominal maksimum'),
+        beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: filter nama penerima manfaat, atau "bersama" untuk transaksi yang tidak untuk siapa-siapa tertentu.'),
       },
     },
     endpoint: { method: 'GET', path: '/v1/transactions' },
@@ -175,6 +201,7 @@ export const TOOLS: ToolDefinition[] = [
           q: args.q as string | undefined,
           min_amount: args.min_amount as number | undefined,
           max_amount: args.max_amount as number | undefined,
+          beneficiary: optStr(args.beneficiary),
           attribution: 'owner',
           include_deleted: false,
           limit: 50,
@@ -185,7 +212,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: 'record_expense',
-    description: 'Catat PENGELUARAN dari satu akun. Gunakan saat user menyebut belanja/bayar/beli. Sebutkan akun persis seperti kata user (mis. "BCA istri", "cash", "gopay suami"). Kalau user tidak menyebut akun, tanya dulu, jangan menebak. Kategori pilih dari list_categories; kalau tidak yakin pakai nama yang paling dekat, API akan mencocokkan alias. Contoh: "catat belanja sayur 45rb dari BCA istri" → {amount_text:"45rb", account:"BCA istri", category:"Makanan", note:"belanja sayur"}.',
+    description: 'Catat PENGELUARAN dari satu akun. Gunakan saat user menyebut belanja/bayar/beli. Sebutkan akun persis seperti kata user (mis. "BCA istri", "cash", "gopay suami"). Kalau user tidak menyebut akun, tanya dulu, jangan menebak. Kategori pilih dari list_categories; kalau tidak yakin pakai nama yang paling dekat, API akan mencocokkan alias. Contoh: "catat belanja sayur 45rb dari BCA istri" → {amount_text:"45rb", account:"BCA istri", category:"Makanan", note:"belanja sayur"}. HANYA kalau fitur "untuk siapa" aktif (cek features.beneficiary di household saat ini) DAN user eksplisit sebut penerima (mis. "buat anak", "buat ortu") → isi juga beneficiary; kalau tidak disebut, JANGAN diisi/ditebak.',
     parameters: {
       type: 'object',
       properties: {
@@ -194,6 +221,7 @@ export const TOOLS: ToolDefinition[] = [
         category: str('Nama kategori atau UUID'),
         note: str('Keterangan singkat, mis. "belanja sayur"'),
         date: str('YYYY-MM-DD; default hari ini (WIB). "kemarin" → isi tanggal kemarin.', { format: 'date' }),
+        beneficiary: str('F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut — jangan menebak.'),
       },
       required: ['amount_text', 'account', 'category'],
     },
@@ -202,7 +230,7 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return transactionsSvc.createTransaction(actor, { type: 'expense', ...pickAmountAccountCategory(args) }, timezone)
+      return transactionsSvc.createTransaction(actor, { type: 'expense', ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary) }, timezone)
     },
   },
   {
@@ -240,7 +268,10 @@ export const TOOLS: ToolDefinition[] = [
           description: 'Daftar item pengeluaran',
           items: {
             type: 'object',
-            properties: { amount_text: str('Nominal item'), category: str('Kategori item'), note: str('Keterangan item') },
+            properties: {
+              amount_text: str('Nominal item'), category: str('Kategori item'), note: str('Keterangan item'),
+              beneficiary: str('F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)'),
+            },
             required: ['amount_text', 'category'],
           },
         },
@@ -252,7 +283,8 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      const items = (args.items as Array<{ amount_text?: string; amount?: number; category?: string; note?: string }>) ?? []
+      const raw = (args.items as Array<{ amount_text?: string; amount?: number; category?: string; note?: string; beneficiary?: unknown }>) ?? []
+      const items = raw.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary) }))
       return transactionsSvc.createTransactionBatch(actor, { account: args.account as string, date: args.date as string | undefined, items }, timezone)
     },
   },
@@ -284,7 +316,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: 'update_transaction',
-    description: 'Ubah transaksi yang SUDAH tercatat (biasanya yang baru saja dicatat pada balasan sebelumnya). Perlu transaction_id dari hasil tool sebelumnya. Contoh: "eh salah, yang tadi 54rb bukan 45rb", "ganti kategorinya jadi Transport".',
+    description: 'Ubah transaksi yang SUDAH tercatat (biasanya yang baru saja dicatat pada balasan sebelumnya). Perlu transaction_id dari hasil tool sebelumnya. Contoh: "eh salah, yang tadi 54rb bukan 45rb", "ganti kategorinya jadi Transport", "eh itu tadi buat anak" (isi beneficiary), "balikin yang tadi ke bersama" (beneficiary:"bersama").',
     parameters: {
       type: 'object',
       properties: {
@@ -293,6 +325,7 @@ export const TOOLS: ToolDefinition[] = [
         category: str('Kategori baru (opsional)'),
         note: str('Catatan baru (opsional)'),
         date: str('Tanggal baru YYYY-MM-DD (opsional)', { format: 'date' }),
+        beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).'),
       },
       required: ['transaction_id'],
     },
@@ -305,6 +338,7 @@ export const TOOLS: ToolDefinition[] = [
         category: args.category as string | undefined,
         note: args.note as string | undefined,
         date: args.date as string | undefined,
+        beneficiary: optStr(args.beneficiary),
       }),
   },
   {
@@ -443,6 +477,175 @@ export const TOOLS: ToolDefinition[] = [
     scope: 'write',
     idempotent: true,
     handler: async (actor) => recurringsSvc.runRecurrings(actor),
+  },
+
+  // ── F-A beneficiary (10-fitur-opsional-keluarga.md §3.5) ────────────────────────────────────
+  {
+    name: 'list_beneficiaries',
+    description: 'Daftar "untuk siapa" yang sudah dikenal (anak, orang tua, dll). Panggil sebelum mencatat/mengubah transaksi dengan beneficiary kalau ragu nama yang valid, atau saat user tanya "siapa aja yang bisa dipilih".',
+    parameters: { type: 'object', properties: {} },
+    endpoint: { method: 'GET', path: '/v1/beneficiaries' },
+    scope: 'read',
+    idempotent: true,
+    feature: 'beneficiary',
+    handler: async (actor) => beneficiariesSvc.listBeneficiaries(actor),
+  },
+  {
+    name: 'add_beneficiary',
+    description: 'Tambah "untuk siapa" baru. Pakai saat user minta eksplisit menambah penerima baru, mis. "tambah Seno sebagai penerima", "nanti kalau beli buat kontrakan catat sebagai Kontrakan". Kind "child"/"relative"/"property"/"other" — pilih yang paling cocok, default "other" kalau ragu.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: str('Nama penerima, mis. "Anak", "Seno", "Kontrakan"'),
+        kind: str('Jenis', { enum: ['child', 'relative', 'property', 'other'] }),
+      },
+      required: ['name'],
+    },
+    endpoint: { method: 'POST', path: '/v1/beneficiaries' },
+    scope: 'write',
+    idempotent: true,
+    feature: 'beneficiary',
+    handler: async (actor, args) => beneficiariesSvc.createBeneficiary(actor, { name: String(args.name), kind: (args.kind as 'child' | 'relative' | 'property' | 'other') ?? 'other', aliases: [] }),
+  },
+
+  // ── F-B laporan bulanan (10-fitur-opsional-keluarga.md §4) — SELALU tersedia, tidak di-gate ──
+  {
+    name: 'get_monthly_report',
+    description: 'Laporan bulanan siap-kirim: total masuk/keluar, kategori terbesar, piutang belum lunas, hutang jatuh tempo, saldo tiap akun, dan ringkasan teks siap kirim (`text_id`). Pakai untuk "laporan bulan ini", "gimana keuangan bulan lalu" kalau user minta ringkasan lengkap (bukan sekadar get_summary), atau saat dipicu jadwal pengiriman otomatis (features.monthly_report). SELALU tersedia — tidak perlu fitur apa pun aktif.',
+    parameters: {
+      type: 'object',
+      properties: { month: str('YYYY-MM; kosongkan untuk bulan sebelumnya (default)') },
+    },
+    endpoint: { method: 'GET', path: '/v1/reports/monthly' },
+    scope: 'read',
+    idempotent: true,
+    handler: async (actor, args) => reportsSvc.getMonthlyReport(actor, { month: args.month as string | undefined }),
+  },
+
+  // ── F-D belanja & pantry (10-fitur-opsional-keluarga.md §6) ─────────────────────────────────
+  {
+    name: 'ingest_receipt',
+    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau).',
+    parameters: {
+      type: 'object',
+      properties: {
+        account: str('Nama akun atau UUID yang dipakai bayar'),
+        date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
+        merchant: str('Nama toko, kalau disebut/terbaca'),
+        ref_no: str('Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)'),
+        items: {
+          type: 'array',
+          description: 'Daftar item di struk',
+          items: {
+            type: 'object',
+            properties: {
+              name: str('Nama item persis seperti di struk atau diucapkan user'),
+              qty: num('Jumlah unit, default 1'),
+              amount: num('Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)'),
+              category: str('Kategori untuk item ini'),
+              for: str('F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini'),
+            },
+            required: ['name', 'amount'],
+          },
+        },
+        total: num('Total struk kalau disebut/terbaca — dipakai untuk validasi (harus sama dengan jumlah semua item)'),
+        shopping: { type: 'boolean', description: 'Default true. false HANYA kalau user eksplisit minta jangan coret daftar belanja.' } as JsonSchema,
+        pantry: { type: 'boolean', description: 'Default true. false HANYA kalau user eksplisit minta jangan tambah stok.' } as JsonSchema,
+      },
+      required: ['account', 'items'],
+    },
+    endpoint: { method: 'POST', path: '/v1/receipts/ingest' },
+    scope: 'write',
+    idempotent: true,
+    feature: 'shopping_stock',
+    handler: async (actor, args) => {
+      // Number(): model internal bisa mengirim angka sebagai string ("25000") — tanpa coerce,
+      // reduce() di ingestReceipt akan MENYAMBUNG string, bukan menjumlah (review 2026-10-08).
+      const items = (args.items as Array<{ name: string; qty?: unknown; amount: unknown; category?: string; for?: unknown }>) ?? []
+      return ingestReceipt(actor, {
+        account: args.account as string | undefined,
+        date: args.date as string | undefined,
+        merchant: optStr(args.merchant),
+        ref_no: optStr(args.ref_no),
+        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for) })),
+        total: args.total == null ? undefined : Number(args.total),
+        shopping: args.shopping !== false,
+        pantry: args.pantry !== false,
+      })
+    },
+  },
+  {
+    name: 'list_shopping',
+    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa".',
+    parameters: { type: 'object', properties: {} },
+    endpoint: { method: 'GET', path: '/v1/shopping' },
+    scope: 'read',
+    idempotent: true,
+    feature: 'shopping_stock',
+    handler: async (actor) => shoppingSvc.listShopping(actor, 'needed'),
+  },
+  {
+    name: 'add_shopping_item',
+    description: 'Tambah satu item ke daftar belanja. Pakai untuk "tambahin telur ke daftar belanja", "inget beli sabun cuci" — TANPA harga/nada "sudah terjadi" (kalau user sebut harga dan sudah dibeli, itu record_expense/ingest_receipt, bukan ini).',
+    parameters: {
+      type: 'object',
+      properties: { name: str('Nama item, mis. "Telur"'), qty_text: str('Jumlah kalau disebut, mis. "2 kg", "1 dus"') },
+      required: ['name'],
+    },
+    endpoint: { method: 'POST', path: '/v1/shopping' },
+    scope: 'write',
+    idempotent: true,
+    feature: 'shopping_stock',
+    handler: async (actor, args) => shoppingSvc.createShoppingItem(actor, { name: String(args.name), qty_text: args.qty_text as string | undefined, notes: '' }),
+  },
+  {
+    name: 'mark_bought',
+    description: 'Tandai item di daftar belanja sudah dibeli (TANPA ikut mencatat transaksi uangnya — kalau user juga sebut harga dan belum dicatat, pakai ingest_receipt/record_expense dulu). Perlu shopping_item_id dari list_shopping.',
+    parameters: { type: 'object', properties: { shopping_item_id: str('UUID item, dari list_shopping') }, required: ['shopping_item_id'] },
+    endpoint: { method: 'PATCH', path: '/v1/shopping/{shopping_item_id}', body: { status: 'bought' } },
+    scope: 'write',
+    idempotent: false,
+    feature: 'shopping_stock',
+    handler: async (actor, args) => shoppingSvc.updateShoppingItem(actor, String(args.shopping_item_id), { status: 'bought' }),
+  },
+  {
+    name: 'shopping_suggestions',
+    description: 'Barang di stok yang sudah menipis dan belum ada di daftar belanja. Pakai untuk "ada yang perlu ditambahin ke belanja gak dari stok yang menipis".',
+    parameters: { type: 'object', properties: {} },
+    endpoint: { method: 'GET', path: '/v1/shopping/suggestions' },
+    scope: 'read',
+    idempotent: true,
+    feature: 'shopping_stock',
+    handler: async (actor) => shoppingSvc.listShoppingSuggestions(actor),
+  },
+  {
+    name: 'list_pantry',
+    description: 'Daftar stok rumah (kulkas/freezer/lemari). Pakai untuk "ada apa aja di kulkas", "stok minyak masih ada gak", "apa yang mau basi". Kalau user tanya SPESIFIK lokasi (kulkas/freezer/lemari), tetap panggil tool ini dan filter sendiri dari hasilnya.',
+    parameters: { type: 'object', properties: {} },
+    endpoint: { method: 'GET', path: '/v1/pantry' },
+    scope: 'read',
+    idempotent: true,
+    feature: 'shopping_stock',
+    handler: async (actor) => pantrySvc.listPantry(actor),
+  },
+  {
+    name: 'adjust_pantry',
+    description: 'Ubah jumlah stok satu item (dipakai/habis/dibuang/koreksi) TANPA lewat struk. Perlu pantry_item_id dari list_pantry. Pakai untuk "abis telur 4", "telurnya dibuang 2 karena busuk", "ternyata minyaknya masih 1 botol" (adjust dengan reason sesuai). delta negatif = berkurang, positif = bertambah.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pantry_item_id: str('UUID item, dari list_pantry'),
+        delta: num('Perubahan jumlah: negatif kalau berkurang (dipakai/dibuang), positif kalau bertambah'),
+        reason: str('Alasan perubahan', { enum: ['consume', 'expired', 'adjust', 'purchase'] }),
+      },
+      required: ['pantry_item_id', 'delta', 'reason'],
+    },
+    endpoint: { method: 'POST', path: '/v1/pantry/{pantry_item_id}/movements' },
+    scope: 'write',
+    idempotent: false,
+    feature: 'shopping_stock',
+    handler: async (actor, args) =>
+      pantrySvc.addPantryMovement(actor, String(args.pantry_item_id), { delta: Number(args.delta), reason: args.reason as 'consume' | 'expired' | 'adjust' | 'purchase', note: '' }),
   },
 ]
 

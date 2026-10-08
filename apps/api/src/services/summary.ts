@@ -69,11 +69,12 @@ export async function getSummary(
       }
       if (!opts.beneficiaryRef) {
         throw ApiError.fromCode('validation_error', {
-          message: 'scope=beneficiary butuh beneficiary (nama/alias/uuid) atau beneficiary=none untuk transaksi bersama.',
+          message: 'scope=beneficiary butuh beneficiary (nama/alias/uuid) atau beneficiary=bersama untuk transaksi bersama.',
           details: { field: 'beneficiary' },
         })
       }
-      beneficiaryId = opts.beneficiaryRef.beneficiary === 'none' ? 'none' : await resolveBeneficiaryRef(tx, actor, opts.beneficiaryRef)
+      const resolved = await resolveBeneficiaryRef(tx, actor, opts.beneficiaryRef)
+      beneficiaryId = resolved === null ? 'none' : resolved
     }
 
     const totals = await computeTotals(tx, actor.householdId, period.from, period.to, opts.scope, accountId, memberId, opts.attribution, beneficiaryId)
