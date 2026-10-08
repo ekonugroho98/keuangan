@@ -1,6 +1,11 @@
 Status: draft
-Terakhir diubah: 2026-10-04
+Terakhir diubah: 2026-10-08
 Bergantung pada: 05-api.md, 03-database.md
+
+> **Riwayat perubahan**
+> | Tanggal | Bagian | Perubahan | Alasan |
+> |---|---|---|---|
+> | 2026-10-08 | §2 (tabel tool, total) | +10 tool F-A/F-B/F-D (`list_beneficiaries`, `add_beneficiary`, `get_monthly_report`, `ingest_receipt`, `list_shopping`, `add_shopping_item`, `mark_bought`, `shopping_suggestions`, `list_pantry`, `adjust_pantry`); total 22→32; `record_expense`/`record_expense_batch`/`update_transaction`/`search_transactions`/`get_summary` dapat parameter opsional `beneficiary` | Implementasi tool Hermes untuk fitur opsional (`10-fitur-opsional-keluarga.md` §2.4), setelah backend+web selesai 2026-10-07. |
 
 # 06 — Integrasi AI Agent (Hermes) : Tool Manifest, Resolusi Nama, Skenario End-to-End
 
@@ -43,8 +48,28 @@ Di-generate dari `apps/api/src/tools/registry.ts` oleh `pnpm gen:tools`. Format:
 | `receive_piutang` | `POST /v1/piutang/{id}/receipts` | write | Terima pembayaran piutang | "Budi bayar 250rb ke BCA suami" |
 | `list_recurrings` | `GET /v1/recurrings` | read | Tagihan rutin dan jatuh tempo | "tagihan apa yang jatuh tempo minggu ini" |
 | `run_recurrings` | `POST /v1/recurrings/run` | write | Eksekusi tagihan rutin jatuh tempo | "jalankan tagihan rutin sekarang" |
+| `list_beneficiaries` | `GET /v1/beneficiaries` | read, **F-A** | "Untuk siapa" yang sudah dikenal | "siapa aja yang bisa dipilih buat 'untuk'" |
+| `add_beneficiary` | `POST /v1/beneficiaries` | write, **F-A** | Tambah "untuk siapa" baru | "tambah Seno sebagai penerima" |
+| `get_monthly_report` | `GET /v1/reports/monthly` | read (SELALU tersedia) | Laporan bulanan siap-kirim (`text_id`) | "laporan bulan ini", dipicu jadwal `features.monthly_report` |
+| `ingest_receipt` | `POST /v1/receipts/ingest` | write, **F-D** | Satu struk → transaksi + coret belanja + tambah stok | foto struk / "tadi beli pampers 48.500 di indomaret" |
+| `list_shopping` | `GET /v1/shopping` | read, **F-D** | Daftar belanja yang masih perlu dibeli | "apa aja yang perlu dibeli" |
+| `add_shopping_item` | `POST /v1/shopping` | write, **F-D** | Tambah item ke daftar belanja (tanpa harga) | "inget beli sabun cuci" |
+| `mark_bought` | `PATCH /v1/shopping/{id}` | write, **F-D** | Tandai item belanja sudah dibeli | dipakai setelah list_shopping dapat id |
+| `shopping_suggestions` | `GET /v1/shopping/suggestions` | read, **F-D** | Barang stok menipis belum ada di daftar belanja | "ada yang perlu ditambah ke belanja dari stok?" |
+| `list_pantry` | `GET /v1/pantry` | read, **F-D** | Stok rumah (kulkas/freezer/lemari) | "ada apa aja di kulkas", "apa yang mau basi" |
+| `adjust_pantry` | `POST /v1/pantry/{id}/movements` | write, **F-D** | Ubah qty stok (pakai/buang/koreksi) | "abis telur 4", "telurnya dibuang 2" |
 
-Total 22 tool. Tool yang menerima `account`, `category`, `member`, `to_account`, `from_account` mendeklarasikan parameter sebagai `oneOf` string nama **atau** UUID (`format: uuid`); API menentukan dari bentuknya.
+Total 32 tool (22 inti + 10 F-A/F-B/F-D opsional, 10-fitur-opsional-keluarga.md §2.4, ditambah 2026-10-08).
+Tool bertanda **F-A**/**F-D** hanya ditawarkan ke model kalau `features.beneficiary`/`features.shopping_stock`
+aktif (dicek dari `GET /v1/households/current`, bukan dari manifest — manifest ini tetap statis/berisi semua
+tool). `get_monthly_report` TIDAK bersyarat (F-B selalu tersedia; flag hanya mengatur jadwal kirim OTOMATIS,
+bukan akses tool ini). `record_expense`, `record_expense_batch`, `update_transaction`, `search_transactions`,
+`get_summary` mendapat parameter opsional baru (`beneficiary`, dan `scope=beneficiary` untuk get_summary) yang
+HANYA boleh diisi kalau `features.beneficiary` aktif DAN user menyebut penerima secara eksplisit — jangan
+menebak. Kata "bersama"/"keluarga" sebagai nilai `beneficiary` berarti "tanpa penerima tertentu" (dipakai untuk
+mengosongkan lewat update_transaction atau memfilter lewat search_transactions/get_summary).
+
+Tool yang menerima `account`, `category`, `member`, `to_account`, `from_account` mendeklarasikan parameter sebagai `oneOf` string nama **atau** UUID (`format: uuid`); API menentukan dari bentuknya.
 
 Contoh satu entri:
 

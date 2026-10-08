@@ -2,7 +2,7 @@ import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { requireFeature } from './features'
-import { resolveMemberRef } from './resolver'
+import { resolveMemberRef, isNoBeneficiarySentinel } from './resolver'
 
 export interface BeneficiaryOut {
   id: string
@@ -12,6 +12,17 @@ export interface BeneficiaryOut {
   aliases: string[]
   icon: string
   color: string
+}
+
+/** "bersama"/"keluarga"/"none" adalah kata sentinel resolver (= tanpa beneficiary) — kalau dibiarkan
+ * jadi nama beneficiary, tidak akan pernah bisa dirujuk lewat nama (review 2026-10-08). */
+function assertNotReservedName(name: string) {
+  if (isNoBeneficiarySentinel(name)) {
+    throw ApiError.fromCode('validation_error', {
+      message: `"${name}" tidak bisa dipakai sebagai nama beneficiary — kata itu berarti "tanpa penerima tertentu".`,
+      details: { field: 'name' },
+    })
+  }
 }
 
 const SELECT = `
@@ -36,6 +47,7 @@ export async function createBeneficiary(
   input: { name: string; kind: 'member' | 'child' | 'relative' | 'property' | 'other'; member?: string; aliases: string[]; icon?: string; color?: string },
 ): Promise<BeneficiaryOut> {
   await requireFeature(actor, 'beneficiary')
+  assertNotReservedName(input.name)
   return withActor(actor, async (tx) => {
     const memberId = input.kind === 'member' && input.member ? ((await resolveMemberRef(tx, actor, { member: input.member })) ?? null) : null
     try {
@@ -57,6 +69,7 @@ export async function createBeneficiary(
 
 export async function updateBeneficiary(actor: Actor, id: string, input: { name?: string; aliases?: string[]; icon?: string; color?: string }): Promise<BeneficiaryOut> {
   await requireFeature(actor, 'beneficiary')
+  if (input.name !== undefined) assertNotReservedName(input.name)
   return withActor(actor, async (tx) => {
     const [existing] = await tx<{ id: string }[]>`select id from beneficiaries where id = ${id} and household_id = ${actor.householdId} and deleted_at is null`
     if (!existing) throw ApiError.fromCode('beneficiary_not_found')
