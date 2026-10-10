@@ -3,7 +3,6 @@ import { fmtRp, fmtDate } from "../../../utils/formatters";
 import { categoryColors } from "../../../constants/categories";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import ScopeSwitcher from "../../household/ScopeSwitcher";
-import { useSummary } from "../../../hooks/useSummary";
 
 /* ═══════════════════════════════════════════════════════════════
  * ASYMMETRIC BENTO DESIGN
@@ -251,31 +250,37 @@ function CategoryDonut({ sortedCats, totalExpense }) {
 /* ═══ Main DasborView ═══ */
 const DasborView = ({
     accounts, transactions, goals, investments = [], debts = [], budgets = [],
-    totalBalance, totalIncome, totalExpense, netBalance, savingRate, expenseRate,
+    totalExpense, savingRate, expenseRate,
     sortedCats, setActiveMenu, setShowAddAccount, setShowAddTx, customCategories = []
 }) => {
     const { t } = useLanguage();
     const [scope, setScope] = useState({ scope: "household" });
-    const { summary: scopedSummary, summaryLoading: scopedSummaryLoading } = useSummary({ period: "this_month", ...scope });
 
-    // Bug ditemukan: section "Portofolio/Akun Anda" di bawah selalu menampilkan SEMUA akun
-    // household apa adanya (arsitektur lama household-wide), tidak ikut berubah saat
-    // ScopeSwitcher pindah ke tab per-anggota — padahal section itu ada TEPAT di sebelah kartu
-    // ringkasan yang SUDAH benar ter-scope (scopedSummary di atas), jadi kelihatan tidak
-    // konsisten/salah meski datanya sendiri bukan salah ambil. Filter accounts di sini supaya
-    // "Akun Anda" benar-benar akun milik scope yang sedang aktif.
+    // Akun yang masuk scope aktif (household = semua, member = akun miliknya, account = satu akun).
     const displayAccounts = scope.scope === "member"
         ? accounts.filter(a => a.owner?.display_name === scope.member)
         : scope.scope === "account"
             ? accounts.filter(a => a.name === scope.account)
             : accounts;
 
+    // Dulu hanya "Akun Anda" yang ikut ScopeSwitcher, sementara Hero/Pemasukan/Pengeluaran/Net/
+    // Rasio Tabungan/grafik/Aktivitas tetap dihitung dari SELURUH transaksi & akun household —
+    // jadi pindah tab ke per-anggota kelihatan tidak berubah atau malah salah. scopedTransactions
+    // jadi satu sumber kebenaran untuk semua kartu di bawah: transaksi ikut masuk scope kalau akun
+    // sumber ATAU akun tujuannya (untuk transfer) dimiliki anggota/akun yang sedang dipilih — sama
+    // persis dengan definisi atribusi "owner" di GET /v1/summary (apps/api/src/services/summary.ts).
+    const scopedAccountNames = new Set(displayAccounts.map(a => a.name));
+    const scopedTransactions = scope.scope === "household"
+        ? transactions
+        : transactions.filter(tx => scopedAccountNames.has(tx.account_name) || scopedAccountNames.has(tx.to_account_name));
+    const scopedBalance = displayAccounts.reduce((a, acc) => a + (acc.balance || 0), 0);
+
     const now = new Date();
     const m = now.getMonth(), y = now.getFullYear();
     const lm = m === 0 ? 11 : m - 1, ly = m === 0 ? y - 1 : y;
 
-    const txThis = transactions.filter(t => { const d = new Date(t.date); return d.getMonth() === m && d.getFullYear() === y; });
-    const txLast = transactions.filter(t => { const d = new Date(t.date); return d.getMonth() === lm && d.getFullYear() === ly; });
+    const txThis = scopedTransactions.filter(t => { const d = new Date(t.date); return d.getMonth() === m && d.getFullYear() === y; });
+    const txLast = scopedTransactions.filter(t => { const d = new Date(t.date); return d.getMonth() === lm && d.getFullYear() === ly; });
 
     const thisIncome = txThis.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
     const thisExpense = txThis.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
@@ -293,7 +298,9 @@ const DasborView = ({
     const thisSavingRate = thisIncome > 0 ? Math.round((1 - thisExpense / thisIncome) * 100) : 0;
 
     const tabunganAccountNames = new Set(accounts.filter(a => a.type === "tabungan").map(a => a.name));
-    const investmentSaving = investments.filter(inv => { const d = new Date(inv.created_at); return d.getMonth() === m && d.getFullYear() === y; }).reduce((s, inv) => s + (inv.buy_price || 0), 0);
+    // investments belum punya atribusi pemilik yang terekspos di sini, jadi dibiarkan 0 saat scope
+    // bukan household — daripada mencampur "investasi household" dengan "tabungan milik anggota".
+    const investmentSaving = scope.scope !== "household" ? 0 : investments.filter(inv => { const d = new Date(inv.created_at); return d.getMonth() === m && d.getFullYear() === y; }).reduce((s, inv) => s + (inv.buy_price || 0), 0);
     const tabunganSaving = txThis.filter(tx => tx.type === "income" && tabunganAccountNames.has(tx.account_name)).reduce((s, tx) => s + tx.amount, 0);
     const actualSavingAmt = investmentSaving + tabunganSaving;
     const actualSavingRate = thisIncome > 0 ? Math.round((actualSavingAmt / thisIncome) * 100) : 0;
@@ -309,7 +316,7 @@ const DasborView = ({
     const sparkData = Array.from({ length: 6 }, (_, i) => {
         const date = new Date(y, m - (5 - i), 1);
         const mo = date.getMonth(), yr = date.getFullYear();
-        const txM = transactions.filter(tx => {
+        const txM = scopedTransactions.filter(tx => {
             const ds = (tx.date || "").slice(0, 10);
             const [txY, txM2] = ds.split("-").map(Number);
             return txM2 - 1 === mo && txY === yr;
@@ -398,27 +405,6 @@ const DasborView = ({
                 <ScopeSwitcher value={scope} onChange={setScope} />
             </div>
 
-            {scope.scope !== "household" && (
-                <div style={{
-                    display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 14, padding: "14px 18px",
-                    borderRadius: 18, background: "var(--glass-1)", backdropFilter: "var(--glass-blur)",
-                    WebkitBackdropFilter: "var(--glass-blur)", border: "1px solid var(--glass-border)",
-                }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.2, width: "100%" }}>
-                        Bulan ini — {scope.scope === "member" ? scope.member : scope.account}
-                    </div>
-                    {scopedSummaryLoading ? (
-                        <div style={{ fontSize: 13, color: "var(--color-muted)" }}>Memuat...</div>
-                    ) : scopedSummary ? (
-                        <>
-                            <div><div style={{ fontSize: 10, color: "var(--color-muted)" }}>Pemasukan</div><div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{fmtRp(scopedSummary.totals.income)}</div></div>
-                            <div><div style={{ fontSize: 10, color: "var(--color-muted)" }}>Pengeluaran</div><div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-expense, #ff716c)" }}>{fmtRp(scopedSummary.totals.expense)}</div></div>
-                            <div><div style={{ fontSize: 10, color: "var(--color-muted)" }}>Bersih</div><div style={{ fontSize: 16, fontWeight: 800 }}>{fmtRp(scopedSummary.totals.net)}</div></div>
-                        </>
-                    ) : null}
-                </div>
-            )}
-
             <div className="bento-grid">
 
                 {/* ═══════════════════════════════════════════════════════
@@ -464,7 +450,7 @@ const DasborView = ({
                             letterSpacing: "-.045em",
                             animation: "count-up .7s ease",
                         }}>
-                            {fmtRp(totalBalance)}
+                            {fmtRp(scopedBalance)}
                         </div>
                     </div>
 
@@ -472,7 +458,7 @@ const DasborView = ({
                     <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                             <span className="chip chip-ghost" style={{ padding: "6px 12px", background: "var(--bg-surface-low)" }}>
-                                🏦 {accounts.length} akun
+                                🏦 {displayAccounts.length} akun
                             </span>
                             <span className="chip chip-ghost" style={{ padding: "6px 12px", background: "var(--bg-surface-low)" }}>
                                 💳 {txThis.length} transaksi bulan ini
@@ -733,7 +719,7 @@ const DasborView = ({
                  * 8. CHART — 8 cols × 2 rows (wide)
                  * ═══════════════════════════════════════════════════════ */}
                 <div className="b-chart">
-                    <AreaChart transactions={transactions} />
+                    <AreaChart transactions={scopedTransactions} />
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════
@@ -747,14 +733,14 @@ const DasborView = ({
                         </div>
                         <button onClick={() => setActiveMenu("transaksi")} className="link-btn" style={{ fontSize: 12 }}>{t("dash.viewAll")}</button>
                     </div>
-                    {transactions.length === 0 ? (
+                    {scopedTransactions.length === 0 ? (
                         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 13, textAlign: "center" }}>
                             <div style={{ fontSize: 36, marginBottom: 10, opacity: .4 }}>💳</div>
                             Belum ada transaksi
                         </div>
                     ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, overflowY: "auto" }}>
-                            {transactions.slice(0, 7).map(tx => (
+                            {scopedTransactions.slice(0, 7).map(tx => (
                                 <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 6px", borderRadius: 10, transition: "background .15s" }}
                                     onMouseOver={e => e.currentTarget.style.background = "var(--color-border-soft)"}
                                     onMouseOut={e => e.currentTarget.style.background = "transparent"}>
