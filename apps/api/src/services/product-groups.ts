@@ -5,7 +5,7 @@ export type ProductGroup = 'food' | 'household' | 'health' | 'utility' | 'transp
 export const PRODUCT_GROUPS: ProductGroup[] = ['food', 'household', 'health', 'utility', 'transport', 'education', 'entertainment', 'other']
 
 export const GROUP_CANDIDATES: Record<ProductGroup, string[]> = {
-  food: ['makanan', 'makanan & minuman', 'makan', 'dapur'],
+  food: ['bahan makanan', 'makanan', 'makanan & minuman', 'makan', 'dapur'],
   household: ['rumah tangga', 'kebersihan', 'shopping', 'belanja'],
   health: ['kesehatan'],
   utility: ['utilitas', 'tagihan'],

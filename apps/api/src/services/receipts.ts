@@ -10,7 +10,7 @@ import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { todayInTz } from './period'
 import { getHouseholdTimezone } from './households'
-import { TX_SELECT, mapTx, type TxRow } from './transactions'
+import { TX_SELECT, mapTx, txSource, type TxRow } from './transactions'
 
 interface ReceiptItemInput {
   name: string
@@ -88,7 +88,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
 
     const createdIdRows = await tx<{ id: string; note: string; amount: string }[]>`
       select id, note, amount::text from post_transactions_batch(
-        ${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items as unknown as postgres.JSONValue)}, 'web'
+        ${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items as unknown as postgres.JSONValue)}, ${txSource(actor)}
       )
     `
 

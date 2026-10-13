@@ -4,6 +4,7 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolveAccountRef } from './resolver'
 import { todayInTz } from './period'
+import { txSource } from './transactions'
 
 export interface CreateTransferInput {
   amount?: number
@@ -30,7 +31,7 @@ export async function createTransfer(actor: Actor, input: CreateTransferInput, t
     const toId = await resolveAccountRef(tx, actor, { account_id: input.to_account_id, account: input.to_account }, 'to_account')
 
     const [txRow] = await tx<{ id: string }[]>`
-      select id from post_transfer(${actor.householdId}, ${actor.memberId}, ${fromId}, ${toId}, ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? null}, 'web')
+      select id from post_transfer(${actor.householdId}, ${actor.memberId}, ${fromId}, ${toId}, ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? null}, ${txSource(actor)})
     `
     const [full] = await tx<{ type: string; amount: string; date: string; note: string; created_at: string }[]>`
       select type, amount::text, date::text, note, created_at::text from transactions where id = ${txRow!.id}

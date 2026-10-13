@@ -38,9 +38,46 @@ const KEYWORD_RULES: Array<{ re: RegExp; group: ProductGroup }> = [
   { re: /pulsa|paket data|token|listrik|pln|internet|wifi|indihome|tagihan/i, group: 'utility' },
   { re: /bensin|bbm|pertamax|pertalite|parkir|\btol\b|ojek|grab|gojek|taxi|taksi|\bbus\b|kereta|transjakarta/i, group: 'transport' },
   { re: /buku|alat tulis|pensil|pulpen|sekolah|kursus|\bles\b|fotokopi|fotocopy/i, group: 'education' },
-  { re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|pewangi|pembersih|\bpel\b|sapu|baju|celana|kaos|sandal|sepatu/i, group: 'household' },
+  { re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|pampers|pewangi|pembersih|sunlight|rinso|molto|so ?klin|daia|downy|vanish|biosol|wipol|bayclin|super ?pel|baygon|pepsodent|ciptadent|lifebuoy|\blux\b|dettol|sunsilk|pantene|rejoice|paseo|montis|monttis|\bpel\b|sapu|baju|celana|kaos|sandal|sepatu/i, group: 'household' },
   { re: /\bmie\b|nasi|ayam|sapi|ikan|sayur|buah|kopi|\bteh\b|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/i, group: 'food' },
 ]
+
+// Kategori khusus yang HANYA ada di sebagian household (dibuat user, bukan bawaan): dicek sebelum
+// kelompok generik, dan hanya berlaku kalau household punya kategori dengan nama/alias kandidatnya.
+// Contoh: "Bakso Mas Boy" → "Makan Beli & Jajan" (bukan "Bahan Makanan"), "Pampers" → "Bayi & Anak".
+export const SPECIAL_RULES: Array<{ re: RegExp; candidates: string[] }> = [
+  {
+    re: /bakso|\bsoto\b|warteg|warung makan|rumah makan|\brm\b|nasi (padang|uduk|goreng|kuning|bungkus|kotak)|\bsate\b|pecel|seblak|siomay|batagor|gorengan|martabak|es teler|es teh|es jeruk|jus buah|resto|restoran|foodhall|food court|\bkfc\b|mcd|mcdonald|starbucks|kopi kenangan|janji jiwa|geprek|penyet|mie ayam|bubur ayam|ketoprak|gado.gado|takoyaki|takayaki|risol|jajan|gofood|grabfood|shopeefood|mie katsu|tongseng/i,
+    candidates: ['makan beli & jajan', 'makan beli', 'jajan', 'makan di luar'],
+  },
+  {
+    re: /popok|diapers|pampers|mamypoko|merries|sweety|baby ha(p)?py|empeng|dot bayi|susu formula|chil ?go|chil ?kid|dancow|bebelac|\bsgm\b|mainan|tisu basah bayi|bedak bayi|minyak telon/i,
+    candidates: ['bayi & anak', 'bayi', 'anak'],
+  },
+  {
+    re: /skincare|serum|toner|sunscreen|lipstik|lipstick|maskara|emina|wardah|make ?up|kosmetik|facial wash/i,
+    candidates: ['kebutuhan istri', 'perawatan diri', 'kecantikan'],
+  },
+  {
+    re: /\bvps\b|hosting|domain|\bserver\b|openai|chatgpt|gemini pro|codebuddy|tokenomix|api key|akun ai|token ai/i,
+    candidates: ['usaha sampingan', 'usaha', 'side income'],
+  },
+  {
+    re: /orang ?tua|\bortu\b|mertua|\badi(k|e)k?\b|\badek\b|ponakan|keponakan/i,
+    candidates: ['keluarga besar'],
+  },
+]
+
+export function specialCategory(name: string, categories: ExpenseCategory[]): string | undefined {
+  for (const r of SPECIAL_RULES) {
+    if (!r.re.test(name)) continue
+    for (const cand of r.candidates) {
+      const hit = categories.find((c) => normText(c.name) === cand || c.aliases.some((a) => normText(a) === cand))
+      if (hit) return hit.name
+    }
+  }
+  return undefined
+}
 
 export function ruleGroup(name: string): ProductGroup | undefined {
   return KEYWORD_RULES.find((r) => r.re.test(name))?.group
@@ -93,6 +130,9 @@ export function classifySync(name: string, aiCategory: unknown, ctx: ClassifyCon
     const ai = findCategory(aiCategory, ctx.categories)
     if (ai && normText(ai) !== 'lainnya') return { category: ai, source: 'ai' }
   }
+
+  const special = specialCategory(name, ctx.categories)
+  if (special) return { category: special, source: 'rule' }
 
   const known = matchKeyword(name, ctx.known)
   const rule = ruleGroup(name)

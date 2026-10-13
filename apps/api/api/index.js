@@ -13924,7 +13924,7 @@ async function callProviderJson(req, provider, timeoutMs = 45e3) {
 // src/services/product-groups.ts
 var PRODUCT_GROUPS = ["food", "household", "health", "utility", "transport", "education", "entertainment", "other"];
 var GROUP_CANDIDATES = {
-  food: ["makanan", "makanan & minuman", "makan", "dapur"],
+  food: ["bahan makanan", "makanan", "makanan & minuman", "makan", "dapur"],
   household: ["rumah tangga", "kebersihan", "shopping", "belanja"],
   health: ["kesehatan"],
   utility: ["utilitas", "tagihan"],
@@ -14019,9 +14019,41 @@ var KEYWORD_RULES = [
   { re: /pulsa|paket data|token|listrik|pln|internet|wifi|indihome|tagihan/i, group: "utility" },
   { re: /bensin|bbm|pertamax|pertalite|parkir|\btol\b|ojek|grab|gojek|taxi|taksi|\bbus\b|kereta|transjakarta/i, group: "transport" },
   { re: /buku|alat tulis|pensil|pulpen|sekolah|kursus|\bles\b|fotokopi|fotocopy/i, group: "education" },
-  { re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|pewangi|pembersih|\bpel\b|sapu|baju|celana|kaos|sandal|sepatu/i, group: "household" },
+  { re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|pampers|pewangi|pembersih|sunlight|rinso|molto|so ?klin|daia|downy|vanish|biosol|wipol|bayclin|super ?pel|baygon|pepsodent|ciptadent|lifebuoy|\blux\b|dettol|sunsilk|pantene|rejoice|paseo|montis|monttis|\bpel\b|sapu|baju|celana|kaos|sandal|sepatu/i, group: "household" },
   { re: /\bmie\b|nasi|ayam|sapi|ikan|sayur|buah|kopi|\bteh\b|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/i, group: "food" }
 ];
+var SPECIAL_RULES = [
+  {
+    re: /bakso|\bsoto\b|warteg|warung makan|rumah makan|\brm\b|nasi (padang|uduk|goreng|kuning|bungkus|kotak)|\bsate\b|pecel|seblak|siomay|batagor|gorengan|martabak|es teler|es teh|es jeruk|jus buah|resto|restoran|foodhall|food court|\bkfc\b|mcd|mcdonald|starbucks|kopi kenangan|janji jiwa|geprek|penyet|mie ayam|bubur ayam|ketoprak|gado.gado|takoyaki|takayaki|risol|jajan|gofood|grabfood|shopeefood|mie katsu|tongseng/i,
+    candidates: ["makan beli & jajan", "makan beli", "jajan", "makan di luar"]
+  },
+  {
+    re: /popok|diapers|pampers|mamypoko|merries|sweety|baby ha(p)?py|empeng|dot bayi|susu formula|chil ?go|chil ?kid|dancow|bebelac|\bsgm\b|mainan|tisu basah bayi|bedak bayi|minyak telon/i,
+    candidates: ["bayi & anak", "bayi", "anak"]
+  },
+  {
+    re: /skincare|serum|toner|sunscreen|lipstik|lipstick|maskara|emina|wardah|make ?up|kosmetik|facial wash/i,
+    candidates: ["kebutuhan istri", "perawatan diri", "kecantikan"]
+  },
+  {
+    re: /\bvps\b|hosting|domain|\bserver\b|openai|chatgpt|gemini pro|codebuddy|tokenomix|api key|akun ai|token ai/i,
+    candidates: ["usaha sampingan", "usaha", "side income"]
+  },
+  {
+    re: /orang ?tua|\bortu\b|mertua|\badi(k|e)k?\b|\badek\b|ponakan|keponakan/i,
+    candidates: ["keluarga besar"]
+  }
+];
+function specialCategory(name, categories) {
+  for (const r of SPECIAL_RULES) {
+    if (!r.re.test(name)) continue;
+    for (const cand of r.candidates) {
+      const hit = categories.find((c) => normText(c.name) === cand || c.aliases.some((a) => normText(a) === cand));
+      if (hit) return hit.name;
+    }
+  }
+  return void 0;
+}
 function ruleGroup(name) {
   return KEYWORD_RULES.find((r) => r.re.test(name))?.group;
 }
@@ -14065,6 +14097,8 @@ function classifySync(name, aiCategory, ctx) {
     const ai = findCategory(aiCategory, ctx.categories);
     if (ai && normText(ai) !== "lainnya") return { category: ai, source: "ai" };
   }
+  const special = specialCategory(name, ctx.categories);
+  if (special) return { category: special, source: "rule" };
   const known = matchKeyword(name, ctx.known);
   const rule = ruleGroup(name);
   if (known && (known.group !== "other" || !rule)) {
@@ -14421,6 +14455,9 @@ async function setProductAlias(actor, input) {
 function touchesBeneficiary(ref) {
   return ref.beneficiary_id !== void 0 || ref.beneficiary !== void 0;
 }
+function txSource(actor) {
+  return actor.credential === "api_key" ? "api_key" : "web";
+}
 function parseAmount(input) {
   try {
     if (input.amount !== void 0) return input.amount;
@@ -14584,7 +14621,7 @@ async function createTransaction(actor, input, timezone) {
     const [row] = await tx`
       select id from post_transaction(
         ${actor.householdId}, ${actor.memberId}, ${input.type}, ${accountId}, ${categoryId},
-        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ""}, 'web', null, ${beneficiaryId}
+        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ""}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `;
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [row.id]);
@@ -14615,7 +14652,7 @@ async function createTransactionBatch(actor, input, timezone) {
     const date = input.date ?? todayInTz(timezone);
     const dbItems = items.map(({ titipan: _t, ...rest }) => rest);
     const createdRows = await tx`
-      select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems)}, 'web')
+      select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems)}, ${txSource(actor)})
     `;
     if (actor.credential === "jwt") await learnKeywords(tx, actor.householdId, items.filter((i) => !i.titipan).map((i) => ({ note: i.note, categoryId: i.category_id })));
     const remaining = [...createdRows];
@@ -14813,7 +14850,7 @@ async function createTransfer(actor, input, timezone) {
     const fromId = await resolveAccountRef(tx, actor, { account_id: input.from_account_id, account: input.from_account }, "from_account");
     const toId = await resolveAccountRef(tx, actor, { account_id: input.to_account_id, account: input.to_account }, "to_account");
     const [txRow] = await tx`
-      select id from post_transfer(${actor.householdId}, ${actor.memberId}, ${fromId}, ${toId}, ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? null}, 'web')
+      select id from post_transfer(${actor.householdId}, ${actor.memberId}, ${fromId}, ${toId}, ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? null}, ${txSource(actor)})
     `;
     const [full] = await tx`
       select type, amount::text, date::text, note, created_at::text from transactions where id = ${txRow.id}
@@ -16790,7 +16827,7 @@ async function ingestReceipt(actor, input) {
     const date = input.date ?? todayInTz(timezone);
     const createdIdRows = await tx`
       select id, note, amount::text from post_transactions_batch(
-        ${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items)}, 'web'
+        ${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items)}, ${txSource(actor)}
       )
     `;
     const remaining = [...createdIdRows];
