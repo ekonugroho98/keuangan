@@ -771,9 +771,14 @@ Yang dikerjakan (commit menyusul):
 Verifikasi: `pnpm --filter @karaya/api typecheck/lint` bersih; `vitest run` **89/89** lulus terhadap
 `supabase start` lokal (54322) setelah migrasi 0024 diterapkan via psql (termasuk 14 unit test
 `categorize.test.ts`: urutan prioritas, substring terpanjang, `keywordFromNote`, parser DDG). Build
-`apps/api` (bundle `api/index.js`) dan `apps/web` hijau. **Migrasi 0024 BELUM diterapkan ke produksi**
-saat entri ini ditulis — wajib sebelum deploy API, karena `scan-receipt`/`ingest` sekarang membaca
-`category_keywords`/`product_knowledge`.
+`apps/api` (bundle `api/index.js`) dan `apps/web` hijau. **Update 2026-10-13: migrasi 0024 SUDAH diterapkan ke
+produksi** (pemilik produk menjalankan isi file lewat SQL Editor Supabase dashboard, seperti 0020), lalu commit
+`24d7bc9` di-push → Vercel `karaya-api-v1` dan `keuangan` Ready, `/v1/health` db ok, manifest
+`/v1/tools/hermes.json` sudah memuat deskripsi `ingest_receipt` baru. Catatan untuk sesi berikutnya: Supabase CLI
+di repo ini ter-link ke produksi (`supabase migration list --linked` jalan tanpa kredensial tambahan), tetapi tabel
+riwayat `supabase_migrations.schema_migrations` di produksi KOSONG (semua migrasi diterapkan manual), jadi
+`supabase db push` polos akan mencoba menerapkan ulang 1..24 — perlu `supabase migration repair --status applied`
+dulu, atau tetap pakai SQL Editor.
 
 Belum diuji end-to-end dengan foto struk nyata (butuh API key provider pemilik). Utang: UI untuk melihat/
 mengedit gudang kata kunci (`GET /v1/categories/keywords` belum ada); `category_source` belum ditampilkan
