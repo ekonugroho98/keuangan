@@ -525,6 +525,22 @@ dicoret dari daftar, 1 stok bertambah; 'garam' tidak ketemu di stok"). `total` o
 *assert* `sum(items.amount) == total` → `422 receipt_total_mismatch` (diskon/voucher harus sudah dialokasikan
 ke item oleh pemanggil, atau dikirim sebagai item negatif? — **tidak**: item `amount` harus net; lihat Q-F7).
 
+**Format note (2026-10-13)**: setiap transaksi dari struk diberi note kanonik **`[Nama Toko] Nama item [ref: NOMOR]`**
+(`formatReceiptNote`/`parseReceiptNote` di `packages/shared/src/format`) — dipakai `receipts/ingest` DAN modal scan web
+(`/v1/transactions/batch`), supaya toko terbaca di daftar transaksi dan bisa diurai balik (perbandingan harga antar toko,
+rekonsiliasi `[ref: …]`). Format lama `Nama — Toko [ref: X]` masih dimengerti parser (data sebelum 2026-10-13).
+
+**Titipan → Piutang (2026-10-13, `apps/api/src/services/titipan.ts`)**: item yang dibelikan untuk orang lain yang akan
+mengganti uangnya BUKAN pengeluaran keluarga. Di `receipts/ingest` dan `transactions/batch`, item dikenali sebagai
+titipan kalau (1) `items[].titipan: "<nama>"` diisi, (2) nama/note memuat kata "titipan" (nama orang diambil dari teks
+sesudahnya, mis. "Sabun titipan Bu Ani" → "Bu Ani"; tanpa nama → "Titipan"), atau (3) kategorinya dipilih "Piutang".
+Efek, dalam transaksi DB yang sama dengan `post_transactions_batch`: kategori item dipaksa ke kategori sistem Piutang,
+note diberi akhiran `(titipan X)` kalau belum menyebutnya, dan **satu baris `piutang` per orang per struk** dibuat
+(`total` = jumlah item orang itu, `from_account_id` = akun struk, `lend_transaction_id` hanya kalau tepat satu item,
+`notes` = "Titipan dari <toko>: item, item"). Respons menambah `piutang: [{id, borrower_name, total, items[]}]`. Item
+titipan tidak diklasifikasi (tidak ada pencarian web) dan tidak dipelajari ke `category_keywords`; `learnKeywords` juga
+mengabaikan kategori sistem apa pun. Pelunasan tetap lewat `POST /v1/piutang/{id}/receipts` yang sudah ada.
+
 ### 6.4 API lain
 
 | Method | Path | Scope | Keterangan |

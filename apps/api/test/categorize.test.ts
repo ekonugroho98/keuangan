@@ -76,7 +76,9 @@ describe('helper', () => {
   })
 
   it('keywordFromNote membuang suffix toko/ref dan menormalkan', () => {
-    expect(keywordFromNote('LFBY BS 85G — Indomaret [ref: 123]')).toBe('lfby bs 85g')
+    expect(keywordFromNote('[Indomaret] LFBY BS 85G [ref: 123]')).toBe('lfby bs 85g')
+    expect(keywordFromNote('LFBY BS 85G — Indomaret [ref: 123]')).toBe('lfby bs 85g') // format lama
+    expect(keywordFromNote('[Alfamart] Sabun (titipan Bu Ani)')).toBe('sabun')
     expect(keywordFromNote('  Téh  Botol ')).toBe('teh botol')
     expect(keywordFromNote('x')).toBeNull()
     expect(keywordFromNote(null)).toBeNull()

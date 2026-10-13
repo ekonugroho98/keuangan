@@ -63,3 +63,43 @@ export function parseAmountId(input: string | number): number {
   if (plain === '') throw new AmountParseError(input)
   return Number.parseInt(plain, 10)
 }
+
+// ── Note transaksi dari struk ───────────────────────────────────────────────────────────────
+// Format kanonik: "[Nama Toko] Nama item [ref: NOMOR]". Dipakai ingest_receipt (Hermes) dan modal
+// scan web supaya note konsisten, mudah dibaca ("[Indomaret] Indomie Goreng"), dan bisa diurai
+// balik: nama toko untuk perbandingan harga antar toko, `[ref: …]` untuk rekonsiliasi bank (F-C).
+export function formatReceiptNote(name: string, merchant?: string | null, refNo?: string | null): string {
+  const m = merchant?.trim()
+  const r = refNo?.trim()
+  return `${m ? `[${m}] ` : ''}${name.trim()}${r ? ` [ref: ${r}]` : ''}`
+}
+
+export interface ParsedReceiptNote {
+  merchant?: string
+  name: string
+  refNo?: string
+}
+
+/** Kebalikan formatReceiptNote. Juga mengerti format lama "Nama — Toko [ref: X]" (struk sebelum 2026-10-13). */
+export function parseReceiptNote(note: string): ParsedReceiptNote {
+  let rest = note.trim()
+  const out: ParsedReceiptNote = { name: rest }
+  const ref = rest.match(/\s*\[ref:\s*([^\]]*)\]\s*$/i)
+  if (ref) {
+    out.refNo = ref[1]!.trim()
+    rest = rest.slice(0, ref.index).trim()
+  }
+  const lead = rest.match(/^\[([^\]]+)\]\s*/)
+  if (lead) {
+    out.merchant = lead[1]!.trim()
+    rest = rest.slice(lead[0].length).trim()
+  } else {
+    const legacy = rest.lastIndexOf(' — ')
+    if (legacy > 0) {
+      out.merchant = rest.slice(legacy + 3).trim()
+      rest = rest.slice(0, legacy).trim()
+    }
+  }
+  out.name = rest
+  return out
+}

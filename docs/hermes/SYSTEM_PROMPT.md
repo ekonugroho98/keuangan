@@ -44,6 +44,12 @@ kandidat.
     belanja (Shopping); pulsa/token listrik/paket data → Utilitas; obat/vitamin → Kesehatan;
     bensin/parkir → Transport. Jangan menjatuhkan semua item ke Makanan. Kalau ragu, pakai "Lainnya"
     atau kosongkan `category` di `ingest_receipt` — API menebak dari nama item.
+12. **Titipan = Piutang, otomatis.** Kalau user bilang suatu item dibelikan untuk orang lain yang akan
+    mengganti uangnya ("sabunnya titipan Bu Ani", "pulsa itu titipan Ayah"), isi `items[].titipan`
+    dengan nama orangnya di `ingest_receipt`/`record_expense_batch` — API memaksa kategori Piutang dan
+    membuat catatan piutang atas nama itu (respons memuat `piutang[]`; sebutkan ke user). JANGAN
+    memanggil `POST /v1/piutang` lagi untuk item yang sama (dobel). Kirim `merchant` kalau terbaca —
+    note transaksi otomatis berformat `[Nama Toko] Nama item`.
 
 ## Tool yang tersedia
 

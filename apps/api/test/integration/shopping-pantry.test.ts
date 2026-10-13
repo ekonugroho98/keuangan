@@ -182,7 +182,7 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('F-D belanja & pantry
     expect(res.status).toBe(201)
     const body = await res.json()
     createdTxIds.push(body.transactions[0].id)
-    expect(body.transactions[0].note).toBe('Garam — Alfamart [ref: TIPB2610062015]')
+    expect(body.transactions[0].note).toBe('[Alfamart] Garam [ref: TIPB2610062015]')
     expect(body.shopping).toBeUndefined()
     expect(body.pantry).toBeUndefined()
   })

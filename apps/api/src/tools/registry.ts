@@ -271,6 +271,7 @@ export const TOOLS: ToolDefinition[] = [
             properties: {
               amount_text: str('Nominal item'), category: str('Nama kategori dari list_categories, dipilih dari JENIS barang item ini (sabun → Shopping, pulsa → Utilitas, obat → Kesehatan, sayur/lauk → Makanan); jangan semua Makanan. Ragu → "Lainnya".'), note: str('Keterangan item'),
               beneficiary: str('F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)'),
+              titipan: str('Nama orang yang menitip, HANYA kalau user bilang item ini titipan orang lain yang akan mengganti uangnya → masuk Piutang + catatan piutang otomatis. Jangan isi kalau tidak disebut.'),
             },
             required: ['amount_text', 'category'],
           },
@@ -283,8 +284,8 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      const raw = (args.items as Array<{ amount_text?: string; amount?: number; category?: string; note?: string; beneficiary?: unknown }>) ?? []
-      const items = raw.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary) }))
+      const raw = (args.items as Array<{ amount_text?: string; amount?: number; category?: string; note?: string; beneficiary?: unknown; titipan?: unknown }>) ?? []
+      const items = raw.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary), titipan: optStr(i.titipan) }))
       return transactionsSvc.createTransactionBatch(actor, { account: args.account as string, date: args.date as string | undefined, items }, timezone)
     },
   },
@@ -525,7 +526,7 @@ export const TOOLS: ToolDefinition[] = [
   // ── F-D belanja & pantry (10-fitur-opsional-keluarga.md §6) ─────────────────────────────────
   {
     name: 'ingest_receipt',
-    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak → kategori makanan; sabun/deterjen/tisu/popok → belanja/Shopping; pulsa/token listrik → Utilitas; obat/vitamin → Kesehatan). Jangan menjatuhkan semua item ke Makanan.',
+    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak → kategori makanan; sabun/deterjen/tisu/popok → belanja/Shopping; pulsa/token listrik → Utilitas; obat/vitamin → Kesehatan). Jangan menjatuhkan semua item ke Makanan. Note transaksi otomatis berformat "[Nama Toko] Nama item" — kirim merchant kalau terbaca. Item TITIPAN (dibelikan untuk orang lain yang akan mengganti uangnya) → isi items[].titipan dengan nama orangnya: masuk Piutang + catatan piutang otomatis, dan respons memuat `piutang[]` — sebutkan ke user.',
     parameters: {
       type: 'object',
       properties: {
@@ -544,6 +545,7 @@ export const TOOLS: ToolDefinition[] = [
               amount: num('Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)'),
               category: str('Nama kategori dari list_categories, dipilih dari JENIS barang ini (bukan toko). Ragu → "Lainnya" atau kosongkan: API menebak dari nama item, dan nama tak dikenal dipetakan ke kategori household terdekat (tidak pernah error).'),
               for: str('F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini'),
+              titipan: str('Nama orang yang MENITIP, HANYA kalau user bilang item ini titipan/dibelikan untuk orang lain yang akan mengganti uangnya ("sabunnya titipan Bu Ani"). Item itu masuk kategori Piutang + otomatis dibuatkan catatan piutang atas nama orang itu (bukan pengeluaran keluarga). Jangan isi kalau tidak disebut.'),
             },
             required: ['name', 'amount'],
           },
@@ -561,13 +563,13 @@ export const TOOLS: ToolDefinition[] = [
     handler: async (actor, args) => {
       // Number(): model internal bisa mengirim angka sebagai string ("25000") — tanpa coerce,
       // reduce() di ingestReceipt akan MENYAMBUNG string, bukan menjumlah (review 2026-10-08).
-      const items = (args.items as Array<{ name: string; qty?: unknown; amount: unknown; category?: string; for?: unknown }>) ?? []
+      const items = (args.items as Array<{ name: string; qty?: unknown; amount: unknown; category?: string; for?: unknown; titipan?: unknown }>) ?? []
       return ingestReceipt(actor, {
         account: args.account as string | undefined,
         date: args.date as string | undefined,
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
-        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for) })),
+        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for), titipan: optStr(i.titipan) })),
         total: args.total == null ? undefined : Number(args.total),
         shopping: args.shopping !== false,
         pantry: args.pantry !== false,

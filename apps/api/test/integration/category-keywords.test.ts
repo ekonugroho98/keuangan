@@ -2,6 +2,7 @@ import { SignJWT } from 'jose'
 import postgres from 'postgres'
 import { afterAll, describe, expect, it } from 'vitest'
 import { buildApp } from '../../src/app'
+import { parseReceiptNote } from '@karaya/shared/format'
 
 // Gudang kata kunci kategori (03-database.md §3.20–3.21, migrasi 0024) — household seed "Keluarga Eko".
 // User seed `ai_config` kosong → tidak ada pencarian web di sini (jalur itu best-effort & butuh BYOK),
@@ -76,7 +77,7 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('gudang kata kunci ka
     })
     expect(res.status).toBe(201)
     const body = await res.json()
-    const byNote = Object.fromEntries(body.transactions.map((t: { id: string; note: string; category: { name: string } }) => [t.note.split(' — ')[0], t]))
+    const byNote = Object.fromEntries(body.transactions.map((t: { id: string; note: string; category: { name: string } }) => [parseReceiptNote(t.note).name, t]))
     for (const t of body.transactions) createdTxIds.push(t.id)
 
     expect(byNote['LFBY BS 85G'].category.name).toBe('Lainnya') // tak dikenal, tanpa AI/web → Lainnya, bukan Makanan

@@ -784,3 +784,23 @@ Belum diuji end-to-end dengan foto struk nyata (butuh API key provider pemilik).
 mengedit gudang kata kunci (`GET /v1/categories/keywords` belum ada); `category_source` belum ditampilkan
 di modal scan; pencarian web bergantung DuckDuckGo Lite yang bisa memblokir IP serverless (fallback:
 pengetahuan AI saja, `source=ai`).
+
+### Titipan → Piutang otomatis + note kanonik `[Toko] item` (2026-10-13)
+Permintaan pemilik produk: (1) item TITIPAN masuk Piutang, (2) note struk berformat `[nama toko] nama item`,
+(3) strategi membandingkan harga produk antar toko walau penamaannya beda.
+- **Note**: `formatReceiptNote`/`parseReceiptNote` baru di `packages/shared/src/format` — dipakai `receipts.ts`
+  (`[Toko] item [ref: X]`), modal scan web (prefix toko saat simpan), dan `keywordFromNote` (parser mengerti format
+  lama ` — Toko` juga). Test `shopping-pantry.test.ts` disesuaikan.
+- **Titipan**: service baru `apps/api/src/services/titipan.ts` (`detectTitipan`, `borrowerFromText`,
+  `createTitipanPiutang`). Dikenali dari field `titipan`, kata "titipan" di nama/note, atau kategori "Piutang".
+  Diterapkan di `ingestReceipt` dan `createTransactionBatch`: kategori dipaksa Piutang, satu baris `piutang` per
+  orang per struk (`from_account_id` akun struk, `lend_transaction_id` kalau tepat satu item), respons `piutang[]`.
+  Tidak ada migrasi (memakai tabel/kategori sistem yang sudah ada). `learnKeywords` melewati kategori sistem.
+  Skema `ReceiptItemSchema`/`BatchItemSchema` + `titipan`; tool `ingest_receipt`/`record_expense_batch` + param
+  `titipan` (manifest di-regen); `SYSTEM_PROMPT.md` aturan 12; skill VPS bagian Titipan ditambah pola otomatis.
+  Modal web: dropdown scan menawarkan "Piutang" (kategori sistem) untuk item titipan.
+- **Verifikasi**: `typecheck`/`lint` bersih; 115/115 test (unit `titipan.test.ts` 5, integrasi `titipan.test.ts` 3);
+  `schema.d.ts` di-regen dari OpenAPI lokal; bundle `api/index.js` + `apps/web` dibangun ulang.
+- **Perbandingan harga antar toko** — BELUM diimplementasi, baru strategi (lihat §"Rencana" di bawah kalau disetujui):
+  identitas produk kanonik dari `product_knowledge.label` (sudah terisi oleh pencarian web) + tabel harga per
+  (produk kanonik, toko, tanggal) yang diisi saat ingest, dibandingkan per satuan (g/ml/pcs).

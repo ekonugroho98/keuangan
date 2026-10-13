@@ -371,6 +371,10 @@
               "beneficiary": {
                 "type": "string",
                 "description": "F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)"
+              },
+              "titipan": {
+                "type": "string",
+                "description": "Nama orang yang menitip, HANYA kalau user bilang item ini titipan orang lain yang akan mengganti uangnya → masuk Piutang + catatan piutang otomatis. Jangan isi kalau tidak disebut."
               }
             },
             "required": [
@@ -778,7 +782,7 @@
   },
   {
     "name": "ingest_receipt",
-    "description": "Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak → kategori makanan; sabun/deterjen/tisu/popok → belanja/Shopping; pulsa/token listrik → Utilitas; obat/vitamin → Kesehatan). Jangan menjatuhkan semua item ke Makanan.",
+    "description": "Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak → kategori makanan; sabun/deterjen/tisu/popok → belanja/Shopping; pulsa/token listrik → Utilitas; obat/vitamin → Kesehatan). Jangan menjatuhkan semua item ke Makanan. Note transaksi otomatis berformat \"[Nama Toko] Nama item\" — kirim merchant kalau terbaca. Item TITIPAN (dibelikan untuk orang lain yang akan mengganti uangnya) → isi items[].titipan dengan nama orangnya: masuk Piutang + catatan piutang otomatis, dan respons memuat `piutang[]` — sebutkan ke user.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -824,6 +828,10 @@
               "for": {
                 "type": "string",
                 "description": "F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini"
+              },
+              "titipan": {
+                "type": "string",
+                "description": "Nama orang yang MENITIP, HANYA kalau user bilang item ini titipan/dibelikan untuk orang lain yang akan mengganti uangnya (\"sabunnya titipan Bu Ani\"). Item itu masuk kategori Piutang + otomatis dibuatkan catatan piutang atas nama orang itu (bukan pengeluaran keluarga). Jangan isi kalau tidak disebut."
               }
             },
             "required": [

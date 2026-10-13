@@ -6,6 +6,7 @@ import { withActor } from '../db/tx'
 import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords } from './categorize'
+import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -269,16 +270,24 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   })
 }
 
-export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string }> }, timezone: string) {
+export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
+    const piutangCatId = await piutangCategoryId(tx, actor.householdId)
+    // Titipan (titipan.ts): field `titipan`, kata "titipan" di note, ATAU kategori dipilih "Piutang"
+    // (dropdown modal web) → kategori Piutang + catatan piutang atas nama orangnya.
     const items = await Promise.all(
-      input.items.map(async (item) => ({
-        amount: parseAmount(item),
-        category_id: await resolveCategoryRef(tx, actor, item, 'expense'),
-        note: item.note ?? '',
-        beneficiary_id: (await resolveBeneficiaryRef(tx, actor, item)) ?? null,
-      })),
+      input.items.map(async (item) => {
+        const resolvedCat = await resolveCategoryRef(tx, actor, item, 'expense')
+        const titipan = detectTitipan(item.note, item.titipan) ?? (resolvedCat === piutangCatId ? { borrower: 'Titipan' } : null)
+        return {
+          amount: parseAmount(item),
+          category_id: titipan ? piutangCatId : resolvedCat,
+          note: titipan ? titipanDisplayName(item.note ?? '', titipan).slice(0, 500) : (item.note ?? ''),
+          beneficiary_id: (await resolveBeneficiaryRef(tx, actor, item)) ?? null,
+          titipan,
+        }
+      }),
     )
     const date = input.date ?? todayInTz(timezone)
     // BUG NYATA ditemukan saat implementasi F-A (belum pernah ketahuan — tidak ada test yang
@@ -287,17 +296,28 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     // tagged template, menghasilkan jsonb STRING SCALAR (bukan ARRAY) -> post_transactions_batch
     // akan gagal di `jsonb_array_length(p_items)`. `tx.json(items)` adalah satu-satunya cara aman
     // (pola sama dengan routes/me.ts).
-    const createdRows = await tx<{ id: string }[]>`
-      select id from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items as unknown as postgres.JSONValue)}, 'web')
+    const dbItems = items.map(({ titipan: _t, ...rest }) => rest)
+    const createdRows = await tx<{ id: string; note: string; amount: string }[]>`
+      select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems as unknown as postgres.JSONValue)}, 'web')
     `
     // Lewat web (JWT) user sudah meninjau kategori tiap item di modal scan sebelum menyimpan — itu
     // konfirmasi manusia, jadi dipelajari (category_keywords). Lewat API key kategori masih tebakan
-    // agent; belajar baru terjadi saat user mengoreksinya (updateTransaction).
-    if (actor.credential === 'jwt') await learnKeywords(tx, actor.householdId, items.map((i) => ({ note: i.note, categoryId: i.category_id })))
+    // agent; belajar baru terjadi saat user mengoreksinya (updateTransaction). Titipan tidak dipelajari.
+    if (actor.credential === 'jwt') await learnKeywords(tx, actor.householdId, items.filter((i) => !i.titipan).map((i) => ({ note: i.note, categoryId: i.category_id })))
+    // Korelasi item → baris lewat note+amount (urutan RETURNING tidak dijamin), pola sama dengan receipts.ts.
+    const remaining = [...createdRows]
+    const titipanCreated: TitipanCreated[] = []
+    for (const it of items) {
+      if (!it.titipan) continue
+      const idx = remaining.findIndex((r) => r.note === it.note && Number(r.amount) === it.amount)
+      const txId = idx === -1 ? undefined : remaining.splice(idx, 1)[0]!.id
+      titipanCreated.push({ txId, borrower: it.titipan.borrower, name: it.note || 'item', amount: it.amount })
+    }
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, created: titipanCreated }) : []
     const ids = createdRows.map((r) => r.id)
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
-    return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow!.balance) } }
+    return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow!.balance) }, ...(piutang.length ? { piutang } : {}) }
   })
 }
 

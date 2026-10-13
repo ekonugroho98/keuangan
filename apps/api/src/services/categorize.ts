@@ -1,4 +1,5 @@
 import type postgres from 'postgres'
+import { parseReceiptNote } from '@karaya/shared/format'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { tryGetAiConfig } from './ai/provider'
@@ -122,10 +123,10 @@ export function normalizeScanResult(raw: Record<string, unknown>, categories: Ex
   return { ...raw, items }
 }
 
-/** Note transaksi → keyword belajar: buang suffix " — Toko [ref: …]" dari ingest_receipt. */
+/** Note transaksi → keyword belajar: buang "[Toko]"/"[ref: …]" (dan format lama " — Toko") dari struk, serta "(titipan X)". */
 export function keywordFromNote(note: unknown): string | null {
   if (typeof note !== 'string') return null
-  const base = normText(note.split(' — ')[0]!.split(' [ref:')[0]!)
+  const base = normText(parseReceiptNote(note).name.replace(/\s*\(titipan [^)]*\)\s*$/i, ''))
   if (base.length < 2 || base.length > 80) return null
   return base
 }
@@ -164,7 +165,12 @@ export async function loadKnownProducts(tx: postgres.TransactionSql, names: stri
 
 /** Dipanggil setelah user MENGONFIRMASI kategori (simpan hasil scan di web, ubah kategori transaksi). */
 export async function learnKeywords(tx: postgres.TransactionSql, householdId: string, pairs: Array<{ note: unknown; categoryId: string }>, source: 'user' | 'web' | 'ai' = 'user'): Promise<void> {
+  if (!pairs.length) return
+  // Kategori sistem (Piutang, Transfer, dll.) bukan sifat barang — "pulsa titipan Dedi" → Piutang
+  // tidak boleh membuat "pulsa" dipelajari sebagai Piutang.
+  const systemIds = new Set((await tx<{ id: string }[]>`select id from categories where household_id = ${householdId} and is_system = true`).map((r) => r.id))
   for (const p of pairs) {
+    if (systemIds.has(p.categoryId)) continue
     const kw = keywordFromNote(p.note)
     if (!kw) continue
     await tx`select learn_category_keyword(${householdId}, ${kw}, ${p.categoryId}, ${source}::keyword_source)`
