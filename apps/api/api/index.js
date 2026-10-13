@@ -16946,6 +16946,13 @@ function fmtDay(date) {
   const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
   return `${Number(d)} ${months[Number(m) - 1]}`;
 }
+var KIND_RULES = [
+  { kind: "Minuman & es", re: /\bes\b|\bjus\b|\bteh\b|kopi|le ?minerale|aqua|air mineral|\bsusu\b|boba|thai tea|minum|milk|yakult/i },
+  { kind: "Camilan", re: /gorengan|risol|takoyaki|takayaki|siomay|batagor|opak|sempol|cilok|cireng|cimol|kerupuk|\bkue\b|roti|martabak|dimsum|dim sum|cakwe|pempek|snack|keripik|cemilan|camilan/i }
+];
+function kindOf(item) {
+  return KIND_RULES.find((r) => r.re.test(item))?.kind ?? "Makan berat";
+}
 function buildInsights(input) {
   const { rows, period, today } = input;
   const total = rows.reduce((s, r) => s + r.amount, 0);
@@ -16964,7 +16971,7 @@ function buildInsights(input) {
   const places = /* @__PURE__ */ new Map();
   for (const r of rows) {
     const { item, place } = splitItem(r.note);
-    const k = normText(item);
+    const k = `${normText(item)}|${place ? normText(place) : ""}`;
     const g = items.get(k) ?? { item, total: 0, count: 0, places: /* @__PURE__ */ new Set(), dates: [] };
     g.total += r.amount;
     g.count++;
@@ -16979,8 +16986,8 @@ function buildInsights(input) {
       places.set(pk, p);
     }
   }
-  const topItems = [...items.values()].sort((a, b2) => b2.total - a.total || b2.count - a.count).slice(0, 15).map((g) => ({ item: g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), places: [...g.places], dates: g.dates.sort() }));
-  const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.item, count: i.count, total: i.total }));
+  const topItems = [...items.values()].sort((a, b2) => b2.total - a.total || b2.count - a.count).slice(0, 15).map((g) => ({ item: g.item, place: [...g.places][0] ?? null, label: g.places.size ? `${g.item} (${[...g.places][0]})` : g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), dates: g.dates.sort() }));
+  const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.label, count: i.count, total: i.total }));
   const topPlaces = [...places.values()].sort((a, b2) => b2.total - a.total).slice(0, 10);
   const days = /* @__PURE__ */ new Map();
   for (const r of rows) {
@@ -17008,8 +17015,12 @@ function buildInsights(input) {
   };
   const largest = [...rows].sort((a, b2) => b2.amount - a.amount).slice(0, 5).map((r) => ({ date: r.date, amount: r.amount, note: r.note, category: r.category, account: r.account }));
   const avgTx = count ? Math.round(total / count) : 0;
+  const byKind = input.filter.category && /makan|jajan|kuliner/i.test(input.filter.category) && count ? ["Makan berat", "Camilan", "Minuman & es"].map((kind) => {
+    const rs = rows.filter((r) => kindOf(splitItem(r.note).item) === kind);
+    return { kind, total: rs.reduce((a, r) => a + r.amount, 0), count: rs.length, items: rs.map((r) => `${splitItem(r.note).item} ${fmtRp(r.amount)}`) };
+  }).filter((k) => k.count > 0) : void 0;
   const prev = input.previous;
-  const comparison = prev ? { from: prev.from, to: prev.to, total: prev.total, count: prev.count, change: total - prev.total, change_pct: prev.total > 0 ? Math.round((total - prev.total) / prev.total * 1e3) / 10 : null } : null;
+  const comparison = prev ? { available: prev.count > 0, from: prev.from, to: prev.to, total: prev.total, count: prev.count, change: total - prev.total, change_pct: prev.total > 0 ? Math.round((total - prev.total) / prev.total * 1e3) / 10 : null } : null;
   let budget = null;
   if (input.budget) {
     const b2 = input.budget.amount;
@@ -17022,6 +17033,8 @@ function buildInsights(input) {
       pct: pct(total, b2),
       projected_pct: pct(projected, b2),
       daily_allowance_left: daysLeft > 0 ? Math.max(0, Math.round(remaining / daysLeft)) : null,
+      // Berapa rata-rata harian harus turun supaya pas budget di akhir periode (0 = laju sekarang sudah aman).
+      cut_per_day_needed: daysLeft > 0 ? Math.max(0, perDay - Math.max(0, Math.round(remaining / daysLeft))) : 0,
       status: total >= b2 ? "over" : projected > b2 ? "akan_lewat" : "aman"
     };
   }
@@ -17029,10 +17042,12 @@ function buildInsights(input) {
   const scope = input.filter.category ?? "Semua pengeluaran";
   parts2.push(`${scope} ${period.label}${ongoing ? ` (s.d. ${fmtDay(effectiveTo)})` : ""}: ${fmtRp(total)} dari ${count} transaksi, rata-rata ${fmtRp(perDay)}/hari.`);
   if (ongoing) parts2.push(`Laju ini \u2248 ${fmtRp(projected)} untuk satu periode penuh.`);
-  if (budget) parts2.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ""}.`);
-  if (comparison && comparison.change_pct !== null) parts2.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? "naik" : "turun"} ${Math.abs(comparison.change_pct)}%.`);
+  if (budget) parts2.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ""}${budget.cut_per_day_needed > 0 ? ` \u2014 supaya pas budget, rata-rata harian perlu turun \xB1${fmtRp(budget.cut_per_day_needed)}` : ""}.`);
+  if (comparison && comparison.available && comparison.change_pct !== null) parts2.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? "naik" : "turun"} ${Math.abs(comparison.change_pct)}%.`);
   if (topDays[0] && topDays[0].count > 1) parts2.push(`Hari paling boros: ${topDays[0].weekday} ${fmtDay(topDays[0].date)} ${fmtRp(topDays[0].total)} (${topDays[0].count} transaksi).`);
   if (repeated.length) parts2.push(`Berulang: ${repeated.slice(0, 4).map((r) => `${r.item} ${r.count}x`).join(", ")}.`);
+  if (comparison && !comparison.available) parts2.push("Belum ada data periode sebelumnya untuk dibandingkan.");
+  if (byKind) parts2.push(`Per jenis: ${byKind.map((k) => `${k.kind} ${fmtRp(k.total)} (${k.count}x)`).join(", ")}.`);
   return {
     period: { label: period.label, from: period.from, to: period.to, days_elapsed: daysElapsed, days_in_period: daysInPeriod, ongoing },
     filter: input.filter,
@@ -17043,6 +17058,7 @@ function buildInsights(input) {
     by_account: byAccount,
     by_owner: byOwner,
     by_beneficiary: byBeneficiary,
+    by_kind: byKind,
     top_items: topItems,
     top_places: topPlaces,
     top_days: topDays,

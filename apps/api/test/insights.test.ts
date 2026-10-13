@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildInsights, splitItem, type InsightTx } from '../src/services/insights'
+import { buildInsights, kindOf, splitItem, type InsightTx } from '../src/services/insights'
 
 const tx = (date: string, amount: number, note: string, extra: Partial<InsightTx> = {}): InsightTx => ({
   id: `${date}-${note}`, date, amount, note, category: 'Makan Beli & Jajan', category_system: false,
@@ -39,16 +39,19 @@ describe('buildInsights', () => {
   })
 
   it('budget: persen, proyeksi, sisa jatah per hari, status', () => {
-    expect(r.budget).toMatchObject({ amount: 300000, remaining: 146000, pct: 51.3, projected_pct: 132.6, daily_allowance_left: 7684, status: 'akan_lewat' })
+    expect(r.budget).toMatchObject({ amount: 300000, remaining: 146000, pct: 51.3, projected_pct: 132.6, daily_allowance_left: 7684, cut_per_day_needed: 5149, status: 'akan_lewat' })
+    expect(r.text_id).toContain('rata-rata harian perlu turun ±Rp 5.149')
   })
 
   it('pembanding periode sebelumnya', () => {
-    expect(r.comparison).toMatchObject({ change: 54000, change_pct: 54 })
+    expect(r.comparison).toMatchObject({ available: true, change: 54000, change_pct: 54 })
   })
 
   it('item berulang digabung lintas tempat, hari terboros, akhir pekan, per pemilik akun', () => {
-    expect(r.top_items[0]).toMatchObject({ item: 'Ayam masak', count: 2, total: 55000, places: ['Ayam Merah'] })
-    expect(r.top_items.find((i) => i.item === 'Bakso')).toMatchObject({ count: 2, total: 54000, places: ['Bakso Mas Boy'] })
+    expect(r.top_items[0]).toMatchObject({ item: 'Ayam masak', place: 'Ayam Merah', label: 'Ayam masak (Ayam Merah)', count: 2, total: 55000 })
+    // Bakso tanpa tempat dan Bakso Mas Boy TIDAK digabung (agent sempat menyimpulkan "Bakso Mas Boy 2x").
+    expect(r.top_items.filter((i) => i.item === 'Bakso').map((i) => [i.label, i.count, i.total])).toEqual([['Bakso (Bakso Mas Boy)', 1, 40000], ['Bakso', 1, 14000]])
+    expect(r.by_kind).toEqual([{ kind: 'Makan berat', total: 154000, count: 6, items: expect.any(Array) }])
     expect(r.top_days[0]).toMatchObject({ date: '2026-10-09', total: 45000, count: 2, weekday: 'Jumat' })
     expect(r.week_split).toMatchObject({ weekend_total: 40000, weekday_total: 114000 })
     expect(r.by_owner).toEqual([
@@ -59,7 +62,8 @@ describe('buildInsights', () => {
     expect(r.transactions).toHaveLength(6)
     expect(r.text_id).toContain('Rp 154.000 dari 6 transaksi')
     expect(r.text_id).toContain('naik 54%')
-    expect(r.text_id).toContain('Berulang: Ayam masak 2x, Bakso 2x')
+    expect(r.text_id).toContain('Berulang: Ayam masak (Ayam Merah) 2x.')
+    expect(r.text_id).toContain('Per jenis: Makan berat Rp 154.000 (6x).')
   })
 
   it('periode selesai: tanpa proyeksi; kosong tidak error', () => {
@@ -67,5 +71,19 @@ describe('buildInsights', () => {
     expect(done.totals).toMatchObject({ total: 0, count: 0, per_day: 0, projected_period_total: 0 })
     expect(done.period.ongoing).toBe(false)
     expect(done.comparison).toBeNull()
+    expect(done.by_kind).toBeUndefined()
+  })
+
+  it('pembanding tanpa data → available false + kalimat jujur', () => {
+    const r2 = buildInsights({ period: { label: 'Oktober 2026', from: '2026-10-01', to: '2026-10-31' }, today: '2026-10-12', rows, previous: { from: '2026-09-01', to: '2026-09-12', total: 0, count: 0 }, budget: null, filter: {} })
+    expect(r2.comparison).toMatchObject({ available: false })
+    expect(r2.text_id).toContain('Belum ada data periode sebelumnya')
+    expect(r2.by_kind).toBeUndefined()
+  })
+
+  it('kindOf: minuman, camilan, makan berat', () => {
+    expect(['Es teh (Es Teh House)', 'Jus alpukat', 'Le Minerale 1 botol', 'Es krim Aus Ichi'].map(kindOf)).toEqual(Array(4).fill('Minuman & es'))
+    expect(['Risol', 'Sempol', 'Gorengan', 'Opak', 'Siomay'].map(kindOf)).toEqual(Array(5).fill('Camilan'))
+    expect(['Bakso', 'Warteg', 'Nasi uduk', 'Mie katsu Dicha', 'Ayam masak'].map(kindOf)).toEqual(Array(5).fill('Makan berat'))
   })
 })
