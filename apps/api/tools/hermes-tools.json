@@ -362,7 +362,7 @@
               },
               "category": {
                 "type": "string",
-                "description": "Kategori item"
+                "description": "Nama kategori dari list_categories, dipilih dari JENIS barang item ini (sabun → Shopping, pulsa → Utilitas, obat → Kesehatan, sayur/lauk → Makanan); jangan semua Makanan. Ragu → \"Lainnya\"."
               },
               "note": {
                 "type": "string",
@@ -778,7 +778,7 @@
   },
   {
     "name": "ingest_receipt",
-    "description": "Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau).",
+    "description": "Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak → kategori makanan; sabun/deterjen/tisu/popok → belanja/Shopping; pulsa/token listrik → Utilitas; obat/vitamin → Kesehatan). Jangan menjatuhkan semua item ke Makanan.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -819,7 +819,7 @@
               },
               "category": {
                 "type": "string",
-                "description": "Kategori untuk item ini"
+                "description": "Nama kategori dari list_categories, dipilih dari JENIS barang ini (bukan toko). Ragu → \"Lainnya\" atau kosongkan: API menebak dari nama item, dan nama tak dikenal dipetakan ke kategori household terdekat (tidak pernah error)."
               },
               "for": {
                 "type": "string",

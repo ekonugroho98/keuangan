@@ -741,3 +741,41 @@ unique per member, laporan bulanan selalu bulan sebelumnya, penerima tanpa key d
 Tidak ada kode, migrasi, atau skill Hermes yang berubah pada 2026-10-07 untuk ini. Pertanyaan terbuka Q-F1..Q-F10
 ada di §9 file spec. Urutan rekomendasi: F-0 → F-A → F-B → F-C → F-D.
 
+
+## Kategori scan struk: kategori household di prompt + gudang kata kunci + pencarian web (2026-10-12)
+
+Keluhan pemilik produk: hasil scan struk "ngasal, semuanya makanan". Akar masalah: prompt `scan-receipt.ts`
+dan `SCAN_CATEGORIES` di `AddTransactionModal.jsx` memakai 8 kategori lama hardcode ("Makanan & Minuman",
+"Tagihan", …) yang tidak sama dengan kategori household di DB; backend lalu mencocokkan fuzzy
+(`resolve_category`) — "Tagihan" bahkan gagal `category_not_found`. Jalur Hermes (`ingest_receipt`) punya
+masalah yang sama plus gagal total kalau `category` kosong.
+
+Yang dikerjakan (commit menyusul):
+- `apps/api/src/services/ai/provider.ts` (baru): akses provider BYOK dipisah dari scan-receipt; model
+  Anthropic → `claude-haiku-5-5`, Google → `gemini-3.6-flash` (1.5 sudah mati; 3.5 dideprekasi & dirutekan
+  ke 3.6 per ai.google.dev), key Gemini lewat header `x-goog-api-key` (bukan query string); `max_tokens` 2048.
+- `apps/api/src/services/categorize.ts` (baru) + `product-groups.ts` + `web-lookup.ts`: klasifikasi per item
+  dengan urutan **learned (category_keywords) → ai → known (product_knowledge) → rule (regex) → web
+  (DuckDuckGo Lite + AI BYOK, maks 5 item/panggilan, hasil di-cache global) → Lainnya**. Dipakai oleh
+  `scan-receipt.ts` (web; respons item kini membawa `category_source`) dan `receipts.ts` (Hermes ingest;
+  klasifikasi dilakukan SEBELUM transaksi DB utama supaya pencarian web tidak menahan koneksi).
+- Belajar: `createTransactionBatch` (hanya JWT) dan `updateTransaction` (perubahan kategori) memanggil
+  `learn_category_keyword`. Migrasi `00000000000024_category_keywords.sql` (03-database.md §3.20–3.21).
+- Prompt scan: daftar kategori household + alias disuntikkan, panduan "per jenis barang, bukan per toko",
+  `note` diminta persis seperti di struk (bahan kata kunci). Frontend: dropdown/validasi memakai kategori
+  household dari API (`useCategories`), default "Lainnya".
+- Hermes: deskripsi `ingest_receipt`/`record_expense_batch` di `registry.ts` (→ `pnpm gen:tools`),
+  `docs/hermes/SYSTEM_PROMPT.md` aturan 11, dan SKILL.md di VPS (section "Kategori" diganti + aturan 11;
+  backup `/home/hermes/SKILL.md.karaya-finance-api.bak-20261012`). Perlu `/new` di Telegram.
+
+Verifikasi: `pnpm --filter @karaya/api typecheck/lint` bersih; `vitest run` **89/89** lulus terhadap
+`supabase start` lokal (54322) setelah migrasi 0024 diterapkan via psql (termasuk 14 unit test
+`categorize.test.ts`: urutan prioritas, substring terpanjang, `keywordFromNote`, parser DDG). Build
+`apps/api` (bundle `api/index.js`) dan `apps/web` hijau. **Migrasi 0024 BELUM diterapkan ke produksi**
+saat entri ini ditulis — wajib sebelum deploy API, karena `scan-receipt`/`ingest` sekarang membaca
+`category_keywords`/`product_knowledge`.
+
+Belum diuji end-to-end dengan foto struk nyata (butuh API key provider pemilik). Utang: UI untuk melihat/
+mengedit gudang kata kunci (`GET /v1/categories/keywords` belum ada); `category_source` belum ditampilkan
+di modal scan; pencarian web bergantung DuckDuckGo Lite yang bisa memblokir IP serverless (fallback:
+pengetahuan AI saja, `source=ai`).

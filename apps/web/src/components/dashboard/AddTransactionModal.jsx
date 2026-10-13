@@ -7,21 +7,23 @@ import {
 import { useLanguage } from "../../i18n/LanguageContext";
 import { api, unwrap } from "../../api/client";
 import { useBeneficiaries } from "../../hooks/useBeneficiaries";
+import { useCategories } from "../../hooks/useCategories";
 
-/* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ── */
-const SCAN_CATEGORIES = [
-  "Makanan & Minuman",
-  "Transportasi",
-  "Belanja",
-  "Hiburan",
-  "Kesehatan",
-  "Pendidikan",
-  "Tagihan",
-  "Lainnya",
-];
+/* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ──
+   Daftar kategori yang dipakai untuk validasi, tebakan fallback, dan dropdown per-item adalah
+   kategori pengeluaran HOUSEHOLD (dari API), bukan daftar hardcode — server (scan-receipt.ts)
+   sudah menormalkan jawaban AI ke nama yang sama, jadi di sini tinggal jaga-jaga. */
+
+/* ── Cari nama kategori household yang cocok (case-insensitive), kembalikan ejaan kanoniknya ── */
+function matchCategory(name, scanCategories) {
+  if (typeof name !== "string") return null;
+  const n = name.trim().toLowerCase();
+  if (!n) return null;
+  return scanCategories.find((c) => c.toLowerCase() === n) || null;
+}
 
 /* ── Validasi & sanitasi hasil parse AI/OCR ── */
-function sanitizeScanResult(raw) {
+function sanitizeScanResult(raw, scanCategories) {
   if (!raw || typeof raw !== "object") throw new Error("Hasil scan tidak valid");
   if (raw.error) return raw; // pass-through error dari AI
 
@@ -34,9 +36,8 @@ function sanitizeScanResult(raw) {
           : parseInt(String(item.amount).replace(/\D/g, ""), 10);
       const note =
         typeof item.note === "string" ? item.note.trim() : String(item.note || "").trim();
-      const category = SCAN_CATEGORIES.includes(item.category)
-        ? item.category
-        : guessCategory(note);
+      const category =
+        matchCategory(item.category, scanCategories) || guessCategory(note, scanCategories);
       if (!note || isNaN(amount) || amount <= 0) return null;
       return { note, amount, category };
     })
@@ -61,42 +62,50 @@ function sanitizeScanResult(raw) {
   return { merchant, date, subtotal, items: sanitized };
 }
 
-/* ── Guess kategori dari nama item ── */
-function guessCategory(note) {
-  const n = note.toLowerCase();
-  if (
-    /mie|nasi|ayam|sapi|ikan|sayur|buah|minum|kopi|teh|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air putih|minuman|makanan|bumbu|santan|telur|daging|bakso|soto/.test(
-      n,
-    )
-  )
-    return "Makanan & Minuman";
-  if (
-    /bensin|bbm|parkir|toll|tol|ojek|taxi|grab|gojek|bus|kereta|motor|mobil|transjakarta/.test(
-      n,
-    )
-  )
-    return "Transportasi";
-  if (
-    /deterjen|sabun|sampo|pasta gigi|sikat|tisu|pembalut|popok|kebersihan|pel|sapu|pewangi/.test(
-      n,
-    )
-  )
-    return "Belanja";
-  if (
-    /obat|vitamin|masker|apotek|klinik|dokter|rumah sakit|suplemen|kesehatan/.test(
-      n,
-    )
-  )
-    return "Kesehatan";
-  if (/listrik|air|gas|internet|pulsa|token|tagihan|pln|wifi|indihome/.test(n))
-    return "Tagihan";
-  if (/buku|alat tulis|pendidikan|sekolah|kursus|les/.test(n))
-    return "Pendidikan";
-  return "Belanja";
+/* ── Guess kategori dari nama item → dipetakan ke nama kategori household yang ada.
+   Hanya dipakai untuk jalur regex tanpa AI dan sebagai jaring kalau server tidak mengembalikan
+   nama yang dikenal. Urutan kandidat = prioritas; "Lainnya" jadi jaring terakhir, BUKAN makanan. ── */
+const GUESS_RULES = [
+  {
+    re: /obat|vitamin|masker|apotek|klinik|dokter|rumah sakit|suplemen|kesehatan|plester|betadine/,
+    candidates: ["Kesehatan"],
+  },
+  {
+    re: /pulsa|paket data|token|listrik|pln|internet|wifi|indihome|tagihan/,
+    candidates: ["Utilitas", "Tagihan"],
+  },
+  {
+    re: /bensin|bbm|pertamax|pertalite|parkir|toll|\btol\b|ojek|taxi|taksi|grab|gojek|bus|kereta|transjakarta/,
+    candidates: ["Transport", "Transportasi"],
+  },
+  {
+    re: /buku|alat tulis|pensil|pulpen|pendidikan|sekolah|kursus|\bles\b|fotokopi|fotocopy/,
+    candidates: ["Pendidikan"],
+  },
+  {
+    re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|kebersihan|\bpel\b|sapu|pewangi|pembersih|baju|celana|kaos|sandal|sepatu/,
+    candidates: ["Rumah Tangga", "Kebersihan", "Shopping", "Belanja"],
+  },
+  {
+    re: /mie|nasi|ayam|sapi|ikan|sayur|buah|kopi|teh|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/,
+    candidates: ["Makanan", "Makanan & Minuman"],
+  },
+];
+
+function guessCategory(note, scanCategories) {
+  const n = (note || "").toLowerCase();
+  for (const rule of GUESS_RULES) {
+    if (!rule.re.test(n)) continue;
+    for (const cand of rule.candidates) {
+      const hit = matchCategory(cand, scanCategories);
+      if (hit) return hit;
+    }
+  }
+  return matchCategory("Lainnya", scanCategories) || scanCategories[0] || "Lainnya";
 }
 
 /* ── Parse teks OCR dengan regex (fallback tanpa AI) ── */
-function parseOCRTextRegex(text) {
+function parseOCRTextRegex(text, scanCategories) {
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -154,7 +163,7 @@ function parseOCRTextRegex(text) {
       const note = m[1].replace(/\s+/g, " ").trim();
       const amount = parsePrice(m[2]);
       if (note.length >= 2 && amount && amount > 0 && !skipRe.test(note))
-        items.push({ note, amount, category: guessCategory(note) });
+        items.push({ note, amount, category: guessCategory(note, scanCategories) });
     }
   }
 
@@ -168,7 +177,7 @@ function parseOCRTextRegex(text) {
         const note = m[1].replace(/\s+/g, " ").trim();
         const amount = parsePrice(m[2]);
         if (note.length >= 2 && amount && amount > 0 && !skipRe.test(note))
-          items.push({ note, amount, category: guessCategory(note) });
+          items.push({ note, amount, category: guessCategory(note, scanCategories) });
       }
     }
   }
@@ -186,7 +195,7 @@ function parseOCRTextRegex(text) {
           items.push({
             note: nameLine.replace(/\s+/g, " ").trim(),
             amount,
-            category: guessCategory(nameLine),
+            category: guessCategory(nameLine, scanCategories),
           });
           i++;
         }
@@ -206,7 +215,7 @@ function parseOCRTextRegex(text) {
           .replace(/\s+/g, " ")
           .trim();
         if (note.length >= 2 && amount && amount > 0 && !skipRe.test(note))
-          items.push({ note, amount, category: guessCategory(note) });
+          items.push({ note, amount, category: guessCategory(note, scanCategories) });
       }
     }
   }
@@ -219,13 +228,13 @@ function parseOCRTextRegex(text) {
 }
 
 /* ── Kirim teks OCR ke AI untuk distrukturkan (POST /v1/ai/scan-receipt, mode ocr_text) ── */
-async function parseOCRTextWithAI(ocrText) {
+async function parseOCRTextWithAI(ocrText, scanCategories) {
   const raw = await unwrap(await api.POST("/v1/ai/scan-receipt", { body: { ocr_text: ocrText } }));
-  return sanitizeScanResult(raw);
+  return sanitizeScanResult(raw, scanCategories);
 }
 
 /* ── OCR: ekstrak teks di browser (tesseract.js, tanpa API key), lalu minta server merapikan ── */
-async function scanReceiptWithOCR(base64, mimeType, onProgress, aiConfig) {
+async function scanReceiptWithOCR(base64, mimeType, onProgress, aiConfig, scanCategories) {
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("ind+eng", 1, {
     logger: (m) => {
@@ -242,17 +251,17 @@ async function scanReceiptWithOCR(base64, mimeType, onProgress, aiConfig) {
   await worker.terminate();
 
   if (aiConfig?.apiKey && !aiConfig?.disabled)
-    return await parseOCRTextWithAI(text);
-  return parseOCRTextRegex(text);
+    return await parseOCRTextWithAI(text, scanCategories);
+  return parseOCRTextRegex(text, scanCategories);
 }
 
 /* ── Foto struk → AI vision server-side (POST /v1/ai/scan-receipt, mode image_base64) ──
    API key provider dibaca dari user_settings di server; tidak pernah dikirim/disimpan di browser. */
-async function scanReceiptWithAI(base64, mimeType) {
+async function scanReceiptWithAI(base64, mimeType, scanCategories) {
   const raw = await unwrap(
     await api.POST("/v1/ai/scan-receipt", { body: { image_base64: base64, mime_type: mimeType } }),
   );
-  return sanitizeScanResult(raw);
+  return sanitizeScanResult(raw, scanCategories);
 }
 
 
@@ -415,6 +424,16 @@ const AddTransactionModal = ({
   // belum mengaktifkan fitur ini tidak pernah memicu GET /v1/beneficiaries (403 feature_disabled).
   const { beneficiaries } = useBeneficiaries(beneficiaryEnabled);
 
+  // Kategori pengeluaran household untuk scan struk: dari API kalau sudah dimuat (nama persis
+  // seperti di DB, termasuk yang di-rename user), fallback ke default + custom sebelum itu.
+  const { allCategoriesFromApi } = useCategories();
+  const apiExpenseNames = allCategoriesFromApi
+    .filter((c) => !c.is_system && c.type !== "income")
+    .map((c) => c.name);
+  const scanCategories = apiExpenseNames.length
+    ? apiExpenseNames
+    : [...expenseCategories, ...customCategories.filter((c) => c.type !== "income").map((c) => c.name)];
+
   // Auto-select akun pertama jika belum ada yang dipilih
   useEffect(() => {
     if (
@@ -488,7 +507,7 @@ const AddTransactionModal = ({
       if (hasAiConfigured) {
         try {
           setScanMode("ai");
-          result = await scanReceiptWithAI(base64, file.type);
+          result = await scanReceiptWithAI(base64, file.type, scanCategories);
         } catch (err) {
           if (err.code !== "provider_no_vision") throw err;
           setScanMode("ocr");
@@ -497,6 +516,7 @@ const AddTransactionModal = ({
             file.type,
             (p) => setScanProgress(p),
             aiConfig,
+            scanCategories,
           );
         }
       } else {
@@ -1193,7 +1213,7 @@ const AddTransactionModal = ({
                           boxSizing: "border-box",
                         }}
                       >
-                        {SCAN_CATEGORIES.map((c) => (
+                        {scanCategories.map((c) => (
                           <option key={c} value={c}>
                             {c}
                           </option>
@@ -1246,7 +1266,7 @@ const AddTransactionModal = ({
                       id: Date.now(),
                       note: "",
                       amount: 0,
-                      category: "Belanja",
+                      category: guessCategory("", scanCategories),
                       selected: true,
                     },
                   ])
