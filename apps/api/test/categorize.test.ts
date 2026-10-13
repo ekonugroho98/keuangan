@@ -121,6 +121,9 @@ describe('kategori khusus household (SPECIAL_RULES)', () => {
   it('makan di luar → Makan Beli & Jajan, bahan → Bahan Makanan', () => {
     expect(classifySync('Bakso Mas Boy', undefined, c2)?.category).toBe('Makan Beli & Jajan')
     expect(classifySync('Nasi uduk', undefined, c2)?.category).toBe('Makan Beli & Jajan')
+    expect(classifySync('Sempol - Arofah kebab Malaka Sari', undefined, c2)?.category).toBe('Makan Beli & Jajan')
+    expect(classifySync('Cilok', 'Bahan Makanan', c2)?.category).toBe('Makan Beli & Jajan') // AI bilang makanan umum, nama jelas jajan
+    expect(classifySync('Popok Merries', 'Rumah Tangga', c2)?.category).toBe('Rumah Tangga') // jawaban AI non-makanan tetap dihormati
     expect(classifySync('Telur ayam 1kg', undefined, c2)?.category).toBe('Bahan Makanan')
     expect(classifySync('Indomie Goreng', 'Makanan', c2)?.category).toBe('Bahan Makanan')
   })

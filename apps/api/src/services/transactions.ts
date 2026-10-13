@@ -5,7 +5,7 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
-import { learnKeywords } from './categorize'
+import { learnKeywords, refineAgentCategory } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
 import { parseReceiptNote } from '@karaya/shared/format'
@@ -263,7 +263,10 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   const amount = parseAmount(input)
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
-    const categoryId = await resolveCategoryRef(tx, actor, input, input.type)
+    const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type)
+    const categoryId = actor.credential === 'api_key' && input.type === 'expense'
+      ? await refineAgentCategory(tx, actor.householdId, input.note, resolvedCategoryId)
+      : resolvedCategoryId
     const beneficiaryId = (await resolveBeneficiaryRef(tx, actor, input)) ?? null
     const [row] = await tx<{ id: string }[]>`
       select id from post_transaction(
@@ -290,7 +293,8 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     // (dropdown modal web) → kategori Piutang + catatan piutang atas nama orangnya.
     const items = await Promise.all(
       input.items.map(async (item) => {
-        const resolvedCat = await resolveCategoryRef(tx, actor, item, 'expense')
+        const resolvedCat0 = await resolveCategoryRef(tx, actor, item, 'expense')
+        const resolvedCat = actor.credential === 'api_key' ? await refineAgentCategory(tx, actor.householdId, item.note, resolvedCat0) : resolvedCat0
         const titipan = detectTitipan(item.note, item.titipan) ?? (resolvedCat === piutangCatId ? { borrower: 'Titipan' } : null)
         return {
           amount: parseAmount(item),
