@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useShopping, useShoppingSuggestions } from "../../../hooks/useShopping";
+import { useShopping, useShoppingSuggestions, comparePrices } from "../../../hooks/useShopping";
+import { fmtRp } from "../../../utils/formatters";
 import { useHouseholdInfo } from "../../../hooks/useHouseholdInfo";
 
 const card = {
@@ -17,6 +18,94 @@ const inputSt = {
     width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12,
     border: "1px solid var(--color-border)", background: "var(--bg-surface-low)",
     color: "var(--color-text)", fontSize: 14, fontFamily: "inherit", outline: "none",
+};
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const shortDate = (d) => {
+    const [, m, day] = (d || "").split("-");
+    return day ? `${Number(day)} ${MONTHS[Number(m) - 1] || m}` : "";
+};
+const basisShort = (b) => (b || "").replace("per ", "/");
+
+/** Baris "termurah di …" untuk item daftar belanja (field `cheapest` dari GET /v1/shopping). */
+const CheapestLine = ({ c }) => {
+    if (!c) return null;
+    return (
+        <div style={{ fontSize: 11, color: "var(--color-primary)", marginTop: 2 }}>
+            💰 {c.stores > 1 ? "Termurah" : "Terakhir"} di {c.merchant}: {fmtRp(c.price)}
+            {c.size ? ` (${c.size})` : ""} · {fmtRp(c.per_unit_price)}{basisShort(c.compare_basis)} · {shortDate(c.last_date)}
+            {c.stores > 1 ? ` · ${c.stores} toko` : ""}
+        </div>
+    );
+};
+
+/**
+ * Banding harga antar toko (10-fitur-opsional-keluarga.md §6.8): cari produk, tampilkan harga terakhir
+ * tiap toko per satuan (per 100 g / 100 ml / pcs). Data dari struk keluarga sendiri, bukan internet.
+ */
+const PriceCompare = ({ toast }) => {
+    const [q, setQ] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+
+    const run = async () => {
+        const query = q.trim();
+        if (query.length < 2) return;
+        setLoading(true);
+        try {
+            setResult(await comparePrices(query));
+        } catch (err) {
+            toast(err.message || "Gagal membandingkan harga", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div style={{ marginTop: 28 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", marginBottom: 4 }}>⚖️ Banding harga antar toko</div>
+            <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 10 }}>
+                Dari struk yang pernah dicatat, dihitung per satuan supaya beda ukuran kemasan tetap adil.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                    style={inputSt} placeholder="Cari produk (mis. sabun lifebuoy, minyak goreng)..."
+                    value={q} onChange={(e) => setQ(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") run(); }}
+                />
+                <button
+                    onClick={run} disabled={loading}
+                    style={{ padding: "0 18px", borderRadius: 12, border: "1px solid var(--color-primary)", background: "transparent", color: "var(--color-primary)", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                >
+                    {loading ? "..." : "Bandingkan"}
+                </button>
+            </div>
+            {result && result.products.length === 0 && (
+                <div style={{ fontSize: 12, color: "var(--color-muted)", padding: "8px 2px" }}>
+                    Belum ada riwayat harga untuk "{result.query}". Harga tercatat otomatis setiap struk disimpan.
+                </div>
+            )}
+            {result?.products.map((p) => (
+                <div key={`${p.product_name}-${p.unit}`} style={{ ...card, display: "block" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", textTransform: "capitalize" }}>{p.product_name}</div>
+                        {p.savings_pct ? <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)", whiteSpace: "nowrap" }}>hemat {p.savings_pct}%</div> : null}
+                    </div>
+                    {p.stores.map((s, i) => (
+                        <div key={s.merchant} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, padding: "4px 0", borderTop: i ? "1px solid var(--glass-border)" : "none" }}>
+                            <div style={{ color: "var(--color-text)", minWidth: 0 }}>
+                                {i === 0 && p.stores.length > 1 ? "🏆 " : ""}{s.merchant}
+                                <span style={{ color: "var(--color-muted)" }}> · {fmtRp(s.price)}{s.size ? ` (${s.size})` : ""} · {shortDate(s.last_date)}</span>
+                            </div>
+                            <div style={{ fontWeight: 700, color: i === 0 ? "var(--color-primary)" : "var(--color-text)", whiteSpace: "nowrap" }}>
+                                {fmtRp(s.per_unit_price)}{basisShort(p.compare_basis)}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ))}
+        </div>
+    );
 };
 
 /**
@@ -106,6 +195,7 @@ const BelanjaView = ({ showToast }) => {
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>{item.name}</div>
                         {item.notes && <div style={{ fontSize: 11, color: "var(--color-muted)" }}>{item.notes}</div>}
+                        <CheapestLine c={item.cheapest} />
                     </div>
                     <button
                         onClick={() => deleteItem(item.id).catch((e) => toast(e.message, "error"))}
@@ -130,6 +220,8 @@ const BelanjaView = ({ showToast }) => {
                     ))}
                 </div>
             )}
+
+            <PriceCompare toast={toast} />
         </div>
     );
 };

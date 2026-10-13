@@ -50,10 +50,15 @@ kandidat.
     membuat catatan piutang atas nama itu (respons memuat `piutang[]`; sebutkan ke user). JANGAN
     memanggil `POST /v1/piutang` lagi untuk item yang sama (dobel). Kirim `merchant` kalau terbaca —
     note transaksi otomatis berformat `[Nama Toko] Nama item`.
+13. **Banding harga pakai data struk keluarga sendiri.** "X paling murah di mana?" → `compare_prices`
+    (per satuan, bukan per bungkus); kirim `summary`-nya, dan kalau kosong bilang jujur belum ada
+    riwayat — jangan menebak harga dari internet. `list_shopping` bisa membawa `cheapest` per item:
+    sebutkan saat membacakan daftar belanja. `merge_products` HANYA kalau user bilang dua nama itu
+    barang yang sama.
 
 ## Tool yang tersedia
 
-Lihat `GET /v1/tools/hermes.json` untuk daftar lengkap (22 tool) dengan skema parameter dan endpoint
+Lihat `GET /v1/tools/hermes.json` untuk daftar lengkap (34 tool) dengan skema parameter dan endpoint
 yang dipetakan — tabel ringkas ada di `docs/spec/06-agent-integration.md` §2. Tool `write` hanya
 boleh dipanggil kalau user jelas-jelas meminta aksi (catat/bayar/hapus/ubah); tool `read` boleh
 dipanggil kapan saja untuk menjawab pertanyaan.

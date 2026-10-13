@@ -199,7 +199,7 @@ export async function classifyItems(
   if (opts.webLookup && unknown.length) {
     const ai = await tryGetAiConfig(actor)
     if (ai) {
-      const discovered = new Map<string, { group: ProductGroup; label: string; grounded: boolean }>()
+      const discovered = new Map<string, { group: ProductGroup; label: string; canonical: string | null; grounded: boolean }>()
       let budget = opts.maxWebLookups ?? MAX_WEB_LOOKUPS_PER_CALL
       for (const i of unknown) {
         const key = names[i]!
@@ -217,7 +217,7 @@ export async function classifyItems(
       if (discovered.size) {
         await withActor(actor, async (tx) => {
           for (const [keyword, d] of discovered) {
-            await tx`select learn_product_knowledge(${keyword}, ${d.group}::product_group, ${d.label}, ${d.grounded ? 'web' : 'ai'}::keyword_source)`
+            await tx`select learn_product_knowledge(${keyword}, ${d.group}::product_group, ${d.label}, ${d.grounded ? 'web' : 'ai'}::keyword_source, ${d.canonical})`
           }
         })
       }

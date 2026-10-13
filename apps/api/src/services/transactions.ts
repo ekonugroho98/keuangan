@@ -7,6 +7,8 @@ import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBenefic
 import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
+import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
+import { parseReceiptNote } from '@karaya/shared/format'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -271,6 +273,11 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
 }
 
 export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
+  // Item berformat struk "[Toko] Nama item" (modal scan web) → riwayat harga per toko (prices.ts).
+  // Kanonikalisasi di luar transaksi DB; biasanya sudah ter-cache sejak scan, jadi tanpa panggilan AI.
+  const parsedNotes = input.items.map((i) => (i.note ? parseReceiptNote(i.note) : null))
+  const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p!.name)
+  if (priceNames.length) await canonicalizeProducts(actor, priceNames)
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
     const piutangCatId = await piutangCategoryId(tx, actor.householdId)
@@ -307,13 +314,21 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     // Korelasi item → baris lewat note+amount (urutan RETURNING tidak dijamin), pola sama dengan receipts.ts.
     const remaining = [...createdRows]
     const titipanCreated: TitipanCreated[] = []
-    for (const it of items) {
-      if (!it.titipan) continue
-      const idx = remaining.findIndex((r) => r.note === it.note && Number(r.amount) === it.amount)
-      const txId = idx === -1 ? undefined : remaining.splice(idx, 1)[0]!.id
-      titipanCreated.push({ txId, borrower: it.titipan.borrower, name: it.note || 'item', amount: it.amount })
+    const pricesByMerchant = new Map<string, PriceItem[]>()
+    for (const [i, it] of items.entries()) {
+      const pos = remaining.findIndex((r) => r.note === it.note && Number(r.amount) === it.amount)
+      const txId = pos === -1 ? undefined : remaining.splice(pos, 1)[0]!.id
+      const parsed = parsedNotes[i]
+      const itemName = parsed?.name || it.note || 'item'
+      if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount })
+      if (parsed?.merchant) {
+        const list = pricesByMerchant.get(parsed.merchant) ?? []
+        list.push({ transaction_id: txId, name: parsed.name, amount: it.amount })
+        pricesByMerchant.set(parsed.merchant, list)
+      }
     }
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, created: titipanCreated }) : []
+    for (const [merchant, list] of pricesByMerchant) await recordPrices(tx, actor.householdId, merchant, date, list)
     const ids = createdRows.map((r) => r.id)
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`

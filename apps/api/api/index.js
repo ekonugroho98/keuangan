@@ -12880,7 +12880,16 @@ var ShoppingItemSchema = external_exports.object({
   notes: external_exports.string(),
   status: ShoppingStatusSchema,
   source: external_exports.enum(["manual", "suggested", "receipt"]),
-  bought_transaction_id: UuidSchema.nullable()
+  bought_transaction_id: UuidSchema.nullable(),
+  cheapest: external_exports.object({
+    merchant: external_exports.string(),
+    price: external_exports.number(),
+    size: external_exports.string().nullable(),
+    per_unit_price: external_exports.number(),
+    compare_basis: external_exports.string(),
+    last_date: external_exports.string(),
+    stores: external_exports.number()
+  }).nullable().optional().openapi({ description: "Toko termurah dari riwayat struk household (perbandingan per satuan). Hanya untuk status needed." })
 }).openapi("ShoppingItem");
 var CreateShoppingItemBodySchema = external_exports.object({ name: external_exports.string().min(1).max(80), qty_text: external_exports.string().optional(), notes: external_exports.string().default("") }).openapi("CreateShoppingItemBody");
 var UpdateShoppingItemBodySchema = external_exports.object({
@@ -12956,6 +12965,33 @@ var IngestReceiptBodySchema = external_exports.object({
   shopping: external_exports.boolean().default(true).openapi({ description: "Coret item yang cocok di daftar belanja." }),
   pantry: external_exports.boolean().default(true).openapi({ description: "Tambah stok untuk item yang cocok di pantry." })
 }).openapi("IngestReceiptBody");
+var ComparePricesQuerySchema = external_exports.object({
+  q: external_exports.string().min(2).openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng"' }),
+  days: external_exports.coerce.number().int().min(1).max(730).default(180)
+});
+var StorePriceSchema = external_exports.object({
+  merchant: external_exports.string(),
+  last_date: external_exports.string(),
+  price: external_exports.number().openapi({ description: "Harga satu kemasan terakhir" }),
+  size: external_exports.string().nullable(),
+  per_unit_price: external_exports.number().openapi({ description: "Harga terakhir per satuan banding (compare_basis)" }),
+  lowest_per_unit_price: external_exports.number(),
+  observations: external_exports.number()
+});
+var ProductComparisonSchema = external_exports.object({
+  product_name: external_exports.string(),
+  unit: external_exports.enum(["g", "ml", "pcs"]).nullable(),
+  compare_basis: external_exports.string().openapi({ description: '"per 100 g" | "per 100 ml" | "per pcs" | "per kemasan"' }),
+  stores: external_exports.array(StorePriceSchema).openapi({ description: "Urut dari termurah per satuan" }),
+  cheapest: external_exports.object({ merchant: external_exports.string(), per_unit_price: external_exports.number(), last_date: external_exports.string() }).nullable(),
+  savings_pct: external_exports.number().nullable(),
+  summary: external_exports.string().openapi({ description: "Ringkasan siap kirim (Bahasa Indonesia)" })
+}).openapi("ProductComparison");
+var ComparePricesResponseSchema = external_exports.object({ query: external_exports.string(), days: external_exports.number(), products: external_exports.array(ProductComparisonSchema) }).openapi("ComparePricesResponse");
+var ProductAliasBodySchema = external_exports.object({
+  item: external_exports.string().min(2).openapi({ description: 'Nama item seperti di struk, mis. "LFBY BS 85G"' }),
+  same_as: external_exports.string().min(2).openapi({ description: 'Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"' })
+}).openapi("ProductAliasBody");
 
 // src/services/features.ts
 var featuresCache = /* @__PURE__ */ new Map();
@@ -13953,7 +13989,8 @@ ${evidence}
 Kelompok yang tersedia:
 ${groups}
 
-Jawab HANYA JSON: {"label": "<nama produk lengkap, singkat>", "group": "<salah satu kelompok di atas>"}
+Jawab HANYA JSON: {"label": "<nama produk lengkap, singkat>", "canonical": "<merek + jenis + varian, huruf kecil, TANPA ukuran/berat/isi, mis. lifebuoy sabun batang total 10>", "group": "<salah satu kelompok di atas>"}
+canonical = null kalau produknya tidak bisa dipastikan.
 Kalau benar-benar tidak bisa dipastikan, group = "other".`;
 }
 async function lookupProduct(itemName, provider, apiKey) {
@@ -13965,7 +14002,8 @@ async function lookupProduct(itemName, provider, apiKey) {
     const group = isProductGroup(raw2.group) ? raw2.group : null;
     if (!group) return null;
     const label = typeof raw2.label === "string" && raw2.label.trim() ? raw2.label.trim().slice(0, 120) : name;
-    return { group, label, grounded: snippets.length > 0 };
+    const canonical = typeof raw2.canonical === "string" && raw2.canonical.trim().length >= 2 ? raw2.canonical.trim().slice(0, 120) : null;
+    return { group, label, canonical, grounded: snippets.length > 0 };
   } catch {
     return null;
   }
@@ -14113,7 +14151,7 @@ async function classifyItems(actor, items, opts = {}) {
       if (discovered.size) {
         await withActor(actor, async (tx) => {
           for (const [keyword, d] of discovered) {
-            await tx`select learn_product_knowledge(${keyword}, ${d.group}::product_group, ${d.label}, ${d.grounded ? "web" : "ai"}::keyword_source)`;
+            await tx`select learn_product_knowledge(${keyword}, ${d.group}::product_group, ${d.label}, ${d.grounded ? "web" : "ai"}::keyword_source, ${d.canonical})`;
           }
         });
       }
@@ -14181,6 +14219,202 @@ async function createTitipanPiutang(tx, actor, input) {
     out.push({ id: row.id, borrower_name: g.borrower, total, items: names });
   }
   return out;
+}
+
+// src/services/prices.ts
+var MAX_CANONICALIZE = 30;
+var DEFAULT_DAYS = 180;
+function canonicalPrompt(names, existing) {
+  const groups = PRODUCT_GROUPS.map((g) => `${g} (${GROUP_LABEL_ID[g]})`).join(", ");
+  const known = existing.length ? `
+Nama kanonik yang SUDAH ADA (pakai PERSIS salah satu ini kalau produknya sama, walau ukurannya beda):
+${existing.map((e) => `- ${e}`).join("\n")}
+` : "";
+  return `Kamu menyeragamkan nama barang dari struk belanja Indonesia supaya barang yang sama dari toko berbeda bisa dibandingkan harganya.
+Nama kasir sering disingkat ("LFBY BS 85G" = Lifebuoy sabun batang, "INDM GRG" = Indomie goreng, "BML MG 2L" = Bimoli minyak goreng).
+${known}
+Untuk TIAP nama di bawah, beri:
+- canonical: merek + jenis produk + varian, huruf kecil, TANPA ukuran/berat/isi/jumlah (mis. "lifebuoy sabun batang total 10", "indomie goreng original", "bimoli minyak goreng"). Barang generik tanpa merek: jenisnya saja ("telur ayam", "beras"). null kalau tidak bisa dipastikan.
+- group: salah satu dari ${groups}.
+
+Nama:
+${names.map((n, i) => `${i + 1}. ${n}`).join("\n")}
+
+Jawab HANYA JSON: {"items": [{"name": "<nama persis seperti di daftar>", "canonical": "...", "group": "..."}]}`;
+}
+async function canonicalizeProducts(actor, names, opts = { llm: true }) {
+  try {
+    const clean = [...new Set(names.map((n) => n.trim()).filter((n) => n.length >= 2))];
+    if (!clean.length || !opts.llm) return;
+    const { missing, existing } = await withActor(actor, async (tx) => {
+      const rows = await tx`
+        select n as name, item_keyword(n) as keyword, pk.canonical_name
+        from unnest(${clean}::text[]) as n
+        left join product_knowledge pk on pk.keyword = item_keyword(n)
+      `;
+      const missing2 = rows.filter((r) => !r.canonical_name && r.keyword.length >= 2).slice(0, MAX_CANONICALIZE);
+      const existing2 = missing2.length ? (await tx`
+              select distinct pk.canonical_name from product_knowledge pk, unnest(${missing2.map((m) => m.keyword)}::text[]) as n
+              where pk.canonical_name is not null and similarity(pk.canonical_name, n) > 0.2
+              limit 60
+            `).map((r) => r.canonical_name) : [];
+      return { missing: missing2, existing: existing2 };
+    });
+    if (!missing.length) return;
+    const ai = await tryGetAiConfig(actor);
+    if (!ai) return;
+    const raw2 = await callProviderJson(buildTextRequest(ai.provider, ai.apiKey, canonicalPrompt(missing.map((m) => m.name), existing), 1500), ai.provider, 25e3);
+    const answers = Array.isArray(raw2.items) ? raw2.items : [];
+    const byName = new Map(answers.map((a) => [normText(String(a.name ?? "")), a]));
+    await withActor(actor, async (tx) => {
+      for (const [i, m] of missing.entries()) {
+        const a = byName.get(normText(m.name)) ?? answers[i];
+        const canonical = typeof a?.canonical === "string" ? a.canonical.trim() : "";
+        if (canonical.length < 2) continue;
+        const group = isProductGroup(a?.group) ? a.group : "other";
+        await tx`select learn_product_knowledge(${m.keyword}, ${group}::product_group, ${canonical}, 'ai'::keyword_source, ${canonical})`;
+      }
+    });
+  } catch (err) {
+    console.warn("[prices] kanonikalisasi produk gagal (diabaikan):", err instanceof Error ? err.message : err);
+  }
+}
+function priceItemName(name) {
+  return name.replace(/\s*\(?\btitipan\b.*$/i, "").trim() || name;
+}
+async function recordPrices(tx, householdId, merchant, date, items) {
+  const m = merchant?.trim();
+  const valid = items.filter((i) => i.transaction_id && i.amount > 0);
+  if (!m || !valid.length) return 0;
+  const payload = valid.map((i) => ({ transaction_id: i.transaction_id, name: priceItemName(i.name), qty: i.qty ?? 1, amount: i.amount }));
+  const [row] = await tx`select record_product_prices(${householdId}, ${m}, ${date}, ${tx.json(payload)}) as n`;
+  return row?.n ?? 0;
+}
+function basisFor(unit) {
+  if (unit === "g") return { label: "per 100 g", factor: 100 };
+  if (unit === "ml") return { label: "per 100 ml", factor: 100 };
+  if (unit === "pcs") return { label: "per pcs", factor: 1 };
+  return { label: "per kemasan", factor: 1 };
+}
+function sizeLabel(o) {
+  if (!o.size_value || !o.size_unit) return null;
+  const v = Number(o.size_value);
+  if (o.size_unit === "g" && v >= 1e3) return `${+(v / 1e3).toFixed(2)} kg`;
+  if (o.size_unit === "ml" && v >= 1e3) return `${+(v / 1e3).toFixed(2)} L`;
+  return `${+v.toFixed(2)} ${o.size_unit}`;
+}
+function fmtDateId(d) {
+  const [, m, day2] = d.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  return `${Number(day2)} ${months[Number(m) - 1] ?? m}`;
+}
+function summarizeObservations(rows) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const key = `${r.product_key}|${r.size_unit ?? "-"}`;
+    const g = groups.get(key) ?? [];
+    g.push(r);
+    groups.set(key, g);
+  }
+  const out = [];
+  for (const obs of groups.values()) {
+    obs.sort((a, b2) => a.date < b2.date ? 1 : a.date > b2.date ? -1 : 0);
+    const unit = obs[0].size_unit;
+    const basis = basisFor(unit);
+    const metric = (o) => Math.round((unit && o.price_per_unit != null ? Number(o.price_per_unit) : Number(o.unit_price)) * basis.factor);
+    const stores = /* @__PURE__ */ new Map();
+    for (const o of obs) {
+      const s = stores.get(o.merchant_key);
+      if (!s) {
+        stores.set(o.merchant_key, {
+          merchant: o.merchant,
+          last_date: o.date,
+          price: Math.round(Number(o.unit_price)),
+          size: sizeLabel(o),
+          per_unit_price: metric(o),
+          lowest_per_unit_price: metric(o),
+          observations: 1
+        });
+      } else {
+        s.observations++;
+        s.lowest_per_unit_price = Math.min(s.lowest_per_unit_price, metric(o));
+      }
+    }
+    const list = [...stores.values()].sort((a, b2) => a.per_unit_price - b2.per_unit_price);
+    const cheapest = list[0] ? { merchant: list[0].merchant, per_unit_price: list[0].per_unit_price, last_date: list[0].last_date } : null;
+    const max = Math.max(...list.map((s) => s.per_unit_price));
+    const savings = list.length > 1 && max > 0 ? Math.round((max - list[0].per_unit_price) / max * 100) : null;
+    const name = obs[0].product_name;
+    const parts2 = list.map((s) => `${s.merchant} ${fmtRp(s.per_unit_price)}/${basis.label.replace("per ", "")}${s.size ? ` (${s.size} ${fmtRp(s.price)})` : ""}, ${fmtDateId(s.last_date)}`);
+    const summary = list.length > 1 ? `${name}: termurah di ${list[0].merchant}. ${parts2.join("; ")}.${savings ? ` Selisih ${savings}%.` : ""}` : `${name}: baru tercatat di ${parts2[0]}. Belum ada pembanding dari toko lain.`;
+    out.push({ product_name: name, unit, compare_basis: basis.label, stores: list, cheapest, savings_pct: savings, summary });
+  }
+  return out.sort((a, b2) => b2.stores.length - a.stores.length || b2.stores.reduce((s, x) => s + x.observations, 0) - a.stores.reduce((s, x) => s + x.observations, 0));
+}
+var OBS_SELECT = `
+  select product_name, product_key, keyword, merchant, merchant_key, qty::float as qty, unit_price::float as unit_price,
+         size_value::float as size_value, size_unit, price_per_unit::float as price_per_unit, date::text as date
+  from v_product_prices`;
+function sinceDate(days) {
+  const d = new Date(Date.now() - days * 864e5);
+  return d.toISOString().slice(0, 10);
+}
+function queryTokens(q) {
+  return normText(q).replace(/[^a-z0-9 ]/g, " ").split(" ").filter((t) => t.length >= 2);
+}
+async function comparePrices(actor, input) {
+  const tokens = queryTokens(input.q);
+  if (!tokens.length) throw ApiError.fromCode("validation_error", { message: "q minimal 2 huruf.", details: { field: "q" } });
+  const days = Math.min(Math.max(input.days ?? DEFAULT_DAYS, 1), 730);
+  const patterns = tokens.map((t) => `%${t}%`);
+  const qn = tokens.join(" ");
+  const rows = await withActor(
+    actor,
+    (tx) => tx.unsafe(
+      `${OBS_SELECT}
+       where household_id = $1 and date >= $2
+         and (norm_text(product_name || ' ' || keyword) like all ($3::text[]) or similarity(product_name, $4) > 0.35)
+       order by date desc limit 1000`,
+      [actor.householdId, sinceDate(days), patterns, qn]
+    )
+  );
+  return { query: input.q, days, products: summarizeObservations(rows).slice(0, 8) };
+}
+async function cheapestForNames(tx, householdId, names) {
+  const out = /* @__PURE__ */ new Map();
+  if (!names.length) return out;
+  const rows = await tx.unsafe(`${OBS_SELECT} where household_id = $1 and date >= $2 order by date desc limit 3000`, [householdId, sinceDate(DEFAULT_DAYS)]);
+  const hay = rows.map((r) => normText(`${r.product_name} ${r.keyword}`));
+  for (const name of names) {
+    const tokens = queryTokens(name);
+    if (!tokens.length) {
+      out.set(name, null);
+      continue;
+    }
+    const hits = hay.map((h) => tokens.filter((t) => h.includes(t)).length);
+    const need = tokens.length >= 3 ? tokens.length - 1 : tokens.length;
+    const top = Math.max(0, ...hits);
+    const matched = top >= need ? rows.filter((_, i) => hits[i] === top) : [];
+    const best = summarizeObservations(matched)[0];
+    const store = best?.stores[0];
+    out.set(name, best && store ? { merchant: store.merchant, price: store.price, size: store.size, per_unit_price: store.per_unit_price, compare_basis: best.compare_basis, last_date: store.last_date, stores: best.stores.length } : null);
+  }
+  return out;
+}
+async function setProductAlias(actor, input) {
+  return withActor(actor, async (tx) => {
+    const [row] = await tx`select item_keyword(${input.item}) as keyword, left(norm_text(${input.same_as}), 120) as canonical`;
+    if (!row || row.keyword.length < 2 || row.canonical.length < 2) throw ApiError.fromCode("validation_error", { message: "item dan same_as minimal 2 huruf." });
+    const [target] = await tx`
+      select product_name from v_product_prices where household_id = ${actor.householdId} and keyword = item_keyword(${input.same_as}) limit 1
+    `;
+    const canonical = target?.product_name ?? row.canonical;
+    await tx`
+      insert into product_aliases (household_id, keyword, canonical_name) values (${actor.householdId}, ${row.keyword}, ${canonical})
+      on conflict (household_id, keyword) do update set canonical_name = excluded.canonical_name
+    `;
+    return { keyword: row.keyword, canonical_name: canonical };
+  });
 }
 
 // src/services/transactions.ts
@@ -14359,6 +14593,9 @@ async function createTransaction(actor, input, timezone) {
   });
 }
 async function createTransactionBatch(actor, input, timezone) {
+  const parsedNotes = input.items.map((i) => i.note ? parseReceiptNote(i.note) : null);
+  const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p.name);
+  if (priceNames.length) await canonicalizeProducts(actor, priceNames);
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input);
     const piutangCatId = await piutangCategoryId(tx, actor.householdId);
@@ -14383,13 +14620,21 @@ async function createTransactionBatch(actor, input, timezone) {
     if (actor.credential === "jwt") await learnKeywords(tx, actor.householdId, items.filter((i) => !i.titipan).map((i) => ({ note: i.note, categoryId: i.category_id })));
     const remaining = [...createdRows];
     const titipanCreated = [];
-    for (const it of items) {
-      if (!it.titipan) continue;
-      const idx = remaining.findIndex((r) => r.note === it.note && Number(r.amount) === it.amount);
-      const txId = idx === -1 ? void 0 : remaining.splice(idx, 1)[0].id;
-      titipanCreated.push({ txId, borrower: it.titipan.borrower, name: it.note || "item", amount: it.amount });
+    const pricesByMerchant = /* @__PURE__ */ new Map();
+    for (const [i, it] of items.entries()) {
+      const pos = remaining.findIndex((r) => r.note === it.note && Number(r.amount) === it.amount);
+      const txId = pos === -1 ? void 0 : remaining.splice(pos, 1)[0].id;
+      const parsed = parsedNotes[i];
+      const itemName = parsed?.name || it.note || "item";
+      if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount });
+      if (parsed?.merchant) {
+        const list = pricesByMerchant.get(parsed.merchant) ?? [];
+        list.push({ transaction_id: txId, name: parsed.name, amount: it.amount });
+        pricesByMerchant.set(parsed.merchant, list);
+      }
     }
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, created: titipanCreated }) : [];
+    for (const [merchant, list] of pricesByMerchant) await recordPrices(tx, actor.householdId, merchant, date, list);
     const ids = createdRows.map((r) => r.id);
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
@@ -16304,7 +16549,9 @@ async function listShopping(actor, status) {
       `${SELECT2} where household_id = $1 and deleted_at is null and status = $2 order by created_at`,
       [actor.householdId, status ?? "needed"]
     );
-    return rows;
+    if ((status ?? "needed") !== "needed" || !rows.length) return rows;
+    const cheapest = await cheapestForNames(tx, actor.householdId, rows.map((r) => r.name));
+    return rows.map((r) => ({ ...r, cheapest: cheapest.get(r.name) ?? null }));
   });
 }
 async function createShoppingItem(actor, input) {
@@ -16525,6 +16772,7 @@ async function ingestReceipt(actor, input) {
   const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx]);
   const classifiedList = await classifyItems(actor, toClassify, { webLookup: true });
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]]));
+  if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name));
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input);
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null;
@@ -16557,8 +16805,10 @@ async function ingestReceipt(actor, input) {
     const pantryUpdated = [];
     const pantryUnmatched = [];
     const titipanCreated = [];
+    const priceItems = [];
     for (const [idx, item] of input.items.entries()) {
       const txId = takeMatch(idx, item.amount);
+      priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount });
       if (titipan[idx]) titipanCreated.push({ txId, borrower: titipan[idx].borrower, name: item.name, amount: item.amount });
       if (input.shopping) {
         const [match2] = await tx`select find_shopping_match(${actor.householdId}, ${item.name}) as id`;
@@ -16583,6 +16833,7 @@ async function ingestReceipt(actor, input) {
       }
     }
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, created: titipanCreated }) : [];
+    const pricesRecorded = await recordPrices(tx, actor.householdId, input.merchant, date, priceItems);
     const ids = createdIdRows.map((r) => r.id);
     const fullRows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
@@ -16590,6 +16841,7 @@ async function ingestReceipt(actor, input) {
       transactions: fullRows.map(mapTx),
       account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
       ...piutang.length ? { piutang } : {},
+      prices_recorded: pricesRecorded,
       ...input.shopping ? { shopping: { marked_bought: shoppingMarked, unmatched: shoppingUnmatched } } : {},
       ...input.pantry ? { pantry: { updated: pantryUpdated, unmatched: pantryUnmatched } } : {}
     };
@@ -17103,8 +17355,37 @@ var TOOLS = [
     }
   },
   {
+    name: "compare_prices",
+    description: 'Bandingkan harga satu produk antar toko dari riwayat STRUK keluarga sendiri (bukan harga internet), dihitung PER SATUAN (per 100 g / per 100 ml / per pcs) supaya beda ukuran kemasan adil. Pakai untuk "sabun lifebuoy paling murah di mana?", "minyak goreng lebih murah di Indomaret atau Alfamart?", "harga beras naik nggak?". Respons `products[]` urut dari yang paling banyak datanya; tiap produk punya `summary` siap kirim, `stores[]` urut termurah, dan `savings_pct`. Kosong = belum pernah tercatat dari struk mana pun \u2014 bilang jujur.',
+    parameters: {
+      type: "object",
+      properties: { q: str('Nama produk, mis. "sabun lifebuoy", "minyak goreng", "beras"'), days: num("Rentang riwayat dalam hari, default 180") },
+      required: ["q"]
+    },
+    endpoint: { method: "GET", path: "/v1/prices/compare" },
+    scope: "read",
+    idempotent: true,
+    handler: async (actor, args) => comparePrices(actor, { q: String(args.q ?? ""), days: args.days == null ? void 0 : Number(args.days) })
+  },
+  {
+    name: "merge_products",
+    description: 'Samakan dua nama item struk yang sebenarnya BARANG YANG SAMA supaya harganya bisa dibandingkan antar toko (nama kasir tiap toko beda). Pakai HANYA kalau user bilang eksplisit, mis. "LFBY BS 85G itu sama dengan Lifebuoy sabun 85gr", atau saat compare_prices memisahkan barang yang user bilang sama.',
+    parameters: {
+      type: "object",
+      properties: {
+        item: str('Nama item seperti tertulis di struk, mis. "LFBY BS 85G"'),
+        same_as: str('Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"')
+      },
+      required: ["item", "same_as"]
+    },
+    endpoint: { method: "POST", path: "/v1/prices/aliases" },
+    scope: "write",
+    idempotent: true,
+    handler: async (actor, args) => setProductAlias(actor, { item: String(args.item ?? ""), same_as: String(args.same_as ?? "") })
+  },
+  {
     name: "list_shopping",
-    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa".',
+    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa". Tiap item bisa punya `cheapest` (toko termurah dari riwayat struk, per satuan) \u2014 sebutkan kalau ada, mis. "sabun: paling murah terakhir di Alfamart Rp4.500".',
     parameters: { type: "object", properties: {} },
     endpoint: { method: "GET", path: "/v1/shopping" },
     scope: "read",
@@ -17641,11 +17922,11 @@ async function scanReceipt(actor, input) {
   }
   if (!Array.isArray(raw2.items)) return raw2;
   const items = raw2.items.filter((it) => it && typeof it === "object");
-  const classified = await classifyItems(
-    actor,
-    items.map((it) => ({ name: typeof it.note === "string" ? it.note : "", aiCategory: it.category })),
-    { webLookup: true }
-  );
+  const names = items.map((it) => typeof it.note === "string" ? it.note : "");
+  const [classified] = await Promise.all([
+    classifyItems(actor, items.map((it, i) => ({ name: names[i], aiCategory: it.category })), { webLookup: true }),
+    canonicalizeProducts(actor, names)
+  ]);
   return { ...raw2, items: items.map((it, i) => ({ ...it, category: classified[i].category, category_source: classified[i].source })) };
 }
 
@@ -18949,8 +19230,61 @@ var hermes_tools_default = [
     feature: "shopping_stock"
   },
   {
+    name: "compare_prices",
+    description: 'Bandingkan harga satu produk antar toko dari riwayat STRUK keluarga sendiri (bukan harga internet), dihitung PER SATUAN (per 100 g / per 100 ml / per pcs) supaya beda ukuran kemasan adil. Pakai untuk "sabun lifebuoy paling murah di mana?", "minyak goreng lebih murah di Indomaret atau Alfamart?", "harga beras naik nggak?". Respons `products[]` urut dari yang paling banyak datanya; tiap produk punya `summary` siap kirim, `stores[]` urut termurah, dan `savings_pct`. Kosong = belum pernah tercatat dari struk mana pun \u2014 bilang jujur.',
+    parameters: {
+      type: "object",
+      properties: {
+        q: {
+          type: "string",
+          description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng", "beras"'
+        },
+        days: {
+          type: "number",
+          description: "Rentang riwayat dalam hari, default 180"
+        }
+      },
+      required: [
+        "q"
+      ]
+    },
+    endpoint: {
+      method: "GET",
+      path: "/v1/prices/compare"
+    },
+    scope: "read",
+    idempotent: true
+  },
+  {
+    name: "merge_products",
+    description: 'Samakan dua nama item struk yang sebenarnya BARANG YANG SAMA supaya harganya bisa dibandingkan antar toko (nama kasir tiap toko beda). Pakai HANYA kalau user bilang eksplisit, mis. "LFBY BS 85G itu sama dengan Lifebuoy sabun 85gr", atau saat compare_prices memisahkan barang yang user bilang sama.',
+    parameters: {
+      type: "object",
+      properties: {
+        item: {
+          type: "string",
+          description: 'Nama item seperti tertulis di struk, mis. "LFBY BS 85G"'
+        },
+        same_as: {
+          type: "string",
+          description: 'Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"'
+        }
+      },
+      required: [
+        "item",
+        "same_as"
+      ]
+    },
+    endpoint: {
+      method: "POST",
+      path: "/v1/prices/aliases"
+    },
+    scope: "write",
+    idempotent: true
+  },
+  {
     name: "list_shopping",
-    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa".',
+    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa". Tiap item bisa punya `cheapest` (toko termurah dari riwayat struk, per satuan) \u2014 sebutkan kalau ada, mis. "sabun: paling murah terakhir di Alfamart Rp4.500".',
     parameters: {
       type: "object",
       properties: {}
@@ -19382,6 +19716,36 @@ receiptsApp.openapi(
   }
 );
 
+// src/routes/prices.ts
+var pricesApp = new OpenAPIHono();
+pricesApp.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/prices/compare",
+    tags: ["prices"],
+    summary: "Bandingkan harga produk antar toko (per satuan)",
+    security: [{ bearerJwt: [] }],
+    request: { query: ComparePricesQuerySchema },
+    responses: { 200: { content: { "application/json": { schema: ComparePricesResponseSchema } }, description: "OK" } }
+  }),
+  async (c) => c.json(await comparePrices(c.get("actor"), c.req.valid("query")), 200)
+);
+pricesApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/prices/aliases",
+    tags: ["prices"],
+    summary: "Samakan item struk dengan produk lain (koreksi manual)",
+    security: [{ bearerJwt: [] }],
+    request: { body: { content: { "application/json": { schema: ProductAliasBodySchema } } } },
+    responses: { 200: { content: { "application/json": { schema: external_exports.object({ keyword: external_exports.string(), canonical_name: external_exports.string() }) } }, description: "OK" } }
+  }),
+  async (c) => {
+    assertScope(c.get("actor"), "write");
+    return c.json(await setProductAlias(c.get("actor"), c.req.valid("json")), 200);
+  }
+);
+
 // src/middleware/audit.ts
 var REDACT_KEYS = /* @__PURE__ */ new Set(["api_key", "secret", "password", "new_password", "authorization", "api_key_pepper"]);
 function redact(value) {
@@ -19526,6 +19890,7 @@ function buildApp() {
   app2.route("/", shoppingApp);
   app2.route("/", pantryApp);
   app2.route("/", receiptsApp);
+  app2.route("/", pricesApp);
   return app2;
 }
 

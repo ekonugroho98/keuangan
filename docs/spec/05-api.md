@@ -5,6 +5,7 @@ Bergantung pada: 03-database.md
 > **Riwayat perubahan**
 > | Tanggal | Bagian | Perubahan | Alasan |
 > |---|---|---|---|
+> | 2026-10-13 | §4.14 (baru), §4 shopping | **Perbandingan harga**: `GET /v1/prices/compare?q=&days=` (read) dan `POST /v1/prices/aliases` (write); `GET /v1/shopping` (status needed) menambah `cheapest` per item; respons `POST /v1/receipts/ingest` menambah `prices_recorded`. Tidak ada error code baru. | Banding harga produk antar toko. Detail `10-fitur-opsional-keluarga.md` §6.8. |
 > | 2026-10-13 | §3 batch, §4 ingest | `items[].titipan` (opsional) di `POST /v1/transactions/batch` dan `POST /v1/receipts/ingest`; respons keduanya bisa memuat `piutang:[{id,borrower_name,total,items}]`. Note struk kanonik `[Toko] item [ref: X]`. Tidak ada error code baru. | Titipan → Piutang otomatis + perbandingan harga antar toko (persiapan). Detail `10-fitur-opsional-keluarga.md` §6.3. |
 > | 2026-10-07 | §4 (baru) | **F-D**: `GET/POST /v1/shopping`, `PATCH/DELETE /v1/shopping/{id}`, `GET /v1/shopping/suggestions`, `GET/POST /v1/pantry`, `PATCH/DELETE /v1/pantry/{id}`, `POST /v1/pantry/{id}/movements`, `GET /v1/pantry/expiring` (+`exclude_acked`), `POST /v1/pantry/expiring/ack`, `POST /v1/receipts/ingest`. Error baru: `shopping_item_not_found` (404), `pantry_item_not_found` (404), `receipt_total_mismatch` (422). Juga `GET /v1/reports/monthly` (F-B, selalu tersedia). Detail: `10-fitur-opsional-keluarga.md` §4, §6. | Implementasi F-B/F-D. |
 > | 2026-10-07 | §4 (baru), §2.4, §2.6 | **F-0+F-A**: `features` field baru di `GET/PATCH /v1/households/current` (sudah `both` jwt+api_key, bukan endpoint `/v1/features` terpisah); `GET/POST /v1/beneficiaries`, `PATCH/DELETE /v1/beneficiaries/{id}`; `POST/PATCH /v1/transactions(+/batch)` tambah `beneficiary_id`/`beneficiary` opsional; `GET /v1/transactions` tambah filter `beneficiary`; `GET /v1/summary` tambah `scope=beneficiary` + `by_beneficiary[]`. Field opsional ini saat fitur mati → `400 validation_error` (BUKAN 403 `feature_disabled` — itu untuk endpoint `/v1/beneficiaries` sendiri). Error code baru: `feature_disabled` (403), `beneficiary_not_found` (404), `ambiguous_beneficiary` (409). Detail lengkap: `10-fitur-opsional-keluarga.md`. | Implementasi F-0/F-A, spec ditulis 2026-10-07. |
@@ -283,6 +284,16 @@ Resolusi `debt`/`goal`/`piutang` by name: endpoint `payments`/`contributions`/`r
 |---|---|---|---|
 | POST | `/v1/ai/chat` | jwt | `{messages:[{role:"user"|"ai", text}]}` → `{reply}`. Provider/model/key dari `user_settings.ai_config` (BYOK, tidak pernah dari body). Tool-calling read-only atas data household (`get_transactions`, `get_summary`, `get_accounts`, `get_debts`, `get_goals`, `get_investments`), bukan registry tool publik §4.11 — agent eksternal tetap memakai endpoint spesifik + `/v1/resolve`. `400 ai_not_configured`, `502 upstream_ai_error` |
 | POST | `/v1/ai/scan-receipt` | jwt | JSON `{image_base64, mime_type}` (mode vision) atau `{ocr_text}` (mode teks, untuk hasil OCR client-side) → `{merchant?, date?, subtotal?, items?:[{note, amount, category}]}` atau `{error:"bukan struk"}`. Provider vision/teks dari `ai_config`; `400 ai_not_configured`, `422 provider_no_vision`, `502 upstream_ai_error` |
+
+### 4.14 Perbandingan harga antar toko (2026-10-13)
+
+Tidak digate feature flag — riwayat harga terisi dari struk mana pun (`POST /v1/receipts/ingest` dengan `merchant`, atau
+`POST /v1/transactions/batch` dengan note `[Toko] item` dari modal scan web). Detail desain: `10-fitur-opsional-keluarga.md` §6.8.
+
+| Method | Path | Auth | Scope | Deskripsi |
+|---|---|---|---|---|
+| GET | `/v1/prices/compare` | both | read | `?q=<produk>&days=180` → `{query, days, products:[{product_name, unit:"g"\|"ml"\|"pcs"\|null, compare_basis, stores:[{merchant, last_date, price, size, per_unit_price, lowest_per_unit_price, observations}], cheapest, savings_pct, summary}]}`. `stores` urut termurah per satuan (harga terakhir tiap toko). `q` < 2 huruf → `400 validation_error` |
+| POST | `/v1/prices/aliases` | both | write | `{item, same_as}` → `{keyword, canonical_name}`. Koreksi manual per household: item struk `item` dianggap produk yang sama dengan `same_as` (nama produk, atau nama item struk lain — dipakai nama produk item itu) |
 
 ### 4.13 ~~Subscription, webhook, internal~~ — DIHAPUS (2026-10-06)
 

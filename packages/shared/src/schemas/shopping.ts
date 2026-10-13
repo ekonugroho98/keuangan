@@ -13,6 +13,19 @@ export const ShoppingItemSchema = z
     status: ShoppingStatusSchema,
     source: z.enum(['manual', 'suggested', 'receipt']),
     bought_transaction_id: UuidSchema.nullable(),
+    cheapest: z
+      .object({
+        merchant: z.string(),
+        price: z.number(),
+        size: z.string().nullable(),
+        per_unit_price: z.number(),
+        compare_basis: z.string(),
+        last_date: z.string(),
+        stores: z.number(),
+      })
+      .nullable()
+      .optional()
+      .openapi({ description: 'Toko termurah dari riwayat struk household (perbandingan per satuan). Hanya untuk status needed.' }),
   })
   .openapi('ShoppingItem')
 
@@ -112,3 +125,42 @@ export const IngestReceiptBodySchema = z
     pantry: z.boolean().default(true).openapi({ description: 'Tambah stok untuk item yang cocok di pantry.' }),
   })
   .openapi('IngestReceiptBody')
+
+// ── Perbandingan harga antar toko (10-fitur-opsional-keluarga.md §6.8) ──────────────────────
+export const ComparePricesQuerySchema = z.object({
+  q: z.string().min(2).openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng"' }),
+  days: z.coerce.number().int().min(1).max(730).default(180),
+})
+
+export const StorePriceSchema = z.object({
+  merchant: z.string(),
+  last_date: z.string(),
+  price: z.number().openapi({ description: 'Harga satu kemasan terakhir' }),
+  size: z.string().nullable(),
+  per_unit_price: z.number().openapi({ description: 'Harga terakhir per satuan banding (compare_basis)' }),
+  lowest_per_unit_price: z.number(),
+  observations: z.number(),
+})
+
+export const ProductComparisonSchema = z
+  .object({
+    product_name: z.string(),
+    unit: z.enum(['g', 'ml', 'pcs']).nullable(),
+    compare_basis: z.string().openapi({ description: '"per 100 g" | "per 100 ml" | "per pcs" | "per kemasan"' }),
+    stores: z.array(StorePriceSchema).openapi({ description: 'Urut dari termurah per satuan' }),
+    cheapest: z.object({ merchant: z.string(), per_unit_price: z.number(), last_date: z.string() }).nullable(),
+    savings_pct: z.number().nullable(),
+    summary: z.string().openapi({ description: 'Ringkasan siap kirim (Bahasa Indonesia)' }),
+  })
+  .openapi('ProductComparison')
+
+export const ComparePricesResponseSchema = z
+  .object({ query: z.string(), days: z.number(), products: z.array(ProductComparisonSchema) })
+  .openapi('ComparePricesResponse')
+
+export const ProductAliasBodySchema = z
+  .object({
+    item: z.string().min(2).openapi({ description: 'Nama item seperti di struk, mis. "LFBY BS 85G"' }),
+    same_as: z.string().min(2).openapi({ description: 'Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"' }),
+  })
+  .openapi('ProductAliasBody')

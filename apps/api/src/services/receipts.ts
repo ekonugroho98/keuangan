@@ -6,6 +6,7 @@ import { requireFeature } from './features'
 import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef } from './resolver'
 import { classifyItems } from './categorize'
 import { formatReceiptNote } from '@karaya/shared/format'
+import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { todayInTz } from './period'
 import { getHouseholdTimezone } from './households'
@@ -59,6 +60,9 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx])
   const classifiedList = await classifyItems(actor, toClassify, { webLookup: true })
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]!]))
+  // Perbandingan harga antar toko (prices.ts): seragamkan nama kasir → produk kanonik (satu panggilan AI
+  // BYOK per struk, di-cache global) SEBELUM transaksi DB dibuka. Best-effort, tidak pernah gagal.
+  if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name))
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null
@@ -105,9 +109,11 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     const pantryUpdated: { name: string; qty_before: number; qty_after: number }[] = []
     const pantryUnmatched: string[] = []
     const titipanCreated: TitipanCreated[] = []
+    const priceItems: PriceItem[] = []
 
     for (const [idx, item] of input.items.entries()) {
       const txId = takeMatch(idx, item.amount)
+      priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount })
       if (titipan[idx]) titipanCreated.push({ txId, borrower: titipan[idx]!.borrower, name: item.name, amount: item.amount })
 
       if (input.shopping) {
@@ -135,6 +141,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     }
 
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, created: titipanCreated }) : []
+    const pricesRecorded = await recordPrices(tx, actor.householdId, input.merchant, date, priceItems)
 
     const ids = createdIdRows.map((r) => r.id)
     const fullRows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
@@ -144,6 +151,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
       transactions: fullRows.map(mapTx),
       account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
       ...(piutang.length ? { piutang } : {}),
+      prices_recorded: pricesRecorded,
       ...(input.shopping ? { shopping: { marked_bought: shoppingMarked, unmatched: shoppingUnmatched } } : {}),
       ...(input.pantry ? { pantry: { updated: pantryUpdated, unmatched: pantryUnmatched } } : {}),
     }

@@ -2,6 +2,7 @@ import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { requireFeature } from './features'
+import { cheapestForNames } from './prices'
 
 export interface ShoppingItemOut {
   id: string
@@ -11,6 +12,8 @@ export interface ShoppingItemOut {
   status: 'needed' | 'bought' | 'cancelled'
   source: 'manual' | 'suggested' | 'receipt'
   bought_transaction_id: string | null
+  /** Toko termurah dari riwayat struk household (prices.ts); null kalau belum pernah tercatat. Hanya status needed. */
+  cheapest?: { merchant: string; price: number; size: string | null; per_unit_price: number; compare_basis: string; last_date: string; stores: number } | null
 }
 
 const SELECT = `select id, name, qty_text, notes, status, source, bought_transaction_id from shopping_items`
@@ -22,7 +25,9 @@ export async function listShopping(actor: Actor, status?: 'needed' | 'bought' | 
       `${SELECT} where household_id = $1 and deleted_at is null and status = $2 order by created_at`,
       [actor.householdId, status ?? 'needed'],
     )
-    return rows
+    if ((status ?? 'needed') !== 'needed' || !rows.length) return rows
+    const cheapest = await cheapestForNames(tx, actor.householdId, rows.map((r) => r.name))
+    return rows.map((r) => ({ ...r, cheapest: cheapest.get(r.name) ?? null }))
   })
 }
 

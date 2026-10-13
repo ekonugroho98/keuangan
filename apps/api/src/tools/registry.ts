@@ -19,6 +19,7 @@ import * as reportsSvc from '../services/reports'
 import * as shoppingSvc from '../services/shopping'
 import * as pantrySvc from '../services/pantry'
 import { ingestReceipt } from '../services/receipts'
+import * as pricesSvc from '../services/prices'
 
 /**
  * Registry tunggal untuk Hermes/agent (06-agent-integration.md §2). Satu sumber kebenaran yang
@@ -577,8 +578,37 @@ export const TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'compare_prices',
+    description: 'Bandingkan harga satu produk antar toko dari riwayat STRUK keluarga sendiri (bukan harga internet), dihitung PER SATUAN (per 100 g / per 100 ml / per pcs) supaya beda ukuran kemasan adil. Pakai untuk "sabun lifebuoy paling murah di mana?", "minyak goreng lebih murah di Indomaret atau Alfamart?", "harga beras naik nggak?". Respons `products[]` urut dari yang paling banyak datanya; tiap produk punya `summary` siap kirim, `stores[]` urut termurah, dan `savings_pct`. Kosong = belum pernah tercatat dari struk mana pun — bilang jujur.',
+    parameters: {
+      type: 'object',
+      properties: { q: str('Nama produk, mis. "sabun lifebuoy", "minyak goreng", "beras"'), days: num('Rentang riwayat dalam hari, default 180') },
+      required: ['q'],
+    },
+    endpoint: { method: 'GET', path: '/v1/prices/compare' },
+    scope: 'read',
+    idempotent: true,
+    handler: async (actor, args) => pricesSvc.comparePrices(actor, { q: String(args.q ?? ''), days: args.days == null ? undefined : Number(args.days) }),
+  },
+  {
+    name: 'merge_products',
+    description: 'Samakan dua nama item struk yang sebenarnya BARANG YANG SAMA supaya harganya bisa dibandingkan antar toko (nama kasir tiap toko beda). Pakai HANYA kalau user bilang eksplisit, mis. "LFBY BS 85G itu sama dengan Lifebuoy sabun 85gr", atau saat compare_prices memisahkan barang yang user bilang sama.',
+    parameters: {
+      type: 'object',
+      properties: {
+        item: str('Nama item seperti tertulis di struk, mis. "LFBY BS 85G"'),
+        same_as: str('Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"'),
+      },
+      required: ['item', 'same_as'],
+    },
+    endpoint: { method: 'POST', path: '/v1/prices/aliases' },
+    scope: 'write',
+    idempotent: true,
+    handler: async (actor, args) => pricesSvc.setProductAlias(actor, { item: String(args.item ?? ''), same_as: String(args.same_as ?? '') }),
+  },
+  {
     name: 'list_shopping',
-    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa".',
+    description: 'Daftar belanja yang masih perlu dibeli. Pakai untuk "apa aja yang perlu dibeli", "daftar belanja kita apa". Tiap item bisa punya `cheapest` (toko termurah dari riwayat struk, per satuan) — sebutkan kalau ada, mis. "sabun: paling murah terakhir di Alfamart Rp4.500".',
     parameters: { type: 'object', properties: {} },
     endpoint: { method: 'GET', path: '/v1/shopping' },
     scope: 'read',

@@ -7,7 +7,7 @@ import { GROUP_LABEL_ID, PRODUCT_GROUPS, isProductGroup, type ProductGroup } fro
  * di-cache di product_knowledge oleh pemanggil (categorize.ts), jadi tiap nama hanya dicari sekali.
  * Semua kegagalan ditelan (null) — ini jalur best-effort, tidak boleh menggagalkan scan/ingest.
  */
-export interface WebLookupResult { group: ProductGroup; label: string; grounded: boolean }
+export interface WebLookupResult { group: ProductGroup; label: string; canonical: string | null; grounded: boolean }
 
 const SEARCH_TIMEOUT_MS = 7_000
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
@@ -60,7 +60,8 @@ ${evidence}
 Kelompok yang tersedia:
 ${groups}
 
-Jawab HANYA JSON: {"label": "<nama produk lengkap, singkat>", "group": "<salah satu kelompok di atas>"}
+Jawab HANYA JSON: {"label": "<nama produk lengkap, singkat>", "canonical": "<merek + jenis + varian, huruf kecil, TANPA ukuran/berat/isi, mis. lifebuoy sabun batang total 10>", "group": "<salah satu kelompok di atas>"}
+canonical = null kalau produknya tidak bisa dipastikan.
 Kalau benar-benar tidak bisa dipastikan, group = "other".`
 }
 
@@ -73,7 +74,8 @@ export async function lookupProduct(itemName: string, provider: string, apiKey: 
     const group = isProductGroup(raw.group) ? raw.group : null
     if (!group) return null
     const label = typeof raw.label === 'string' && raw.label.trim() ? raw.label.trim().slice(0, 120) : name
-    return { group, label, grounded: snippets.length > 0 }
+    const canonical = typeof raw.canonical === 'string' && raw.canonical.trim().length >= 2 ? raw.canonical.trim().slice(0, 120) : null
+    return { group, label, canonical, grounded: snippets.length > 0 }
   } catch {
     return null
   }

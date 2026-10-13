@@ -5,6 +5,7 @@ Bergantung pada: 00-ringkasan.md, 01-kondisi-saat-ini.md
 > **Riwayat perubahan**
 > | Tanggal | Bagian | Perubahan | Alasan |
 > |---|---|---|---|
+> | 2026-10-13 | §3.22 (baru) | Migrasi `00000000000025`: `product_prices`, `product_aliases`, `product_knowledge.canonical_name`, view `v_product_prices`, fungsi `parse_item_size`/`item_keyword`/`product_key`/`merchant_key`/`record_product_prices`, `learn_product_knowledge` + `p_canonical` | Perbandingan harga produk antar toko |
 > | 2026-10-07 | §3, §8.3 (implisit) | **F-D** (migrasi `00000000000023`): tabel `shopping_items`, `pantry_items` (lokasi, tanggal kedaluwarsa), `pantry_movements`; fungsi `apply_pantry_movement`, `find_pantry_match`/`find_shopping_match` (pencocokan longgar via `norm_text`+trgm, BUKAN pola `resolve_*` jsonb). Detail: `10-fitur-opsional-keluarga.md` §6. | Implementasi F-D. |
 > | 2026-10-07 | — (apps/api) | **Bug nyata**: `current_date + ${jsNumber}` tanpa cast eksplisit di tagged template postgres.js -> `operator is not unique: date + unknown` (parameter tanpa tipe eksplisit ambigu antara overload `date+integer`/`date+interval`). Diperbaiki `${n}::int`. | Ditemukan test integrasi `GET /v1/pantry/expiring`. |
 > | 2026-10-07 | §3, §8.3 (implisit) | **F-0+F-A** (migrasi `00000000000021`, `00000000000022`): `households.features jsonb`; tabel `beneficiaries` + `beneficiaries_kind` enum + `transactions.beneficiary_id`; `resolve_beneficiary()`, `enable_beneficiary_feature()`; `post_transaction` tambah parameter `p_beneficiary_id` (signature berubah, `drop function` dulu pola 0013/0014); `post_transactions_batch` dan `update_transaction` baca `beneficiary_id` dari jsonb yang sudah ada (signature TIDAK berubah). Detail lengkap di `10-fitur-opsional-keluarga.md` §2-§3. | Implementasi F-0/F-A, spec ditulis 2026-10-07. |
@@ -633,6 +634,26 @@ CREATE TABLE product_knowledge (
 ```
 
 Kelompok → kategori household lewat daftar kandidat nama/alias (`apps/api/src/services/product-groups.ts`: `household` → "Rumah Tangga"/"Kebersihan"/"Shopping"/"Belanja", dst.). RLS: `authenticated` boleh baca & tulis (risiko racun lintas household diterima: isinya hanya "nama item = kelompok", dan koreksi user di `category_keywords` selalu menang). Urutan keputusan lengkap per item ada di `apps/api/src/services/categorize.ts` (learned → ai → known → rule → web → Lainnya).
+
+### 3.22 `product_prices` + `product_aliases`, `product_knowledge.canonical_name` (migrasi `00000000000025`, 2026-10-13)
+
+Perbandingan harga produk antar toko. Detail alur: `10-fitur-opsional-keluarga.md` §6.8.
+
+- `product_knowledge.canonical_name TEXT NULL` — nama produk kanonik TANPA ukuran ("lifebuoy sabun batang"), global,
+  diisi AI BYOK (`canonicalizeProducts`, sekali per struk) atau pencarian web. `learn_product_knowledge` dapat parameter
+  ke-5 `p_canonical` (versi 4-parameter di-drop): sumber lebih kuat boleh mengganti, sumber lebih lemah hanya mengisi yang kosong.
+- `product_prices` — satu baris per transaksi item struk (`transaction_id` UNIQUE, cascade): `keyword` (`item_keyword`:
+  nama dinormalkan tanpa kelipatan "x2"), `base_name` (tanpa ukuran), `merchant` apa adanya + `merchant_key` (jaringan
+  minimarket disatukan lintas cabang), `qty`, `amount`, `unit_price = amount/qty`, `size_value`+`size_unit` (`g`/`ml`/`pcs`,
+  diurai `parse_item_size`), `date`. RLS per household (select anggota, tulis owner/member).
+- `product_aliases (household_id, keyword) UNIQUE → canonical_name` — koreksi manual, menang atas kanonik global.
+- Fungsi: `parse_item_size(name) → (base_name, size_value, size_unit, multiplier)`, `item_keyword(name)`,
+  `product_key(name)` (token unik diurutkan, tanpa ukuran — urutan kata tidak berpengaruh), `merchant_key(merchant)`,
+  `record_product_prices(household, merchant, date, items jsonb)` (tanpa toko / prefix penanda `[TITIPAN]`/`[NOMBOK]` → 0).
+- View `v_product_prices` (security_invoker): `product_name = coalesce(alias, canonical_name, base_name)`, `product_key`,
+  `price_per_unit = unit_price/size_value`; transaksi terhapus tidak ikut. Nama diputuskan saat DIBACA, jadi kanonikalisasi
+  atau alias yang datang belakangan langsung berlaku untuk riwayat lama.
+- Backfill di migrasi: transaksi expense lama ber-note `[Toko] …` atau `… — Toko` (qty 1).
 
 ## 4. View
 
