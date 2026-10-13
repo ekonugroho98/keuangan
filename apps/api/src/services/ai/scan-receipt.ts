@@ -2,6 +2,7 @@ import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../../auth/actor'
 import { withActor } from '../../db/tx'
 import { classifyItems, loadExpenseCategories, type ExpenseCategory } from '../categorize'
+import { canonicalizeProducts } from '../prices'
 import { VISION_PROVIDERS, buildTextRequest, buildVisionRequest, callProviderJson, getAiConfig } from './provider'
 
 // Kategori pengeluaran milik household (bukan daftar hardcode) — ini yang ditawarkan ke AI dan
@@ -91,10 +92,12 @@ export async function scanReceipt(actor: Actor, input: { image_base64?: string; 
 
   if (!Array.isArray(raw.items)) return raw
   const items = (raw.items as Array<Record<string, unknown>>).filter((it) => it && typeof it === 'object')
-  const classified = await classifyItems(
-    actor,
-    items.map((it) => ({ name: typeof it.note === 'string' ? it.note : '', aiCategory: it.category })),
-    { webLookup: true },
-  )
+  const names = items.map((it) => (typeof it.note === 'string' ? it.note : ''))
+  // Kanonikalisasi produk (perbandingan harga, prices.ts) jalan paralel dengan klasifikasi supaya
+  // saat user menyimpan hasil scan, nama produknya sudah ter-cache. Best-effort.
+  const [classified] = await Promise.all([
+    classifyItems(actor, items.map((it, i) => ({ name: names[i]!, aiCategory: it.category })), { webLookup: true }),
+    canonicalizeProducts(actor, names),
+  ])
   return { ...raw, items: items.map((it, i) => ({ ...it, category: classified[i]!.category, category_source: classified[i]!.source })) }
 }

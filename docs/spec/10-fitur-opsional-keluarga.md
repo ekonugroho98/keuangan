@@ -5,6 +5,7 @@ Bergantung pada: 03-database.md, 05-api.md, 06-agent-integration.md, 07-frontend
 > **Riwayat perubahan**
 > | Tanggal | Bagian | Perubahan | Alasan |
 > |---|---|---|---|
+> | 2026-10-13 | §6.3, §6.8 (baru) | Titipan → Piutang otomatis + note struk `[Toko] item`; perbandingan harga antar toko (migrasi `00000000000025`, `prices.ts`, `GET /v1/prices/compare`, `POST /v1/prices/aliases`, `cheapest` di daftar belanja, tool `compare_prices`/`merge_products`) | Permintaan pemilik produk 2026-10-13 |
 > | 2026-10-07 | (file baru) | Spec 4 fitur opsional "kelola keluarga" + mekanisme feature flag per household | Permintaan pemilik produk setelah Fase 6 + migrasi data Hermes: aplikasi tetap **fokus keuangan**, tapi fitur keluarga di luar keuangan murni harus bisa **diaktifkan/dimatikan per household** tanpa mengubah perilaku inti saat mati. Ide dipilih dari lubang nyata yang kelihatan saat migrasi (dimensi `untuk` hilang, 3 silo belanja/stok/keuangan, lupa catat, lupa settle). |
 > | 2026-10-07 | §6.2, §6.4, §6.5 | `pantry_items` dapat kolom `location` (enum `pantry_location`: `fridge` kulkas, `freezer`, `shelf` lemari/rak dapur, `other`); filter `GET /v1/pantry?location=`; Hermes menebak lokasi dari jenis barang | Pemilik produk: istilahnya tetap "pantry" (stok rumah), bukan "kulkas", tapi harus bisa dibedakan mana yang di kulkas dan mana yang bukan. |
 > | 2026-10-07 | §2.1, §6.2, §6.4, §6.6 (baru), §8, §9 | Pengingat kedaluwarsa: kolom `expires_estimated`, `GET /v1/pantry/expiring`, konfigurasi `features.shopping_stock.expiry_reminder`, cron harian Hermes; Q-F9, Q-F10 | Permintaan pemilik produk ("tambahin pengingat kedaluwarsa juga"). |
@@ -612,6 +613,35 @@ Web: badge merah/kuning di halaman Stok (lewat / ≤ `days_before` hari), tanda 
 Skrip sekali jalan dari `belanja.db` (28 baris, 2026-10-07) dan `kulkas.db` (`stock`, `stock_history`) lewat
 API (`location` dari `kulkas.db` → `fridge` sebagai default, kecuali datanya sendiri sudah membedakan freezer — dicek saat dump) — pola `migrate-expenses.mjs`: dump JSON via SSH → dry-run mapping → eksekusi dengan `Idempotency-Key`.
 Setelah itu SQLite jadi read-only historis (sama seperti `keuangan.db`).
+
+### 6.8 Perbandingan harga antar toko (2026-10-13, migrasi `00000000000025`)
+
+**Masalah**: barang yang sama punya nama kasir berbeda tiap toko ("LFBY BS 85G" di Indomaret, "LIFEBUOY SABUN 85GR" di
+Alfamart) dan ukuran kemasan berbeda (85 g vs 110 g), jadi riwayat transaksi tidak bisa langsung dibandingkan.
+
+**Tiga lapis** (skema di `03-database.md` §3.22):
+1. **Identitas produk kanonik.** `product_knowledge.canonical_name` (global): merek + jenis + varian TANPA ukuran. Diisi
+   `canonicalizeProducts` (`apps/api/src/services/prices.ts`) — SATU panggilan AI BYOK per struk untuk item yang belum
+   punya nama kanonik, dengan daftar nama kanonik yang sudah ada (kemiripan trigram) supaya AI memakai ulang nama yang
+   sama; juga diisi pencarian web (`lookupProduct` kini mengembalikan `canonical`). `product_key()` mengurutkan token, jadi
+   "lifebuoy sabun batang" = "sabun lifebuoy batang". Koreksi manual per household lewat `product_aliases`
+   (`POST /v1/prices/aliases`, tool `merge_products`). Tanpa BYOK: nama dasar (tanpa ukuran) dipakai — item dengan nama
+   kasir berbeda baru bertemu setelah alias.
+2. **Riwayat harga per toko.** `product_prices`, diisi otomatis di DALAM transaksi DB yang sama dengan pencatatan:
+   `ingestReceipt` (kalau `merchant` ada; qty dari item, "x2" di nama dipakai kalau qty 1) dan `createTransactionBatch`
+   (item ber-note `[Toko] item`, yaitu simpan hasil scan web). Kanonikalisasi berjalan SEBELUM transaksi DB (scan web:
+   paralel dengan klasifikasi kategori, jadi saat disimpan sudah ter-cache).
+3. **Banding per satuan.** `parse_item_size` mengurai ukuran (kg/g/mg → g, l/ml/cc → ml, pcs/sachet/btl/… → pcs).
+   `summarizeObservations` mengelompokkan per (produk, satuan) — g tidak dicampur dengan tanpa-ukuran — dan mewakili tiap
+   toko (jaringan disatukan lintas cabang lewat `merchant_key`) dengan harga TERAKHIR, dibanding per 100 g / 100 ml / pcs.
+
+**Keluaran**: `GET /v1/prices/compare` + tool Hermes `compare_prices` (ringkasan `summary` siap kirim, `savings_pct`);
+`GET /v1/shopping` menambah `cheapest` per item (nama daftar belanja 3+ kata boleh meleset satu kata); halaman Belanja web
+menampilkan "💰 Termurah di …" per item dan panel "⚖️ Banding harga antar toko". Tidak digate feature flag.
+
+**Batasan yang diketahui**: tanpa BYOK atau saat AI ragu, nama kasir yang berbeda tidak otomatis bertemu; harga yang
+dicatat adalah harga NET per baris struk (diskon per item ikut, diskon total struk tidak dialokasikan); qty transaksi lama
+(backfill) dianggap 1.
 
 ## 7. Urutan, dependensi, ukuran
 

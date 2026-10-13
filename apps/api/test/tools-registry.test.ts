@@ -11,8 +11,8 @@ import manifest from '../tools/hermes-tools.json'
 // HTTP (endpoint/parameters, sudah diverifikasi manual thd DB lokal di sesi sebelumnya); test ini
 // menjaga STRUKTUR registry & manifest tetap konsisten (jumlah, field feature, sinkron dgn file JSON).
 describe('tools registry (10-fitur-opsional-keluarga.md §2.4)', () => {
-  it('total 32 tool (22 lama + 10 baru F-A/F-B/F-D)', () => {
-    expect(TOOLS).toHaveLength(32)
+  it('total 34 tool (22 lama + 10 F-A/F-B/F-D + 2 perbandingan harga)', () => {
+    expect(TOOLS).toHaveLength(34)
   })
 
   it('hermes-tools.json (file ter-commit) SINKRON dengan registry — jalankan `pnpm gen:tools` kalau test ini gagal', () => {

@@ -3557,6 +3557,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/prices/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bandingkan harga produk antar toko (per satuan) */
+        get: {
+            parameters: {
+                query: {
+                    q: string;
+                    days?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ComparePricesResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prices/aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Samakan item struk dengan produk lain (koreksi manual) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ProductAliasBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            keyword: string;
+                            canonical_name: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4233,6 +4315,16 @@ export interface components {
              * @example 11111111-1111-1111-1111-111111111111
              */
             bought_transaction_id: string | null;
+            /** @description Toko termurah dari riwayat struk household (perbandingan per satuan). Hanya untuk status needed. */
+            cheapest?: {
+                merchant: string;
+                price: number;
+                size: string | null;
+                per_unit_price: number;
+                compare_basis: string;
+                last_date: string;
+                stores: number;
+            } | null;
         };
         CreateShoppingItemBody: {
             name: string;
@@ -4345,6 +4437,44 @@ export interface components {
              * @default true
              */
             pantry: boolean;
+        };
+        ProductComparison: {
+            product_name: string;
+            /** @enum {string|null} */
+            unit: "g" | "ml" | "pcs" | null;
+            /** @description "per 100 g" | "per 100 ml" | "per pcs" | "per kemasan" */
+            compare_basis: string;
+            /** @description Urut dari termurah per satuan */
+            stores: {
+                merchant: string;
+                last_date: string;
+                /** @description Harga satu kemasan terakhir */
+                price: number;
+                size: string | null;
+                /** @description Harga terakhir per satuan banding (compare_basis) */
+                per_unit_price: number;
+                lowest_per_unit_price: number;
+                observations: number;
+            }[];
+            cheapest: {
+                merchant: string;
+                per_unit_price: number;
+                last_date: string;
+            } | null;
+            savings_pct: number | null;
+            /** @description Ringkasan siap kirim (Bahasa Indonesia) */
+            summary: string;
+        };
+        ComparePricesResponse: {
+            query: string;
+            days: number;
+            products: components["schemas"]["ProductComparison"][];
+        };
+        ProductAliasBody: {
+            /** @description Nama item seperti di struk, mis. "LFBY BS 85G" */
+            item: string;
+            /** @description Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR" */
+            same_as: string;
         };
     };
     responses: never;

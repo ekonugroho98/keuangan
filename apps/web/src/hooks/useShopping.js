@@ -60,3 +60,13 @@ export function useShoppingSuggestions(enabled = true) {
     });
     return { suggestions: query.data ?? [] };
 }
+
+/** Perbandingan harga antar toko dari riwayat struk household (GET /v1/prices/compare, per satuan). */
+export async function comparePrices(q, days = 180) {
+    return unwrap(await api.GET("/v1/prices/compare", { params: { query: { q, days } } }));
+}
+
+/** Koreksi manual: item struk ini = produk itu (POST /v1/prices/aliases). */
+export async function mergeProducts(item, sameAs) {
+    return unwrap(await api.POST("/v1/prices/aliases", { body: { item, same_as: sameAs } }));
+}

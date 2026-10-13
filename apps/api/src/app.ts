@@ -31,6 +31,7 @@ import { reportsApp } from './routes/reports'
 import { shoppingApp } from './routes/shopping'
 import { pantryApp } from './routes/pantry'
 import { receiptsApp } from './routes/receipts'
+import { pricesApp } from './routes/prices'
 import { auditMiddleware } from './middleware/audit'
 
 export function buildApp() {
@@ -149,6 +150,7 @@ export function buildApp() {
   app.route('/', shoppingApp)
   app.route('/', pantryApp)
   app.route('/', receiptsApp)
+  app.route('/', pricesApp)
 
   return app
 }

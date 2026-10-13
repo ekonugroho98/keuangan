@@ -801,6 +801,22 @@ Permintaan pemilik produk: (1) item TITIPAN masuk Piutang, (2) note struk berfor
   Modal web: dropdown scan menawarkan "Piutang" (kategori sistem) untuk item titipan.
 - **Verifikasi**: `typecheck`/`lint` bersih; 115/115 test (unit `titipan.test.ts` 5, integrasi `titipan.test.ts` 3);
   `schema.d.ts` di-regen dari OpenAPI lokal; bundle `api/index.js` + `apps/web` dibangun ulang.
-- **Perbandingan harga antar toko** — BELUM diimplementasi, baru strategi (lihat §"Rencana" di bawah kalau disetujui):
-  identitas produk kanonik dari `product_knowledge.label` (sudah terisi oleh pencarian web) + tabel harga per
-  (produk kanonik, toko, tanggal) yang diisi saat ingest, dibandingkan per satuan (g/ml/pcs).
+- **Perbandingan harga antar toko** — dikerjakan di entri berikutnya.
+
+### Perbandingan harga produk antar toko (2026-10-13)
+Desain lengkap: `10-fitur-opsional-keluarga.md` §6.8; skema `03-database.md` §3.22; endpoint `05-api.md` §4.14.
+- **Migrasi `00000000000025_product_prices.sql`**: `product_prices`, `product_aliases`, `product_knowledge.canonical_name`,
+  view `v_product_prices`, fungsi `parse_item_size`/`item_keyword`/`product_key`/`merchant_key`/`record_product_prices`,
+  `learn_product_knowledge` + `p_canonical` (versi lama di-drop), backfill dari note struk lama. Diterapkan ke DB LOKAL.
+  **BELUM diterapkan ke produksi** saat entri ini ditulis — wajib sebelum deploy API (ingest/batch memanggil
+  `record_product_prices` dan `item_keyword`; tanpa migrasi, simpan struk akan error).
+- **API**: `services/prices.ts` (kanonikalisasi AI sekali per struk, `recordPrices`, `summarizeObservations`,
+  `comparePrices`, `cheapestForNames`, `setProductAlias`), `routes/prices.ts`; terpasang di `receipts.ts`,
+  `transactions.ts` (batch), `ai/scan-receipt.ts`, `shopping.ts` (`cheapest`), `web-lookup.ts` (+`canonical`).
+  Tool Hermes `compare_prices`, `merge_products` (registry 32 → 34, manifest di-regen). `SYSTEM_PROMPT.md` aturan 13.
+- **Web**: halaman Belanja menampilkan "💰 Termurah di …" per item + panel "⚖️ Banding harga antar toko".
+- **Verifikasi**: `typecheck`/`lint` bersih; 125/125 test di Supabase lokal (unit `prices.test.ts` 4, integrasi
+  `prices.test.ts` 6: parser ukuran, ingest dua toko dengan nama kasir beda → satu produk, banding per 100 g,
+  `cheapest` di daftar belanja, batch `[Toko]` + alias manual, transaksi terhapus tidak ikut, q pendek → 400);
+  `schema.d.ts` di-regen; bundle `api/index.js` + `apps/web` dibangun ulang. Belum diuji dengan BYOK sungguhan
+  (kanonikalisasi AI) — jalur itu best-effort dan tidak pernah menggagalkan pencatatan.
