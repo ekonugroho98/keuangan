@@ -5,6 +5,7 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
+import { learnKeywords } from './categorize'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -289,6 +290,10 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     const createdRows = await tx<{ id: string }[]>`
       select id from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items as unknown as postgres.JSONValue)}, 'web')
     `
+    // Lewat web (JWT) user sudah meninjau kategori tiap item di modal scan sebelum menyimpan — itu
+    // konfirmasi manusia, jadi dipelajari (category_keywords). Lewat API key kategori masih tebakan
+    // agent; belajar baru terjadi saat user mengoreksinya (updateTransaction).
+    if (actor.credential === 'jwt') await learnKeywords(tx, actor.householdId, items.map((i) => ({ note: i.note, categoryId: i.category_id })))
     const ids = createdRows.map((r) => r.id)
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
@@ -328,6 +333,8 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
+    // Koreksi kategori eksplisit (web maupun Hermes) = sinyal terkuat untuk gudang kata kunci.
+    if (typeof patch.category_id === 'string') await learnKeywords(tx, actor.householdId, [{ note: rows[0]!.note, categoryId: patch.category_id }])
     return mapTx(rows[0]!)
   })
 }

@@ -4,6 +4,7 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { requireFeature } from './features'
 import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef } from './resolver'
+import { classifyItems } from './categorize'
 import { todayInTz } from './period'
 import { getHouseholdTimezone } from './households'
 import { TX_SELECT, mapTx, type TxRow } from './transactions'
@@ -44,6 +45,16 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   }
 
   const timezone = await getHouseholdTimezone(actor)
+  // `category` dari agent adalah teks bebas (bisa kosong, typo, atau nama taksonomi lain seperti
+  // "Makanan & Minuman"/"Tagihan") — diklasifikasi dulu (categorize.ts: kata kunci yang dipelajari
+  // user > jawaban agent > gudang produk > regex > pencarian web > "Lainnya") SEBELUM transaksi DB
+  // utama dibuka, karena pencarian web bisa lambat. Satu item tak dikenal tidak lagi menggagalkan
+  // seluruh struk dan tidak nyasar lewat fuzzy match.
+  const classified = await classifyItems(
+    actor,
+    input.items.map((item) => ({ name: item.name, aiCategory: item.category })),
+    { webLookup: true },
+  )
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
     // merchant + ref_no ikut ke note tiap item (post_transactions_batch tidak punya kolom terpisah),
@@ -52,9 +63,11 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     const suffix = `${input.merchant ? ` — ${input.merchant}` : ''}${input.ref_no ? ` [ref: ${input.ref_no}]` : ''}`
     const noteFor = (name: string) => (name + suffix).slice(0, 500)
     const items = await Promise.all(
-      input.items.map(async (item) => ({
+      input.items.map(async (item, idx) => ({
         amount: item.amount,
-        category_id: await resolveCategoryRef(tx, actor, item, 'expense'),
+        category_id: item.category_id
+          ? await resolveCategoryRef(tx, actor, item, 'expense')
+          : await resolveCategoryRef(tx, actor, { category: classified[idx]!.category }, 'expense'),
         note: noteFor(item.name),
         // Gate fitur F-A ada di dalam resolveBeneficiaryRef — `for` saat beneficiary mati -> 400.
         beneficiary_id: item.for ? ((await resolveBeneficiaryRef(tx, actor, { beneficiary: item.for })) ?? null) : null,

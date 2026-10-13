@@ -269,7 +269,7 @@ export const TOOLS: ToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              amount_text: str('Nominal item'), category: str('Kategori item'), note: str('Keterangan item'),
+              amount_text: str('Nominal item'), category: str('Nama kategori dari list_categories, dipilih dari JENIS barang item ini (sabun → Shopping, pulsa → Utilitas, obat → Kesehatan, sayur/lauk → Makanan); jangan semua Makanan. Ragu → "Lainnya".'), note: str('Keterangan item'),
               beneficiary: str('F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)'),
             },
             required: ['amount_text', 'category'],
@@ -525,7 +525,7 @@ export const TOOLS: ToolDefinition[] = [
   // ── F-D belanja & pantry (10-fitur-opsional-keluarga.md §6) ─────────────────────────────────
   {
     name: 'ingest_receipt',
-    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau).',
+    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry — semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak → kategori makanan; sabun/deterjen/tisu/popok → belanja/Shopping; pulsa/token listrik → Utilitas; obat/vitamin → Kesehatan). Jangan menjatuhkan semua item ke Makanan.',
     parameters: {
       type: 'object',
       properties: {
@@ -542,7 +542,7 @@ export const TOOLS: ToolDefinition[] = [
               name: str('Nama item persis seperti di struk atau diucapkan user'),
               qty: num('Jumlah unit, default 1'),
               amount: num('Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)'),
-              category: str('Kategori untuk item ini'),
+              category: str('Nama kategori dari list_categories, dipilih dari JENIS barang ini (bukan toko). Ragu → "Lainnya" atau kosongkan: API menebak dari nama item, dan nama tak dikenal dipetakan ke kategori household terdekat (tidak pernah error).'),
               for: str('F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini'),
             },
             required: ['name', 'amount'],

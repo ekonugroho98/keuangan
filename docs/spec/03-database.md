@@ -593,6 +593,47 @@ CREATE TABLE migration_issues (
 );
 ```
 
+### 3.20 `category_keywords` — gudang kata kunci per household (migrasi `00000000000024`, 2026-10-12)
+
+Masalah: nama item di struk minimarket disingkat kasir ("LFBY BS 85G") sehingga AI/regex sering salah atau menjatuhkan semua ke Makanan. Tabel ini **belajar dari konfirmasi/koreksi user** dan hasilnya **mengalahkan tebakan AI** pada scan berikutnya.
+
+```sql
+CREATE TYPE keyword_source AS ENUM ('user', 'web', 'ai');   -- rank user(3) > web(2) > ai(1), lihat keyword_source_rank()
+
+CREATE TABLE category_keywords (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id  UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  keyword       TEXT NOT NULL CHECK (length(keyword) BETWEEN 2 AND 80),   -- norm_text(nama item)
+  category_id   UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  source        keyword_source NOT NULL DEFAULT 'user',
+  hits          INT NOT NULL DEFAULT 1,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX category_keywords_uq ON category_keywords (household_id, keyword);
+```
+
+Diisi lewat `learn_category_keyword(household, keyword, category_id, source)` (upsert; sumber lebih lemah tidak menimpa yang lebih kuat) dari dua titik di `apps/api`: `POST /v1/transactions/batch` **hanya saat credential JWT** (user sudah meninjau kategori tiap item di modal scan web), dan `PATCH /v1/transactions/{id}` saat `category` berubah (koreksi eksplisit, dari web maupun Hermes). Ingest dari agent **tidak** dipelajari (masih tebakan). Pencocokan saat dipakai: exact, lalu keyword terpanjang (≥3 huruf) yang jadi substring nama item. RLS: baca semua anggota, tulis owner/member.
+
+### 3.21 `product_knowledge` — pengetahuan produk lintas household (migrasi `00000000000024`)
+
+Bukan data keuangan: `norm_text(nama item)` → kelompok generik, diisi backend dari hasil **pencarian web (DuckDuckGo Lite, tanpa API key) + AI BYOK user** saat item tidak dikenali siapa pun, supaya tiap nama hanya dicari sekali untuk semua household.
+
+```sql
+CREATE TYPE product_group AS ENUM ('food','household','health','utility','transport','education','entertainment','other');
+
+CREATE TABLE product_knowledge (
+  keyword        TEXT PRIMARY KEY CHECK (length(keyword) BETWEEN 2 AND 80),
+  product_group  product_group NOT NULL,
+  label          TEXT,                                   -- "Lifebuoy sabun mandi batang 85g"
+  source         keyword_source NOT NULL DEFAULT 'web',  -- 'ai' kalau web tidak memberi hasil
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+Kelompok → kategori household lewat daftar kandidat nama/alias (`apps/api/src/services/product-groups.ts`: `household` → "Rumah Tangga"/"Kebersihan"/"Shopping"/"Belanja", dst.). RLS: `authenticated` boleh baca & tulis (risiko racun lintas household diterima: isinya hanya "nama item = kelompok", dan koreksi user di `category_keywords` selalu menang). Urutan keputusan lengkap per item ada di `apps/api/src/services/categorize.ts` (learned → ai → known → rule → web → Lainnya).
+
 ## 4. View
 
 ### 4.1 `v_account_balances` (inti ADR-05)

@@ -1,154 +1,100 @@
 import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../../auth/actor'
-import { withUserClaims } from '../../db/tx'
+import { withActor } from '../../db/tx'
+import { classifyItems, loadExpenseCategories, type ExpenseCategory } from '../categorize'
+import { VISION_PROVIDERS, buildTextRequest, buildVisionRequest, callProviderJson, getAiConfig } from './provider'
 
-interface AiConfig {
-  provider?: string
-  model?: string
-  apiKey?: string
-  disabled?: boolean
+// Kategori pengeluaran milik household (bukan daftar hardcode) — ini yang ditawarkan ke AI dan
+// yang jadi acuan normalisasi jawabannya (services/categorize.ts, dipakai juga oleh jalur Hermes).
+function categoryBlock(categories: ExpenseCategory[]): string {
+  const lines = categories.map((c) => (c.aliases.length ? `- ${c.name} (mis. ${c.aliases.join(', ')})` : `- ${c.name}`))
+  return `KATEGORI YANG TERSEDIA (tulis namanya PERSIS seperti di daftar, jangan buat nama baru):
+${lines.join('\n')}
+
+Panduan memilih kategori:
+- Tentukan dari JENIS BARANG/LAYANAN tiap item, BUKAN dari nama toko. Struk minimarket/supermarket hampir selalu berisi campuran kategori.
+- Makanan/minuman/bahan masak (beras, minyak goreng, bumbu, snack, kopi, susu) → kategori makanan.
+- Sabun, deterjen, sampo, tisu, popok, pembalut, perlengkapan rumah, pakaian → kategori belanja/rumah tangga, BUKAN makanan.
+- Obat, vitamin, masker, alat kesehatan → kategori kesehatan.
+- Pulsa, paket data, token listrik, bayar tagihan → kategori utilitas/tagihan.
+- Bensin, parkir, tol, ongkos → kategori transport.
+- Buku, alat tulis, perlengkapan sekolah → kategori pendidikan.
+- Pilih kategori yang paling dekat dari daftar. Kalau tidak ada yang cocok atau ragu, pakai "Lainnya" — jangan memaksa ke kategori makanan.`
 }
 
-async function getAiConfig(actor: Actor): Promise<AiConfig> {
-  const config = await withUserClaims(actor.userId, async (tx) => {
-    const [row] = await tx<{ ai_config: AiConfig }[]>`select ai_config from user_settings where user_id = ${actor.userId}`
-    return row?.ai_config ?? {}
-  })
-  if (!config.apiKey || config.disabled) throw ApiError.fromCode('ai_not_configured')
-  return config
-}
+function visionPrompt(categories: ExpenseCategory[]): string {
+  return `Kamu adalah asisten keuangan keluarga Indonesia. Baca struk/nota/receipt ini dan ekstrak SEMUA item produk/layanan yang dibeli secara terpisah, lalu beri kategori untuk TIAP item.
 
-// Provider yang mendukung vision (baca gambar) di endpoint chat/completions-nya (AddTransactionModal.jsx VISION_PROVIDERS).
-const VISION_PROVIDERS = ['groq', 'openai', 'anthropic', 'google']
+${categoryBlock(categories)}
 
-const VISION_PROMPT = `Kamu adalah asisten keuangan Indonesia. Baca struk/nota/receipt ini dan ekstrak SEMUA item produk/layanan yang dibeli secara terpisah.
 Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
 {
   "merchant": "Nama Toko",
   "date": "2026-04-06",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk 1", "amount": 15000, "category": "Makanan & Minuman" },
-    { "note": "Nama Produk 2", "amount": 8500, "category": "Belanja" }
+    { "note": "Nama Produk 1", "amount": 15000, "category": "<nama kategori dari daftar>" },
+    { "note": "Nama Produk 2", "amount": 8500, "category": "<nama kategori dari daftar>" }
   ]
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
-- note: nama produk singkat dan jelas
+- note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus — dipakai untuk mengenali produk yang sama lain kali)
 - amount: harga total untuk item itu (qty × harga satuan), angka bulat tanpa titik/koma
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
-- category: pilih salah satu: "Makanan & Minuman", "Transportasi", "Belanja", "Hiburan", "Kesehatan", "Pendidikan", "Tagihan", "Lainnya"
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
 - Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
 Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`
+}
 
-function textPrompt(ocrText: string): string {
-  return `Berikut teks struk/nota yang dibaca OCR. Ekstrak SEMUA item produk yang dibeli.
+function textPrompt(ocrText: string, categories: ExpenseCategory[]): string {
+  return `Berikut teks struk/nota yang dibaca OCR. Ekstrak SEMUA item produk yang dibeli dan beri kategori untuk TIAP item.
+
+${categoryBlock(categories)}
+
 Kembalikan HANYA JSON (tanpa penjelasan lain):
 {
   "merchant": "Nama Toko",
   "date": "YYYY-MM-DD atau null",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk", "amount": 15000, "category": "Makanan & Minuman" }
+    { "note": "Nama Produk", "amount": 15000, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: amount = harga total per item (qty×satuan), jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
-category: "Makanan & Minuman","Transportasi","Belanja","Hiburan","Kesehatan","Pendidikan","Tagihan","Lainnya"
+Aturan: note = nama item persis seperti di struk; amount = harga total per item (qty×satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:
 ${ocrText}`
 }
 
-interface ProviderRequest { url: string; headers: Record<string, string>; body: Record<string, unknown> }
-
-function buildVisionRequest(provider: string, apiKey: string, base64: string, mimeType: string): ProviderRequest {
-  const msgs = [{ role: 'user', content: [{ type: 'text', text: VISION_PROMPT }, { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }] }]
-  if (provider === 'groq') {
-    return { url: 'https://api.groq.com/openai/v1/chat/completions', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: { model: 'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens: 1000, messages: msgs } }
-  }
-  if (provider === 'openai') {
-    return { url: 'https://api.openai.com/v1/chat/completions', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: { model: 'gpt-4o-mini', max_tokens: 1000, messages: msgs } }
-  }
-  if (provider === 'anthropic') {
-    return {
-      url: 'https://api.anthropic.com/v1/messages',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: { model: 'claude-3-5-haiku-20241022', max_tokens: 1000, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } }, { type: 'text', text: VISION_PROMPT }] }] },
-    }
-  }
-  if (provider === 'google') {
-    return {
-      url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      headers: { 'Content-Type': 'application/json' },
-      body: { contents: [{ parts: [{ text: VISION_PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }] },
-    }
-  }
-  throw ApiError.fromCode('provider_no_vision')
-}
-
-function buildTextRequest(provider: string, apiKey: string, ocrText: string): ProviderRequest {
-  const prompt = textPrompt(ocrText)
-  const msgs = [{ role: 'user', content: prompt }]
-  if (provider === 'groq' || provider === 'openai') {
-    return {
-      url: provider === 'groq' ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: { model: provider === 'groq' ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini', max_tokens: 1000, messages: msgs },
-    }
-  }
-  if (provider === 'anthropic') {
-    return {
-      url: 'https://api.anthropic.com/v1/messages',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: { model: 'claude-3-5-haiku-20241022', max_tokens: 1000, messages: msgs },
-    }
-  }
-  if (provider === 'google') {
-    return { url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, headers: { 'Content-Type': 'application/json' }, body: { contents: [{ parts: [{ text: prompt }] }] } }
-  }
-  const baseUrl: Record<string, string> = { mistral: 'https://api.mistral.ai/v1', deepseek: 'https://api.deepseek.com/v1', xai: 'https://api.x.ai/v1' }
-  const modelByProvider: Record<string, string> = { mistral: 'mistral-small-latest', deepseek: 'deepseek-chat', xai: 'grok-2-latest' }
-  return {
-    url: `${baseUrl[provider] ?? 'https://api.openai.com/v1'}/chat/completions`,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: { model: modelByProvider[provider] ?? 'gpt-4o-mini', max_tokens: 1000, messages: msgs },
-  }
-}
-
-function extractText(provider: string, data: Record<string, unknown>): string {
-  if (provider === 'anthropic') return ((data.content as Array<{ text?: string }>)?.[0]?.text) ?? ''
-  if (provider === 'google') return ((data.candidates as Array<{ content: { parts: Array<{ text?: string }> } }>)?.[0]?.content?.parts?.[0]?.text) ?? ''
-  return ((data.choices as Array<{ message: { content?: string } }>)?.[0]?.message?.content) ?? ''
-}
-
-async function callProvider(req: ProviderRequest, provider: string): Promise<Record<string, unknown>> {
-  const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
-  const data = (await res.json()) as Record<string, unknown> & { error?: { message?: string } }
-  if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `Gagal scan (provider ${provider})` })
-  const text = extractText(provider, data)
-  const match = text.match(/\{[\s\S]*\}/)
-  if (!match) throw ApiError.fromCode('upstream_ai_error', { message: 'Format respons AI tidak valid.' })
-  return JSON.parse(match[0])
-}
-
 /**
  * Vision (foto struk) atau teks (hasil OCR client-side tesseract.js yang perlu distrukturkan) —
- * lihat ScanReceiptBodySchema. Sanitasi/validasi hasil (sanitizeScanResult) tetap di frontend
- * karena murni logika tampilan (guess kategori, dsb.), bukan sesuatu yang butuh rahasia server.
+ * lihat ScanReceiptBodySchema. Kategori tiap item SELALU dikembalikan sebagai nama kategori
+ * household yang persis ada (classifyItems: kata kunci yang dipelajari > jawaban AI > gudang produk
+ * > regex > pencarian web > Lainnya), plus `category_source` supaya UI bisa menandai asal tebakan.
+ * Validasi nominal/note tetap di frontend (sanitizeScanResult).
  */
 export async function scanReceipt(actor: Actor, input: { image_base64?: string; mime_type?: string; ocr_text?: string }) {
   const config = await getAiConfig(actor)
   const provider = config.provider!
   const apiKey = config.apiKey!
+  const categories = await withActor(actor, (tx) => loadExpenseCategories(tx, actor.householdId))
 
+  let raw: Record<string, unknown>
   if (input.image_base64 && input.mime_type) {
     if (!VISION_PROVIDERS.includes(provider)) throw ApiError.fromCode('provider_no_vision')
-    const req = buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type)
-    return callProvider(req, provider)
+    raw = await callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider)
+  } else {
+    raw = await callProviderJson(buildTextRequest(provider, apiKey, textPrompt(input.ocr_text!, categories)), provider)
   }
 
-  const req = buildTextRequest(provider, apiKey, input.ocr_text!)
-  return callProvider(req, provider)
+  if (!Array.isArray(raw.items)) return raw
+  const items = (raw.items as Array<Record<string, unknown>>).filter((it) => it && typeof it === 'object')
+  const classified = await classifyItems(
+    actor,
+    items.map((it) => ({ name: typeof it.note === 'string' ? it.note : '', aiCategory: it.category })),
+    { webLookup: true },
+  )
+  return { ...raw, items: items.map((it, i) => ({ ...it, category: classified[i]!.category, category_source: classified[i]!.source })) }
 }
