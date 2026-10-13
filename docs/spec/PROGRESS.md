@@ -842,3 +842,14 @@ dari `search_transactions` (≤200 baris) tanpa resep. Solusi: angka dihitung se
   (resep jawaban 6 bagian, daftar bukan tabel untuk Telegram); skill VPS bagian "Analisa keuangan".
 - Verifikasi: unit `insights.test.ts` 6, integrasi `insights.test.ts` 2. Tidak ada migrasi.
 - Lanjutan yang belum: model lebih kuat khusus analisa (routing per tugas), konteks keluarga di memori Hermes.
+
+### Hermes tidak memuat skill + koreksi kategori dari agent (2026-10-13)
+- Temuan: bot Telegram keluarga = profil `eko` di HOST VPS (user `office`), bukan container ws-001 (gateway ws-001 mati
+  sejak cutover 2026-10-10). Patch skill hari ini diterapkan ulang ke `profiles/eko/skills/.../karaya-finance-api/SKILL.md`.
+- Setelah `/new`, "jajan bulan ini ke mana aja?" dijawab sebagai AI umum: deskripsi skill hanya menyebut pencatatan/
+  ringkasan dalam bahasa Inggris dan SOUL `eko` tidak menyinggung keuangan. Perbaikan: deskripsi skill diperluas
+  (jajan, analisa, boros, harga, titipan, …) + bagian "Keuangan keluarga (wajib)" di SOUL `eko`.
+- `refineAgentCategory` (categorize.ts): untuk transaksi dari API key (record_expense / batch), kata kunci yang pernah
+  dikoreksi user dan aturan kategori khusus mengalahkan kategori makanan umum pilihan agent ("Sempol" → Makan Beli &
+  Jajan). Pilihan web tidak disentuh. `classifySync` juga: jawaban AI = kategori makanan umum kalah dari aturan khusus.
+  Kata kunci jajan ditambah (kebab, sempol, cilok, dimsum, burger, boba, …). Test integrasi `agent-category.test.ts`.

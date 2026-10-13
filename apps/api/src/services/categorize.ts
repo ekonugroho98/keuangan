@@ -47,7 +47,7 @@ const KEYWORD_RULES: Array<{ re: RegExp; group: ProductGroup }> = [
 // Contoh: "Bakso Mas Boy" → "Makan Beli & Jajan" (bukan "Bahan Makanan"), "Pampers" → "Bayi & Anak".
 export const SPECIAL_RULES: Array<{ re: RegExp; candidates: string[] }> = [
   {
-    re: /bakso|\bsoto\b|warteg|warung makan|rumah makan|\brm\b|nasi (padang|uduk|goreng|kuning|bungkus|kotak)|\bsate\b|pecel|seblak|siomay|batagor|gorengan|martabak|es teler|es teh|es jeruk|jus buah|resto|restoran|foodhall|food court|\bkfc\b|mcd|mcdonald|starbucks|kopi kenangan|janji jiwa|geprek|penyet|mie ayam|bubur ayam|ketoprak|gado.gado|takoyaki|takayaki|risol|jajan|gofood|grabfood|shopeefood|mie katsu|tongseng/i,
+    re: /bakso|\bsoto\b|warteg|warung makan|rumah makan|\brm\b|nasi (padang|uduk|goreng|kuning|bungkus|kotak)|\bsate\b|pecel|seblak|siomay|batagor|gorengan|martabak|es teler|es teh|es jeruk|jus buah|resto|restoran|foodhall|food court|\bkfc\b|mcd|mcdonald|starbucks|kopi kenangan|janji jiwa|geprek|penyet|mie ayam|bubur ayam|ketoprak|gado.gado|takoyaki|takayaki|risol|jajan|gofood|grabfood|shopeefood|mie katsu|tongseng|kebab|sempol|cilok|cireng|cimol|dimsum|dim sum|burger|pizza|hot ?dog|corn ?dog|sosis bakar|telur gulung|pempek|empek|bakmi|roti bakar|lontong|rawon|batagor|cakwe|boba|thai tea|es kopi|kopi susu|es campur|es buah|warung sate|nasi (campur|rames|ayam|bebek|liwet)|ayam (goreng|bakar) (kfc|mcd|geprek)|street food/i,
     candidates: ['makan beli & jajan', 'makan beli', 'jajan', 'makan di luar'],
   },
   {
@@ -126,12 +126,15 @@ export function classifySync(name: string, aiCategory: unknown, ctx: ClassifyCon
   const learned = matchKeyword(name, ctx.learned)
   if (learned) return { category: learned.category, source: 'learned' }
 
+  const special = specialCategory(name, ctx.categories)
   if (typeof aiCategory === 'string') {
     const ai = findCategory(aiCategory, ctx.categories)
+    // Agent sering menjatuhkan semua makanan ke kategori makanan umum; kalau household punya kategori yang lebih
+    // spesifik dan namanya jelas cocok (sempol → "Makan Beli & Jajan"), yang spesifik menang. Jawaban AI lain tetap dihormati.
+    if (ai && special && ai !== special && ai === groupToCategory('food', ctx.categories)) return { category: special, source: 'rule' }
     if (ai && normText(ai) !== 'lainnya') return { category: ai, source: 'ai' }
   }
 
-  const special = specialCategory(name, ctx.categories)
   if (special) return { category: special, source: 'rule' }
 
   const known = matchKeyword(name, ctx.known)
@@ -266,4 +269,30 @@ export async function classifyItems(
 
   const fallback = fallbackCategory(ctx.categories)
   return results.map((r) => r ?? { category: fallback, source: 'fallback' })
+}
+
+/**
+ * Koreksi ringan untuk kategori yang dikirim AGENT (API key) di record_expense / record_expense_batch, yang tidak
+ * lewat classifyItems. Hanya dua hal, keduanya sinyal yang lebih kuat dari tebakan agent:
+ *   1. kata kunci yang pernah dikoreksi user (category_keywords) cocok dengan nama item;
+ *   2. agent memilih kategori makanan umum tapi namanya jelas kategori household yang lebih spesifik (sempol → jajan).
+ * Kategori sistem / non-makanan pilihan agent tidak diubah. Mengembalikan id kategori (bisa sama dengan masukan).
+ */
+export async function refineAgentCategory(tx: postgres.TransactionSql, householdId: string, note: string | undefined, categoryId: string): Promise<string> {
+  const name = note ? parseReceiptNote(note).name : ''
+  if (normText(name).length < 2) return categoryId
+  const rows = await tx<{ id: string; name: string; aliases: string[] | null; is_system: boolean; type: string }[]>`
+    select id, name, aliases, is_system, type::text from categories where household_id = ${householdId} and deleted_at is null
+  `
+  const current = rows.find((r) => r.id === categoryId)
+  if (!current || current.is_system) return categoryId
+  const cats = rows.filter((r) => !r.is_system && r.type !== 'income').map((r) => ({ name: r.name, aliases: r.aliases ?? [] }))
+  const idOf = (n: string | undefined) => (n ? rows.find((r) => r.name === n)?.id : undefined)
+  const learned = matchKeyword(name, await loadLearnedKeywords(tx, householdId))
+  if (learned) return idOf(learned.category) ?? categoryId
+  if (current.name === groupToCategory('food', cats)) {
+    const special = specialCategory(name, cats)
+    if (special) return idOf(special) ?? categoryId
+  }
+  return categoryId
 }
