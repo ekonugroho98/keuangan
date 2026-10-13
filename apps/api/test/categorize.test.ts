@@ -107,3 +107,32 @@ describe('parseDdgLite', () => {
     expect(parseDdgLite('<html></html>')).toEqual([])
   })
 })
+
+describe('kategori khusus household (SPECIAL_RULES)', () => {
+  const custom = [
+    { name: 'Bahan Makanan', aliases: ['makanan', 'dapur'] },
+    { name: 'Makan Beli & Jajan', aliases: ['jajan'] },
+    { name: 'Bayi & Anak', aliases: [] },
+    { name: 'Rumah Tangga', aliases: [] },
+    { name: 'Usaha Sampingan', aliases: [] },
+    { name: 'Lainnya', aliases: [] },
+  ]
+  const c2 = { categories: custom, learned: [], known: [] }
+  it('makan di luar → Makan Beli & Jajan, bahan → Bahan Makanan', () => {
+    expect(classifySync('Bakso Mas Boy', undefined, c2)?.category).toBe('Makan Beli & Jajan')
+    expect(classifySync('Nasi uduk', undefined, c2)?.category).toBe('Makan Beli & Jajan')
+    expect(classifySync('Telur ayam 1kg', undefined, c2)?.category).toBe('Bahan Makanan')
+    expect(classifySync('Indomie Goreng', 'Makanan', c2)?.category).toBe('Bahan Makanan')
+  })
+  it('popok/mainan → Bayi & Anak, sabun → Rumah Tangga, VPS → Usaha Sampingan', () => {
+    expect(classifySync('Baby Hapy Pants 32/M', undefined, c2)?.category).toBe('Bayi & Anak')
+    expect(classifySync('Sunlight 610J2X', undefined, c2)?.category).toBe('Rumah Tangga')
+    expect(classifySync('Pepsodent White 2X2X', undefined, c2)?.category).toBe('Rumah Tangga')
+    expect(classifySync('Sabun Lifebuoy', undefined, c2)?.category).toBe('Rumah Tangga')
+    expect(classifySync('Beli VPS SaungMedia', undefined, c2)?.category).toBe('Usaha Sampingan')
+  })
+  it('household tanpa kategori khusus → aturan lama tetap jalan', () => {
+    expect(classifySync('Bakso Mas Boy', undefined, ctx)?.category).toBe('Makanan')
+    expect(classifySync('Pampers M', undefined, ctx)?.category).toBe('Shopping')
+  })
+})

@@ -820,3 +820,16 @@ Desain lengkap: `10-fitur-opsional-keluarga.md` §6.8; skema `03-database.md` §
   `cheapest` di daftar belanja, batch `[Toko]` + alias manual, transaksi terhapus tidak ikut, q pendek → 400);
   `schema.d.ts` di-regen; bundle `api/index.js` + `apps/web` dibangun ulang. Belum diuji dengan BYOK sungguhan
   (kanonikalisasi AI) — jalur itu best-effort dan tidak pernah menggagalkan pencatatan.
+
+### Kategori khusus household + sumber transaksi agent (2026-10-13)
+- `categorize.ts`: `SPECIAL_RULES`/`specialCategory` — aturan untuk kategori yang hanya ada di sebagian household
+  (Makan Beli & Jajan, Bayi & Anak, Kebutuhan Istri, Usaha Sampingan, Keluarga Besar), dicek sebelum kelompok
+  generik dan hanya berlaku kalau household punya kategori itu. Regex rumah tangga ditambah merek umum (Sunlight,
+  Rinso, Molto, Pepsodent, …). `GROUP_CANDIDATES.food` mendahulukan "bahan makanan". 3 test baru.
+- Transaksi lewat API key kini bersumber `api_key` (sebelumnya selalu `web`): `txSource()` di transactions/batch/
+  transfers/receipts.
+- Data household "Kara": analisa 158 transaksi (1–12 Okt). Total struk Hari Hari 03/10 = Rp895.125 = debit BRI, jadi
+  baris `[promo]/[bulk]` bukan uang dobel (hanya salah baca nama). Beneficiary Anak/Seno/Orang Tua/Kontrakan dibuat
+  via API. Rename Makanan → Bahan Makanan + 4 kategori baru butuh scope admin (JWT) → SQL sekali jalan untuk
+  pemilik; perapian 150 transaksi + budget Oktober menunggu dijalankan pemilik (izin sesi menolak tulis massal ke
+  data keuangan produksi).

@@ -16,6 +16,11 @@ function touchesBeneficiary(ref: { beneficiary_id?: string | null; beneficiary?:
   return ref.beneficiary_id !== undefined || ref.beneficiary !== undefined
 }
 
+/** Sumber transaksi: lewat API key (Hermes/agent) → 'api_key', lewat web (JWT) → 'web'. Sebelumnya selalu 'web'. */
+export function txSource(actor: Actor): 'web' | 'api_key' {
+  return actor.credential === 'api_key' ? 'api_key' : 'web'
+}
+
 function parseAmount(input: { amount?: number; amount_text?: string }): number {
   try {
     if (input.amount !== undefined) return input.amount
@@ -263,7 +268,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
     const [row] = await tx<{ id: string }[]>`
       select id from post_transaction(
         ${actor.householdId}, ${actor.memberId}, ${input.type}, ${accountId}, ${categoryId},
-        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ''}, 'web', null, ${beneficiaryId}
+        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ''}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [row!.id])
@@ -305,7 +310,7 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     // (pola sama dengan routes/me.ts).
     const dbItems = items.map(({ titipan: _t, ...rest }) => rest)
     const createdRows = await tx<{ id: string; note: string; amount: string }[]>`
-      select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems as unknown as postgres.JSONValue)}, 'web')
+      select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems as unknown as postgres.JSONValue)}, ${txSource(actor)})
     `
     // Lewat web (JWT) user sudah meninjau kategori tiap item di modal scan sebelum menyimpan — itu
     // konfirmasi manusia, jadi dipelajari (category_keywords). Lewat API key kategori masih tebakan

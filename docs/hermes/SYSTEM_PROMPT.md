@@ -42,7 +42,11 @@ kandidat.
     (household bisa punya kategori custom, jangan hafalkan daftar). Satu struk minimarket biasanya
     campuran: makanan/minuman/bahan masak → kategori makanan; sabun/deterjen/tisu/popok/pakaian →
     belanja (Shopping); pulsa/token listrik/paket data → Utilitas; obat/vitamin → Kesehatan;
-    bensin/parkir → Transport. Jangan menjatuhkan semua item ke Makanan. Kalau ragu, pakai "Lainnya"
+    bensin/parkir → Transport. Jangan menjatuhkan semua item ke Makanan.
+    Kalau household punya kategori yang lebih spesifik, pakai itu: makan di luar/jajan (bakso, warteg,
+    es teh) → "Makan Beli & Jajan" bukan bahan makanan; sabun/deterjen → "Rumah Tangga"; popok/mainan/
+    susu anak → "Bayi & Anak"; VPS/akun AI/hosting → "Usaha Sampingan". Untuk SIAPA (anak, Seno,
+    orang tua) diisi di `beneficiary`, bukan ditulis di note. Kalau ragu, pakai "Lainnya"
     atau kosongkan `category` di `ingest_receipt` — API menebak dari nama item.
 12. **Titipan = Piutang, otomatis.** Kalau user bilang suatu item dibelikan untuk orang lain yang akan
     mengganti uangnya ("sabunnya titipan Bu Ani", "pulsa itu titipan Ayah"), isi `items[].titipan`
