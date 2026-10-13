@@ -867,6 +867,60 @@
     "feature": "shopping_stock"
   },
   {
+    "name": "analyze_spending",
+    "description": "ANALISA pengeluaran dengan angka yang sudah dihitung server: total, rata-rata per hari, proyeksi akhir bulan, posisi budget (sisa jatah per hari), perbandingan dengan periode sebelumnya (hari yang sama), rincian per kategori/akun/pemilik akun/untuk siapa, item & tempat terbanyak, item berulang, hari paling boros, hari kerja vs akhir pekan, transaksi terbesar, dan daftar transaksinya (≤80). Pakai untuk SEMUA pertanyaan analisa/evaluasi: \"jajan bulan ini ke mana aja\", \"kenapa boros\", \"breakdown makanan\", \"pengeluaran anak\", \"bisa hemat di mana\", \"bandingin sama bulan lalu\". JANGAN menjumlah sendiri dari search_transactions — semua angka di jawaban harus berasal dari respons tool ini. Boleh mengelompokkan `transactions` secara makna (mis. makan berat / camilan / minuman) tapi jumlahkan ulang dengan teliti hanya dari baris itu.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "string",
+          "description": "Periode, default this_month",
+          "enum": [
+            "this_month",
+            "last_month",
+            "this_week",
+            "last_week",
+            "today",
+            "yesterday",
+            "this_year"
+          ]
+        },
+        "from": {
+          "type": "string",
+          "description": "Awal periode kustom YYYY-MM-DD (bersama to)",
+          "format": "date"
+        },
+        "to": {
+          "type": "string",
+          "description": "Akhir periode kustom YYYY-MM-DD",
+          "format": "date"
+        },
+        "category": {
+          "type": "string",
+          "description": "Nama kategori dari list_categories, mis. \"Makan Beli & Jajan\"; kosong = semua pengeluaran"
+        },
+        "account": {
+          "type": "string",
+          "description": "Nama akun, opsional"
+        },
+        "beneficiary": {
+          "type": "string",
+          "description": "Untuk siapa, opsional (mis. \"Anak\")"
+        },
+        "q": {
+          "type": "string",
+          "description": "Cari kata di catatan, opsional (mis. \"bakso\", \"Indomaret\")"
+        }
+      }
+    },
+    "endpoint": {
+      "method": "GET",
+      "path": "/v1/insights/spending"
+    },
+    "scope": "read",
+    "idempotent": true
+  },
+  {
     "name": "compare_prices",
     "description": "Bandingkan harga satu produk antar toko dari riwayat STRUK keluarga sendiri (bukan harga internet), dihitung PER SATUAN (per 100 g / per 100 ml / per pcs) supaya beda ukuran kemasan adil. Pakai untuk \"sabun lifebuoy paling murah di mana?\", \"minyak goreng lebih murah di Indomaret atau Alfamart?\", \"harga beras naik nggak?\". Respons `products[]` urut dari yang paling banyak datanya; tiap produk punya `summary` siap kirim, `stores[]` urut termurah, dan `savings_pct`. Kosong = belum pernah tercatat dari struk mana pun — bilang jujur.",
     "parameters": {

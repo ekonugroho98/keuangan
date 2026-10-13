@@ -28,7 +28,7 @@ function fromUtcDate(d: Date): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
 }
 
-function addDays(dateStr: string, days: number): string {
+export function addDays(dateStr: string, days: number): string {
   const [y, m, d] = parts(dateStr)
   return fromUtcDate(new Date(Date.UTC(y, m - 1, d + days)))
 }

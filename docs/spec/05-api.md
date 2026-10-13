@@ -5,6 +5,7 @@ Bergantung pada: 03-database.md
 > **Riwayat perubahan**
 > | Tanggal | Bagian | Perubahan | Alasan |
 > |---|---|---|---|
+> | 2026-10-13 | §4.15 (baru) | `GET /v1/insights/spending` (analisa pengeluaran siap pakai untuk agent), tool `analyze_spending` | Jawaban analisa Hermes setara analisa manual |
 > | 2026-10-13 | §4.14 (baru), §4 shopping | **Perbandingan harga**: `GET /v1/prices/compare?q=&days=` (read) dan `POST /v1/prices/aliases` (write); `GET /v1/shopping` (status needed) menambah `cheapest` per item; respons `POST /v1/receipts/ingest` menambah `prices_recorded`. Tidak ada error code baru. | Banding harga produk antar toko. Detail `10-fitur-opsional-keluarga.md` §6.8. |
 > | 2026-10-13 | §3 batch, §4 ingest | `items[].titipan` (opsional) di `POST /v1/transactions/batch` dan `POST /v1/receipts/ingest`; respons keduanya bisa memuat `piutang:[{id,borrower_name,total,items}]`. Note struk kanonik `[Toko] item [ref: X]`. Tidak ada error code baru. | Titipan → Piutang otomatis + perbandingan harga antar toko (persiapan). Detail `10-fitur-opsional-keluarga.md` §6.3. |
 > | 2026-10-07 | §4 (baru) | **F-D**: `GET/POST /v1/shopping`, `PATCH/DELETE /v1/shopping/{id}`, `GET /v1/shopping/suggestions`, `GET/POST /v1/pantry`, `PATCH/DELETE /v1/pantry/{id}`, `POST /v1/pantry/{id}/movements`, `GET /v1/pantry/expiring` (+`exclude_acked`), `POST /v1/pantry/expiring/ack`, `POST /v1/receipts/ingest`. Error baru: `shopping_item_not_found` (404), `pantry_item_not_found` (404), `receipt_total_mismatch` (422). Juga `GET /v1/reports/monthly` (F-B, selalu tersedia). Detail: `10-fitur-opsional-keluarga.md` §4, §6. | Implementasi F-B/F-D. |
@@ -294,6 +295,12 @@ Tidak digate feature flag — riwayat harga terisi dari struk mana pun (`POST /v
 |---|---|---|---|---|
 | GET | `/v1/prices/compare` | both | read | `?q=<produk>&days=180` → `{query, days, products:[{product_name, unit:"g"\|"ml"\|"pcs"\|null, compare_basis, stores:[{merchant, last_date, price, size, per_unit_price, lowest_per_unit_price, observations}], cheapest, savings_pct, summary}]}`. `stores` urut termurah per satuan (harga terakhir tiap toko). `q` < 2 huruf → `400 validation_error` |
 | POST | `/v1/prices/aliases` | both | write | `{item, same_as}` → `{keyword, canonical_name}`. Koreksi manual per household: item struk `item` dianggap produk yang sama dengan `same_as` (nama produk, atau nama item struk lain — dipakai nama produk item itu) |
+
+### 4.15 Analisa pengeluaran untuk agent (2026-10-13)
+
+| Method | Path | Auth | Scope | Deskripsi |
+|---|---|---|---|---|
+| GET | `/v1/insights/spending` | both | read | `?period=this_month\|last_month\|…\|YYYY-MM` atau `from`+`to`, filter opsional `category`, `account`, `beneficiary`, `q` (cari di note), `compare=false`. → `{period{days_elapsed,days_in_period,ongoing}, totals{total,count,per_day,avg_per_transaction,active_days,projected_period_total}, budget (kalau filter satu kategori + bulan: pct, projected_pct, daily_allowance_left, status), budgets[] (tanpa filter), comparison (periode sebelumnya sepanjang hari berjalan; rentang mulai tgl 1 → tanggal sama bulan lalu), by_category, by_account, by_owner, by_beneficiary, top_items[{item,total,count,avg,places,dates}], top_places, top_days, by_weekday, week_split, largest, transactions (≤80), text_id}`. Semua angka dihitung server supaya agent (model kecil sekalipun) tidak menjumlah sendiri. Tool Hermes `analyze_spending`. |
 
 ### 4.13 ~~Subscription, webhook, internal~~ — DIHAPUS (2026-10-06)
 

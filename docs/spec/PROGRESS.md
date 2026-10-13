@@ -833,3 +833,12 @@ Desain lengkap: `10-fitur-opsional-keluarga.md` §6.8; skema `03-database.md` §
   via API. Rename Makanan → Bahan Makanan + 4 kategori baru butuh scope admin (JWT) → SQL sekali jalan untuk
   pemilik; perapian 150 transaksi + budget Oktober menunggu dijalankan pemilik (izin sesi menolak tulis massal ke
   data keuangan produksi).
+
+### Analisa pengeluaran untuk Hermes (2026-10-13)
+Tujuan: jawaban analisa Hermes (model gratis `laguna-s`) setara analisa manual. Akar masalah: Hermes menjumlah sendiri
+dari `search_transactions` (≤200 baris) tanpa resep. Solusi: angka dihitung server, model hanya bercerita.
+- `services/insights.ts` (`buildInsights` murni + `analyzeSpending`), `routes/insights.ts` → `GET /v1/insights/spending`
+  (05-api.md §4.15). Tool `analyze_spending` (registry 34 → 35, manifest di-regen). `SYSTEM_PROMPT.md` aturan 14
+  (resep jawaban 6 bagian, daftar bukan tabel untuk Telegram); skill VPS bagian "Analisa keuangan".
+- Verifikasi: unit `insights.test.ts` 6, integrasi `insights.test.ts` 2. Tidak ada migrasi.
+- Lanjutan yang belum: model lebih kuat khusus analisa (routing per tugas), konteks keluarga di memori Hermes.
