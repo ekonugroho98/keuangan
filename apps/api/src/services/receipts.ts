@@ -5,6 +5,8 @@ import { withActor } from '../db/tx'
 import { requireFeature } from './features'
 import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef } from './resolver'
 import { classifyItems } from './categorize'
+import { formatReceiptNote } from '@karaya/shared/format'
+import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { todayInTz } from './period'
 import { getHouseholdTimezone } from './households'
 import { TX_SELECT, mapTx, type TxRow } from './transactions'
@@ -16,6 +18,7 @@ interface ReceiptItemInput {
   category_id?: string
   category?: string
   for?: string
+  titipan?: string
 }
 
 export interface IngestReceiptInput {
@@ -50,25 +53,29 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   // user > jawaban agent > gudang produk > regex > pencarian web > "Lainnya") SEBELUM transaksi DB
   // utama dibuka, karena pencarian web bisa lambat. Satu item tak dikenal tidak lagi menggagalkan
   // seluruh struk dan tidak nyasar lewat fuzzy match.
-  const classified = await classifyItems(
-    actor,
-    input.items.map((item) => ({ name: item.name, aiCategory: item.category })),
-    { webLookup: true },
-  )
+  // Titipan (titipan.ts): barang untuk orang lain yang akan mengganti uangnya → kategori Piutang +
+  // catatan piutang otomatis; tidak ikut diklasifikasi (bukan pengeluaran keluarga) dan tidak dipelajari.
+  const titipan = input.items.map((item) => detectTitipan(item.name, item.titipan))
+  const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx])
+  const classifiedList = await classifyItems(actor, toClassify, { webLookup: true })
+  const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]!]))
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
-    // merchant + ref_no ikut ke note tiap item (post_transactions_batch tidak punya kolom terpisah),
-    // supaya `[ref: ...]` nanti bisa dipakai F-C rekonsiliasi (spec §5.4: ref_no di note = +40 skor).
-    // Note dipotong ke 500 (check constraint transactions.note); nama item diutamakan.
-    const suffix = `${input.merchant ? ` — ${input.merchant}` : ''}${input.ref_no ? ` [ref: ${input.ref_no}]` : ''}`
-    const noteFor = (name: string) => (name + suffix).slice(0, 500)
+    const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null
+    // Note kanonik "[Toko] Nama item [ref: NOMOR]" (formatReceiptNote): toko di depan supaya terbaca
+    // dan bisa diurai untuk perbandingan harga antar toko; `[ref: ...]` untuk F-C rekonsiliasi
+    // (spec §5.4: ref_no di note = +40 skor). Dipotong ke 500 (check constraint transactions.note).
+    const displayNames = input.items.map((item, idx) => titipanDisplayName(item.name, titipan[idx]!))
+    const noteFor = (idx: number) => formatReceiptNote(displayNames[idx]!, input.merchant, input.ref_no).slice(0, 500)
     const items = await Promise.all(
       input.items.map(async (item, idx) => ({
         amount: item.amount,
-        category_id: item.category_id
-          ? await resolveCategoryRef(tx, actor, item, 'expense')
-          : await resolveCategoryRef(tx, actor, { category: classified[idx]!.category }, 'expense'),
-        note: noteFor(item.name),
+        category_id: titipan[idx]
+          ? piutangCatId!
+          : item.category_id
+            ? await resolveCategoryRef(tx, actor, item, 'expense')
+            : await resolveCategoryRef(tx, actor, { category: classified.get(idx)!.category }, 'expense'),
+        note: noteFor(idx),
         // Gate fitur F-A ada di dalam resolveBeneficiaryRef — `for` saat beneficiary mati -> 400.
         beneficiary_id: item.for ? ((await resolveBeneficiaryRef(tx, actor, { beneficiary: item.for })) ?? null) : null,
       })),
@@ -86,20 +93,22 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     // INSERT...SELECT...RETURNING tanpa ORDER BY eksplisit; note+amount tahan terhadap itu, dan
     // note di sini SELALU persis noteFor(item.name) yang kita kirim sebagai item.note di atas).
     const remaining = [...createdIdRows]
-    function takeMatch(name: string, amount: number): string | undefined {
-      const expected = noteFor(name)
-      const idx = remaining.findIndex((r) => r.note === expected && Number(r.amount) === amount)
-      if (idx === -1) return undefined
-      return remaining.splice(idx, 1)[0]!.id
+    function takeMatch(idx: number, amount: number): string | undefined {
+      const expected = noteFor(idx)
+      const pos = remaining.findIndex((r) => r.note === expected && Number(r.amount) === amount)
+      if (pos === -1) return undefined
+      return remaining.splice(pos, 1)[0]!.id
     }
 
     const shoppingMarked: { id: string; name: string }[] = []
     const shoppingUnmatched: string[] = []
     const pantryUpdated: { name: string; qty_before: number; qty_after: number }[] = []
     const pantryUnmatched: string[] = []
+    const titipanCreated: TitipanCreated[] = []
 
-    for (const item of input.items) {
-      const txId = takeMatch(item.name, item.amount)
+    for (const [idx, item] of input.items.entries()) {
+      const txId = takeMatch(idx, item.amount)
+      if (titipan[idx]) titipanCreated.push({ txId, borrower: titipan[idx]!.borrower, name: item.name, amount: item.amount })
 
       if (input.shopping) {
         const [match] = await tx<{ id: string | null }[]>`select find_shopping_match(${actor.householdId}, ${item.name}) as id`
@@ -125,6 +134,8 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
       }
     }
 
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, created: titipanCreated }) : []
+
     const ids = createdIdRows.map((r) => r.id)
     const fullRows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
@@ -132,6 +143,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     return {
       transactions: fullRows.map(mapTx),
       account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
+      ...(piutang.length ? { piutang } : {}),
       ...(input.shopping ? { shopping: { marked_bought: shoppingMarked, unmatched: shoppingUnmatched } } : {}),
       ...(input.pantry ? { pantry: { updated: pantryUpdated, unmatched: pantryUnmatched } } : {}),
     }

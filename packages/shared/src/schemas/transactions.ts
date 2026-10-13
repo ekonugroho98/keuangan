@@ -57,6 +57,7 @@ export const BatchItemSchema = z.object({
   note: z.string().optional(),
   beneficiary_id: UuidSchema.optional(),
   beneficiary: z.string().optional(),
+  titipan: z.string().max(80).optional().openapi({ description: 'Nama orang yang menitip → item masuk Piutang + catatan piutang otomatis. Kata "titipan" di note atau kategori "Piutang" juga dikenali.' }),
 })
 
 export const CreateTransactionBatchBodySchema = z

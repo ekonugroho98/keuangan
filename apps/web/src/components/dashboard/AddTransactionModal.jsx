@@ -8,6 +8,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { api, unwrap } from "../../api/client";
 import { useBeneficiaries } from "../../hooks/useBeneficiaries";
 import { useCategories } from "../../hooks/useCategories";
+import { formatReceiptNote } from "@karaya/shared/format";
 
 /* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ──
    Daftar kategori yang dipakai untuk validasi, tebakan fallback, dan dropdown per-item adalah
@@ -430,9 +431,16 @@ const AddTransactionModal = ({
   const apiExpenseNames = allCategoriesFromApi
     .filter((c) => !c.is_system && c.type !== "income")
     .map((c) => c.name);
-  const scanCategories = apiExpenseNames.length
-    ? apiExpenseNames
-    : [...expenseCategories, ...customCategories.filter((c) => c.type !== "income").map((c) => c.name)];
+  // "Piutang" (kategori sistem) ikut ditawarkan untuk item TITIPAN: barang yang dibelikan untuk
+  // orang lain yang akan mengganti uangnya — backend otomatis membuat catatan piutang atas nama
+  // orangnya (tulis "titipan <nama>" di nama item). Lihat apps/api/src/services/titipan.ts.
+  const piutangName = allCategoriesFromApi.find((c) => c.system_key === "piutang")?.name;
+  const scanCategories = [
+    ...(apiExpenseNames.length
+      ? apiExpenseNames
+      : [...expenseCategories, ...customCategories.filter((c) => c.type !== "income").map((c) => c.name)]),
+    ...(piutangName ? [piutangName] : []),
+  ];
 
   // Auto-select akun pertama jika belum ada yang dipilih
   useEffect(() => {
@@ -549,7 +557,10 @@ const AddTransactionModal = ({
     }
     setScanError("");
     if (onSubmitMultiple) {
-      await onSubmitMultiple(selected, scanAccount, scanResults?.date);
+      // Note kanonik "[Nama Toko] Nama item" (sama dengan ingest_receipt di backend) — toko di depan
+      // supaya terbaca di daftar transaksi dan bisa diurai untuk perbandingan harga antar toko.
+      const withMerchant = selected.map((i) => ({ ...i, note: formatReceiptNote(i.note, scanResults?.merchant) }));
+      await onSubmitMultiple(withMerchant, scanAccount, scanResults?.date);
     }
     resetScan();
   };

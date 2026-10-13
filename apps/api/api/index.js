@@ -12482,7 +12482,8 @@ var BatchItemSchema = external_exports.object({
   category: external_exports.string().optional(),
   note: external_exports.string().optional(),
   beneficiary_id: UuidSchema.optional(),
-  beneficiary: external_exports.string().optional()
+  beneficiary: external_exports.string().optional(),
+  titipan: external_exports.string().max(80).optional().openapi({ description: 'Nama orang yang menitip \u2192 item masuk Piutang + catatan piutang otomatis. Kata "titipan" di note atau kategori "Piutang" juga dikenali.' })
 });
 var CreateTransactionBatchBodySchema = external_exports.object({
   account_id: UuidSchema.optional(),
@@ -12941,7 +12942,8 @@ var ReceiptItemSchema = external_exports.object({
   amount: external_exports.number().int().positive(),
   category_id: UuidSchema.optional(),
   category: external_exports.string().optional(),
-  for: external_exports.string().optional().openapi({ description: "Alias beneficiary untuk item ini (F-A), diteruskan apa adanya." })
+  for: external_exports.string().optional().openapi({ description: "Alias beneficiary untuk item ini (F-A), diteruskan apa adanya." }),
+  titipan: external_exports.string().max(80).optional().openapi({ description: 'Nama orang yang menitip (barang dibelikan untuk orang lain yang akan mengganti uangnya). Item masuk kategori Piutang + dibuatkan catatan piutang otomatis. Kata "titipan" di name juga dikenali.' })
 });
 var IngestReceiptBodySchema = external_exports.object({
   account_id: UuidSchema.optional(),
@@ -13664,6 +13666,33 @@ function parseAmountId(input) {
   if (plain === "") throw new AmountParseError(input);
   return Number.parseInt(plain, 10);
 }
+function formatReceiptNote(name, merchant, refNo) {
+  const m = merchant?.trim();
+  const r = refNo?.trim();
+  return `${m ? `[${m}] ` : ""}${name.trim()}${r ? ` [ref: ${r}]` : ""}`;
+}
+function parseReceiptNote(note) {
+  let rest = note.trim();
+  const out = { name: rest };
+  const ref = rest.match(/\s*\[ref:\s*([^\]]*)\]\s*$/i);
+  if (ref) {
+    out.refNo = ref[1].trim();
+    rest = rest.slice(0, ref.index).trim();
+  }
+  const lead = rest.match(/^\[([^\]]+)\]\s*/);
+  if (lead) {
+    out.merchant = lead[1].trim();
+    rest = rest.slice(lead[0].length).trim();
+  } else {
+    const legacy = rest.lastIndexOf(" \u2014 ");
+    if (legacy > 0) {
+      out.merchant = rest.slice(legacy + 3).trim();
+      rest = rest.slice(0, legacy).trim();
+    }
+  }
+  out.name = rest;
+  return out;
+}
 
 // src/services/period.ts
 var MONTH_NAMES_ID = [
@@ -14012,7 +14041,7 @@ function classifySync(name, aiCategory, ctx) {
 }
 function keywordFromNote(note) {
   if (typeof note !== "string") return null;
-  const base = normText(note.split(" \u2014 ")[0].split(" [ref:")[0]);
+  const base = normText(parseReceiptNote(note).name.replace(/\s*\(titipan [^)]*\)\s*$/i, ""));
   if (base.length < 2 || base.length > 80) return null;
   return base;
 }
@@ -14044,7 +14073,10 @@ async function loadKnownProducts(tx, names) {
   return rows.map((r) => ({ keyword: r.keyword, group: r.product_group }));
 }
 async function learnKeywords(tx, householdId, pairs, source = "user") {
+  if (!pairs.length) return;
+  const systemIds = new Set((await tx`select id from categories where household_id = ${householdId} and is_system = true`).map((r) => r.id));
   for (const p of pairs) {
+    if (systemIds.has(p.categoryId)) continue;
     const kw = keywordFromNote(p.note);
     if (!kw) continue;
     await tx`select learn_category_keyword(${householdId}, ${kw}, ${p.categoryId}, ${source}::keyword_source)`;
@@ -14089,6 +14121,66 @@ async function classifyItems(actor, items, opts = {}) {
   }
   const fallback = fallbackCategory(ctx.categories);
   return results.map((r) => r ?? { category: fallback, source: "fallback" });
+}
+
+// src/services/titipan.ts
+var TITIPAN_RE = /\btitipan\b/i;
+var LEAD_WORDS_RE = /^(?:[-:,]\s*|(?:dari|buat|untuk|punya|nya|dr|utk)\b\s*)+/i;
+var TAIL_RE = /\s*(?:[([].*|x\s*\d+.*|\d+\s*(?:pcs|pc|bh|bks|btl|g|gr|kg|ml|l)\b.*|[-:,.;]+)\s*$/i;
+function titleCase(s) {
+  return s.split(/\s+/).map((w) => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(" ");
+}
+function borrowerFromText(text) {
+  const m = text.match(TITIPAN_RE);
+  if (!m || m.index === void 0) return "Titipan";
+  let tail = text.slice(m.index + m[0].length).trim();
+  tail = tail.replace(LEAD_WORDS_RE, "");
+  tail = tail.split(/[:,;()[\]]|\s[-–]\s/)[0].replace(TAIL_RE, "").trim();
+  const words = tail.split(/\s+/).filter((w) => /^[\p{L}\p{N}.'-]+$/u.test(w)).slice(0, 4);
+  const name = words.join(" ").trim();
+  if (!name || /^(?:item|barang|belanja|struk)$/i.test(name)) return "Titipan";
+  return titleCase(name).slice(0, 80);
+}
+function detectTitipan(text, explicit) {
+  const ex = explicit?.trim();
+  if (ex) return { borrower: titleCase(ex).slice(0, 80) };
+  if (text && TITIPAN_RE.test(text)) return { borrower: borrowerFromText(text) };
+  return null;
+}
+function titipanDisplayName(name, titipan) {
+  if (!titipan || TITIPAN_RE.test(name)) return name;
+  return `${name} (titipan ${titipan.borrower})`;
+}
+async function piutangCategoryId(tx, householdId) {
+  const [row] = await tx`
+    select id from categories where household_id = ${householdId} and system_key = 'piutang' and deleted_at is null limit 1
+  `;
+  if (!row) throw new Error("kategori sistem Piutang tidak ditemukan untuk household ini");
+  return row.id;
+}
+async function createTitipanPiutang(tx, actor, input) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const c of input.created) {
+    const key = c.borrower.toLowerCase();
+    const g = groups.get(key) ?? { borrower: c.borrower, items: [] };
+    g.items.push(c);
+    groups.set(key, g);
+  }
+  const out = [];
+  for (const g of groups.values()) {
+    const total = g.items.reduce((s, i) => s + i.amount, 0);
+    if (total <= 0) continue;
+    const names = g.items.map((i) => i.name);
+    const notes = `Titipan${input.merchant ? ` dari ${input.merchant}` : ""}: ${names.join(", ")}`.slice(0, 300);
+    const lendTxId = g.items.length === 1 ? g.items[0].txId ?? null : null;
+    const [row] = await tx`
+      insert into piutang (household_id, owner_member_id, borrower_name, total, from_account_id, notes, lend_transaction_id)
+      values (${actor.householdId}, ${actor.memberId}, ${g.borrower}, ${total}, ${input.accountId}, ${notes}, ${lendTxId})
+      returning id
+    `;
+    out.push({ id: row.id, borrower_name: g.borrower, total, items: names });
+  }
+  return out;
 }
 
 // src/services/transactions.ts
@@ -14269,23 +14361,39 @@ async function createTransaction(actor, input, timezone) {
 async function createTransactionBatch(actor, input, timezone) {
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input);
+    const piutangCatId = await piutangCategoryId(tx, actor.householdId);
     const items = await Promise.all(
-      input.items.map(async (item) => ({
-        amount: parseAmount(item),
-        category_id: await resolveCategoryRef(tx, actor, item, "expense"),
-        note: item.note ?? "",
-        beneficiary_id: await resolveBeneficiaryRef(tx, actor, item) ?? null
-      }))
+      input.items.map(async (item) => {
+        const resolvedCat = await resolveCategoryRef(tx, actor, item, "expense");
+        const titipan = detectTitipan(item.note, item.titipan) ?? (resolvedCat === piutangCatId ? { borrower: "Titipan" } : null);
+        return {
+          amount: parseAmount(item),
+          category_id: titipan ? piutangCatId : resolvedCat,
+          note: titipan ? titipanDisplayName(item.note ?? "", titipan).slice(0, 500) : item.note ?? "",
+          beneficiary_id: await resolveBeneficiaryRef(tx, actor, item) ?? null,
+          titipan
+        };
+      })
     );
     const date = input.date ?? todayInTz(timezone);
+    const dbItems = items.map(({ titipan: _t, ...rest }) => rest);
     const createdRows = await tx`
-      select id from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items)}, 'web')
+      select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems)}, 'web')
     `;
-    if (actor.credential === "jwt") await learnKeywords(tx, actor.householdId, items.map((i) => ({ note: i.note, categoryId: i.category_id })));
+    if (actor.credential === "jwt") await learnKeywords(tx, actor.householdId, items.filter((i) => !i.titipan).map((i) => ({ note: i.note, categoryId: i.category_id })));
+    const remaining = [...createdRows];
+    const titipanCreated = [];
+    for (const it of items) {
+      if (!it.titipan) continue;
+      const idx = remaining.findIndex((r) => r.note === it.note && Number(r.amount) === it.amount);
+      const txId = idx === -1 ? void 0 : remaining.splice(idx, 1)[0].id;
+      titipanCreated.push({ txId, borrower: it.titipan.borrower, name: it.note || "item", amount: it.amount });
+    }
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, created: titipanCreated }) : [];
     const ids = createdRows.map((r) => r.id);
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
-    return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow.balance) } };
+    return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow.balance) }, ...piutang.length ? { piutang } : {} };
   });
 }
 async function updateTransaction(actor, id, input) {
@@ -14376,7 +14484,7 @@ transactionsApp.openapi(
     summary: "Catat beberapa pengeluaran sekaligus",
     security: [{ bearerJwt: [] }],
     request: { body: { content: { "application/json": { schema: CreateTransactionBatchBodySchema } } } },
-    responses: { 201: { content: { "application/json": { schema: external_exports.object({ transactions: external_exports.array(external_exports.any()), account: external_exports.object({ id: UuidSchema, balance: external_exports.number() }) }) } }, description: "Dibuat" } }
+    responses: { 201: { content: { "application/json": { schema: external_exports.object({ transactions: external_exports.array(external_exports.any()), account: external_exports.object({ id: UuidSchema, balance: external_exports.number() }), piutang: external_exports.array(external_exports.object({ id: UuidSchema, borrower_name: external_exports.string(), total: external_exports.number(), items: external_exports.array(external_exports.string()) })).optional() }) } }, description: "Dibuat" } }
   }),
   async (c) => {
     const actor = c.get("actor");
@@ -16413,20 +16521,20 @@ async function ingestReceipt(actor, input) {
     throw ApiError.fromCode("receipt_total_mismatch", { details: { sum_items: sumAmount, total: input.total } });
   }
   const timezone = await getHouseholdTimezone(actor);
-  const classified = await classifyItems(
-    actor,
-    input.items.map((item) => ({ name: item.name, aiCategory: item.category })),
-    { webLookup: true }
-  );
+  const titipan = input.items.map((item) => detectTitipan(item.name, item.titipan));
+  const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx]);
+  const classifiedList = await classifyItems(actor, toClassify, { webLookup: true });
+  const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]]));
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input);
-    const suffix = `${input.merchant ? ` \u2014 ${input.merchant}` : ""}${input.ref_no ? ` [ref: ${input.ref_no}]` : ""}`;
-    const noteFor = (name) => (name + suffix).slice(0, 500);
+    const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null;
+    const displayNames = input.items.map((item, idx) => titipanDisplayName(item.name, titipan[idx]));
+    const noteFor = (idx) => formatReceiptNote(displayNames[idx], input.merchant, input.ref_no).slice(0, 500);
     const items = await Promise.all(
       input.items.map(async (item, idx) => ({
         amount: item.amount,
-        category_id: item.category_id ? await resolveCategoryRef(tx, actor, item, "expense") : await resolveCategoryRef(tx, actor, { category: classified[idx].category }, "expense"),
-        note: noteFor(item.name),
+        category_id: titipan[idx] ? piutangCatId : item.category_id ? await resolveCategoryRef(tx, actor, item, "expense") : await resolveCategoryRef(tx, actor, { category: classified.get(idx).category }, "expense"),
+        note: noteFor(idx),
         // Gate fitur F-A ada di dalam resolveBeneficiaryRef — `for` saat beneficiary mati -> 400.
         beneficiary_id: item.for ? await resolveBeneficiaryRef(tx, actor, { beneficiary: item.for }) ?? null : null
       }))
@@ -16438,18 +16546,20 @@ async function ingestReceipt(actor, input) {
       )
     `;
     const remaining = [...createdIdRows];
-    function takeMatch(name, amount) {
-      const expected = noteFor(name);
-      const idx = remaining.findIndex((r) => r.note === expected && Number(r.amount) === amount);
-      if (idx === -1) return void 0;
-      return remaining.splice(idx, 1)[0].id;
+    function takeMatch(idx, amount) {
+      const expected = noteFor(idx);
+      const pos = remaining.findIndex((r) => r.note === expected && Number(r.amount) === amount);
+      if (pos === -1) return void 0;
+      return remaining.splice(pos, 1)[0].id;
     }
     const shoppingMarked = [];
     const shoppingUnmatched = [];
     const pantryUpdated = [];
     const pantryUnmatched = [];
-    for (const item of input.items) {
-      const txId = takeMatch(item.name, item.amount);
+    const titipanCreated = [];
+    for (const [idx, item] of input.items.entries()) {
+      const txId = takeMatch(idx, item.amount);
+      if (titipan[idx]) titipanCreated.push({ txId, borrower: titipan[idx].borrower, name: item.name, amount: item.amount });
       if (input.shopping) {
         const [match2] = await tx`select find_shopping_match(${actor.householdId}, ${item.name}) as id`;
         if (match2?.id) {
@@ -16472,12 +16582,14 @@ async function ingestReceipt(actor, input) {
         }
       }
     }
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, created: titipanCreated }) : [];
     const ids = createdIdRows.map((r) => r.id);
     const fullRows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
     return {
       transactions: fullRows.map(mapTx),
       account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
+      ...piutang.length ? { piutang } : {},
       ...input.shopping ? { shopping: { marked_bought: shoppingMarked, unmatched: shoppingUnmatched } } : {},
       ...input.pantry ? { pantry: { updated: pantryUpdated, unmatched: pantryUnmatched } } : {}
     };
@@ -16690,7 +16802,8 @@ var TOOLS = [
               amount_text: str("Nominal item"),
               category: str('Nama kategori dari list_categories, dipilih dari JENIS barang item ini (sabun \u2192 Shopping, pulsa \u2192 Utilitas, obat \u2192 Kesehatan, sayur/lauk \u2192 Makanan); jangan semua Makanan. Ragu \u2192 "Lainnya".'),
               note: str("Keterangan item"),
-              beneficiary: str("F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)")
+              beneficiary: str("F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)"),
+              titipan: str("Nama orang yang menitip, HANYA kalau user bilang item ini titipan orang lain yang akan mengganti uangnya \u2192 masuk Piutang + catatan piutang otomatis. Jangan isi kalau tidak disebut.")
             },
             required: ["amount_text", "category"]
           }
@@ -16704,7 +16817,7 @@ var TOOLS = [
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor);
       const raw2 = args.items ?? [];
-      const items = raw2.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary) }));
+      const items = raw2.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary), titipan: optStr(i.titipan) }));
       return createTransactionBatch(actor, { account: args.account, date: args.date, items }, timezone);
     }
   },
@@ -16941,7 +17054,7 @@ var TOOLS = [
   // ── F-D belanja & pantry (10-fitur-opsional-keluarga.md §6) ─────────────────────────────────
   {
     name: "ingest_receipt",
-    description: "Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry \u2014 semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak \u2192 kategori makanan; sabun/deterjen/tisu/popok \u2192 belanja/Shopping; pulsa/token listrik \u2192 Utilitas; obat/vitamin \u2192 Kesehatan). Jangan menjatuhkan semua item ke Makanan.",
+    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry \u2014 semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak \u2192 kategori makanan; sabun/deterjen/tisu/popok \u2192 belanja/Shopping; pulsa/token listrik \u2192 Utilitas; obat/vitamin \u2192 Kesehatan). Jangan menjatuhkan semua item ke Makanan. Note transaksi otomatis berformat "[Nama Toko] Nama item" \u2014 kirim merchant kalau terbaca. Item TITIPAN (dibelikan untuk orang lain yang akan mengganti uangnya) \u2192 isi items[].titipan dengan nama orangnya: masuk Piutang + catatan piutang otomatis, dan respons memuat `piutang[]` \u2014 sebutkan ke user.',
     parameters: {
       type: "object",
       properties: {
@@ -16959,7 +17072,8 @@ var TOOLS = [
               qty: num("Jumlah unit, default 1"),
               amount: num("Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)"),
               category: str('Nama kategori dari list_categories, dipilih dari JENIS barang ini (bukan toko). Ragu \u2192 "Lainnya" atau kosongkan: API menebak dari nama item, dan nama tak dikenal dipetakan ke kategori household terdekat (tidak pernah error).'),
-              for: str("F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini")
+              for: str("F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini"),
+              titipan: str('Nama orang yang MENITIP, HANYA kalau user bilang item ini titipan/dibelikan untuk orang lain yang akan mengganti uangnya ("sabunnya titipan Bu Ani"). Item itu masuk kategori Piutang + otomatis dibuatkan catatan piutang atas nama orang itu (bukan pengeluaran keluarga). Jangan isi kalau tidak disebut.')
             },
             required: ["name", "amount"]
           }
@@ -16981,7 +17095,7 @@ var TOOLS = [
         date: args.date,
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
-        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for) })),
+        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for), titipan: optStr(i.titipan) })),
         total: args.total == null ? void 0 : Number(args.total),
         shopping: args.shopping !== false,
         pantry: args.pantry !== false
@@ -18339,6 +18453,10 @@ var hermes_tools_default = [
               beneficiary: {
                 type: "string",
                 description: "F-A, opsional: penerima manfaat item ini (hanya kalau fitur aktif & disebut eksplisit)"
+              },
+              titipan: {
+                type: "string",
+                description: "Nama orang yang menitip, HANYA kalau user bilang item ini titipan orang lain yang akan mengganti uangnya \u2192 masuk Piutang + catatan piutang otomatis. Jangan isi kalau tidak disebut."
               }
             },
             required: [
@@ -18746,7 +18864,7 @@ var hermes_tools_default = [
   },
   {
     name: "ingest_receipt",
-    description: "Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry \u2014 semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak \u2192 kategori makanan; sabun/deterjen/tisu/popok \u2192 belanja/Shopping; pulsa/token listrik \u2192 Utilitas; obat/vitamin \u2192 Kesehatan). Jangan menjatuhkan semua item ke Makanan.",
+    description: 'Catat SATU STRUK sekaligus: transaksi pengeluaran per item + coret item yang cocok di daftar belanja + tambah stok pantry \u2014 semua dalam satu langkah. Pakai saat user kirim foto struk atau sebut beberapa barang belanjaan dengan harga dari SATU toko/transaksi. Beda dari record_expense_batch: ini JUGA mencoba mencocokkan ke shopping list & pantry (boleh dimatikan per panggilan lewat shopping/pantry:false kalau user eksplisit tidak mau). Kategori ditentukan PER ITEM dari jenis barangnya, bukan dari nama toko: struk minimarket biasanya campuran (makanan/bahan masak \u2192 kategori makanan; sabun/deterjen/tisu/popok \u2192 belanja/Shopping; pulsa/token listrik \u2192 Utilitas; obat/vitamin \u2192 Kesehatan). Jangan menjatuhkan semua item ke Makanan. Note transaksi otomatis berformat "[Nama Toko] Nama item" \u2014 kirim merchant kalau terbaca. Item TITIPAN (dibelikan untuk orang lain yang akan mengganti uangnya) \u2192 isi items[].titipan dengan nama orangnya: masuk Piutang + catatan piutang otomatis, dan respons memuat `piutang[]` \u2014 sebutkan ke user.',
     parameters: {
       type: "object",
       properties: {
@@ -18792,6 +18910,10 @@ var hermes_tools_default = [
               for: {
                 type: "string",
                 description: "F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini"
+              },
+              titipan: {
+                type: "string",
+                description: 'Nama orang yang MENITIP, HANYA kalau user bilang item ini titipan/dibelikan untuk orang lain yang akan mengganti uangnya ("sabunnya titipan Bu Ani"). Item itu masuk kategori Piutang + otomatis dibuatkan catatan piutang atas nama orang itu (bukan pengeluaran keluarga). Jangan isi kalau tidak disebut.'
               }
             },
             required: [

@@ -792,6 +792,8 @@ export interface paths {
                     category?: string;
                     member_id?: string;
                     member?: string;
+                    beneficiary_id?: string;
+                    beneficiary?: string;
                     attribution?: "owner" | "recorded_by";
                     q?: string;
                     min_amount?: number | null;
@@ -925,6 +927,16 @@ export interface paths {
                                 id: string;
                                 balance: number;
                             };
+                            piutang?: {
+                                /**
+                                 * Format: uuid
+                                 * @example 11111111-1111-1111-1111-111111111111
+                                 */
+                                id: string;
+                                borrower_name: string;
+                                total: number;
+                                items: string[];
+                            }[];
                         };
                     };
                 };
@@ -2130,11 +2142,13 @@ export interface paths {
                     period?: string;
                     from?: string;
                     to?: string;
-                    scope?: "household" | "member" | "account";
+                    scope?: "household" | "member" | "account" | "beneficiary";
                     member_id?: string;
                     member?: string;
                     account_id?: string;
                     account?: string;
+                    beneficiary_id?: string;
+                    beneficiary?: string;
                     attribution?: "owner" | "recorded_by";
                     compare?: boolean | null;
                 };
@@ -2908,6 +2922,641 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/beneficiaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar "untuk siapa" (F-A, opsional) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Beneficiary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Buat "untuk siapa" baru */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateBeneficiaryBody"];
+                };
+            };
+            responses: {
+                /** @description Dibuat */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Beneficiary"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/beneficiaries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Hapus "untuk siapa" (soft delete) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            success: true;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Ubah "untuk siapa" */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateBeneficiaryBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Beneficiary"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/reports/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Laporan bulanan siap-kirim (F-B, selalu tersedia) */
+        get: {
+            parameters: {
+                query?: {
+                    month?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shopping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar belanja (F-D, opsional) */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "needed" | "bought" | "cancelled";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ShoppingItem"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Tambah item belanja */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateShoppingItemBody"];
+                };
+            };
+            responses: {
+                /** @description Dibuat */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ShoppingItem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shopping/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Saran belanja dari stok menipis */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shopping/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Hapus item belanja */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            success: true;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Ubah item belanja (mis. tandai dibeli) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateShoppingItemBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ShoppingItem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/pantry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar stok rumah (F-D, opsional) */
+        get: {
+            parameters: {
+                query?: {
+                    location?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PantryItem"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Tambah item stok */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreatePantryItemBody"];
+                };
+            };
+            responses: {
+                /** @description Dibuat */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PantryItem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pantry/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Barang hampir/sudah kedaluwarsa (§6.6) */
+        get: {
+            parameters: {
+                query?: {
+                    within_days?: number | null;
+                    include_expired?: boolean | null;
+                    exclude_acked?: boolean | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pantry/expiring/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tandai sudah diingatkan hari ini */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        ids: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            success: true;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pantry/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Hapus item stok */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            success: true;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Ubah item stok */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdatePantryItemBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PantryItem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/pantry/{id}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Catat perubahan qty manual (pakai/buang/koreksi) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PantryMovementBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PantryItem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/receipts/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Catat struk: transaksi + coret belanja + tambah stok sekaligus */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IngestReceiptBody"];
+                };
+            };
+            responses: {
+                /** @description Dibuat */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+                /** @description receipt_total_mismatch / insufficient_funds */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2954,10 +3603,49 @@ export interface components {
             default_account_visibility?: "shared" | "private";
             owners_can_view_private_totals?: boolean;
         };
+        UpdateHouseholdFeaturesBody: {
+            beneficiary?: {
+                /** @default false */
+                enabled: boolean;
+            };
+            monthly_report?: {
+                /** @default false */
+                enabled: boolean;
+                /** @default 1 */
+                day: number;
+                /** @default 8 */
+                hour: number;
+                /**
+                 * @default both
+                 * @enum {string}
+                 */
+                channel: "telegram" | "whatsapp" | "both";
+                /** @default all */
+                recipients: "all" | string[];
+            };
+            reconciliation?: {
+                /** @default false */
+                enabled: boolean;
+            };
+            shopping_stock?: {
+                enabled?: boolean;
+                expiry_reminder?: {
+                    /** @default false */
+                    enabled: boolean;
+                    /** @default 7 */
+                    hour: number;
+                    /** @default 2 */
+                    days_before: number;
+                    /** @default all */
+                    recipients: "all" | string[];
+                };
+            };
+        };
         UpdateHouseholdBody: {
             name?: string;
             timezone?: string;
             settings?: components["schemas"]["UpdateHouseholdSettingsBody"];
+            features?: components["schemas"]["UpdateHouseholdFeaturesBody"];
         };
         ErrorResponse: {
             error: {
@@ -3058,6 +3746,13 @@ export interface components {
             /** @example 2026-10-04 */
             date?: string;
             note?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            beneficiary_id?: string;
+            /** @description F-A (10-fitur-opsional-keluarga.md §3), hanya berlaku kalau feature beneficiary aktif. */
+            beneficiary?: string;
         };
         CreateTransactionBatchBody: {
             /**
@@ -3078,6 +3773,14 @@ export interface components {
                 category_id?: string;
                 category?: string;
                 note?: string;
+                /**
+                 * Format: uuid
+                 * @example 11111111-1111-1111-1111-111111111111
+                 */
+                beneficiary_id?: string;
+                beneficiary?: string;
+                /** @description Nama orang yang menitip → item masuk Piutang + catatan piutang otomatis. Kata "titipan" di note atau kategori "Piutang" juga dikenali. */
+                titipan?: string;
             }[];
         };
         UpdateTransactionBody: {
@@ -3099,6 +3802,13 @@ export interface components {
             /** @example 2026-10-04 */
             date?: string;
             note?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            beneficiary_id?: string | null;
+            /** @description null eksplisit pada beneficiary_id = kembali ke bersama. */
+            beneficiary?: string;
         };
         CreateTransferBody: {
             amount?: number;
@@ -3466,6 +4176,175 @@ export interface components {
             /** @description "me" (default) atau nama/alias/uuid member lain (owner saja). */
             member?: string;
             expires_in_days?: number;
+        };
+        Beneficiary: {
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "member" | "child" | "relative" | "property" | "other";
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            member_id: string | null;
+            aliases: string[];
+            icon: string;
+            color: string;
+        };
+        CreateBeneficiaryBody: {
+            name: string;
+            /**
+             * @default other
+             * @enum {string}
+             */
+            kind: "member" | "child" | "relative" | "property" | "other";
+            /** @description Nama/alias/uuid member, hanya kalau kind="member". */
+            member?: string;
+            /** @default [] */
+            aliases: string[];
+            icon?: string;
+            color?: string;
+        };
+        UpdateBeneficiaryBody: {
+            name?: string;
+            aliases?: string[];
+            icon?: string;
+            color?: string;
+        };
+        ShoppingItem: {
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            id: string;
+            name: string;
+            qty_text: string | null;
+            notes: string;
+            /** @enum {string} */
+            status: "needed" | "bought" | "cancelled";
+            /** @enum {string} */
+            source: "manual" | "suggested" | "receipt";
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            bought_transaction_id: string | null;
+        };
+        CreateShoppingItemBody: {
+            name: string;
+            qty_text?: string;
+            /** @default  */
+            notes: string;
+        };
+        UpdateShoppingItemBody: {
+            name?: string;
+            qty_text?: string | null;
+            notes?: string;
+            /** @enum {string} */
+            status?: "needed" | "bought" | "cancelled";
+            /**
+             * Format: uuid
+             * @description Kalau status="bought", kaitkan ke transaksi yang sudah dicatat.
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            transaction_id?: string;
+        };
+        PantryItem: {
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            id: string;
+            name: string;
+            unit: string;
+            qty: number;
+            min_qty: number | null;
+            /** @enum {string} */
+            location: "fridge" | "freezer" | "shelf" | "other";
+            category: string | null;
+            /** @example 2026-10-04 */
+            expires_at: string | null;
+            expires_estimated: boolean;
+            aliases: string[];
+        };
+        CreatePantryItemBody: {
+            name: string;
+            /** @default pcs */
+            unit: string;
+            /** @default 0 */
+            qty: number;
+            min_qty?: number;
+            /** @description kulkas/freezer/lemari/lainnya atau fridge/freezer/shelf/other. */
+            location?: string;
+            category?: string;
+            /** @example 2026-10-04 */
+            expires_at?: string;
+            /** @default false */
+            expires_estimated: boolean;
+            /** @default [] */
+            aliases: string[];
+        };
+        UpdatePantryItemBody: {
+            name?: string;
+            unit?: string;
+            min_qty?: number | null;
+            location?: string;
+            category?: string | null;
+            /** @example 2026-10-04 */
+            expires_at?: string | null;
+            expires_estimated?: boolean;
+            aliases?: string[];
+        };
+        PantryMovementBody: {
+            delta: number;
+            /** @enum {string} */
+            reason: "purchase" | "consume" | "adjust" | "expired";
+            /** @default  */
+            note: string;
+        };
+        IngestReceiptBody: {
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            account_id?: string;
+            account?: string;
+            /** @example 2026-10-04 */
+            date?: string;
+            merchant?: string;
+            items: {
+                name: string;
+                /** @default 1 */
+                qty: number;
+                amount: number;
+                /**
+                 * Format: uuid
+                 * @example 11111111-1111-1111-1111-111111111111
+                 */
+                category_id?: string;
+                category?: string;
+                /** @description Alias beneficiary untuk item ini (F-A), diteruskan apa adanya. */
+                for?: string;
+                /** @description Nama orang yang menitip (barang dibelikan untuk orang lain yang akan mengganti uangnya). Item masuk kategori Piutang + dibuatkan catatan piutang otomatis. Kata "titipan" di name juga dikenali. */
+                titipan?: string;
+            }[];
+            /** @description Kalau dikirim, divalidasi sum(items.amount) === total. */
+            total?: number;
+            ref_no?: string;
+            /**
+             * @description Coret item yang cocok di daftar belanja.
+             * @default true
+             */
+            shopping: boolean;
+            /**
+             * @description Tambah stok untuk item yang cocok di pantry.
+             * @default true
+             */
+            pantry: boolean;
         };
     };
     responses: never;

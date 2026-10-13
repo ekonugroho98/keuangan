@@ -56,7 +56,7 @@ transactionsApp.openapi(
     method: 'post', path: '/v1/transactions/batch', tags: ['transactions'], summary: 'Catat beberapa pengeluaran sekaligus',
     security: [{ bearerJwt: [] }],
     request: { body: { content: { 'application/json': { schema: CreateTransactionBatchBodySchema } } } },
-    responses: { 201: { content: { 'application/json': { schema: z.object({ transactions: z.array(z.any()), account: z.object({ id: UuidSchema, balance: z.number() }) }) } }, description: 'Dibuat' } },
+    responses: { 201: { content: { 'application/json': { schema: z.object({ transactions: z.array(z.any()), account: z.object({ id: UuidSchema, balance: z.number() }), piutang: z.array(z.object({ id: UuidSchema, borrower_name: z.string(), total: z.number(), items: z.array(z.string()) })).optional() }) } }, description: 'Dibuat' } },
   }),
   async (c) => {
     const actor = c.get('actor')

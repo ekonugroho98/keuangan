@@ -96,6 +96,7 @@ export const ReceiptItemSchema = z.object({
   category_id: UuidSchema.optional(),
   category: z.string().optional(),
   for: z.string().optional().openapi({ description: 'Alias beneficiary untuk item ini (F-A), diteruskan apa adanya.' }),
+  titipan: z.string().max(80).optional().openapi({ description: 'Nama orang yang menitip (barang dibelikan untuk orang lain yang akan mengganti uangnya). Item masuk kategori Piutang + dibuatkan catatan piutang otomatis. Kata "titipan" di name juga dikenali.' }),
 })
 
 export const IngestReceiptBodySchema = z
