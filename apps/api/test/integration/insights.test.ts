@@ -49,7 +49,7 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('analisa pengeluaran 
     const body = await res.json()
     expect(body.filter).toMatchObject({ category: 'Makanan', q: 'zz' })
     expect(body.totals).toMatchObject({ total: 50000, count: 3, active_days: 2, per_day: 5000 })
-    expect(body.top_items[0]).toMatchObject({ item: 'ZZ Bakso', count: 2, total: 45000, places: ['Warung Test'] })
+    expect(body.top_items[0]).toMatchObject({ item: 'ZZ Bakso', place: 'Warung Test', count: 2, total: 45000 })
     expect(body.top_days[0]).toMatchObject({ date: '2025-01-10', total: 30000 })
     // Rentang mulai tanggal 1 → dibanding tanggal yang sama bulan lalu (1–10 Des 2024).
     expect(body.comparison).toMatchObject({ from: '2024-12-01', to: '2024-12-10', total: 10000, change_pct: 400 })

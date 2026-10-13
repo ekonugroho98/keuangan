@@ -81,6 +81,16 @@ function fmtDay(date: string): string {
   return `${Number(d)} ${months[Number(m) - 1]}`
 }
 
+// Jenis makanan siap santap — hanya dihitung kalau filter kategori adalah kategori makan/jajan, supaya agent selalu punya
+// rincian per jenis yang angkanya pasti (bukan menjumlah sendiri).
+const KIND_RULES: Array<{ kind: string; re: RegExp }> = [
+  { kind: 'Minuman & es', re: /\bes\b|\bjus\b|\bteh\b|kopi|le ?minerale|aqua|air mineral|\bsusu\b|boba|thai tea|minum|milk|yakult/i },
+  { kind: 'Camilan', re: /gorengan|risol|takoyaki|takayaki|siomay|batagor|opak|sempol|cilok|cireng|cimol|kerupuk|\bkue\b|roti|martabak|dimsum|dim sum|cakwe|pempek|snack|keripik|cemilan|camilan/i },
+]
+export function kindOf(item: string): string {
+  return KIND_RULES.find((r) => r.re.test(item))?.kind ?? 'Makan berat'
+}
+
 export function buildInsights(input: InsightsInput) {
   const { rows, period, today } = input
   const total = rows.reduce((s, r) => s + r.amount, 0)
@@ -98,11 +108,13 @@ export function buildInsights(input: InsightsInput) {
   const byOwner = group(rows, (r) => r.account_owner ?? '(bersama)', (r) => r.account_owner ?? '(bersama)').map((g) => ({ owner: g.label, total: g.total, count: g.count, pct: pct(g.total, total) }))
   const byBeneficiary = group(rows, (r) => r.beneficiary, (r) => r.beneficiary!).map((g) => ({ beneficiary: g.label, total: g.total, count: g.count }))
 
+  // Kunci = item + tempat: "Bakso" (tanpa tempat) dan "Bakso (Bakso Mas Boy)" adalah dua baris berbeda supaya agent
+  // tidak menyimpulkan "Bakso Mas Boy 2x". Item yang sama di banyak tempat terlihat dari `item` yang berulang.
   const items = new Map<string, { item: string; total: number; count: number; places: Set<string>; dates: string[] }>()
   const places = new Map<string, { place: string; total: number; count: number }>()
   for (const r of rows) {
     const { item, place } = splitItem(r.note)
-    const k = normText(item)
+    const k = `${normText(item)}|${place ? normText(place) : ''}`
     const g = items.get(k) ?? { item, total: 0, count: 0, places: new Set<string>(), dates: [] }
     g.total += r.amount
     g.count++
@@ -120,8 +132,8 @@ export function buildInsights(input: InsightsInput) {
   const topItems = [...items.values()]
     .sort((a, b) => b.total - a.total || b.count - a.count)
     .slice(0, 15)
-    .map((g) => ({ item: g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), places: [...g.places], dates: g.dates.sort() }))
-  const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.item, count: i.count, total: i.total }))
+    .map((g) => ({ item: g.item, place: [...g.places][0] ?? null, label: g.places.size ? `${g.item} (${[...g.places][0]})` : g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), dates: g.dates.sort() }))
+  const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.label, count: i.count, total: i.total }))
   const topPlaces = [...places.values()].sort((a, b) => b.total - a.total).slice(0, 10)
 
   const days = new Map<string, { date: string; total: number; count: number; items: string[] }>()
@@ -153,12 +165,20 @@ export function buildInsights(input: InsightsInput) {
   const largest = [...rows].sort((a, b) => b.amount - a.amount).slice(0, 5).map((r) => ({ date: r.date, amount: r.amount, note: r.note, category: r.category, account: r.account }))
   const avgTx = count ? Math.round(total / count) : 0
 
+  const byKind = input.filter.category && /makan|jajan|kuliner/i.test(input.filter.category) && count
+    ? (['Makan berat', 'Camilan', 'Minuman & es'] as const)
+        .map((kind) => {
+          const rs = rows.filter((r) => kindOf(splitItem(r.note).item) === kind)
+          return { kind, total: rs.reduce((a, r) => a + r.amount, 0), count: rs.length, items: rs.map((r) => `${splitItem(r.note).item} ${fmtRp(r.amount)}`) }
+        })
+        .filter((k) => k.count > 0)
+    : undefined
   const prev = input.previous
   const comparison = prev
-    ? { from: prev.from, to: prev.to, total: prev.total, count: prev.count, change: total - prev.total, change_pct: prev.total > 0 ? Math.round(((total - prev.total) / prev.total) * 1000) / 10 : null }
+    ? { available: prev.count > 0, from: prev.from, to: prev.to, total: prev.total, count: prev.count, change: total - prev.total, change_pct: prev.total > 0 ? Math.round(((total - prev.total) / prev.total) * 1000) / 10 : null }
     : null
 
-  let budget = null as null | { amount: number; spent: number; remaining: number; pct: number; projected_pct: number; daily_allowance_left: number | null; status: string }
+  let budget = null as null | { amount: number; spent: number; remaining: number; pct: number; projected_pct: number; daily_allowance_left: number | null; cut_per_day_needed: number; status: string }
   if (input.budget) {
     const b = input.budget.amount
     const daysLeft = ongoing ? daysInPeriod - daysElapsed : 0
@@ -170,6 +190,8 @@ export function buildInsights(input: InsightsInput) {
       pct: pct(total, b),
       projected_pct: pct(projected, b),
       daily_allowance_left: daysLeft > 0 ? Math.max(0, Math.round(remaining / daysLeft)) : null,
+      // Berapa rata-rata harian harus turun supaya pas budget di akhir periode (0 = laju sekarang sudah aman).
+      cut_per_day_needed: daysLeft > 0 ? Math.max(0, perDay - Math.max(0, Math.round(remaining / daysLeft))) : 0,
       status: total >= b ? 'over' : projected > b ? 'akan_lewat' : 'aman',
     }
   }
@@ -179,10 +201,12 @@ export function buildInsights(input: InsightsInput) {
   const scope = input.filter.category ?? 'Semua pengeluaran'
   parts.push(`${scope} ${period.label}${ongoing ? ` (s.d. ${fmtDay(effectiveTo)})` : ''}: ${fmtRp(total)} dari ${count} transaksi, rata-rata ${fmtRp(perDay)}/hari.`)
   if (ongoing) parts.push(`Laju ini ≈ ${fmtRp(projected)} untuk satu periode penuh.`)
-  if (budget) parts.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ''}.`)
-  if (comparison && comparison.change_pct !== null) parts.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? 'naik' : 'turun'} ${Math.abs(comparison.change_pct)}%.`)
+  if (budget) parts.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ''}${budget.cut_per_day_needed > 0 ? ` — supaya pas budget, rata-rata harian perlu turun ±${fmtRp(budget.cut_per_day_needed)}` : ''}.`)
+  if (comparison && comparison.available && comparison.change_pct !== null) parts.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? 'naik' : 'turun'} ${Math.abs(comparison.change_pct)}%.`)
   if (topDays[0] && topDays[0].count > 1) parts.push(`Hari paling boros: ${topDays[0].weekday} ${fmtDay(topDays[0].date)} ${fmtRp(topDays[0].total)} (${topDays[0].count} transaksi).`)
   if (repeated.length) parts.push(`Berulang: ${repeated.slice(0, 4).map((r) => `${r.item} ${r.count}x`).join(', ')}.`)
+  if (comparison && !comparison.available) parts.push('Belum ada data periode sebelumnya untuk dibandingkan.')
+  if (byKind) parts.push(`Per jenis: ${byKind.map((k) => `${k.kind} ${fmtRp(k.total)} (${k.count}x)`).join(', ')}.`)
 
   return {
     period: { label: period.label, from: period.from, to: period.to, days_elapsed: daysElapsed, days_in_period: daysInPeriod, ongoing },
@@ -194,6 +218,7 @@ export function buildInsights(input: InsightsInput) {
     by_account: byAccount,
     by_owner: byOwner,
     by_beneficiary: byBeneficiary,
+    by_kind: byKind,
     top_items: topItems,
     top_places: topPlaces,
     top_days: topDays,

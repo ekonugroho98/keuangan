@@ -853,3 +853,7 @@ dari `search_transactions` (≤200 baris) tanpa resep. Solusi: angka dihitung se
   dikoreksi user dan aturan kategori khusus mengalahkan kategori makanan umum pilihan agent ("Sempol" → Makan Beli &
   Jajan). Pilihan web tidak disentuh. `classifySync` juga: jawaban AI = kategori makanan umum kalah dari aturan khusus.
   Kata kunci jajan ditambah (kebab, sempol, cilok, dimsum, burger, boba, …). Test integrasi `agent-category.test.ts`.
+- Revisi setelah uji jawaban Hermes (angka benar semua, tapi: "Bakso Mas Boy 2x" padahal beda tempat, tanpa rincian
+  per jenis, saran tidak berangka, menawarkan banding bulan lalu yang kosong): `top_items` dikelompokkan per item+tempat
+  (`label`), `by_kind` untuk kategori makan/jajan, `budget.cut_per_day_needed`, `comparison.available`; resep skill
+  diperketat. 10 test insights.
