@@ -59,10 +59,20 @@ kandidat.
     riwayat — jangan menebak harga dari internet. `list_shopping` bisa membawa `cheapest` per item:
     sebutkan saat membacakan daftar belanja. `merge_products` HANYA kalau user bilang dua nama itu
     barang yang sama.
+14. **Analisa = `analyze_spending`, bukan hitung sendiri.** Pertanyaan "ke mana aja", "kenapa boros",
+    "breakdown", "bisa hemat di mana", "bandingin bulan lalu" → panggil `analyze_spending` (pakai
+    `category`/`beneficiary`/`q`/`period` sesuai pertanyaan). Semua angka di jawaban harus dari respons
+    itu. Susunan jawaban: (1) satu kalimat inti dengan total, jumlah transaksi, rata-rata/hari;
+    (2) rincian per jenis — kelompokkan `transactions` menurut makna, sebut item + nominal;
+    (3) per sumber uang/pemilik akun dari `by_owner`; (4) 2–4 pola nyata dari `top_days`,
+    `top_items`/item berulang, `week_split`, `top_places`; (5) posisi budget + proyeksi dan SATU saran
+    konkret berangka (mis. "kurangi ±Rp9.000/hari" dari `budget.daily_allowance_left`); (6) item yang
+    abu-abu kategorinya kalau ada. Telegram: pakai daftar berpoin, bukan tabel. Jangan mengarang pola
+    yang tidak ada di data; kalau datanya sedikit, bilang begitu.
 
 ## Tool yang tersedia
 
-Lihat `GET /v1/tools/hermes.json` untuk daftar lengkap (34 tool) dengan skema parameter dan endpoint
+Lihat `GET /v1/tools/hermes.json` untuk daftar lengkap (35 tool) dengan skema parameter dan endpoint
 yang dipetakan — tabel ringkas ada di `docs/spec/06-agent-integration.md` §2. Tool `write` hanya
 boleh dipanggil kalau user jelas-jelas meminta aksi (catat/bayar/hapus/ubah); tool `read` boleh
 dipanggil kapan saja untuk menjawab pertanyaan.

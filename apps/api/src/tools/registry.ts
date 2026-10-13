@@ -20,6 +20,7 @@ import * as shoppingSvc from '../services/shopping'
 import * as pantrySvc from '../services/pantry'
 import { ingestReceipt } from '../services/receipts'
 import * as pricesSvc from '../services/prices'
+import * as insightsSvc from '../services/insights'
 
 /**
  * Registry tunggal untuk Hermes/agent (06-agent-integration.md §2). Satu sumber kebenaran yang
@@ -576,6 +577,35 @@ export const TOOLS: ToolDefinition[] = [
         pantry: args.pantry !== false,
       })
     },
+  },
+  {
+    name: 'analyze_spending',
+    description: 'ANALISA pengeluaran dengan angka yang sudah dihitung server: total, rata-rata per hari, proyeksi akhir bulan, posisi budget (sisa jatah per hari), perbandingan dengan periode sebelumnya (hari yang sama), rincian per kategori/akun/pemilik akun/untuk siapa, item & tempat terbanyak, item berulang, hari paling boros, hari kerja vs akhir pekan, transaksi terbesar, dan daftar transaksinya (≤80). Pakai untuk SEMUA pertanyaan analisa/evaluasi: "jajan bulan ini ke mana aja", "kenapa boros", "breakdown makanan", "pengeluaran anak", "bisa hemat di mana", "bandingin sama bulan lalu". JANGAN menjumlah sendiri dari search_transactions — semua angka di jawaban harus berasal dari respons tool ini. Boleh mengelompokkan `transactions` secara makna (mis. makan berat / camilan / minuman) tapi jumlahkan ulang dengan teliti hanya dari baris itu.',
+    parameters: {
+      type: 'object',
+      properties: {
+        period: str('Periode, default this_month', { enum: ['this_month', 'last_month', 'this_week', 'last_week', 'today', 'yesterday', 'this_year'] }),
+        from: str('Awal periode kustom YYYY-MM-DD (bersama to)', { format: 'date' }),
+        to: str('Akhir periode kustom YYYY-MM-DD', { format: 'date' }),
+        category: str('Nama kategori dari list_categories, mis. "Makan Beli & Jajan"; kosong = semua pengeluaran'),
+        account: str('Nama akun, opsional'),
+        beneficiary: str('Untuk siapa, opsional (mis. "Anak")'),
+        q: str('Cari kata di catatan, opsional (mis. "bakso", "Indomaret")'),
+      },
+    },
+    endpoint: { method: 'GET', path: '/v1/insights/spending' },
+    scope: 'read',
+    idempotent: true,
+    handler: async (actor, args) =>
+      insightsSvc.analyzeSpending(actor, {
+        period: optStr(args.period),
+        from: optStr(args.from),
+        to: optStr(args.to),
+        category: optStr(args.category),
+        account: optStr(args.account),
+        beneficiary: optStr(args.beneficiary),
+        q: optStr(args.q),
+      }),
   },
   {
     name: 'compare_prices',

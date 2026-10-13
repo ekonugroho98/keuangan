@@ -13999,11 +13999,11 @@ async function lookupProduct(itemName, provider, apiKey) {
   const snippets = await searchWeb(`${name} produk`);
   try {
     const raw2 = await callProviderJson(buildTextRequest(provider, apiKey, classifyPrompt(name, snippets), 200), provider, 2e4);
-    const group = isProductGroup(raw2.group) ? raw2.group : null;
-    if (!group) return null;
+    const group2 = isProductGroup(raw2.group) ? raw2.group : null;
+    if (!group2) return null;
     const label = typeof raw2.label === "string" && raw2.label.trim() ? raw2.label.trim().slice(0, 120) : name;
     const canonical = typeof raw2.canonical === "string" && raw2.canonical.trim().length >= 2 ? raw2.canonical.trim().slice(0, 120) : null;
-    return { group, label, canonical, grounded: snippets.length > 0 };
+    return { group: group2, label, canonical, grounded: snippets.length > 0 };
   } catch {
     return null;
   }
@@ -14069,8 +14069,8 @@ function findCategory(query, categories) {
   });
   return partial?.name;
 }
-function groupToCategory(group, categories) {
-  for (const cand of GROUP_CANDIDATES[group]) {
+function groupToCategory(group2, categories) {
+  for (const cand of GROUP_CANDIDATES[group2]) {
     const hit = findCategory(cand, categories);
     if (hit) return hit;
   }
@@ -14305,8 +14305,8 @@ async function canonicalizeProducts(actor, names, opts = { llm: true }) {
         const a = byName.get(normText(m.name)) ?? answers[i];
         const canonical = typeof a?.canonical === "string" ? a.canonical.trim() : "";
         if (canonical.length < 2) continue;
-        const group = isProductGroup(a?.group) ? a.group : "other";
-        await tx`select learn_product_knowledge(${m.keyword}, ${group}::product_group, ${canonical}, 'ai'::keyword_source, ${canonical})`;
+        const group2 = isProductGroup(a?.group) ? a.group : "other";
+        await tx`select learn_product_knowledge(${m.keyword}, ${group2}::product_group, ${canonical}, 'ai'::keyword_source, ${canonical})`;
       }
     });
   } catch (err) {
@@ -14939,15 +14939,15 @@ async function getBudgetStatus(actor, month, scope, memberRef) {
     const items = rows.map((r) => {
       const amount = Number(r.amount);
       const spent = Number(r.spent);
-      const pct = amount > 0 ? Math.round(spent / amount * 1e3) / 10 : 0;
+      const pct2 = amount > 0 ? Math.round(spent / amount * 1e3) / 10 : 0;
       return {
         budget_id: r.budget_id,
         category: { id: r.category_id, name: r.category_name, icon: r.category_icon },
         amount,
         spent,
         remaining: amount - spent,
-        pct,
-        status: spent >= amount ? "over" : pct >= 80 ? "warning" : "ok"
+        pct: pct2,
+        status: spent >= amount ? "over" : pct2 >= 80 ? "warning" : "ok"
       };
     });
     const totals = items.reduce((acc, i) => ({ budgeted: acc.budgeted + i.amount, spent: acc.spent + i.spent, remaining: acc.remaining + i.remaining }), { budgeted: 0, spent: 0, remaining: 0 });
@@ -16885,6 +16885,249 @@ async function ingestReceipt(actor, input) {
   });
 }
 
+// src/services/insights.ts
+var WEEKDAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+var MAX_TX_LIST = 80;
+function daysBetween(from, to) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 864e5) + 1;
+}
+function weekday(date) {
+  return (/* @__PURE__ */ new Date(`${date}T00:00:00Z`)).getUTCDay();
+}
+function splitItem(note) {
+  const parsed = parseReceiptNote(note || "");
+  let item = parsed.name.replace(/\s*\(titipan [^)]*\)\s*$/i, "").trim();
+  let place = parsed.merchant ?? null;
+  const paren = item.match(/^(.*\S)\s*\(([^)]+)\)$/);
+  if (paren && !place) {
+    item = paren[1].trim();
+    place = paren[2].trim();
+  }
+  return { item: item || "(tanpa keterangan)", place };
+}
+function pct(part, total) {
+  return total > 0 ? Math.round(part / total * 1e3) / 10 : 0;
+}
+function group(rows, keyOf, labelOf) {
+  const m = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const k = keyOf(r);
+    if (k === null) continue;
+    const g = m.get(k) ?? { label: labelOf(r), total: 0, count: 0 };
+    g.total += r.amount;
+    g.count++;
+    m.set(k, g);
+  }
+  return [...m.values()].sort((a, b2) => b2.total - a.total || b2.count - a.count);
+}
+function fmtDay(date) {
+  const [, m, d] = date.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  return `${Number(d)} ${months[Number(m) - 1]}`;
+}
+function buildInsights(input) {
+  const { rows, period, today } = input;
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const count = rows.length;
+  const effectiveTo = today < period.to && today >= period.from ? today : period.to;
+  const daysElapsed = Math.max(1, daysBetween(period.from, effectiveTo));
+  const daysInPeriod = daysBetween(period.from, period.to);
+  const perDay = Math.round(total / daysElapsed);
+  const ongoing = effectiveTo !== period.to;
+  const projected = ongoing ? Math.round(total / daysElapsed * daysInPeriod) : total;
+  const byCategory = group(rows, (r) => r.category, (r) => r.category).map((g) => ({ category: g.label, total: g.total, count: g.count, pct: pct(g.total, total) }));
+  const byAccount = group(rows, (r) => r.account, (r) => ({ account: r.account, owner: r.account_owner })).map((g) => ({ ...g.label, total: g.total, count: g.count, pct: pct(g.total, total) }));
+  const byOwner = group(rows, (r) => r.account_owner ?? "(bersama)", (r) => r.account_owner ?? "(bersama)").map((g) => ({ owner: g.label, total: g.total, count: g.count, pct: pct(g.total, total) }));
+  const byBeneficiary = group(rows, (r) => r.beneficiary, (r) => r.beneficiary).map((g) => ({ beneficiary: g.label, total: g.total, count: g.count }));
+  const items = /* @__PURE__ */ new Map();
+  const places = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const { item, place } = splitItem(r.note);
+    const k = normText(item);
+    const g = items.get(k) ?? { item, total: 0, count: 0, places: /* @__PURE__ */ new Set(), dates: [] };
+    g.total += r.amount;
+    g.count++;
+    g.dates.push(r.date);
+    if (place) g.places.add(place);
+    items.set(k, g);
+    if (place) {
+      const pk = normText(place);
+      const p = places.get(pk) ?? { place, total: 0, count: 0 };
+      p.total += r.amount;
+      p.count++;
+      places.set(pk, p);
+    }
+  }
+  const topItems = [...items.values()].sort((a, b2) => b2.total - a.total || b2.count - a.count).slice(0, 15).map((g) => ({ item: g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), places: [...g.places], dates: g.dates.sort() }));
+  const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.item, count: i.count, total: i.total }));
+  const topPlaces = [...places.values()].sort((a, b2) => b2.total - a.total).slice(0, 10);
+  const days = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const d = days.get(r.date) ?? { date: r.date, total: 0, count: 0, items: [] };
+    d.total += r.amount;
+    d.count++;
+    d.items.push(`${splitItem(r.note).item} ${fmtRp(r.amount)}`);
+    days.set(r.date, d);
+  }
+  const activeDays = days.size;
+  const topDays = [...days.values()].sort((a, b2) => b2.total - a.total).slice(0, 3).map((d) => ({ ...d, weekday: WEEKDAYS[weekday(d.date)] }));
+  const byWeekday = WEEKDAYS.map((name, i) => {
+    const rs = rows.filter((r) => weekday(r.date) === i);
+    return { weekday: name, total: rs.reduce((s, r) => s + r.amount, 0), count: rs.length };
+  });
+  const weekendRows = rows.filter((r) => [0, 6].includes(weekday(r.date)));
+  const weekend = weekendRows.reduce((s, r) => s + r.amount, 0);
+  const weekendDays = [...days.keys()].filter((d) => [0, 6].includes(weekday(d))).length;
+  const weekdayDays = activeDays - weekendDays;
+  const weekSplit = {
+    weekday_total: total - weekend,
+    weekend_total: weekend,
+    weekday_avg_per_active_day: weekdayDays ? Math.round((total - weekend) / weekdayDays) : 0,
+    weekend_avg_per_active_day: weekendDays ? Math.round(weekend / weekendDays) : 0
+  };
+  const largest = [...rows].sort((a, b2) => b2.amount - a.amount).slice(0, 5).map((r) => ({ date: r.date, amount: r.amount, note: r.note, category: r.category, account: r.account }));
+  const avgTx = count ? Math.round(total / count) : 0;
+  const prev = input.previous;
+  const comparison = prev ? { from: prev.from, to: prev.to, total: prev.total, count: prev.count, change: total - prev.total, change_pct: prev.total > 0 ? Math.round((total - prev.total) / prev.total * 1e3) / 10 : null } : null;
+  let budget = null;
+  if (input.budget) {
+    const b2 = input.budget.amount;
+    const daysLeft = ongoing ? daysInPeriod - daysElapsed : 0;
+    const remaining = b2 - total;
+    budget = {
+      amount: b2,
+      spent: total,
+      remaining,
+      pct: pct(total, b2),
+      projected_pct: pct(projected, b2),
+      daily_allowance_left: daysLeft > 0 ? Math.max(0, Math.round(remaining / daysLeft)) : null,
+      status: total >= b2 ? "over" : projected > b2 ? "akan_lewat" : "aman"
+    };
+  }
+  const parts2 = [];
+  const scope = input.filter.category ?? "Semua pengeluaran";
+  parts2.push(`${scope} ${period.label}${ongoing ? ` (s.d. ${fmtDay(effectiveTo)})` : ""}: ${fmtRp(total)} dari ${count} transaksi, rata-rata ${fmtRp(perDay)}/hari.`);
+  if (ongoing) parts2.push(`Laju ini \u2248 ${fmtRp(projected)} untuk satu periode penuh.`);
+  if (budget) parts2.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ""}.`);
+  if (comparison && comparison.change_pct !== null) parts2.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? "naik" : "turun"} ${Math.abs(comparison.change_pct)}%.`);
+  if (topDays[0] && topDays[0].count > 1) parts2.push(`Hari paling boros: ${topDays[0].weekday} ${fmtDay(topDays[0].date)} ${fmtRp(topDays[0].total)} (${topDays[0].count} transaksi).`);
+  if (repeated.length) parts2.push(`Berulang: ${repeated.slice(0, 4).map((r) => `${r.item} ${r.count}x`).join(", ")}.`);
+  return {
+    period: { label: period.label, from: period.from, to: period.to, days_elapsed: daysElapsed, days_in_period: daysInPeriod, ongoing },
+    filter: input.filter,
+    totals: { total, count, per_day: perDay, avg_per_transaction: avgTx, active_days: activeDays, projected_period_total: projected },
+    budget,
+    comparison,
+    by_category: input.filter.category ? void 0 : byCategory,
+    by_account: byAccount,
+    by_owner: byOwner,
+    by_beneficiary: byBeneficiary,
+    top_items: topItems,
+    top_places: topPlaces,
+    top_days: topDays,
+    by_weekday: byWeekday,
+    week_split: weekSplit,
+    largest,
+    transactions: count <= MAX_TX_LIST ? [...rows].sort((a, b2) => a.date < b2.date ? -1 : 1).map((r) => ({ date: r.date, amount: r.amount, note: r.note, category: r.category, account: r.account, beneficiary: r.beneficiary })) : void 0,
+    transactions_omitted: count > MAX_TX_LIST ? count : 0,
+    text_id: parts2.join(" ")
+  };
+}
+async function analyzeSpending(actor, input) {
+  const timezone = await getHouseholdTimezone(actor);
+  const period = input.from && input.to ? resolvePeriod("custom", timezone, input.from, input.to) : resolvePeriod(input.period ?? "this_month", timezone);
+  const today = todayInTz(timezone);
+  return withActor(actor, async (tx) => {
+    const filter = {};
+    let categoryId = null;
+    let categoryName = null;
+    if (input.category) {
+      categoryId = await resolveCategoryRef(tx, actor, { category: input.category }, "expense");
+      const [c] = await tx`select name from categories where id = ${categoryId}`;
+      categoryName = c?.name ?? input.category;
+      filter.category = categoryName;
+    }
+    const accountId = input.account ? await resolveAccountRef(tx, actor, { account: input.account }) : null;
+    if (input.account) filter.account = input.account;
+    const beneficiaryId = input.beneficiary ? await resolveBeneficiaryRef(tx, actor, { beneficiary: input.beneficiary }) ?? null : null;
+    if (input.beneficiary) filter.beneficiary = input.beneficiary;
+    const q = input.q?.trim() ? `%${normText(input.q)}%` : null;
+    if (q) filter.q = input.q;
+    const where = (from, to) => tx`
+      t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
+      and t.date between ${from} and ${to}
+      and c.system_key is distinct from 'transfer'
+      ${categoryId ? tx`and t.category_id = ${categoryId}` : tx``}
+      ${accountId ? tx`and t.account_id = ${accountId}` : tx``}
+      ${beneficiaryId ? tx`and t.beneficiary_id = ${beneficiaryId}` : tx``}
+      ${q ? tx`and norm_text(t.note) like ${q}` : tx``}
+    `;
+    const raw2 = await tx`
+      select t.id, t.date::text as date, t.amount::text as amount, coalesce(t.note, '') as note,
+             c.name as category, c.is_system as category_system,
+             a.name as account, am.display_name as account_owner,
+             coalesce(bm.display_name, b.name) as beneficiary, rm.display_name as recorded_by
+      from transactions t
+      join categories c on c.id = t.category_id
+      join accounts a on a.id = t.account_id
+      left join household_members am on am.id = a.owner_member_id
+      left join beneficiaries b on b.id = t.beneficiary_id
+      left join household_members bm on bm.id = b.member_id
+      join household_members rm on rm.id = t.recorded_by_member_id
+      where ${where(period.from, period.to)}
+      order by t.date, t.created_at
+    `;
+    const rows = raw2.map((r) => ({ ...r, amount: Number(r.amount) }));
+    let previous = null;
+    if (input.compare !== false) {
+      const effectiveTo = today < period.to && today >= period.from ? today : period.to;
+      const len = daysBetween(period.from, effectiveTo);
+      const isMonth = /^\d{4}-\d{2}-01$/.test(period.from);
+      let pFrom;
+      let pTo;
+      if (isMonth) {
+        const [y, m] = period.from.split("-").map(Number);
+        const py = m === 1 ? y - 1 : y;
+        const pm = m === 1 ? 12 : m - 1;
+        pFrom = `${py}-${String(pm).padStart(2, "0")}-01`;
+        pTo = addDays(pFrom, len - 1);
+        const pEnd = addDays(period.from, -1);
+        if (pTo > pEnd) pTo = pEnd;
+      } else {
+        pTo = addDays(period.from, -1);
+        pFrom = addDays(pTo, -(len - 1));
+      }
+      const [agg] = await tx`
+        select coalesce(sum(t.amount), 0)::text as total, count(*)::text as count
+        from transactions t join categories c on c.id = t.category_id
+        where ${where(pFrom, pTo)}
+      `;
+      previous = { from: pFrom, to: pTo, total: Number(agg.total), count: Number(agg.count) };
+    }
+    let budget = null;
+    const monthStart2 = period.from.slice(0, 8) + "01";
+    const singleMonth = period.from === monthStart2 && period.to.slice(0, 7) === period.from.slice(0, 7);
+    if (singleMonth && categoryId && !accountId && !beneficiaryId && !q) {
+      const [b2] = await tx`select amount::text from budgets where household_id = ${actor.householdId} and category_id = ${categoryId} and member_id is null and period_start = ${monthStart2} and deleted_at is null`;
+      if (b2) budget = { amount: Number(b2.amount), category: categoryName };
+    }
+    const result = buildInsights({ period, today, rows, previous, budget, filter });
+    const budgets = singleMonth && !categoryId && !accountId && !beneficiaryId && !q ? (await tx`
+          select c.name as category, b.amount::text,
+            coalesce((select sum(t.amount) from transactions t where t.household_id = b.household_id and t.type = 'expense'
+              and t.deleted_at is null and t.category_id = b.category_id and t.date between ${period.from} and ${period.to}), 0)::text as spent
+          from budgets b join categories c on c.id = b.category_id
+          where b.household_id = ${actor.householdId} and b.member_id is null and b.period_start = ${monthStart2} and b.deleted_at is null
+          order by c.sort_order`).map((r) => {
+      const amount = Number(r.amount);
+      const spent = Number(r.spent);
+      const projected = result.period.ongoing ? Math.round(spent / result.period.days_elapsed * result.period.days_in_period) : spent;
+      return { category: r.category, amount, spent, pct: amount ? Math.round(spent / amount * 1e3) / 10 : 0, projected_pct: amount ? Math.round(projected / amount * 1e3) / 10 : 0 };
+    }) : void 0;
+    return { ...result, budgets };
+  });
+}
+
 // src/tools/registry.ts
 function str(description, extra) {
   return { type: "string", description, ...extra };
@@ -17392,6 +17635,34 @@ var TOOLS = [
     }
   },
   {
+    name: "analyze_spending",
+    description: 'ANALISA pengeluaran dengan angka yang sudah dihitung server: total, rata-rata per hari, proyeksi akhir bulan, posisi budget (sisa jatah per hari), perbandingan dengan periode sebelumnya (hari yang sama), rincian per kategori/akun/pemilik akun/untuk siapa, item & tempat terbanyak, item berulang, hari paling boros, hari kerja vs akhir pekan, transaksi terbesar, dan daftar transaksinya (\u226480). Pakai untuk SEMUA pertanyaan analisa/evaluasi: "jajan bulan ini ke mana aja", "kenapa boros", "breakdown makanan", "pengeluaran anak", "bisa hemat di mana", "bandingin sama bulan lalu". JANGAN menjumlah sendiri dari search_transactions \u2014 semua angka di jawaban harus berasal dari respons tool ini. Boleh mengelompokkan `transactions` secara makna (mis. makan berat / camilan / minuman) tapi jumlahkan ulang dengan teliti hanya dari baris itu.',
+    parameters: {
+      type: "object",
+      properties: {
+        period: str("Periode, default this_month", { enum: ["this_month", "last_month", "this_week", "last_week", "today", "yesterday", "this_year"] }),
+        from: str("Awal periode kustom YYYY-MM-DD (bersama to)", { format: "date" }),
+        to: str("Akhir periode kustom YYYY-MM-DD", { format: "date" }),
+        category: str('Nama kategori dari list_categories, mis. "Makan Beli & Jajan"; kosong = semua pengeluaran'),
+        account: str("Nama akun, opsional"),
+        beneficiary: str('Untuk siapa, opsional (mis. "Anak")'),
+        q: str('Cari kata di catatan, opsional (mis. "bakso", "Indomaret")')
+      }
+    },
+    endpoint: { method: "GET", path: "/v1/insights/spending" },
+    scope: "read",
+    idempotent: true,
+    handler: async (actor, args) => analyzeSpending(actor, {
+      period: optStr(args.period),
+      from: optStr(args.from),
+      to: optStr(args.to),
+      category: optStr(args.category),
+      account: optStr(args.account),
+      beneficiary: optStr(args.beneficiary),
+      q: optStr(args.q)
+    })
+  },
+  {
     name: "compare_prices",
     description: 'Bandingkan harga satu produk antar toko dari riwayat STRUK keluarga sendiri (bukan harga internet), dihitung PER SATUAN (per 100 g / per 100 ml / per pcs) supaya beda ukuran kemasan adil. Pakai untuk "sabun lifebuoy paling murah di mana?", "minyak goreng lebih murah di Indomaret atau Alfamart?", "harga beras naik nggak?". Respons `products[]` urut dari yang paling banyak datanya; tiap produk punya `summary` siap kirim, `stores[]` urut termurah, dan `savings_pct`. Kosong = belum pernah tercatat dari struk mana pun \u2014 bilang jujur.',
     parameters: {
@@ -17719,8 +17990,8 @@ async function executeTool(actor, name, args) {
     const totalNilai = invs.reduce((a, i) => a + Number(i.current_value), 0);
     const rows = invs.map((i) => {
       const gain = Number(i.current_value) - Number(i.buy_price);
-      const pct = Number(i.buy_price) > 0 ? (gain / Number(i.buy_price) * 100).toFixed(1) : "0";
-      return `  ${i.name} (${i.type}): modal ${fmtRp3(i.buy_price)}, nilai ${fmtRp3(i.current_value)}, ${gain >= 0 ? "+" : ""}${fmtRp3(gain)} (${pct}%)`;
+      const pct2 = Number(i.buy_price) > 0 ? (gain / Number(i.buy_price) * 100).toFixed(1) : "0";
+      return `  ${i.name} (${i.type}): modal ${fmtRp3(i.buy_price)}, nilai ${fmtRp3(i.current_value)}, ${gain >= 0 ? "+" : ""}${fmtRp3(gain)} (${pct2}%)`;
     }).join("\n");
     return `Investasi (${invs.length} aset):
 Modal: ${fmtRp3(totalModal)} | Nilai: ${fmtRp3(totalNilai)}
@@ -19267,6 +19538,60 @@ var hermes_tools_default = [
     feature: "shopping_stock"
   },
   {
+    name: "analyze_spending",
+    description: 'ANALISA pengeluaran dengan angka yang sudah dihitung server: total, rata-rata per hari, proyeksi akhir bulan, posisi budget (sisa jatah per hari), perbandingan dengan periode sebelumnya (hari yang sama), rincian per kategori/akun/pemilik akun/untuk siapa, item & tempat terbanyak, item berulang, hari paling boros, hari kerja vs akhir pekan, transaksi terbesar, dan daftar transaksinya (\u226480). Pakai untuk SEMUA pertanyaan analisa/evaluasi: "jajan bulan ini ke mana aja", "kenapa boros", "breakdown makanan", "pengeluaran anak", "bisa hemat di mana", "bandingin sama bulan lalu". JANGAN menjumlah sendiri dari search_transactions \u2014 semua angka di jawaban harus berasal dari respons tool ini. Boleh mengelompokkan `transactions` secara makna (mis. makan berat / camilan / minuman) tapi jumlahkan ulang dengan teliti hanya dari baris itu.',
+    parameters: {
+      type: "object",
+      properties: {
+        period: {
+          type: "string",
+          description: "Periode, default this_month",
+          enum: [
+            "this_month",
+            "last_month",
+            "this_week",
+            "last_week",
+            "today",
+            "yesterday",
+            "this_year"
+          ]
+        },
+        from: {
+          type: "string",
+          description: "Awal periode kustom YYYY-MM-DD (bersama to)",
+          format: "date"
+        },
+        to: {
+          type: "string",
+          description: "Akhir periode kustom YYYY-MM-DD",
+          format: "date"
+        },
+        category: {
+          type: "string",
+          description: 'Nama kategori dari list_categories, mis. "Makan Beli & Jajan"; kosong = semua pengeluaran'
+        },
+        account: {
+          type: "string",
+          description: "Nama akun, opsional"
+        },
+        beneficiary: {
+          type: "string",
+          description: 'Untuk siapa, opsional (mis. "Anak")'
+        },
+        q: {
+          type: "string",
+          description: 'Cari kata di catatan, opsional (mis. "bakso", "Indomaret")'
+        }
+      }
+    },
+    endpoint: {
+      method: "GET",
+      path: "/v1/insights/spending"
+    },
+    scope: "read",
+    idempotent: true
+  },
+  {
     name: "compare_prices",
     description: 'Bandingkan harga satu produk antar toko dari riwayat STRUK keluarga sendiri (bukan harga internet), dihitung PER SATUAN (per 100 g / per 100 ml / per pcs) supaya beda ukuran kemasan adil. Pakai untuk "sabun lifebuoy paling murah di mana?", "minyak goreng lebih murah di Indomaret atau Alfamart?", "harga beras naik nggak?". Respons `products[]` urut dari yang paling banyak datanya; tiap produk punya `summary` siap kirim, `stores[]` urut termurah, dan `savings_pct`. Kosong = belum pernah tercatat dari struk mana pun \u2014 bilang jujur.',
     parameters: {
@@ -19783,6 +20108,35 @@ pricesApp.openapi(
   }
 );
 
+// src/routes/insights.ts
+var insightsApp = new OpenAPIHono();
+insightsApp.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/insights/spending",
+    tags: ["insights"],
+    summary: "Analisa pengeluaran (angka matang untuk agent)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      query: external_exports.object({
+        period: external_exports.string().optional().openapi({ description: "this_month (default), last_month, this_week, last_week, today, yesterday, this_year, YYYY-MM, YYYY" }),
+        from: DateStringSchema.optional(),
+        to: DateStringSchema.optional(),
+        category: external_exports.string().optional(),
+        account: external_exports.string().optional(),
+        beneficiary: external_exports.string().optional(),
+        q: external_exports.string().optional().openapi({ description: 'Cari di catatan, mis. "bakso"' }),
+        compare: external_exports.enum(["true", "false"]).optional()
+      })
+    },
+    responses: { 200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" } }
+  }),
+  async (c) => {
+    const q = c.req.valid("query");
+    return c.json(await analyzeSpending(c.get("actor"), { ...q, compare: q.compare !== "false" }), 200);
+  }
+);
+
 // src/middleware/audit.ts
 var REDACT_KEYS = /* @__PURE__ */ new Set(["api_key", "secret", "password", "new_password", "authorization", "api_key_pepper"]);
 function redact(value) {
@@ -19928,6 +20282,7 @@ function buildApp() {
   app2.route("/", pantryApp);
   app2.route("/", receiptsApp);
   app2.route("/", pricesApp);
+  app2.route("/", insightsApp);
   return app2;
 }
 
