@@ -79,7 +79,13 @@ export function useTransactions() {
     };
 
     const editTx = async (id, { type, amount, category, note, account, date, beneficiary }) => {
-        const body = { type, amount, category, note, account, date };
+        const body = {};
+        if (type !== undefined) body.type = type;
+        if (amount !== undefined) body.amount = amount;
+        if (category !== undefined) body.category = category;
+        if (note !== undefined) body.note = note;
+        if (account !== undefined) body.account = account;
+        if (date !== undefined) body.date = date;
         // `beneficiary` key HARUS tidak ada sama sekali di objek yang dioper kalau caller tidak
         // ikut mengirimnya (household belum aktifkan F-A) — beda dari string kosong ("" = user
         // sengaja pilih "Bersama" di form, yang justru WAJIB jadi beneficiary_id:null eksplisit

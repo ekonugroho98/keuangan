@@ -1,7 +1,36 @@
 import { useState, useMemo } from "react";
+import { parseReceiptNote } from "@karaya/shared/format";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import ScopeSwitcher from "../../household/ScopeSwitcher";
+import PrediksiView from "./PrediksiView";
+
+const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+const KIND_RULES = [
+    { kind: "Minuman & es", icon: "🧋", color: "#4FC3F7", re: /\bes\b|\bjus\b|\bteh\b|kopi|le ?minerale|aqua|air mineral|\bsusu\b|boba|thai tea|minum|milk|yakult|matcha|latte|americano/i },
+    { kind: "Camilan", icon: "🥟", color: "#D9A74A", re: /gorengan|risol|takoyaki|takayaki|siomay|batagor|opak|sempol|cilok|cireng|cimol|kerupuk|\bkue\b|roti|martabak|dimsum|dim sum|cakwe|pempek|snack|keripik|cemilan|camilan|donat|pisang|tahubulat|tahu bulat/i },
+];
+
+function normKey(s) {
+    return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function splitItem(note) {
+    const parsed = parseReceiptNote(note || "");
+    let item = (parsed.name || "").replace(/\s*\(titipan [^)]*\)\s*$/i, "").trim();
+    let place = parsed.merchant ?? null;
+    const paren = item.match(/^(.*\S)\s*\(([^)]+)\)$/);
+    if (paren && !place) {
+        item = paren[1].trim();
+        place = paren[2].trim();
+    }
+    return { item: item || "(tanpa keterangan)", place };
+}
+
+function kindOf(item) {
+    const found = KIND_RULES.find((r) => r.re.test(item));
+    return found ? found.kind : "Makan berat";
+}
 
 /**
  * Filter transaksi berdasarkan scope (Household/per-anggota/per-akun, F5-T5) SEBELUM filter
@@ -62,8 +91,8 @@ const MONTHS_LOCALIZED = {
 
 /* Kategori palette */
 const CAT_COLORS = [
-    "#60fcc6", "#4FC3F7", "#f59e0b", "#ff716c",
-    "#ec4899", "#a855f7", "#14b8a6", "#f97316",
+    "#839B7A", "#C87D55", "#D9A74A", "#ff716c",
+    "#4FC3F7", "#a855f7", "#14b8a6", "#f97316",
     "#6366f1", "#22c55e",
 ];
 
@@ -114,7 +143,7 @@ const PeriodChips = ({ value, onChange }) => {
                         fontFamily: "inherit", fontSize: 12, fontWeight: 700, transition: "all .18s",
                         background: value === opt.v ? "var(--color-primary-soft)" : "transparent",
                         color: value === opt.v ? "var(--color-primary)" : "var(--color-muted)",
-                        boxShadow: value === opt.v ? "inset 0 0 0 1px rgba(96,252,198,.25)" : "none",
+                        boxShadow: value === opt.v ? "inset 0 0 0 1px rgba(131,155,122,.25)" : "none",
                         minHeight: 34,
                         letterSpacing: "-.01em",
                     }}>
@@ -192,7 +221,7 @@ const SavingRing = ({ rate }) => {
                     strokeWidth="9"
                     strokeDasharray={`${dash} ${C}`}
                     strokeLinecap="round"
-                    style={{ transition: "stroke-dasharray 1s ease", filter: "drop-shadow(0 0 12px rgba(96,252,198,.45))" }}
+                    style={{ transition: "stroke-dasharray 1s ease", filter: "drop-shadow(0 0 12px rgba(131,155,122,.45))" }}
                 />
             </svg>
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
@@ -342,10 +371,10 @@ const Heatmap = ({ dailyExpense, daysInMonth, maxDaily, firstDayOfWeek, periodLa
     };
     const colorFor = (intensity) => {
         if (intensity === 0) return "var(--bg-sunk)";
-        if (intensity === 1) return "rgba(96,252,198,.25)";
-        if (intensity === 2) return "rgba(96,252,198,.5)";
-        if (intensity === 3) return "rgba(245,158,11,.55)";
-        return "rgba(255,113,108,.65)";
+        if (intensity === 1) return "rgba(131,155,122,.28)";
+        if (intensity === 2) return "rgba(131,155,122,.58)";
+        if (intensity === 3) return "rgba(217,167,74,.58)";
+        return "rgba(229,115,104,.68)";
     };
 
     const dayLabels = ["M", "S", "S", "R", "K", "J", "S"];
@@ -405,12 +434,14 @@ const Heatmap = ({ dailyExpense, daysInMonth, maxDaily, firstDayOfWeek, periodLa
 /* ═══════════════════════════════════════════════════════════════
  * MAIN COMPONENT
  * ═══════════════════════════════════════════════════════════════ */
-const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
+const LaporanView = ({ transactions: allTransactions = [], accounts = [], budgets = [], personalBudgets = [] }) => {
     const { t, lang } = useLanguage();
     const MONTHS = MONTHS_LOCALIZED[lang] || MONTHS_LOCALIZED.id;
 
     const now = new Date();
     const [scope, setScope] = useState({ scope: "household" });
+    const [activeTab, setActiveTab] = useState("ringkasan");
+    const [itemRankMode, setItemRankMode] = useState("repeated");
     const transactions = useMemo(() => scopeFilterTx(allTransactions, accounts, scope), [allTransactions, accounts, scope]);
     const [quickPeriod, setQuickPeriod] = useState("thisMonth");
     const [customYear, setCustomYear] = useState(String(now.getFullYear()));
@@ -464,15 +495,40 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
         });
     }, [transactions, filterYear, filterMonth]);
 
-    const income = filtered.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
-    const expense = filtered.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
-    const transfer = filtered.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
-    const net = income - expense;
-    const savingRate = income > 0 ? Math.round((1 - expense / income) * 100) : 0;
+    const isScoped = scope && scope.scope !== "household";
+    const scopedAccountNames = useMemo(() => {
+        if (!isScoped) return new Set();
+        if (scope.scope === "account") return new Set([scope.account]);
+        if (scope.scope === "member") {
+            return new Set((accounts || []).filter((a) => a.owner?.display_name === scope.member).map((a) => a.name));
+        }
+        return new Set();
+    }, [accounts, scope, isScoped]);
 
-    const prevIncome = prevPeriodTxs.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
-    const prevExpense = prevPeriodTxs.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
-    const prevNet = prevIncome - prevExpense;
+    const isScopeTransferIn = (tx) =>
+        isScoped && tx.type === "transfer" && scopedAccountNames.has(tx.to_account_name) && !scopedAccountNames.has(tx.account_name);
+    const isScopeTransferOut = (tx) =>
+        isScoped && tx.type === "transfer" && scopedAccountNames.has(tx.account_name) && !scopedAccountNames.has(tx.to_account_name);
+    const isScopeIncome = (tx) =>
+        (tx.type === "income" && tx.category !== "Piutang" && (!isScoped || scopedAccountNames.has(tx.account_name))) || isScopeTransferIn(tx);
+    const isScopePiutangOffset = (tx) =>
+        tx.type === "income" && tx.category === "Piutang" && (!isScoped || scopedAccountNames.has(tx.account_name));
+    const isScopeExpense = (tx) =>
+        tx.type === "expense" && (!isScoped || scopedAccountNames.has(tx.account_name));
+
+    const income = filtered.filter(isScopeIncome).reduce((a, tx) => a + tx.amount, 0);
+    const piutangOffset = filtered.filter(isScopePiutangOffset).reduce((a, tx) => a + tx.amount, 0);
+    const expense = Math.max(0, filtered.filter(isScopeExpense).reduce((a, tx) => a + tx.amount, 0) - piutangOffset);
+    const transferOut = filtered.filter(isScopeTransferOut).reduce((a, tx) => a + tx.amount, 0);
+    const transfer = filtered.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
+    const net = income - expense - transferOut;
+    const savingRate = income > 0 ? Math.max(0, Math.round((net / income) * 100)) : 0;
+
+    const prevIncome = prevPeriodTxs.filter(isScopeIncome).reduce((a, tx) => a + tx.amount, 0);
+    const prevPiutangOffset = prevPeriodTxs.filter(isScopePiutangOffset).reduce((a, tx) => a + tx.amount, 0);
+    const prevExpense = Math.max(0, prevPeriodTxs.filter(isScopeExpense).reduce((a, tx) => a + tx.amount, 0) - prevPiutangOffset);
+    const prevTransferOut = prevPeriodTxs.filter(isScopeTransferOut).reduce((a, tx) => a + tx.amount, 0);
+    const prevNet = prevIncome - prevExpense - prevTransferOut;
 
     const pctDelta = (cur, prev) => {
         if (!prev) return null;
@@ -486,6 +542,13 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
     const daysInMonth = filterYear && filterMonth
         ? new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
         : 30;
+    const isCurrentMonth = filterYear === String(now.getFullYear()) && filterMonth === String(now.getMonth() + 1).padStart(2, "0");
+    const currentDay = now.getDate();
+    const remainingDays = isCurrentMonth ? Math.max(1, daysInMonth - currentDay + 1) : 0;
+    const isOngoingMonth = isCurrentMonth && remainingDays > 1;
+    const safeDailyAllowance = isOngoingMonth && net > 0 ? Math.floor(net / remainingDays) : 0;
+    const spentPct = income > 0 ? Math.min(100, Math.round(((expense + transferOut) / income) * 100)) : 0;
+
     const firstDayOfWeek = filterYear && filterMonth
         ? new Date(parseInt(filterYear), parseInt(filterMonth) - 1, 1).getDay()
         : 0;
@@ -507,7 +570,10 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
     filtered.filter(tx => tx.type === "expense").forEach(tx => {
         catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
     });
-    const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+    filtered.filter(isScopePiutangOffset).forEach(tx => {
+        catTotals.Piutang = Math.max(0, (catTotals.Piutang || 0) - tx.amount);
+    });
+    const sortedCats = Object.entries(catTotals).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
 
     const monthLabel = filterMonth ? MONTHS.find(m => m.v === filterMonth)?.l : "";
     const periodLabel = monthLabel && filterYear ? `${monthLabel} ${filterYear}` : filterYear || "Sepanjang masa";
@@ -516,6 +582,148 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
     const activityRate = daysInMonth > 0 ? Math.round((activeDaysCount / daysInMonth) * 100) : 0;
 
     const showHeatmap = !!filterMonth && daysInMonth > 0;
+
+    /* ═══ KEBIASAAN & POLA BELANJA (mirrors apps/api/src/services/insights.ts) ═══ */
+    const habitStats = useMemo(() => {
+        const expRows = filtered.filter(isScopeExpense);
+        const totalExp = expRows.reduce((s, r) => s + r.amount, 0);
+        const countExp = expRows.length;
+        const avgTx = countExp > 0 ? Math.round(totalExp / countExp) : 0;
+
+        // Owner lookup from accounts
+        const ownerByAcc = new Map();
+        (accounts || []).forEach(a => {
+            ownerByAcc.set(a.name, a.owner?.display_name || "Bersama");
+        });
+
+        // Weekday & WeekSplit (Mon-Fri vs Sat-Sun)
+        const byWeekdayRaw = WEEKDAYS_ID.map((name, idx) => {
+            const rs = expRows.filter(r => r.date && new Date(`${r.date}T00:00:00Z`).getUTCDay() === idx);
+            const activeD = new Set(rs.map(r => r.date)).size;
+            const tot = rs.reduce((s, r) => s + r.amount, 0);
+            return { idx, weekday: name, total: tot, count: rs.length, activeDays: activeD, avgActive: activeD ? Math.round(tot / activeD) : 0 };
+        });
+        // Order Monday (1) -> Sunday (0)
+        const byWeekday = [1, 2, 3, 4, 5, 6, 0].map(i => byWeekdayRaw[i]);
+        const maxWeekdayTotal = Math.max(...byWeekday.map(d => d.total), 1);
+        const peakWeekday = [...byWeekday].sort((a, b) => b.total - a.total)[0] || null;
+
+        const weekendRows = expRows.filter(r => {
+            if (!r.date) return false;
+            const d = new Date(`${r.date}T00:00:00Z`).getUTCDay();
+            return d === 0 || d === 6;
+        });
+        const weekendTotal = weekendRows.reduce((s, r) => s + r.amount, 0);
+        const weekdayTotal = totalExp - weekendTotal;
+        const allDates = new Set(expRows.map(r => r.date).filter(Boolean));
+        const weekendActiveDays = [...allDates].filter(d => [0, 6].includes(new Date(`${d}T00:00:00Z`).getUTCDay())).length;
+        const weekdayActiveDays = allDates.size - weekendActiveDays;
+        const weekdayAvgActive = weekdayActiveDays > 0 ? Math.round(weekdayTotal / weekdayActiveDays) : 0;
+        const weekendAvgActive = weekendActiveDays > 0 ? Math.round(weekendTotal / weekendActiveDays) : 0;
+
+        // Items & Places (Merchants)
+        const itemsMap = new Map();
+        const placesMap = new Map();
+        for (const r of expRows) {
+            const { item, place } = splitItem(r.note || r.category || "");
+            const k = `${normKey(item)}|${place ? normKey(place) : ""}`;
+            const g = itemsMap.get(k) || { item, total: 0, count: 0, places: new Set(), category: r.category };
+            g.total += r.amount;
+            g.count += 1;
+            if (place) g.places.add(place);
+            itemsMap.set(k, g);
+
+            if (place) {
+                const pk = normKey(place);
+                const p = placesMap.get(pk) || { place, total: 0, count: 0 };
+                p.total += r.amount;
+                p.count += 1;
+                placesMap.set(pk, p);
+            }
+        }
+        const allParsedItems = [...itemsMap.values()].map(g => ({
+            item: g.item,
+            place: [...g.places][0] || null,
+            label: g.places.size ? `${g.item} (${[...g.places][0]})` : g.item,
+            category: g.category,
+            total: g.total,
+            count: g.count,
+            avg: Math.round(g.total / g.count),
+        }));
+        const topItems = [...allParsedItems].sort((a, b) => b.total - a.total || b.count - a.count).slice(0, 8);
+        const repeatedItems = [...allParsedItems]
+            .filter(i => i.count > 1 && i.item !== "(tanpa keterangan)")
+            .sort((a, b) => b.count - a.count || b.total - a.total)
+            .slice(0, 8);
+        const topPlaces = [...placesMap.values()].sort((a, b) => b.total - a.total || b.count - a.count).slice(0, 6);
+
+        // Culinary & Jajan Breakdown (Makan berat vs Camilan vs Minuman & es)
+        const foodRows = expRows.filter(r =>
+            /makan|jajan|kuliner|minum|kopi|warung|restoran|dapur|cemilan|camilan|snack/i.test(r.category || "") ||
+            KIND_RULES.some(rule => rule.re.test(r.note || ""))
+        );
+        const foodTotal = foodRows.reduce((s, r) => s + r.amount, 0);
+        const byKind = [
+            { kind: "Makan berat", icon: "🍛", color: "#839B7A" },
+            { kind: "Camilan", icon: "🥟", color: "#D9A74A" },
+            { kind: "Minuman & es", icon: "🧋", color: "#4FC3F7" },
+        ].map(meta => {
+            const rs = foodRows.filter(r => kindOf(splitItem(r.note || r.category || "").item) === meta.kind);
+            const tot = rs.reduce((s, r) => s + r.amount, 0);
+            const sampleMap = new Map();
+            rs.forEach(r => {
+                const nm = splitItem(r.note || r.category || "").item;
+                if (nm && nm !== "(tanpa keterangan)") {
+                    sampleMap.set(nm, (sampleMap.get(nm) || 0) + r.amount);
+                }
+            });
+            const topSamples = [...sampleMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([nm]) => nm);
+            return {
+                ...meta,
+                total: tot,
+                count: rs.length,
+                pct: foodTotal > 0 ? Math.round((tot / foodTotal) * 100) : 0,
+                samples: topSamples,
+            };
+        });
+
+        // By Account Owner & By Beneficiary ("Untuk siapa")
+        const ownerMap = new Map();
+        const benMap = new Map();
+        expRows.forEach(r => {
+            const owner = ownerByAcc.get(r.account_name) || "Bersama";
+            const og = ownerMap.get(owner) || { label: owner, total: 0, count: 0 };
+            og.total += r.amount;
+            og.count += 1;
+            ownerMap.set(owner, og);
+
+            const ben = r.beneficiary || null;
+            if (ben) {
+                const bg = benMap.get(ben) || { label: ben, total: 0, count: 0 };
+                bg.total += r.amount;
+                bg.count += 1;
+                benMap.set(ben, bg);
+            }
+        });
+        const byOwner = [...ownerMap.values()].sort((a, b) => b.total - a.total).map(g => ({
+            ...g,
+            pct: totalExp > 0 ? Math.round((g.total / totalExp) * 100) : 0,
+        }));
+        const byBeneficiary = [...benMap.values()].sort((a, b) => b.total - a.total).map(g => ({
+            ...g,
+            pct: totalExp > 0 ? Math.round((g.total / totalExp) * 100) : 0,
+        }));
+
+        return {
+            totalExp, countExp, avgTx,
+            byWeekday, maxWeekdayTotal, peakWeekday,
+            weekdayTotal, weekendTotal, weekdayActiveDays, weekendActiveDays, weekdayAvgActive, weekendAvgActive,
+            weekdayCount: countExp - weekendRows.length, weekendCount: weekendRows.length,
+            topItems, repeatedItems, topPlaces,
+            foodTotal, foodCount: foodRows.length, byKind,
+            byOwner, byBeneficiary,
+        };
+    }, [filtered, accounts, isScoped, scopedAccountNames]);
 
     return (
         <>
@@ -533,16 +741,17 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                 .lap-heatmap  { grid-column: span 4; }
                 .lap-breakdown{ grid-column: span 7; }
                 .lap-toplist  { grid-column: span 5; }
+                .lap-half     { grid-column: span 6; }
 
                 @media (max-width: 1100px) {
                     .lap-hero, .lap-saving { grid-column: span 12; grid-row: auto; }
                     .lap-daily, .lap-heatmap { grid-column: span 12; }
-                    .lap-breakdown, .lap-toplist { grid-column: span 12; }
+                    .lap-breakdown, .lap-toplist, .lap-half { grid-column: span 12; }
                 }
                 @media (max-width: 720px) {
                     .lap-grid { grid-template-columns: repeat(6, 1fr); gap: 10px; }
                     .lap-hero, .lap-saving, .lap-stats, .lap-daily,
-                    .lap-heatmap, .lap-breakdown, .lap-toplist {
+                    .lap-heatmap, .lap-breakdown, .lap-toplist, .lap-half {
                         grid-column: span 6 !important;
                         grid-row: auto !important;
                     }
@@ -555,57 +764,115 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                 </div>
 
                 {/* ═══ HEADER ═══ */}
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 18 }}>
                     <div>
-                        <div style={{ ...eyebrow, marginBottom: 8 }}>ANALITIK</div>
+                        <div style={{ ...eyebrow, marginBottom: 8 }}>EVALUASI & ANALITIK KELUARGA</div>
                         <h1 style={{ fontSize: "clamp(24px, 3.2vw, 34px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", margin: 0 }}>{t("rep.title")}</h1>
                         <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                             <span className="chip chip-mint" style={{ fontSize: 11, padding: "4px 12px" }}>
                                 <span style={{ width: 6, height: 6, borderRadius: 99, background: "currentColor", animation: "glow-pulse 2s infinite" }} />
-                                {periodLabel}
+                                {activeTab === "proyeksi" ? "Proyeksi Bulan Berjalan" : periodLabel}
                             </span>
                             <span>·</span>
-                            <span>{filtered.length} transaksi</span>
+                            <span>{activeTab === "proyeksi" ? "Berdasarkan tren 3 bulan terakhir" : `${filtered.length} transaksi`}</span>
                         </p>
                     </div>
 
-                    {/* Period chips + custom selector */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                        <PeriodChips value={useCustom ? "" : quickPeriod} onChange={v => { setUseCustom(false); setQuickPeriod(v); }} />
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            <button onClick={() => setUseCustom(v => !v)}
-                                className={useCustom ? "chip chip-mint" : "chip chip-ghost"}
-                                style={{ fontSize: 11, padding: "6px 12px", cursor: "pointer", border: "none", fontFamily: "inherit" }}>
-                                {useCustom ? "✓ " : ""}Custom
-                            </button>
-                            {useCustom && (
-                                <>
-                                    <select value={customYear} onChange={e => setCustomYear(e.target.value)} style={{
-                                        padding: "6px 10px", borderRadius: 8, minHeight: 32,
-                                        background: "var(--glass-1)",
-                                        backdropFilter: "var(--glass-blur-sm)",
-                                        border: "1px solid var(--glass-border)",
-                                        color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
-                                    }}>
-                                        {years.map(y => <option key={y} value={y}>{y}</option>)}
-                                    </select>
-                                    <select value={customMonth} onChange={e => setCustomMonth(e.target.value)} style={{
-                                        padding: "6px 10px", borderRadius: 8, minHeight: 32,
-                                        background: "var(--glass-1)",
-                                        backdropFilter: "var(--glass-blur-sm)",
-                                        border: "1px solid var(--glass-border)",
-                                        color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
-                                    }}>
-                                        <option value="">Setahun</option>
-                                        {MONTHS.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                                    </select>
-                                </>
-                            )}
+                    {/* Period chips + custom selector (shown for Ringkasan & Kebiasaan tabs) */}
+                    {activeTab !== "proyeksi" && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                            <PeriodChips value={useCustom ? "" : quickPeriod} onChange={v => { setUseCustom(false); setQuickPeriod(v); }} />
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                <button onClick={() => setUseCustom(v => !v)}
+                                    className={useCustom ? "chip chip-mint" : "chip chip-ghost"}
+                                    style={{ fontSize: 11, padding: "6px 12px", cursor: "pointer", border: "none", fontFamily: "inherit" }}>
+                                    {useCustom ? "✓ " : ""}Custom
+                                </button>
+                                {useCustom && (
+                                    <>
+                                        <select value={customYear} onChange={e => setCustomYear(e.target.value)} style={{
+                                            padding: "6px 10px", borderRadius: 8, minHeight: 32,
+                                            background: "var(--glass-1)",
+                                            backdropFilter: "var(--glass-blur-sm)",
+                                            border: "1px solid var(--glass-border)",
+                                            color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+                                        }}>
+                                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+                                        </select>
+                                        <select value={customMonth} onChange={e => setCustomMonth(e.target.value)} style={{
+                                            padding: "6px 10px", borderRadius: 8, minHeight: 32,
+                                            background: "var(--glass-1)",
+                                            backdropFilter: "var(--glass-blur-sm)",
+                                            border: "1px solid var(--glass-border)",
+                                            color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+                                        }}>
+                                            <option value="">Setahun</option>
+                                            {MONTHS.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                                        </select>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
-                {/* ═══ BENTO GRID ═══ */}
+                {/* ═══ 3 SUB-TABS (OPSI A: RINGKASAN · KEBIASAAN · PROYEKSI) ═══ */}
+                <div style={{
+                    display: "flex", gap: 6, padding: 5, borderRadius: 14,
+                    background: "var(--glass-1)",
+                    border: "1px solid var(--glass-border)",
+                    marginBottom: 22,
+                    overflowX: "auto",
+                }}>
+                    {[
+                        { id: "ringkasan", icon: "📊", label: "Ringkasan & Tren", sub: "Arus kas, sisa kas & kalender" },
+                        { id: "kebiasaan", icon: "🔍", label: "Kebiasaan & Pola Belanja", sub: "Kuliner, item berulang & toko" },
+                        { id: "proyeksi", icon: "🧭", label: "Proyeksi Akhir Bulan", sub: "Tagihan rutin vs rem harian" },
+                    ].map(tab => {
+                        const active = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                style={{
+                                    flex: "1 1 200px",
+                                    display: "flex", alignItems: "center", gap: 12,
+                                    padding: "11px 16px",
+                                    borderRadius: 10,
+                                    border: active ? "1px solid rgba(131,155,122,.32)" : "1px solid transparent",
+                                    background: active ? "var(--color-primary-soft)" : "transparent",
+                                    color: active ? "var(--color-text)" : "var(--color-muted)",
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                    textAlign: "left",
+                                    transition: "all .18s",
+                                }}
+                            >
+                                <span style={{
+                                    width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                                    background: active ? "rgba(131,155,122,.22)" : "rgba(255,255,255,.04)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 16,
+                                }}>{tab.icon}</span>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{
+                                        fontSize: 13, fontWeight: 800,
+                                        color: active ? "var(--color-primary)" : "var(--color-text)",
+                                        letterSpacing: "-.01em",
+                                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                    }}>{tab.label}</div>
+                                    <div style={{
+                                        fontSize: 11, color: "var(--color-subtle)", marginTop: 2,
+                                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                    }}>{tab.sub}</div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* ═══ TAB 1: RINGKASAN & TREN ═══ */}
+                {activeTab === "ringkasan" && (
                 <div className="lap-grid">
 
                     {/* HERO KPI row */}
@@ -616,7 +883,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                         borderRadius: 24,
                     }}>
                         {/* Ambient orb */}
-                        <div style={{ position: "absolute", top: -100, right: -60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,252,198,.14), transparent 70%)", pointerEvents: "none", filter: "blur(8px)" }} />
+                        <div style={{ position: "absolute", top: -100, right: -60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.14), transparent 70%)", pointerEvents: "none", filter: "blur(8px)" }} />
                         <div style={{ position: "relative" }}>
                             <div style={{ ...eyebrow, marginBottom: 18 }}>RINGKASAN KEUANGAN</div>
                             <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
@@ -639,7 +906,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                                 />
                                 <div style={{ width: 1, background: "var(--glass-border)", alignSelf: "stretch" }} />
                                 <KpiCard
-                                    label="Net Balance"
+                                    label={isOngoingMonth ? "Sisa Kas Bulan Ini" : "Saldo Bersih"}
                                     value={`${net >= 0 ? "+" : "−"}${fmtRp(Math.abs(net))}`}
                                     delta={netDelta !== null ? `${netDelta >= 0 ? "+" : ""}${netDelta}%` : null}
                                     deltaGood={netDelta !== null && netDelta >= 0}
@@ -658,10 +925,10 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                         </div>
                     </div>
 
-                    {/* Saving rate ring */}
+                    {/* Saving rate / Sisa Kas ring */}
                     <div className="lap-saving" style={{
                         ...glassCard,
-                        background: "linear-gradient(145deg, var(--color-primary-soft), rgba(25,206,155,.02))",
+                        background: "linear-gradient(145deg, var(--color-primary-soft), rgba(70,99,78,.03))",
                         border: "1px solid var(--color-primary-soft)",
                         borderRadius: 24,
                         padding: "28px 24px",
@@ -669,25 +936,39 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                     }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                             <div>
-                                <div style={eyebrow}>Saving Rate</div>
+                                <div style={eyebrow}>{isOngoingMonth ? "Sisa Kas vs Pemasukan" : "Saving Rate"}</div>
                                 <h3 style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)", marginTop: 6, letterSpacing: "-.02em" }}>{periodLabel}</h3>
                             </div>
-                            <span className={savingRate >= 20 ? "chip chip-mint" : savingRate >= 10 ? "chip chip-amber" : "chip chip-red"}>
-                                {savingRate >= 20 ? "Mantap 👍" : savingRate >= 10 ? "Cukup" : "Tingkatkan"}
+                            <span className={isOngoingMonth ? (net >= 0 ? "chip chip-mint" : "chip chip-red") : (savingRate >= 20 ? "chip chip-mint" : savingRate >= 10 ? "chip chip-amber" : "chip chip-red")}>
+                                {isOngoingMonth
+                                    ? (net >= 0 ? `⏳ Sisa ${remainingDays} hr` : "Overbudget ⚠️")
+                                    : (savingRate >= 20 ? "Mantap 👍" : savingRate >= 10 ? "Cukup" : "Tingkatkan")}
                             </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 16 }}>
                             <SavingRing rate={savingRate} />
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 6, fontWeight: 600 }}>Target ideal: <strong style={{ color: "var(--color-primary)" }}>20%+</strong></div>
+                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 6, fontWeight: 600 }}>
+                                    {isOngoingMonth ? (
+                                        <>Terpakai: <strong style={{ color: "var(--color-text)" }}>{spentPct}%</strong> dari pemasukan</>
+                                    ) : (
+                                        <>Target ideal: <strong style={{ color: "var(--color-primary)" }}>20%+</strong></>
+                                    )}
+                                </div>
                                 <div style={{ fontSize: 11, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                                    {savingRate >= 20
-                                        ? "Kamu sudah di zona aman. Coba naikkan ke 30% untuk financial freedom lebih cepat."
-                                        : savingRate >= 10
-                                            ? "Masih bisa dioptimalkan. Cek kategori pengeluaran terbesar untuk prioritas hemat."
+                                    {isOngoingMonth
+                                        ? (net > 0
+                                            ? `Kas tersisa untuk ${remainingDays} hari ke depan. Jatah harian aman: ~${fmtRp(safeDailyAllowance)}/hari.`
                                             : income > 0
-                                                ? "Pengeluaran hampir sama dengan pemasukan. Fokus kurangi expense bulan depan."
-                                                : "Belum ada pemasukan di periode ini."}
+                                                ? "Pengeluaran sudah melewati pemasukan bulan ini. Rem pengeluaran non-prioritas."
+                                                : "Belum ada pemasukan tercatat di bulan ini.")
+                                        : (savingRate >= 20
+                                            ? "Kamu sudah di zona aman. Pertahankan rasio tabungan keluarga."
+                                            : savingRate >= 10
+                                                ? "Masih bisa dioptimalkan. Cek kategori pengeluaran terbesar untuk prioritas hemat."
+                                                : income > 0
+                                                    ? "Pengeluaran hampir sama dengan pemasukan. Fokus kurangi pengeluaran bulan depan."
+                                                    : "Belum ada pemasukan di periode ini.")}
                                 </div>
                             </div>
                         </div>
@@ -768,11 +1049,11 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                                                 ? "var(--color-border-soft)"
                                                 : isHigh ? "linear-gradient(to top,#e04f4f,#ff716c)"
                                                     : isMed ? "linear-gradient(to top,#d97706,#f59e0b)"
-                                                        : "linear-gradient(to top,#19ce9b,#60fcc6)";
+                                                        : "linear-gradient(to top,var(--color-primary-deep),var(--color-primary))";
                                             return (
                                                 <div key={day}
                                                     title={val > 0 ? `${day} ${periodLabel}: ${fmtRp(val)}` : `${day}: tidak ada pengeluaran`}
-                                                    style={{ flex: 1, minWidth: 4, height: val === 0 ? 2 : `${hPct}%`, borderRadius: "3px 3px 0 0", background: bg, opacity: val === 0 ? 0.25 : 1, transition: "height .5s ease", cursor: "default", alignSelf: "flex-end", boxShadow: val > 0 ? "0 0 8px rgba(96,252,198,.15)" : "none" }}
+                                                    style={{ flex: 1, minWidth: 4, height: val === 0 ? 2 : `${hPct}%`, borderRadius: "3px 3px 0 0", background: bg, opacity: val === 0 ? 0.25 : 1, transition: "height .5s ease", cursor: "default", alignSelf: "flex-end", boxShadow: val > 0 ? "0 0 8px var(--color-primary-soft)" : "none" }}
                                                 />
                                             );
                                         })}
@@ -785,7 +1066,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                                 </div>
                                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", paddingTop: 10, borderTop: "1px solid var(--color-border-soft)" }}>
                                     {[
-                                        { bg: "linear-gradient(to top,#19ce9b,#60fcc6)", l: "Normal" },
+                                        { bg: "linear-gradient(to top,var(--color-primary-deep),var(--color-primary))", l: "Normal" },
                                         { bg: "linear-gradient(to top,#d97706,#f59e0b)", l: "> 40% maks" },
                                         { bg: "linear-gradient(to top,#e04f4f,#ff716c)", l: "> 70% maks" },
                                     ].map(item => (
@@ -910,7 +1191,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                                                 display: "flex", alignItems: "center", justifyContent: "center",
                                                 fontSize: 13, fontWeight: 900,
                                                 color: i === 0 ? "var(--color-on-primary)" : c,
-                                                boxShadow: i === 0 ? "0 4px 10px rgba(96,252,198,.28), inset 0 1px 0 rgba(255,255,255,.25)" : "none",
+                                                boxShadow: i === 0 ? "0 4px 10px rgba(131,155,122,.28), inset 0 1px 0 rgba(255,255,255,.25)" : "none",
                                             }}>
                                                 {i === 0 ? "★" : `#${i + 1}`}
                                             </div>
@@ -926,6 +1207,379 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [] }) => {
                         )}
                     </div>
                 </div>
+                )}
+
+                {/* ═══ TAB 2: KEBIASAAN & POLA BELANJA ═══ */}
+                {activeTab === "kebiasaan" && (
+                    <div className="lap-grid" style={{ animation: "fadeIn .3s" }}>
+                        {/* Auto-Narrative Insight Banner */}
+                        <div className="lap-stats" style={{
+                            ...glassCard,
+                            background: "linear-gradient(135deg, rgba(131,155,122,.10) 0%, rgba(200,125,85,.06) 100%)",
+                            border: "1px solid rgba(131,155,122,.22)",
+                            padding: "22px 26px",
+                            borderRadius: 22,
+                        }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
+                                <div style={{
+                                    width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+                                    background: "rgba(131,155,122,.18)",
+                                    border: "1px solid rgba(131,155,122,.28)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 20,
+                                }}>🔍</div>
+                                <div style={{ flex: 1, minWidth: 220 }}>
+                                    <div style={{ ...eyebrow, color: "var(--color-primary)", marginBottom: 6 }}>RINGKASAN KEBIASAAN BELANJA · {periodLabel}</div>
+                                    {habitStats.countExp === 0 ? (
+                                        <div style={{ fontSize: 13, color: "var(--color-muted)" }}>
+                                            Belum ada catatan pengeluaran di periode <strong>{periodLabel}</strong>. Catat struk atau pengeluaran harian supaya pola belanja keluarga terbaca otomatis.
+                                        </div>
+                                    ) : (
+                                        <div style={{ fontSize: 13, color: "var(--color-text)", lineHeight: 1.65 }}>
+                                            Sepanjang <strong>{periodLabel}</strong>, tercatat <strong>{habitStats.countExp}x pengeluaran</strong> senilai total{" "}
+                                            <strong className="mono num-tight" style={{ color: "var(--color-primary)" }}>{fmtRp(habitStats.totalExp)}</strong>{" "}
+                                            (rata-rata <strong className="mono num-tight">{fmtRp(habitStats.avgTx)}</strong>/transaksi).
+                                            {habitStats.peakWeekday && habitStats.peakWeekday.total > 0 && (
+                                                <> Hari dengan pengeluaran tertinggi jatuh pada hari <strong>{habitStats.peakWeekday.weekday}</strong> (<span className="mono num-tight">{fmtRp(habitStats.peakWeekday.total)}</span>).</>
+                                            )}
+                                            {habitStats.repeatedItems.length > 0 && (
+                                                <> Item yang paling sering dibeli berulang adalah <strong>{habitStats.repeatedItems[0].label}</strong> ({habitStats.repeatedItems[0].count}x · <span className="mono num-tight">{fmtRp(habitStats.repeatedItems[0].total)}</span>).</>
+                                            )}
+                                            {habitStats.topPlaces.length > 0 && (
+                                                <> Tempat/toko langganan teratas: <strong>{habitStats.topPlaces[0].place}</strong> ({habitStats.topPlaces[0].count}x kunjungan).</>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Card 1: Pola Hari Kerja vs Akhir Pekan + Grafik 7 Hari */}
+                        <div className="lap-breakdown" style={{ ...glassCard, padding: "22px 24px", borderRadius: 20 }}>
+                            <div style={{ marginBottom: 16 }}>
+                                <div style={eyebrow}>RITME MINGGUAN</div>
+                                <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", margin: "6px 0 0", letterSpacing: "-.02em" }}>
+                                    Hari Kerja vs Akhir Pekan
+                                </h3>
+                                <p style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 4 }}>
+                                    Perbandingan rata-rata belanja di hari aktif & distribusi Senin–Minggu
+                                </p>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 18 }}>
+                                <div style={{
+                                    padding: "14px 16px", borderRadius: 14,
+                                    background: "rgba(131,155,122,.07)",
+                                    border: "1px solid rgba(131,155,122,.18)",
+                                }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)" }}>💼 Hari Kerja (Sen–Jum)</div>
+                                    <div className="mono num-tight" style={{ fontSize: 18, fontWeight: 900, color: "var(--color-text)", marginTop: 6 }}>
+                                        {fmtRp(habitStats.weekdayTotal)}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 4 }}>
+                                        {habitStats.weekdayCount}x transaksi · rata-rata <strong style={{ color: "var(--color-text)" }}>{fmtRp(habitStats.weekdayAvgActive)}</strong>/hari aktif
+                                    </div>
+                                </div>
+                                <div style={{
+                                    padding: "14px 16px", borderRadius: 14,
+                                    background: "rgba(217,167,74,.08)",
+                                    border: "1px solid rgba(217,167,74,.22)",
+                                }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)" }}>🌴 Akhir Pekan (Sab–Min)</div>
+                                    <div className="mono num-tight" style={{ fontSize: 18, fontWeight: 900, color: "var(--color-text)", marginTop: 6 }}>
+                                        {fmtRp(habitStats.weekendTotal)}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 4 }}>
+                                        {habitStats.weekendCount}x transaksi · rata-rata <strong style={{ color: "var(--color-text)" }}>{fmtRp(habitStats.weekendAvgActive)}</strong>/hari aktif
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                                {habitStats.byWeekday.map((d) => {
+                                    const pct = habitStats.totalExp > 0 ? Math.round((d.total / habitStats.totalExp) * 100) : 0;
+                                    const barW = habitStats.maxWeekdayTotal > 0 ? Math.round((d.total / habitStats.maxWeekdayTotal) * 100) : 0;
+                                    const isPeak = habitStats.peakWeekday && habitStats.peakWeekday.weekday === d.weekday && d.total > 0;
+                                    const isWeekend = d.idx === 0 || d.idx === 6;
+                                    return (
+                                        <div key={d.weekday}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginBottom: 4 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                    <span style={{ fontWeight: 700, color: isPeak ? "var(--color-expense)" : "var(--color-text)", minWidth: 58 }}>{d.weekday}</span>
+                                                    <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>{d.count}x</span>
+                                                    {isPeak && <span className="chip chip-red" style={{ fontSize: 9, padding: "1px 7px" }}>Puncak</span>}
+                                                </div>
+                                                <div className="mono num-tight" style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)" }}>
+                                                    {fmtRp(d.total)} <span style={{ color: "var(--color-subtle)", fontWeight: 500 }}>({pct}%)</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ height: 6, borderRadius: 99, background: "var(--bg-sunk)", overflow: "hidden" }}>
+                                                <div style={{
+                                                    height: "100%", borderRadius: 99,
+                                                    width: `${barW}%`,
+                                                    background: isPeak
+                                                        ? "linear-gradient(90deg, #e04f4f, #ff716c)"
+                                                        : isWeekend
+                                                            ? "linear-gradient(90deg, #d97706, #D9A74A)"
+                                                            : "linear-gradient(90deg, var(--color-primary-deep), var(--color-primary))",
+                                                    transition: "width .6s ease",
+                                                }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Card 2: Bedah Kuliner & Jajan Keluarga */}
+                        <div className="lap-toplist" style={{ ...glassCard, padding: "22px 24px", borderRadius: 20 }}>
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={eyebrow}>BEDAH KULINER & JAJAN</div>
+                                <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", margin: "6px 0 0", letterSpacing: "-.02em" }}>
+                                    Makan Berat vs Camilan vs Minuman
+                                </h3>
+                                <p style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 4 }}>
+                                    Total kuliner & jajan: <strong className="mono num-tight" style={{ color: "var(--color-text)" }}>{fmtRp(habitStats.foodTotal)}</strong> ({habitStats.foodCount}x)
+                                </p>
+                            </div>
+
+                            {habitStats.foodCount === 0 ? (
+                                <div style={{ height: 180, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 12, gap: 8, textAlign: "center" }}>
+                                    <div style={{ fontSize: 30, opacity: .4 }}>🍛</div>
+                                    Belum ada transaksi kategori Makanan/Minuman/Jajanan di periode ini.
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    {habitStats.byKind.map((k) => (
+                                        <div key={k.kind} style={{
+                                            padding: "13px 15px", borderRadius: 14,
+                                            background: "rgba(255,255,255,.025)",
+                                            border: "1px solid var(--glass-border)",
+                                        }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                                                    <span style={{
+                                                        width: 30, height: 30, borderRadius: 9,
+                                                        background: `color-mix(in srgb, ${k.color} 16%, transparent)`,
+                                                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
+                                                    }}>{k.icon}</span>
+                                                    <div>
+                                                        <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>{k.kind}</div>
+                                                        <div style={{ fontSize: 10, color: "var(--color-subtle)" }}>{k.count}x transaksi</div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ textAlign: "right" }}>
+                                                    <div className="mono num-tight" style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>{fmtRp(k.total)}</div>
+                                                    <div style={{ fontSize: 10, fontWeight: 700, color: k.color }}>{k.pct}% dari kuliner</div>
+                                                </div>
+                                            </div>
+                                            <div style={{ height: 5, borderRadius: 99, background: "var(--bg-sunk)", overflow: "hidden", marginBottom: k.samples.length > 0 ? 8 : 0 }}>
+                                                <div style={{ height: "100%", width: `${k.pct}%`, background: k.color, borderRadius: 99 }} />
+                                            </div>
+                                            {k.samples.length > 0 && (
+                                                <div style={{ fontSize: 11, color: "var(--color-muted)", display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                                    <span style={{ color: "var(--color-subtle)" }}>Contoh:</span>
+                                                    {k.samples.map((s) => (
+                                                        <span key={s} style={{
+                                                            padding: "1px 7px", borderRadius: 6,
+                                                            background: "rgba(255,255,255,.04)",
+                                                            border: "1px solid var(--glass-border)",
+                                                            fontSize: 10,
+                                                        }}>{s}</span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Card 3: Item Berulang & Barang Terbesar */}
+                        <div className="lap-half" style={{ ...glassCard, padding: "22px 24px", borderRadius: 20 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                                <div>
+                                    <div style={eyebrow}>DETEKSI CATATAN & STRUK</div>
+                                    <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", margin: "6px 0 0", letterSpacing: "-.02em" }}>
+                                        {itemRankMode === "repeated" ? "Item yang Sering Dibeli Berulang" : "Item Pengeluaran Terbesar"}
+                                    </h3>
+                                    <p style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 4 }}>
+                                        Diekstrak otomatis dari catatan transaksi & struk belanja
+                                    </p>
+                                </div>
+                                <ChartToggle
+                                    value={itemRankMode}
+                                    options={[
+                                        { v: "repeated", icon: "🔁", l: "Berulang" },
+                                        { v: "top", icon: "💰", l: "Terbesar" },
+                                    ]}
+                                    onChange={setItemRankMode}
+                                />
+                            </div>
+
+                            {(() => {
+                                const list = itemRankMode === "repeated"
+                                    ? (habitStats.repeatedItems.length > 0 ? habitStats.repeatedItems : habitStats.topItems)
+                                    : habitStats.topItems;
+                                if (list.length === 0) {
+                                    return (
+                                        <div style={{ height: 160, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-subtle)", fontSize: 12, gap: 8 }}>
+                                            <div style={{ fontSize: 28, opacity: .4 }}>🧾</div>
+                                            Belum ada rincian item di periode ini.
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                        {itemRankMode === "repeated" && habitStats.repeatedItems.length === 0 && (
+                                            <div style={{ fontSize: 11, color: "var(--color-amber)", marginBottom: 4 }}>
+                                                Belum ada item yang dibeli ≥ 2x di periode ini — menampilkan item dengan nilai terbesar:
+                                            </div>
+                                        )}
+                                        {list.slice(0, 6).map((it, idx) => (
+                                            <div key={`${it.label}-${idx}`} style={{
+                                                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                                                padding: "10px 12px", borderRadius: 12,
+                                                background: "rgba(255,255,255,.02)",
+                                                border: "1px solid var(--glass-border)",
+                                            }}>
+                                                <div style={{ minWidth: 0, flex: 1 }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                                                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                            {it.item}
+                                                        </span>
+                                                        {it.place && (
+                                                            <span className="chip chip-ghost" style={{ fontSize: 10, padding: "1px 7px" }}>
+                                                                🏪 {it.place}
+                                                            </span>
+                                                        )}
+                                                        {it.count > 1 && (
+                                                            <span className="chip chip-mint" style={{ fontSize: 10, padding: "1px 7px" }}>
+                                                                {it.count}x beli
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 3 }}>
+                                                        {it.category} · rata-rata <span className="mono num-tight">{fmtRp(it.avg)}</span>/beli
+                                                    </div>
+                                                </div>
+                                                <div className="mono num-tight" style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)", flexShrink: 0 }}>
+                                                    {fmtRp(it.total)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Card 4: Toko / Merchant Langganan + Distribusi Anggota */}
+                        <div className="lap-half" style={{ ...glassCard, padding: "22px 24px", borderRadius: 20, display: "flex", flexDirection: "column", gap: 18 }}>
+                            <div>
+                                <div style={eyebrow}>TOKO & ANGGOTA KELUARGA</div>
+                                <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", margin: "6px 0 0", letterSpacing: "-.02em" }}>
+                                    Merchant Langganan & Pemilik Akun
+                                </h3>
+                                <p style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 4 }}>
+                                    Toko dari hasil scan struk (`[Nama Toko]`) & pembagian pengeluaran per anggota
+                                </p>
+                            </div>
+
+                            {/* Top Places / Merchants */}
+                            <div>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)", marginBottom: 8 }}>
+                                    🏪 Toko / Warung yang Paling Sering Dikunjungi
+                                </div>
+                                {habitStats.topPlaces.length === 0 ? (
+                                    <div style={{
+                                        padding: "12px 14px", borderRadius: 12,
+                                        background: "rgba(255,255,255,.02)", border: "1px dashed var(--glass-border)",
+                                        fontSize: 11, color: "var(--color-subtle)",
+                                    }}>
+                                        Tips: Gunakan fitur <strong>Scan Struk</strong> atau tulis nama toko di catatan (contoh: <code>[Indomaret] Susu UHT</code> atau <code>Bakso (Bakso Mas Boy)</code>) agar toko langganan terekam otomatis.
+                                    </div>
+                                ) : (
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+                                        {habitStats.topPlaces.map((p, idx) => (
+                                            <div key={p.place} style={{
+                                                padding: "10px 12px", borderRadius: 12,
+                                                background: idx === 0 ? "rgba(131,155,122,.08)" : "rgba(255,255,255,.02)",
+                                                border: "1px solid var(--glass-border)",
+                                            }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                                                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        {p.place}
+                                                    </span>
+                                                    <span className="chip chip-mint" style={{ fontSize: 9, padding: "1px 6px" }}>{p.count}x</span>
+                                                </div>
+                                                <div className="mono num-tight" style={{ fontSize: 12, fontWeight: 700, color: "var(--color-muted)", marginTop: 4 }}>
+                                                    {fmtRp(p.total)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* By Account Owner & Beneficiary */}
+                            <div style={{ paddingTop: 12, borderTop: "1px solid var(--glass-border)" }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)", marginBottom: 8 }}>
+                                    👨‍👩‍👧‍👦 Proporsi Pengeluaran per Anggota / Dompet
+                                </div>
+                                {habitStats.byOwner.length === 0 ? (
+                                    <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>Belum ada data pengeluaran.</div>
+                                ) : (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                        {habitStats.byOwner.map((o, idx) => {
+                                            const c = CAT_COLORS[idx % CAT_COLORS.length];
+                                            return (
+                                                <div key={o.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12 }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                        <span style={{ width: 8, height: 8, borderRadius: 99, background: c }} />
+                                                        <span style={{ fontWeight: 700, color: "var(--color-text)" }}>{o.label}</span>
+                                                        <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>({o.count}x)</span>
+                                                    </div>
+                                                    <div className="mono num-tight" style={{ fontWeight: 700, color: "var(--color-muted)" }}>
+                                                        {fmtRp(o.total)} <span style={{ color: c }}>({o.pct}%)</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {habitStats.byBeneficiary.length > 0 && (
+                                    <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--glass-border)" }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)", marginBottom: 6 }}>
+                                            🎁 Rincian Peruntukan ("Untuk Siapa")
+                                        </div>
+                                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                            {habitStats.byBeneficiary.map((b) => (
+                                                <span key={b.label} className="chip chip-ghost" style={{ fontSize: 11, padding: "4px 10px" }}>
+                                                    <strong>{b.label}</strong>: {fmtRp(b.total)} ({b.count}x)
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══ TAB 3: PROYEKSI AKHIR BULAN (EMBEDDED PREDIKSIVIEW) ═══ */}
+                {activeTab === "proyeksi" && (
+                    <div style={{ animation: "fadeIn .3s" }}>
+                        <PrediksiView
+                            transactions={allTransactions}
+                            budgets={budgets}
+                            personalBudgets={personalBudgets}
+                            accounts={accounts}
+                            embedded={true}
+                            externalScope={scope}
+                        />
+                    </div>
+                )}
             </div>
         </>
     );

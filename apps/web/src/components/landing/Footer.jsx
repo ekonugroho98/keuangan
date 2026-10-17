@@ -21,14 +21,14 @@ const Footer = () => {
         { label: "Privacy", href: "#" },
         { label: "Terms", href: "#" },
         { label: "Security", href: "#" },
-        { label: "Contact", href: "mailto:info@karaya.co.id" },
+        { label: "Telegram Komunitas", href: "https://t.me/keluargaberkembang" },
     ];
 
     const socials = [
-        { icon: "𝕏", label: "Twitter", href: "#" },
-        { icon: "in", label: "LinkedIn", href: "#" },
+        { icon: "TG", label: "Telegram @keluargaberkembang", href: "https://t.me/keluargaberkembang" },
         { icon: "IG", label: "Instagram", href: "#" },
         { icon: "YT", label: "YouTube", href: "#" },
+        { icon: "𝕏", label: "Twitter", href: "#" },
     ];
 
     return (
@@ -46,7 +46,7 @@ const Footer = () => {
             {/* Ambient */}
             <div aria-hidden style={{
                 position: "absolute", inset: 0, pointerEvents: "none",
-                background: "radial-gradient(800px 300px at 50% 0%, rgba(96,252,198,.04), transparent 70%)",
+                background: "radial-gradient(800px 300px at 50% 0%, rgba(70,99,78,.06), transparent 70%)",
             }} />
 
             <div style={{ maxWidth: 1240, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -63,20 +63,31 @@ const Footer = () => {
                     {/* Brand */}
                     <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                            <div style={{
-                                width: 34, height: 34, borderRadius: 10,
-                                background: "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontWeight: 900, fontSize: 15, color: "#003828",
-                                boxShadow: "0 8px 20px rgba(96,252,198,.3)",
-                            }}>{APP_NAME[0]}</div>
-                            <span style={{ fontWeight: 900, fontSize: 18, color: "var(--color-text)", letterSpacing: "-.02em" }}>{APP_NAME}</span>
+                            <img
+                                src="/logo-icon.png"
+                                alt={APP_NAME}
+                                style={{
+                                    width: 38, height: 38, borderRadius: 11,
+                                    objectFit: "cover",
+                                    border: "1px solid var(--color-border)",
+                                    boxShadow: "0 4px 12px rgba(63,81,66,.15)",
+                                }}
+                            />
+                            <div style={{ lineHeight: 1.05 }}>
+                                <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, letterSpacing: ".02em" }}>
+                                    <span style={{ color: "var(--color-soil, #7D513B)" }}>KELUARGA </span>
+                                    <span style={{ color: "var(--color-primary)" }}>BERKEMBANG</span>
+                                </div>
+                                <div style={{ fontFamily: "var(--font-hand, 'Caveat', cursive)", fontSize: 13.5, color: "var(--color-muted)" }}>
+                                    Berkembang Bersama dalam Kehangatan
+                                </div>
+                            </div>
                         </div>
                         <p style={{
                             color: "var(--color-muted)", fontSize: 13.5,
-                            lineHeight: 1.65, maxWidth: 320, marginBottom: 20,
+                            lineHeight: 1.65, maxWidth: 340, marginBottom: 20,
                         }}>
-                            {t("lp.footer.tagline") || "Platform keuangan pintar dengan AI — kelola uang, capai target, hidup lebih tenang."}
+                            {t("lp.footer.tagline") || "Rumah digital keluarga hangat — kelola keuangan suami-istri, daftar belanja, dan stok kulkas bersama."}
                         </p>
                         {/* Socials */}
                         <div style={{ display: "flex", gap: 8 }}>
@@ -90,13 +101,13 @@ const Footer = () => {
                                         background: "var(--bg-surface)",
                                         border: "1px solid var(--color-border-soft)",
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        color: "var(--color-muted)", fontSize: 12, fontWeight: 800,
+                                        color: "var(--color-muted)", fontSize: 12, fontWeight: 700,
                                         textDecoration: "none",
                                         transition: "all .25s",
                                     }}
                                     onMouseOver={e => {
                                         e.currentTarget.style.color = "var(--color-primary)";
-                                        e.currentTarget.style.borderColor = "rgba(96,252,198,.35)";
+                                        e.currentTarget.style.borderColor = "var(--color-border)";
                                         e.currentTarget.style.transform = "translateY(-2px)";
                                     }}
                                     onMouseOut={e => {

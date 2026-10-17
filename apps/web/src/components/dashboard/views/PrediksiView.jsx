@@ -29,9 +29,11 @@ const isSemanticFixed = (cat) => {
     return FIXED_KEYWORDS.some(k => lower.includes(k));
 };
 
-const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
+const PrediksiView = ({ transactions: allTransactions, budgets, personalBudgets = [], accounts, embedded = false, externalScope = null }) => {
     const { t } = useLanguage();
-    const [scope, setScope] = useState({ scope: "household" });
+    const [internalScope, setInternalScope] = useState({ scope: "household" });
+    const scope = externalScope || internalScope;
+    const setScope = setInternalScope;
     const transactions = useMemo(() => scopeFilterTx(allTransactions, accounts, scope), [allTransactions, accounts, scope]);
     const scopedAccounts = useMemo(() => {
         if (scope.scope === "household") return accounts;
@@ -39,6 +41,16 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
         if (scope.scope === "member") return accounts.filter((a) => a.owner?.display_name === scope.member);
         return accounts;
     }, [accounts, scope]);
+
+    const activeBudgets = useMemo(() => {
+        if (scope.scope === "member") {
+            const matched = personalBudgets.filter(
+                (b) => !scope.member || !b.member?.display_name || b.member?.display_name === scope.member,
+            );
+            return matched.length > 0 ? matched : budgets;
+        }
+        return budgets;
+    }, [scope, budgets, personalBudgets]);
 
     const now          = new Date();
     const thisYear     = now.getFullYear();
@@ -51,8 +63,12 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
 
     const calc = useMemo(() => {
         const expenses       = transactions.filter(t => t.type === "expense");
+        const piutangIn      = transactions.filter(t => t.type === "income" && t.category === "Piutang");
         const thisMonthTxs   = expenses.filter(t => t.date?.startsWith(monthStr));
-        const spentThisMonth = thisMonthTxs.reduce((s, t) => s + t.amount, 0);
+        const thisMonthPiutangOffset = piutangIn
+            .filter(t => t.date?.startsWith(monthStr))
+            .reduce((s, t) => s + t.amount, 0);
+        const spentThisMonth = Math.max(0, thisMonthTxs.reduce((s, t) => s + t.amount, 0) - thisMonthPiutangOffset);
 
         /* ── Per kategori bulan ini ── */
         const spentByCategory = {};
@@ -61,6 +77,10 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
             spentByCategory[t.category]  = (spentByCategory[t.category]  || 0) + t.amount;
             countByCategory[t.category]  = (countByCategory[t.category]  || 0) + 1;
         });
+        if (thisMonthPiutangOffset > 0 && spentByCategory.Piutang !== undefined) {
+            spentByCategory.Piutang = Math.max(0, spentByCategory.Piutang - thisMonthPiutangOffset);
+            if (spentByCategory.Piutang === 0) delete spentByCategory.Piutang;
+        }
 
         /* ── Avg 3 bulan lalu ── */
         const past3 = [-3, -2, -1].map(o => {
@@ -72,17 +92,14 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
             expenses.filter(t => t.date?.startsWith(m)).forEach(t => {
                 avgByCategory[t.category] = (avgByCategory[t.category] || 0) + t.amount;
             });
+            piutangIn.filter(t => t.date?.startsWith(m)).forEach(t => {
+                if (avgByCategory.Piutang !== undefined) {
+                    avgByCategory.Piutang = Math.max(0, avgByCategory.Piutang - t.amount);
+                }
+            });
         });
         Object.keys(avgByCategory).forEach(k => { avgByCategory[k] /= 3; });
 
-        /* ─────────────────────────────────────────────────────────
-           SMART CLASSIFICATION
-           "Tetap"  = bayar sekali (atau ≤2×) per bulan DAN jumlahnya
-                      besar (> 2× rata-rata pengeluaran harian)
-           "Variabel" = sisanya — diekstrapolasi secara harian
-        ───────────────────────────────────────────────────────── */
-        /*  Threshold ABSOLUT: jika 1-2 transaksi/bulan DAN tiap transaksi
-            >= Rp 200.000 → kemungkinan besar pembayaran bulanan (bukan harian)  */
         const FIXED_PER_TX = 200_000;
 
         let fixedTotal    = 0;
@@ -93,7 +110,6 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
             const count    = countByCategory[cat] || 1;
             const perTx    = amt / count;
             const isSemFix = isSemanticFixed(cat);
-            // Bayar ≤2× sebulan DAN nominal per transaksi ≥ 200rb → tetap
             const isBigOnce = count <= 2 && perTx >= FIXED_PER_TX;
 
             if (isSemFix || isBigOnce) {
@@ -108,34 +124,27 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
         const predictedVariable = variableDailyRate * daysInMonth;
         const predictedTotal    = fixedTotal + predictedVariable;
 
-        /* prediksi per kategori:
-           - Tetap  → gunakan nilai aktual (tidak diekstrapolasi)
-           - Variabel → gunakan avg 3 bulan jika ada, atau ekstrapolasi harian */
         const predictedByCategory = {};
         Object.keys(spentByCategory).forEach(cat => {
             if (fixedSet.has(cat)) {
-                predictedByCategory[cat] = spentByCategory[cat]; // nilai aktual
+                predictedByCategory[cat] = spentByCategory[cat];
             } else if (avgByCategory[cat] > 0) {
-                predictedByCategory[cat] = avgByCategory[cat];   // rata-rata historis lebih stabil
+                predictedByCategory[cat] = avgByCategory[cat];
             } else {
                 predictedByCategory[cat] = (spentByCategory[cat] / todayDay) * daysInMonth;
             }
         });
 
-        /* alert terhadap budget
-           - Variabel : alert jika prediksi > 70% budget (bisa membengkak sisa bulan)
-           - Tetap    : alert hanya jika prediksi > 100% budget (melebihi, bukan pas)
-             karena biaya tetap yang pas = budget adalah hal NORMAL, bukan bahaya
-        */
         const alertCategories = [];
-        if (budgets?.length > 0) {
-            budgets.filter(b => !b.month || b.month === monthStr).forEach(b => {
+        let totalMonthBudget = 0;
+        if (activeBudgets?.length > 0) {
+            activeBudgets.filter(b => !b.month || b.month === monthStr).forEach(b => {
+                totalMonthBudget += (b.amount || 0);
                 const predicted = predictedByCategory[b.category] || 0;
                 const spent     = spentByCategory[b.category]     || 0;
                 const pct       = b.amount > 0 ? (predicted / b.amount) * 100 : 0;
                 const isFixed   = fixedSet.has(b.category);
 
-                // Threshold berbeda: tetap harus > 100%, variabel cukup > 70%
                 const threshold = isFixed ? 100 : 70;
                 if (pct > threshold) {
                     alertCategories.push({
@@ -156,14 +165,16 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
             spentThisMonth, spentByCategory, avgByCategory,
             predictedTotal, predictedByCategory, alertCategories,
             fixedTotal, variableSpent, variableDailyRate, fixedSet,
+            totalMonthBudget,
             hasData,
         };
-    }, [transactions, budgets, monthStr, todayDay, daysInMonth, thisYear, thisMonth]);
+    }, [transactions, activeBudgets, monthStr, todayDay, daysInMonth, thisYear, thisMonth]);
 
     const {
         spentThisMonth, spentByCategory, avgByCategory,
         predictedTotal, predictedByCategory, alertCategories,
         fixedTotal, variableSpent, variableDailyRate, fixedSet,
+        totalMonthBudget,
         hasData,
     } = calc;
 
@@ -171,9 +182,18 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
     const trendPct    = avgTotal3m > 0 ? Math.round(((predictedTotal - avgTotal3m) / avgTotal3m) * 100) : 0;
     const trendUp     = trendPct > 0;
 
-    const remainingDays       = daysInMonth - todayDay;
-    const remainingPredicted  = variableDailyRate * remainingDays; // hanya variabel yang diproyeksikan sisa bulan
+    const remainingDays       = Math.max(0, daysInMonth - todayDay);
+    const remainingPredicted  = variableDailyRate * remainingDays;
     const estimatedEndBalance = totalBalance - remainingPredicted;
+
+    // Angka penghematan per hari (sama seperti insights.ts cut_per_day_needed)
+    const remainingBudget = totalMonthBudget > 0 ? totalMonthBudget - spentThisMonth : null;
+    const safeDailyFromBudget = remainingBudget !== null && remainingDays > 0
+        ? Math.max(0, Math.round(remainingBudget / remainingDays))
+        : null;
+    const cutPerDayNeeded = safeDailyFromBudget !== null && remainingDays > 0
+        ? Math.max(0, Math.round(variableDailyRate - safeDailyFromBudget))
+        : 0;
 
     const allCategories = [...new Set([...Object.keys(spentByCategory), ...Object.keys(avgByCategory)])];
     const monthName     = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
@@ -191,16 +211,20 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
     if (!hasData) {
         return (
             <div style={{ animation: "fadeIn .4s" }}>
-                <div style={{ marginBottom: 16 }}>
-                    <ScopeSwitcher value={scope} onChange={setScope} />
-                </div>
-                <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PREDICTION</div>
-                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("pred.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>{t("pred.subtitle")}</p>
-                </div>
+                {!embedded && (
+                    <>
+                        <div style={{ marginBottom: 16 }}>
+                            <ScopeSwitcher value={scope} onChange={setScope} accounts={accounts} />
+                        </div>
+                        <div style={{ marginBottom: 24 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PROYEKSI BULANAN</div>
+                            <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("pred.title")}</h1>
+                            <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>{t("pred.subtitle")}</p>
+                        </div>
+                    </>
+                )}
                 <div style={{ ...cardStyle, textAlign: "center", padding: "48px 24px" }}>
-                    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.4 }}>🔮</div>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.4 }}>🧭</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", marginBottom: 6, letterSpacing: "-.01em" }}>{t("pred.noData")}</div>
                     <div style={{ fontSize: 13, color: "var(--color-muted)" }}>{t("pred.noDataSub")}</div>
                 </div>
@@ -210,23 +234,24 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
 
     return (
         <div style={{ animation: "fadeIn .4s" }}>
-            <div style={{ marginBottom: 16 }}>
-                <ScopeSwitcher value={scope} onChange={setScope} />
-            </div>
+            {!embedded && (
+                <>
+                    <div style={{ marginBottom: 16 }}>
+                        <ScopeSwitcher value={scope} onChange={setScope} accounts={accounts} />
+                    </div>
+                    <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PROYEKSI KELUARGA</div>
+                            <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("pred.title")}</h1>
+                            <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                                {t("pred.subtitle")} · {monthName}
+                            </p>
+                        </div>
+                    </div>
+                </>
+            )}
 
-            {/* Header */}
-            <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>PREDICTION</div>
-                    <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("pred.title")}</h1>
-                    <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
-                        {t("pred.subtitle")} · {monthName}
-                    </p>
-                </div>
-                <span className="chip chip-blue" style={{ fontSize: 11, fontWeight: 800 }}>✨ AI Prediction</span>
-            </div>
-
-            {/* Info banner — metode prediksi */}
+            {/* Info banner — metode pemisahan Tagihan Rutin vs Belanja Harian */}
             <div style={{
                 display: "flex", alignItems: "flex-start", gap: 10,
                 background: "var(--color-primary-soft)",
@@ -236,18 +261,17 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
                 borderRadius: 14, padding: "12px 16px", marginBottom: 20,
                 boxShadow: "var(--glass-highlight)",
             }}>
-                <span style={{ fontSize: 16, flexShrink: 0 }}>🧮</span>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>🧭</span>
                 <div style={{ fontSize: 12, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                    <strong style={{ color: "var(--color-primary)" }}>{t("pred.methodTitle")}</strong>
-                    {" "}— {t("pred.methodDesc")}{" "}
-                    <span style={{ color: "var(--color-text)", fontWeight: 700 }}>{t("pred.fixed")}</span> {t("pred.methodFixedDesc")}
-                    {" "}{t("pred.methodAnd")}{" "}
-                    <span style={{ color: "var(--color-text)", fontWeight: 700 }}>{t("pred.variable")}</span> {t("pred.methodVariableDesc")}.
-                    {" "}{t("pred.fixedLabel")} <strong className="num-tight mono" style={{ color: "var(--color-transfer)" }}>{fmtRp(fixedTotal)}</strong> ·
-                    {t("pred.variablePerDay")} <strong className="num-tight mono" style={{ color: "var(--color-amber)" }}>{fmtRp(variableDailyRate)}</strong>
-                    <span style={{ display: "block", marginTop: 4, color: "var(--color-subtle)" }}>
-                        💡 {t("pred.aiTip")} <strong>AI Coach</strong>.
-                    </span>
+                    <strong style={{ color: "var(--color-primary)" }}>Cara Hitung Proyeksi Keluarga</strong>
+                    {" "}— Pengeluaran dipisahkan otomatis menjadi{" "}
+                    <span style={{ color: "var(--color-text)", fontWeight: 700 }}>Tagihan Rutin/Tetap</span> (listrik, cicilan, internet — bayar sekali sebulan, tidak dikali harian)
+                    {" "}dan{" "}
+                    <span style={{ color: "var(--color-text)", fontWeight: 700 }}>Belanja Harian</span> (dapur, makan, jajan — diproyeksikan sampai akhir bulan).
+                    <div style={{ marginTop: 4 }}>
+                        🔒 Tagihan Rutin: <strong className="num-tight mono" style={{ color: "var(--color-transfer)" }}>{fmtRp(fixedTotal)}</strong> ·
+                        🛒 Rata-rata Belanja Harian: <strong className="num-tight mono" style={{ color: "var(--color-amber)" }}>{fmtRp(variableDailyRate)}/hari</strong> (total {fmtRp(variableSpent)})
+                    </div>
                 </div>
             </div>
 
@@ -325,24 +349,45 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
                     </div>
                 </div>
 
-                {/* Estimasi Saldo */}
-                <div style={{ ...cardStyle }}>
-                    <div style={{ position: "absolute", right: -20, top: -20, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, var(--color-transfer-soft), transparent 70%)", pointerEvents: "none" }} />
-                    <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", letterSpacing: 1.6, marginBottom: 10, textTransform: "uppercase" }}>
-                        {t("pred.estimatedBalance")}
+                {/* Estimasi Saldo & Target Rem Harian */}
+                <div style={{ ...cardStyle, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                        <div style={{ position: "absolute", right: -20, top: -20, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, var(--color-transfer-soft), transparent 70%)", pointerEvents: "none" }} />
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", letterSpacing: 1.6, marginBottom: 10, textTransform: "uppercase" }}>
+                            {t("pred.estimatedBalance")}
+                        </div>
+                        <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3.5vw, 30px)", fontWeight: 900, color: estimatedEndBalance >= 0 ? "var(--color-text)" : "var(--color-expense)", marginBottom: 8, letterSpacing: "-.03em", lineHeight: 1 }}>
+                            {fmtRp(estimatedEndBalance)}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
+                            {t("pred.currentBalance")}: <strong className="num-tight mono" style={{ color: "var(--color-text)" }}>{fmtRp(totalBalance)}</strong>
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
+                            {t("pred.projVariableRem")}: <strong className="num-tight mono" style={{ color: "var(--color-expense)" }}>−{fmtRp(remainingPredicted)}</strong>
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 8 }}>
+                            {remainingDays} {t("pred.daysRemaining")} @ {fmtRp(variableDailyRate)}{t("pred.perDayVar")}
+                        </div>
                     </div>
-                    <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3.5vw, 30px)", fontWeight: 900, color: estimatedEndBalance >= 0 ? "var(--color-text)" : "var(--color-expense)", marginBottom: 8, letterSpacing: "-.03em", lineHeight: 1 }}>
-                        {fmtRp(estimatedEndBalance)}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
-                        {t("pred.currentBalance")}: <strong className="num-tight mono" style={{ color: "var(--color-text)" }}>{fmtRp(totalBalance)}</strong>
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 4 }}>
-                        {t("pred.projVariableRem")}: <strong className="num-tight mono" style={{ color: "var(--color-expense)" }}>−{fmtRp(remainingPredicted)}</strong>
-                    </div>
-                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 10 }}>
-                        {remainingDays} {t("pred.daysRemaining")} @ {fmtRp(variableDailyRate)}{t("pred.perDayVar")}
-                    </div>
+
+                    {totalMonthBudget > 0 && (
+                        <div style={{
+                            marginTop: 14, padding: "10px 12px", borderRadius: 12,
+                            background: cutPerDayNeeded > 0 ? "var(--color-amber-soft)" : "var(--color-primary-soft)",
+                            border: `1px solid ${cutPerDayNeeded > 0 ? "rgba(217,167,74,.3)" : "var(--color-border-strong)"}`,
+                            fontSize: 11.5, color: "var(--color-text)", lineHeight: 1.5,
+                        }}>
+                            {cutPerDayNeeded > 0 ? (
+                                <>
+                                    ⚠️ <strong>Target Rem Harian:</strong> Kurangi belanja harian sekitar <strong className="mono" style={{ color: "var(--color-amber)" }}>{fmtRp(cutPerDayNeeded)}/hari</strong> (maks {fmtRp(safeDailyFromBudget)}/hari) supaya pas dengan total anggaran {fmtRp(totalMonthBudget)}.
+                                </>
+                            ) : (
+                                <>
+                                    ✅ <strong>Anggaran Aman:</strong> Laju belanja harian masih di bawah batas anggaran ({fmtRp(totalMonthBudget)}). Sisa jatah anggaran: <strong className="mono" style={{ color: "var(--color-primary)" }}>{fmtRp(safeDailyFromBudget || 0)}/hari</strong>.
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -430,7 +475,7 @@ const PrediksiView = ({ transactions: allTransactions, budgets, accounts }) => {
                                             <td style={{ padding: "12px 10px", color: "var(--color-text)", fontWeight: 700 }}>{cat}</td>
                                             <td style={{ padding: "12px 10px" }}>
                                                 <span className={isFixed ? "chip chip-blue" : "chip chip-amber"} style={{ fontSize: 10 }}>
-                                                    {isFixed ? t("pred.typeFixed") : t("pred.typeVariable")}
+                                                    {isFixed ? "🔒 Tagihan Rutin" : "🛒 Harian"}
                                                 </span>
                                             </td>
                                             <td className="num-tight mono" style={{ padding: "12px 10px", textAlign: "right", color: "var(--color-text)" }}>{fmtRp(spent)}</td>

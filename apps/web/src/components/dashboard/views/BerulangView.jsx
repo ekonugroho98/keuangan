@@ -74,14 +74,34 @@ const SCard = ({ label, value, sub, color, icon }) => (
 );
 
 /* ─── MAIN ─── */
-const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdit, onDelete, customCategories = [] }) => {
+const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdit, onDelete, customCategories = [], allCategoriesFromApi = [] }) => {
     const { t, lang } = useLanguage();
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
-    const mergedCategories = [
-        ...allCategories,
-        ...customCategories.map(c => c.name).filter(n => !allCategories.includes(n)),
-    ];
+    const apiNonSystemCats = allCategoriesFromApi.filter(c => !c.is_system);
+    const mergedCategories = apiNonSystemCats.length > 0
+        ? apiNonSystemCats.map(c => c.name)
+        : [
+            ...allCategories.filter(c => c !== "Makanan" && c !== "Transfer"),
+            ...customCategories.map(c => c.name).filter(n => !allCategories.includes(n)),
+        ];
+
+    const getCatIcon = (catName) => {
+        const fromApi = allCategoriesFromApi.find(c => c.name === catName);
+        if (fromApi?.icon) return fromApi.icon;
+        const customCat = customCategories.find(c => c.name === catName);
+        return customCat?.icon || categoryIcons[catName] || "📦";
+    };
+
+    const isIncomeCat = (catName) => {
+        const fromApi = allCategoriesFromApi.find(c => c.name === catName);
+        if (fromApi) return fromApi.type === "income";
+        const customCat = customCategories.find(c => c.name === catName);
+        if (customCat) return customCat.type === "income";
+        return INCOME_CATS.includes(catName) && catName !== "Transfer";
+    };
+
+    const isIncomeRec = (r) => r.type ? r.type === "income" : isIncomeCat(r.category);
 
     const FREQ_OPTIONS = [
         { v: "daily",   l: t("rec.freq.daily"),   icon: "📅" },
@@ -103,8 +123,8 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
     const [hoveredId,     setHoveredId]     = useState(null);
 
     /* ── computed ── */
-    const expenseRecs = recurrings.filter(r => !INCOME_CATS.includes(r.category));
-    const incomeRecs  = recurrings.filter(r => INCOME_CATS.includes(r.category));
+    const expenseRecs = recurrings.filter(r => !isIncomeRec(r));
+    const incomeRecs  = recurrings.filter(r => isIncomeRec(r));
     const overdueRecs = recurrings.filter(r => daysUntil(r.next_date) < 0);
     const dueSoonRecs = recurrings.filter(r => daysUntil(r.next_date) >= 0 && isThisMonth(r.next_date));
     const paidRecs    = recurrings.filter(isPaidThisMonth);
@@ -129,6 +149,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
         setEditTarget(null);
         const f = emptyForm();
         if (accounts.length > 0) f.account_name = accounts[0].name;
+        if (mergedCategories.length > 0 && !mergedCategories.includes(f.category)) f.category = mergedCategories[0];
         setForm(f);
         setShowModal(true);
     };
@@ -140,7 +161,8 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
     const handleFreqChange = (freq) => setForm(p => ({ ...p, frequency: freq, next_date: nextDateFromFreq(freq) }));
     const handleSubmit = () => {
         if (!form.name.trim() || !form.amount || !form.account_name) return;
-        const payload = { name: form.name.trim(), amount: parseInt(form.amount), icon: form.icon, category: form.category, account_name: form.account_name, frequency: form.frequency, next_date: form.next_date, notes: form.notes.trim(), debt_id: form.debt_id || null };
+        const type = isIncomeCat(form.category) ? "income" : "expense";
+        const payload = { name: form.name.trim(), amount: parseInt(form.amount), type, icon: form.icon, category: form.category, account_name: form.account_name, frequency: form.frequency, next_date: form.next_date, notes: form.notes.trim(), debt_id: form.debt_id || null };
         editTarget ? onEdit(editTarget.id, payload) : onAdd(payload);
         setShowModal(false);
     };
@@ -158,11 +180,11 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
         const d = daysUntil(r.next_date);
         if (d < 0)  return "#ff716c";                                       // overdue → red
         if (d <= 3) return "#f59e0b";                                       // ≤3 days → amber
-        if (d <= 7) return INCOME_CATS.includes(r.category) ? "var(--color-primary)" : "#f59e0b"; // 4–7 days → amber/green
-        return INCOME_CATS.includes(r.category) ? "var(--color-primary)" : "#a78bfa";   // normal → green/purple
+        if (d <= 7) return isIncomeRec(r) ? "var(--color-primary)" : "#f59e0b"; // 4–7 days → amber/green
+        return isIncomeRec(r) ? "var(--color-primary)" : "#a78bfa";   // normal → green/purple
     };
-    const amtColor = (r) => INCOME_CATS.includes(r.category) ? "var(--color-primary)" : "#ff716c";
-    const amtSign  = (r) => INCOME_CATS.includes(r.category) ? "+" : "-";
+    const amtColor = (r) => isIncomeRec(r) ? "var(--color-primary)" : "#ff716c";
+    const amtSign  = (r) => isIncomeRec(r) ? "+" : "-";
 
     return (
         <div style={{ animation: "fadeIn .4s", display: "flex", flexDirection: "column", gap: 22 }}>
@@ -197,12 +219,11 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 8 }}>{t("tx.category")}</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {mergedCategories.map(cat => {
-                                const customCat = customCategories.find(c => c.name === cat);
-                                const icon = customCat?.icon || categoryIcons[cat] || "📦";
+                                const icon = getCatIcon(cat);
                                 const isSel = form.category === cat;
                                 return (
                                     <button key={cat} onClick={() => setForm(p => ({ ...p, category: cat }))}
-                                        style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${isSel ? "rgba(96,252,198,.5)" : "var(--color-border-soft)"}`, background: isSel ? "rgba(96,252,198,.15)" : "transparent", color: isSel ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: isSel ? 700 : 400, display: "flex", alignItems: "center", gap: 5 }}>
+                                        style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${isSel ? "rgba(131,155,122,.5)" : "var(--color-border-soft)"}`, background: isSel ? "rgba(131,155,122,.15)" : "transparent", color: isSel ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: isSel ? 700 : 400, display: "flex", alignItems: "center", gap: 5 }}>
                                         <span>{icon}</span><span>{cat}</span>
                                     </button>
                                 );
@@ -230,7 +251,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                             {FREQ_OPTIONS.map(f => (
                                 <button key={f.v} onClick={() => handleFreqChange(f.v)}
-                                    style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1px solid ${form.frequency === f.v ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.frequency === f.v ? "rgba(96,252,198,.15)" : "transparent", color: form.frequency === f.v ? "var(--color-primary)" : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}>
+                                    style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `1px solid ${form.frequency === f.v ? "rgba(131,155,122,.45)" : "var(--color-border-soft)"}`, background: form.frequency === f.v ? "rgba(131,155,122,.15)" : "transparent", color: form.frequency === f.v ? "var(--color-primary)" : "var(--color-subtle)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}>
                                     <div style={{ marginBottom: 3 }}>{f.icon}</div><div>{f.l}</div>
                                 </button>
                             ))}
@@ -243,7 +264,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
+                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "rgba(131,155,122,.45)" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(131,155,122,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
                                     {e}
                                 </button>
                             ))}
@@ -321,7 +342,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                             : tab.id === "overdue" && tab.count > 0
                                 ? "rgba(255,113,108,.2)"
                                 : tab.id === "paid" && tab.count > 0
-                                    ? "rgba(96,252,198,.15)"
+                                    ? "rgba(131,155,122,.15)"
                                     : "rgba(255,255,255,.07)";
                         const badgeClr  = isActive ? (tab.id === "overdue" ? "#fff" : "var(--color-on-primary)")
                             : tab.id === "overdue" && tab.count > 0 ? "#ff716c"
@@ -370,7 +391,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                         const isHov   = hoveredId === r.id;
                         const account = accounts.find(a => a.name === r.account_name);
                         const rowBg   = isHov ? "var(--bg-surface-hover)"
-                            : paid ? "rgba(96,252,198,.04)"
+                            : paid ? "rgba(131,155,122,.04)"
                             : idx % 2 === 0 ? "var(--bg-surface-low)" : "var(--bg-alt-row)";
                         const lastExec = lastExecutedDate(r);
                         const dueText = paid
@@ -422,7 +443,7 @@ const BerulangView = ({ recurrings = [], accounts = [], debts = [], onAdd, onEdi
                                             <span style={{ opacity: .3, fontSize: 10 }}>·</span>
                                             {/* Category */}
                                             <span style={{ fontSize: 10, color: "var(--color-muted)", background: "var(--color-border-soft)", padding: "1px 7px", borderRadius: 5 }}>
-                                                {categoryIcons[r.category] || "📦"} {tCat(r.category)}
+                                                {getCatIcon(r.category)} {tCat(r.category)}
                                             </span>
                                             <span style={{ opacity: .3, fontSize: 10 }}>·</span>
                                             {/* Account */}

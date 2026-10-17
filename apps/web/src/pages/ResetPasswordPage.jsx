@@ -59,7 +59,7 @@ const ResetPasswordPage = ({ showToast, onDone }) => {
                     width: 520,
                     height: 520,
                     borderRadius: "50%",
-                    background: "radial-gradient(circle, rgba(96,252,198,.22), transparent 65%)",
+                    background: "radial-gradient(circle, var(--color-primary-soft), transparent 65%)",
                     filter: "blur(60px)",
                     pointerEvents: "none",
                 }}
@@ -73,7 +73,7 @@ const ResetPasswordPage = ({ showToast, onDone }) => {
                     width: 600,
                     height: 600,
                     borderRadius: "50%",
-                    background: "radial-gradient(circle, rgba(167,139,250,.18), transparent 65%)",
+                    background: "radial-gradient(circle, rgba(200,125,85,.14), transparent 65%)",
                     filter: "blur(60px)",
                     pointerEvents: "none",
                 }}
@@ -106,7 +106,7 @@ const ResetPasswordPage = ({ showToast, onDone }) => {
                         width: 220,
                         height: 220,
                         borderRadius: "50%",
-                        background: "radial-gradient(circle, rgba(96,252,198,.18), transparent 70%)",
+                        background: "radial-gradient(circle, var(--color-primary-soft), transparent 70%)",
                         filter: "blur(20px)",
                         pointerEvents: "none",
                     }}
@@ -123,9 +123,9 @@ const ResetPasswordPage = ({ showToast, onDone }) => {
                             alignItems: "center",
                             justifyContent: "center",
                             fontSize: 30,
-                            background: "linear-gradient(135deg, rgba(96,252,198,.2), rgba(96,252,198,.05))",
-                            border: "1px solid rgba(96,252,198,.25)",
-                            boxShadow: "0 10px 30px rgba(96,252,198,.15), inset 0 1px 0 rgba(255,255,255,.1)",
+                            background: "var(--color-primary-soft)",
+                            border: "1px solid var(--color-border-strong)",
+                            boxShadow: "0 10px 30px rgba(63,81,66,.15), inset 0 1px 0 rgba(255,255,255,.1)",
                         }}
                     >
                         🔐
@@ -197,8 +197,8 @@ const ResetPasswordPage = ({ showToast, onDone }) => {
                             borderRadius: 14,
                             border: "none",
                             background:
-                                "linear-gradient(135deg, var(--color-primary, #60fcc6), var(--color-primary-deep, #19ce9b))",
-                            color: "var(--color-on-primary, #005e44)",
+                                "linear-gradient(135deg, var(--color-primary, #46634E), var(--color-primary-deep, #2D3B30))",
+                            color: "var(--color-on-primary, #fff)",
                             fontSize: 14,
                             fontWeight: 800,
                             letterSpacing: "-.01em",
@@ -210,7 +210,7 @@ const ResetPasswordPage = ({ showToast, onDone }) => {
                             justifyContent: "center",
                             gap: 8,
                             boxShadow:
-                                "0 8px 24px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.35)",
+                                "0 8px 24px rgba(63,81,66,.22), inset 0 1px 0 rgba(255,255,255,.2)",
                             transition: "transform .15s, box-shadow .15s",
                         }}
                     >

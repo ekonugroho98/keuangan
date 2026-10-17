@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useTheme } from "../../i18n/ThemeContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { APP_NAME } from "../../config/app";
+import { APP_NAME, APP_TAGLINE } from "../../config/app";
 
 const Navbar = ({ scrollY, onLogin, onSignup }) => {
     const { t, lang, setLang, languages } = useLanguage();
+    const { themeId, toggleTheme } = useTheme();
     const [showLang, setShowLang] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const isMobile = useIsMobile();
@@ -22,23 +24,36 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
             <nav style={{
                 position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
                 padding: isMobile ? "12px 16px" : "14px 24px",
-                background: (scrollY > 50 || mobileOpen) ? "rgba(10,10,16,.7)" : "transparent",
-                backdropFilter: (scrollY > 50 || mobileOpen) ? "saturate(180%) blur(24px)" : "none",
-                WebkitBackdropFilter: (scrollY > 50 || mobileOpen) ? "saturate(180%) blur(24px)" : "none",
-                borderBottom: (scrollY > 50 || mobileOpen) ? "1px solid rgba(255,255,255,.06)" : "none",
+                background: (scrollY > 50 || mobileOpen) ? "var(--bg-glass)" : "transparent",
+                backdropFilter: (scrollY > 50 || mobileOpen) ? "saturate(160%) blur(20px)" : "none",
+                WebkitBackdropFilter: (scrollY > 50 || mobileOpen) ? "saturate(160%) blur(20px)" : "none",
+                borderBottom: (scrollY > 50 || mobileOpen) ? "1px solid var(--color-border)" : "none",
                 transition: "all .3s",
             }}>
                 <div style={{ maxWidth: 1240, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    {/* Logo */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false); }}>
+                    {/* Logo — Keluarga Berkembang */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 11, cursor: "pointer" }} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false); }}>
                         <div style={{
-                            width: 34, height: 34, borderRadius: 11,
-                            background: "linear-gradient(135deg,#60fcc6,#19ce9b)",
+                            width: 40, height: 40, borderRadius: 12,
+                            background: "#FFFDF8",
+                            border: "1px solid var(--color-border)",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontWeight: 800, fontSize: 16, color: "#003828",
-                            boxShadow: "0 4px 14px rgba(96,252,198,.25), inset 0 1px 0 rgba(255,255,255,.35)",
-                        }}>{APP_NAME[0]}</div>
-                        <span style={{ fontWeight: 800, fontSize: 18, color: "#fff", letterSpacing: "-.02em" }}>{APP_NAME}</span>
+                            boxShadow: "var(--shadow-sm)",
+                            overflow: "hidden",
+                        }}>
+                            <img src="/logo-icon.png" alt={APP_NAME} style={{ width: 36, height: 36, objectFit: "contain" }} />
+                        </div>
+                        <div>
+                            <div style={{ fontFamily: "'Fredoka', sans-serif", fontWeight: 600, fontSize: isMobile ? 16 : 18, letterSpacing: "-.01em", lineHeight: 1.1 }}>
+                                <span style={{ color: "var(--color-soil, #7D513B)" }}>KELUARGA </span>
+                                <span style={{ color: "var(--color-primary, #46634E)" }}>BERKEMBANG</span>
+                            </div>
+                            {!isMobile && (
+                                <div className="font-quote" style={{ fontSize: 13.5, color: "var(--color-muted)", lineHeight: 1.1, marginTop: 1 }}>
+                                    {APP_TAGLINE}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Desktop Nav */}
@@ -48,8 +63,18 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                                 <button key={l.id} className="nav-link" onClick={() => scrollTo(l.id)}>{l.label}</button>
                             ))}
 
+                            {/* Theme Toggle (Soft Sage Light vs Dark Sage) */}
+                            <button
+                                onClick={toggleTheme}
+                                title={themeId === "dark" ? "Mode Sejuk (Terang)" : "Mode Teduh (Gelap)"}
+                                className="nav-link"
+                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", marginLeft: 4 }}
+                            >
+                                <span style={{ fontSize: 15 }}>{themeId === "dark" ? "🌿" : "🌙"}</span>
+                            </button>
+
                             {/* Language Picker */}
-                            <div style={{ position: "relative", marginLeft: 4 }}>
+                            <div style={{ position: "relative" }}>
                                 <button
                                     onClick={() => setShowLang(v => !v)}
                                     className="nav-link"
@@ -61,23 +86,23 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                                 {showLang && (
                                     <div style={{
                                         position: "absolute", top: "calc(100% + 8px)", right: 0,
-                                        background: "rgba(14,14,21,.98)", border: "1px solid rgba(255,255,255,.1)",
+                                        background: "var(--bg-elevated)", border: "1px solid var(--color-border)",
                                         borderRadius: 12, padding: 6, minWidth: 160, zIndex: 200,
-                                        boxShadow: "0 8px 24px rgba(0,0,0,.5)",
+                                        boxShadow: "var(--shadow-lg)",
                                     }}>
                                         {languages.map(l => (
                                             <button key={l.code} onClick={() => { setLang(l.code); setShowLang(false); }}
                                                 style={{
                                                     display: "flex", alignItems: "center", gap: 8,
                                                     width: "100%", padding: "8px 10px", borderRadius: 8, border: "none",
-                                                    background: lang === l.code ? "rgba(96,252,198,.15)" : "transparent",
-                                                    color: lang === l.code ? "#60fcc6" : "var(--color-muted)",
-                                                    fontSize: 12, fontWeight: lang === l.code ? 600 : 400,
+                                                    background: lang === l.code ? "var(--color-primary-soft)" : "transparent",
+                                                    color: lang === l.code ? "var(--color-primary)" : "var(--color-muted)",
+                                                    fontSize: 12, fontWeight: lang === l.code ? 700 : 500,
                                                     cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                                                 }}>
                                                 <span style={{ fontSize: 14 }}>{l.flag}</span>
                                                 <span>{l.label}</span>
-                                                {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "#60fcc6" }}>✓</span>}
+                                                {lang === l.code && <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-primary)" }}>✓</span>}
                                             </button>
                                         ))}
                                     </div>
@@ -89,20 +114,24 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                         </div>
                     )}
 
-                    {/* Mobile: Lang + Hamburger */}
+                    {/* Mobile: Theme + Lang + Hamburger */}
                     {isMobile && (
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {/* Mobile lang flag */}
+                            <button
+                                onClick={toggleTheme}
+                                style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center" }}
+                            >
+                                <span>{themeId === "dark" ? "🌿" : "🌙"}</span>
+                            </button>
                             <button
                                 onClick={() => { setShowLang(v => !v); setMobileOpen(false); }}
-                                style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}
+                                style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}
                             >
                                 <span>{currentLang?.flag}</span>
                             </button>
-                            {/* Hamburger */}
                             <button
                                 onClick={() => { setMobileOpen(v => !v); setShowLang(false); }}
-                                style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#fff", fontSize: 18, display: "flex", alignItems: "center" }}
+                                style={{ background: "var(--bg-surface)", border: "1px solid var(--color-border)", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "var(--color-text)", fontSize: 18, display: "flex", alignItems: "center" }}
                             >
                                 {mobileOpen ? "✕" : "☰"}
                             </button>
@@ -113,16 +142,16 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                 {/* Mobile lang dropdown */}
                 {isMobile && showLang && (
                     <div style={{ maxWidth: 1200, margin: "8px auto 0", padding: "0 4px" }}>
-                        <div style={{ background: "rgba(14,14,21,.98)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: 6 }}>
+                        <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--color-border)", borderRadius: 12, padding: 6 }}>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
                                 {languages.map(l => (
                                     <button key={l.code} onClick={() => { setLang(l.code); setShowLang(false); }}
                                         style={{
                                             display: "flex", alignItems: "center", gap: 6,
                                             padding: "8px 10px", borderRadius: 8, border: "none",
-                                            background: lang === l.code ? "rgba(96,252,198,.15)" : "transparent",
-                                            color: lang === l.code ? "#60fcc6" : "#94a3b8",
-                                            fontSize: 12, fontWeight: lang === l.code ? 600 : 400,
+                                            background: lang === l.code ? "var(--color-primary-soft)" : "transparent",
+                                            color: lang === l.code ? "var(--color-primary)" : "var(--color-muted)",
+                                            fontSize: 12, fontWeight: lang === l.code ? 700 : 500,
                                             cursor: "pointer", fontFamily: "inherit",
                                         }}>
                                         <span style={{ fontSize: 14 }}>{l.flag}</span>
@@ -137,14 +166,14 @@ const Navbar = ({ scrollY, onLogin, onSignup }) => {
                 {/* Mobile menu */}
                 {isMobile && mobileOpen && (
                     <div style={{ maxWidth: 1200, margin: "12px auto 0", padding: "0 4px", animation: "slideUp .2s" }}>
-                        <div style={{ background: "rgba(10,10,20,.98)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--color-border)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 4, boxShadow: "var(--shadow-lg)" }}>
                             {navLinks.map(l => (
                                 <button key={l.id} onClick={() => scrollTo(l.id)}
-                                    style={{ textAlign: "left", padding: "12px 14px", borderRadius: 10, border: "none", background: "transparent", color: "#cbd5e1", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                                    style={{ textAlign: "left", padding: "12px 14px", borderRadius: 10, border: "none", background: "transparent", color: "var(--color-text)", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                     {l.label}
                                 </button>
                             ))}
-                            <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", marginTop: 4, paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ borderTop: "1px solid var(--color-border-soft)", marginTop: 4, paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
                                 <button className="btn-secondary" onClick={() => { onLogin(); setMobileOpen(false); }} style={{ width: "100%", padding: "12px", fontSize: 14 }}>{t("lp.nav.login")}</button>
                                 <button className="btn-primary" onClick={() => { onSignup(); setMobileOpen(false); }} style={{ width: "100%", padding: "12px", fontSize: 14 }}>{t("lp.nav.signup")}</button>
                             </div>

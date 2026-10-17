@@ -25,7 +25,7 @@ const LandingPage = ({ showToast }) => {
     const [formErrors, setFormErrors] = useState({});
     const [formStep, setFormStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    const [chatMessages, setChatMessages] = useState([{ role: "ai", text: `Halo! Gue ${APP_AI_NAME} 👋 Tanya apa aja soal keuangan lu!` }]);
+    const [chatMessages, setChatMessages] = useState([{ role: "ai", text: `Halo! Gue ${APP_AI_NAME} 🌱 Mau cek anggaran belanja dapur, stok kulkas, atau keuangan keluarga hari ini?` }]);
     const [chatInput, setChatInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
 
@@ -109,29 +109,20 @@ const LandingPage = ({ showToast }) => {
         setChatInput("");
         setIsTyping(true);
         setTimeout(() => {
-            setChatMessages(p => [...p, { role: "ai", text: ["Coba rule 50/30/20 buat budgeting.", "Spending pattern lu naik 15% di hiburan.", "Berdasarkan analisis, lu bisa hemat 30% di Food."][Math.floor(Math.random() * 3)] }]);
+            setChatMessages(p => [...p, { role: "ai", text: [
+                "Anggaran belanja dapur bulan ini masih aman (terpakai 62%). Susu UHT paling murah di Indomaret Rp 18.500/kotak.",
+                "Stok telur & minyak goreng di dapur sisa 1, mau langsung gue masukin ke Daftar Belanja Keluarga?",
+                "Transfer uang belanja dari Ayah Rp 5,8 jt sudah masuk ke rekening Ibu dan siap dialokasikan.",
+            ][Math.floor(Math.random() * 3)] }]);
             setIsTyping(false);
-        }, 1500);
+        }, 1200);
     };
 
-    const openSignup = () => { setShowSignup(true); };
     const closeSignup = () => { setShowSignup(false); setFormErrors({}); setFormStep(1); };
     const closeLogin = () => { setShowLogin(false); setFormErrors({}); };
 
-    /* Landing page selalu dark — theme toggle hanya berlaku untuk dashboard */
-    const darkVars = {
-        "--bg-app": "#0e0e15", "--bg-deep": "#0f0f1a", "--bg-surface": "#1f1f28",
-        "--bg-surface-low": "#13131a", "--bg-surface-hover": "#191921",
-        "--bg-glass": "rgba(31,31,38,.6)", "--bg-alt-row": "rgba(37,37,47,.35)",
-        "--color-text": "#efecf7", "--color-muted": "#acaab4", "--color-subtle": "#76747e",
-        "--color-primary": "#60fcc6", "--color-on-primary": "#005e44",
-        "--color-border": "rgba(255,255,255,.07)", "--color-border-soft": "rgba(255,255,255,.04)",
-        "--color-expense": "#ff716c", "--color-transfer": "#4FC3F7",
-        "--nav-active-bg": "rgba(27,27,34,.5)",
-    };
-
     return (
-        <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", background: "#0e0e15", color: "#e2e8f0", minHeight: "100vh", overflowX: "hidden", ...darkVars }}>
+        <div style={{ fontFamily: "'Quicksand',-apple-system,sans-serif", background: "var(--bg-app)", color: "var(--color-text)", minHeight: "100vh", overflowX: "hidden" }}>
             <Navbar scrollY={scrollY} onLogin={() => setShowLogin(true)} onSignup={() => setShowSignup(true)} />
             <HeroSection onSignup={() => setShowSignup(true)} onDemo={() => setShowDemo(true)} />
             <FeaturesSection />

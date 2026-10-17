@@ -36,7 +36,7 @@ meApp.openapi(
       language: string; theme: string; active_household_id: string | null; ai_config: { provider?: string; model?: string; apiKey?: string; disabled?: boolean }
     }[]>`select avatar_color, hidden_menus, app_name, app_tagline, language, theme, active_household_id, ai_config from user_settings where user_id = ${userId}`)
     const row = rows[0]
-    if (!row) return c.json({ avatar_color: '#60fcc6', hidden_menus: [], app_name: 'Karaya', app_tagline: 'Wealth Ledger', language: 'id', theme: 'dark', active_household_id: null, ai_config: { has_api_key: false } })
+    if (!row) return c.json({ avatar_color: '#46634E', hidden_menus: [], app_name: 'Keluarga Berkembang', app_tagline: 'Berkembang Bersama dalam Kehangatan', language: 'id', theme: 'dark', active_household_id: null, ai_config: { has_api_key: false } })
     const { ai_config, ...rest } = row
     return c.json({ ...rest, ai_config: { provider: ai_config?.provider, model: ai_config?.model, has_api_key: !!ai_config?.apiKey, disabled: ai_config?.disabled ?? false } })
   },
@@ -58,7 +58,7 @@ meApp.openapi(
         : undefined
       await tx`
         insert into user_settings (user_id, avatar_color, hidden_menus, app_name, app_tagline, language, theme, active_household_id, ai_config)
-        values (${userId}, ${body.avatar_color ?? '#60fcc6'}, ${tx.json(body.hidden_menus ?? [])}, ${body.app_name ?? 'Karaya'}, ${body.app_tagline ?? 'Wealth Ledger'}, ${body.language ?? 'id'}, ${body.theme ?? 'dark'}, ${body.active_household_id ?? null}, ${tx.json(mergedAiConfig ?? {})})
+        values (${userId}, ${body.avatar_color ?? '#46634E'}, ${tx.json(body.hidden_menus ?? [])}, ${body.app_name ?? 'Keluarga Berkembang'}, ${body.app_tagline ?? 'Berkembang Bersama dalam Kehangatan'}, ${body.language ?? 'id'}, ${body.theme ?? 'dark'}, ${body.active_household_id ?? null}, ${tx.json(mergedAiConfig ?? {})})
         on conflict (user_id) do update set
           avatar_color = coalesce(${body.avatar_color ?? null}, user_settings.avatar_color),
           hidden_menus = coalesce(${tx.json(body.hidden_menus ?? null)}, user_settings.hidden_menus),

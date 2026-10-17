@@ -115,7 +115,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
     const involvesAccount = (tx, acc) => {
         if (!acc) return true;
         if (tx.account_name === acc) return true;
-        if (tx.type === "transfer" && tx.to_account === acc) return true;
+        if (tx.type === "transfer" && tx.to_account_name === acc) return true;
         return false;
     };
 
@@ -135,18 +135,26 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
             return (
                 tx.note?.toLowerCase().includes(q) ||
                 tx.category?.toLowerCase().includes(q) ||
-                tx.account_name?.toLowerCase().includes(q)
+                tx.account_name?.toLowerCase().includes(q) ||
+                tx.to_account_name?.toLowerCase().includes(q)
             );
         }
         return true;
     });
 
     // Summary dihitung dari filtered (semua filter aktif mempengaruhi total)
-    const sumIn       = filtered.filter(tx => tx.type === "income" ).reduce((a, tx) => a + tx.amount, 0);
-    const sumOut      = filtered.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
+    const offsetPiutang = !filterAccount && filterCategory !== "Piutang" && filterType === "all";
+    const piutangOffset = offsetPiutang
+        ? filtered.filter(tx => tx.type === "income" && tx.category === "Piutang").reduce((a, tx) => a + tx.amount, 0)
+        : 0;
+    const sumIn = filtered
+        .filter(tx => tx.type === "income" && (!offsetPiutang || tx.category !== "Piutang"))
+        .reduce((a, tx) => a + tx.amount, 0);
+    const rawOut = filtered.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
+    const sumOut = offsetPiutang ? Math.max(0, rawOut - piutangOffset) : rawOut;
     const sumTransfer = filtered.filter(tx => tx.type === "transfer").reduce((a, tx) => a + tx.amount, 0);
     const sumTransferIn  = filterAccount
-        ? filtered.filter(tx => tx.type === "transfer" && tx.to_account === filterAccount).reduce((a, tx) => a + tx.amount, 0)
+        ? filtered.filter(tx => tx.type === "transfer" && tx.to_account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
         : 0;
     const sumTransferOut = filterAccount
         ? filtered.filter(tx => tx.type === "transfer" && tx.account_name === filterAccount).reduce((a, tx) => a + tx.amount, 0)
@@ -188,7 +196,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
     ];
 
     const typeMeta = (type) => {
-        if (type === "income")   return { badgeBg: "rgba(96,252,198,.12)",  badgeColor: "var(--color-primary)", iconBg: "rgba(96,252,198,.1)",  amtColor: "var(--color-primary)", sign: "+"  };
+        if (type === "income")   return { badgeBg: "rgba(131,155,122,.12)",  badgeColor: "var(--color-primary)", iconBg: "rgba(131,155,122,.1)",  amtColor: "var(--color-primary)", sign: "+"  };
         if (type === "transfer") return { badgeBg: "rgba(79,195,247,.12)",  badgeColor: "#4FC3F7", iconBg: "rgba(79,195,247,.1)",  amtColor: "#4FC3F7", sign: "↔ " }; // netral — bukan minus
         return                          { badgeBg: "rgba(255,113,108,.12)", badgeColor: "#ff716c", iconBg: "rgba(255,113,108,.1)", amtColor: "#ff716c", sign: "-"  };
     };
@@ -300,7 +308,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                             <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.6 }}>{t("tx.income") || "Pemasukan"}</div>
-                            <span className="chip chip-mint">{filtered.filter(tx => tx.type === "income").length} tx</span>
+                            <span className="chip chip-mint">{filtered.filter(tx => tx.type === "income" && (!offsetPiutang || tx.category !== "Piutang")).length} tx</span>
                         </div>
                         <div className="num-tight mono" style={{ fontSize: "clamp(20px, 2.6vw, 26px)", fontWeight: 900, color: "var(--color-primary)", letterSpacing: "-.03em", lineHeight: 1 }}>+{fmtRp(sumIn)}</div>
                         <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 6 }}>{t("tx.moreEconomical") || "periode ini"}</div>
@@ -437,8 +445,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                 value={filterAccount}
                                 onChange={e => { setFilterAccount(e.target.value); setPage(1); }}
                                 style={{
-                                    background: filterAccount ? "rgba(96,252,198,.1)" : "transparent",
-                                    border: filterAccount ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    background: filterAccount ? "rgba(131,155,122,.1)" : "transparent",
+                                    border: filterAccount ? "1px solid rgba(131,155,122,.3)" : "none",
                                     borderRadius: 8,
                                     color: filterAccount ? "var(--color-primary)" : "var(--color-muted)",
                                     fontSize: 12, fontWeight: filterAccount ? 700 : 500,
@@ -467,8 +475,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                 value={filterCategory}
                                 onChange={e => { setFilterCategory(e.target.value); setPage(1); }}
                                 style={{
-                                    background: filterCategory ? "rgba(96,252,198,.1)" : "transparent",
-                                    border: filterCategory ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    background: filterCategory ? "rgba(131,155,122,.1)" : "transparent",
+                                    border: filterCategory ? "1px solid rgba(131,155,122,.3)" : "none",
                                     borderRadius: 8,
                                     color: filterCategory ? "var(--color-primary)" : "var(--color-muted)",
                                     fontSize: 12, fontWeight: filterCategory ? 700 : 500,
@@ -498,8 +506,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                 value={filterMember}
                                 onChange={e => { setFilterMember(e.target.value); setPage(1); }}
                                 style={{
-                                    background: filterMember ? "rgba(96,252,198,.1)" : "transparent",
-                                    border: filterMember ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    background: filterMember ? "rgba(131,155,122,.1)" : "transparent",
+                                    border: filterMember ? "1px solid rgba(131,155,122,.3)" : "none",
                                     borderRadius: 8,
                                     color: filterMember ? "var(--color-primary)" : "var(--color-muted)",
                                     fontSize: 12, fontWeight: filterMember ? 700 : 500,
@@ -528,8 +536,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                 value={filterBeneficiary}
                                 onChange={e => { setFilterBeneficiary(e.target.value); setPage(1); }}
                                 style={{
-                                    background: filterBeneficiary ? "rgba(96,252,198,.1)" : "transparent",
-                                    border: filterBeneficiary ? "1px solid rgba(96,252,198,.3)" : "none",
+                                    background: filterBeneficiary ? "rgba(131,155,122,.1)" : "transparent",
+                                    border: filterBeneficiary ? "1px solid rgba(131,155,122,.3)" : "none",
                                     borderRadius: 8,
                                     color: filterBeneficiary ? "var(--color-primary)" : "var(--color-muted)",
                                     fontSize: 12, fontWeight: filterBeneficiary ? 700 : 500,
@@ -670,7 +678,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                             {beneficiaryEnabled && tx.beneficiary && (
                                                 <span style={{
                                                     fontSize: 9, padding: "2px 8px", borderRadius: 9999,
-                                                    background: "rgba(96,252,198,.1)", color: "var(--color-primary)",
+                                                    background: "rgba(131,155,122,.1)", color: "var(--color-primary)",
                                                     fontWeight: 700, whiteSpace: "nowrap",
                                                 }}>
                                                     untuk: {tx.beneficiary}
@@ -679,8 +687,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                         </div>
                                         <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0 }}>
                                             {fmtDate(tx.date)} · {tCat(tx.category)} ·{" "}
-                                            {tx.type === "transfer" && tx.to_account
-                                                ? <span style={{ color: "#4FC3F7", fontWeight: 600 }}>{tx.account_name} → {tx.to_account}</span>
+                                            {tx.type === "transfer" && tx.to_account_name
+                                                ? <span style={{ color: "#4FC3F7", fontWeight: 600 }}>{tx.account_name} → {tx.to_account_name}</span>
                                                 : tx.account_name
                                             }
                                         </p>
@@ -742,7 +750,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                             <button
                                 key={p}
                                 onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                                style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${p === page ? "var(--color-primary)" : "var(--color-border)"}`, background: p === page ? "rgba(96,252,198,.15)" : "transparent", color: p === page ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: p === page ? 700 : 500, cursor: "pointer", fontFamily: "inherit" }}>
+                                style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${p === page ? "var(--color-primary)" : "var(--color-border)"}`, background: p === page ? "rgba(131,155,122,.15)" : "transparent", color: p === page ? "var(--color-primary)" : "var(--color-muted)", fontSize: 12, fontWeight: p === page ? 700 : 500, cursor: "pointer", fontFamily: "inherit" }}>
                                 {p}
                             </button>
                         ))

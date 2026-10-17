@@ -28,6 +28,12 @@ export function useShopping(enabled = true) {
         return result;
     };
 
+    const updateItem = async (id, payload) => {
+        const result = await unwrap(await api.PATCH("/v1/shopping/{id}", { params: { path: { id } }, body: payload }));
+        invalidate();
+        return result;
+    };
+
     const markBought = async (id) => {
         await unwrap(await api.PATCH("/v1/shopping/{id}", { params: { path: { id } }, body: { status: "bought" } }));
         invalidate();
@@ -47,7 +53,7 @@ export function useShopping(enabled = true) {
         needed: query.data ?? [],
         bought: boughtQuery.data ?? [],
         shoppingLoading: query.isLoading,
-        addItem, markBought, markNeeded, deleteItem,
+        addItem, updateItem, markBought, markNeeded, deleteItem,
     };
 }
 

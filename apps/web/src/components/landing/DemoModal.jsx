@@ -1,16 +1,16 @@
 import Modal from "../ui/Modal";
 
 const METRICS = [
-    { label: "Income", value: "Rp 10,5jt", color: "var(--color-primary)", icon: "↑", chip: "chip-mint" },
-    { label: "Expense", value: "Rp 2,8jt", color: "var(--color-expense)", icon: "↓", chip: "chip-red" },
-    { label: "Goals", value: "3 aktif", color: "var(--color-transfer)", icon: "◎", chip: "chip-blue" },
+    { label: "Pemasukan", value: "Rp 10,5jt", color: "var(--color-primary)", icon: "↑", chip: "chip-mint" },
+    { label: "Pengeluaran", value: "Rp 2,8jt", color: "var(--color-expense)", icon: "↓", chip: "chip-red" },
+    { label: "Jatah Aman", value: "Rp 385rb/hr", color: "var(--color-transfer)", icon: "◎", chip: "chip-blue" },
 ];
 
 const FEATURES = [
-    { icon: "📊", label: "Analitik cerdas" },
-    { icon: "🎯", label: "Target tabungan" },
-    { icon: "🔔", label: "Reminder tagihan" },
-    { icon: "🔒", label: "Data terenkripsi" },
+    { icon: "📊", label: "Keuangan suami-istri" },
+    { icon: "🛒", label: "Belanja & banding harga" },
+    { icon: "🧊", label: "Stok kulkas & rumah" },
+    { icon: "🎯", label: "Dana sekolah & impian" },
 ];
 
 const DemoModal = ({ open, onClose, onSignup }) => (
@@ -28,8 +28,8 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                 position: "relative", overflow: "hidden",
             }}>
                 {/* Ambient aurora orbs */}
-                <div style={{ position: "absolute", top: -120, left: -70, width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,252,198,.22), transparent 70%)", pointerEvents: "none", filter: "blur(14px)" }} />
-                <div style={{ position: "absolute", bottom: -140, right: -80, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,189,248,.16), transparent 70%)", pointerEvents: "none", filter: "blur(14px)" }} />
+                <div style={{ position: "absolute", top: -120, left: -70, width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, var(--color-primary-soft), transparent 70%)", pointerEvents: "none", filter: "blur(14px)" }} />
+                <div style={{ position: "absolute", bottom: -140, right: -80, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(200,125,85,.14), transparent 70%)", pointerEvents: "none", filter: "blur(14px)" }} />
 
                 {/* Close */}
                 <button
@@ -50,7 +50,7 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                     {/* Header */}
                     <div style={{ textAlign: "center", marginBottom: 20 }}>
                         <div className="chip chip-mint" style={{ display: "inline-flex", marginBottom: 12 }}>
-                            <span>◉</span> LIVE PREVIEW
+                            <span>◉</span> CONTOH RUANG KELUARGA
                         </div>
                         <h2 style={{
                             fontSize: "clamp(22px, 3vw, 28px)",
@@ -58,11 +58,12 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                             color: "var(--color-text)",
                             letterSpacing: "-.03em",
                             margin: 0,
+                            fontFamily: "var(--font-display)",
                         }}>
-                            Intip <span className="gradient-text">dashboard</span> dulu
+                            Intip <span className="gradient-text">dasbor keluarga</span> dulu
                         </h2>
                         <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
-                            Ini contoh tampilan yang bakal lu lihat tiap hari ✨
+                            Tampilan hangat & tenang untuk kelola keuangan dan rumah bersama ✨
                         </p>
                     </div>
 
@@ -84,7 +85,7 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-amber)" }} />
                                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-primary)" }} />
                                 <span className="eyebrow" style={{ marginLeft: "auto", fontSize: 9, color: "var(--color-subtle)" }}>
-                                    DASBOR · APRIL
+                                    DASBOR KELUARGA · OKTOBER
                                 </span>
                             </div>
 
@@ -95,7 +96,7 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                                 fontWeight: 700,
                                 letterSpacing: 1.4,
                                 textTransform: "uppercase",
-                            }}>Total Balance</div>
+                            }}>Total Saldo Keluarga</div>
                             <div className="num-tight" style={{
                                 fontSize: "clamp(26px, 4vw, 32px)",
                                 fontWeight: 900,
@@ -104,7 +105,7 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                                 marginTop: 2,
                             }}>Rp 9.270.000</div>
                             <div className="chip chip-mint" style={{ display: "inline-flex", marginTop: 6, marginBottom: 16 }}>
-                                <span>↑</span> Saving rate 27%
+                                <span>⏳</span> Sisa kas 73% · Aman s/d akhir bulan
                             </div>
 
                             {/* Metrics grid */}
@@ -145,8 +146,8 @@ const DemoModal = ({ open, onClose, onSignup }) => (
                                         borderRadius: 4,
                                         background: i === 5
                                             ? "linear-gradient(180deg, var(--color-primary), var(--color-primary-deep))"
-                                            : "rgba(96,252,198,.22)",
-                                        boxShadow: i === 5 ? "0 0 12px rgba(96,252,198,.4)" : "none",
+                                            : "var(--color-primary-soft)",
+                                        boxShadow: i === 5 ? "0 0 12px var(--color-primary-soft)" : "none",
                                     }} />
                                 ))}
                             </div>

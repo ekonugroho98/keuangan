@@ -16,7 +16,7 @@ const FaqSection = () => {
             {/* Ambient aurora */}
             <div aria-hidden style={{
                 position: "absolute", inset: 0, pointerEvents: "none",
-                background: "radial-gradient(600px 400px at 85% 20%, rgba(251,191,36,.06), transparent 60%), radial-gradient(500px 300px at 10% 80%, rgba(96,252,198,.05), transparent 60%)",
+                background: "radial-gradient(600px 400px at 85% 20%, rgba(200,150,62,.08), transparent 60%), radial-gradient(500px 300px at 10% 80%, rgba(70,99,78,.07), transparent 60%)",
             }} />
 
             <div style={{ maxWidth: 820, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -25,17 +25,17 @@ const FaqSection = () => {
                         <div style={{
                             display: "inline-flex", alignItems: "center", gap: 8,
                             padding: "6px 14px", borderRadius: 99,
-                            background: "rgba(251,191,36,.10)",
-                            border: "1px solid rgba(251,191,36,.26)",
+                            background: "rgba(200,150,62,.12)",
+                            border: "1px solid rgba(200,150,62,.28)",
                             marginBottom: 20, backdropFilter: "blur(12px)",
                         }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 99, background: "#fbbf24", animation: "pulse 2s infinite" }} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "#fbbf24", letterSpacing: 1.2 }}>{t("lp.faq.tag")}</span>
+                            <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-warn)", animation: "pulse 2s infinite" }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-warn)", letterSpacing: 1.2 }}>{t("lp.faq.tag")}</span>
                         </div>
                         <h2 style={{
                             fontSize: "clamp(32px, 5vw, 52px)",
-                            fontWeight: 900, letterSpacing: "-.04em",
-                            color: "var(--color-text)", lineHeight: 1.05, marginBottom: 16,
+                            fontWeight: 600, letterSpacing: "-.03em",
+                            color: "var(--color-text)", lineHeight: 1.08, marginBottom: 16,
                         }}>
                             {t("lp.faq.h2")}{" "}
                             <span className="gradient-text">{t("lp.faq.h2g")}</span>
@@ -62,8 +62,8 @@ const FaqSection = () => {
                                         padding: "20px 24px",
                                         cursor: "pointer",
                                         transition: "all .3s cubic-bezier(.2,.8,.2,1)",
-                                        borderColor: isOpen ? "rgba(96,252,198,.4)" : undefined,
-                                        background: isOpen ? "rgba(96,252,198,.04)" : undefined,
+                                        borderColor: isOpen ? "var(--color-primary)" : undefined,
+                                        background: isOpen ? "var(--bg-surface-low)" : undefined,
                                     }}
                                     role="button"
                                     aria-expanded={isOpen}
@@ -72,7 +72,7 @@ const FaqSection = () => {
                                 >
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
                                         <h3 style={{
-                                            fontSize: 15, fontWeight: 700,
+                                            fontSize: 15, fontWeight: 600,
                                             color: "var(--color-text)",
                                             lineHeight: 1.4,
                                             letterSpacing: "-.01em",
@@ -80,8 +80,8 @@ const FaqSection = () => {
                                         }}>{f.q}</h3>
                                         <span style={{
                                             width: 32, height: 32, borderRadius: 10,
-                                            background: isOpen ? "rgba(96,252,198,.15)" : "var(--color-border-soft)",
-                                            border: `1px solid ${isOpen ? "rgba(96,252,198,.35)" : "transparent"}`,
+                                            background: isOpen ? "var(--color-border)" : "var(--color-border-soft)",
+                                            border: `1px solid ${isOpen ? "var(--color-primary)" : "transparent"}`,
                                             color: isOpen ? "var(--color-primary)" : "var(--color-muted)",
                                             display: "flex", alignItems: "center", justifyContent: "center",
                                             fontSize: 18, fontWeight: 400,

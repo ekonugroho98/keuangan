@@ -5,8 +5,8 @@ import { useHousehold } from "../auth/HouseholdProvider";
 const LOCATIONS = [
     { value: "fridge", label: "Kulkas", icon: "🧊" },
     { value: "freezer", label: "Freezer", icon: "❄️" },
-    { value: "shelf", label: "Lemari", icon: "🗄️" },
-    { value: "other", label: "Lainnya", icon: "📦" },
+    { value: "shelf", label: "Lemari & Dapur", icon: "🗄️" },
+    { value: "other", label: "Rumah Lainnya", icon: "📦" },
 ];
 export { LOCATIONS };
 

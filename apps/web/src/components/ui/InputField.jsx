@@ -57,8 +57,8 @@ const InputField = ({ label, type = "text", value, onChange, error, placeholder,
                 }}
                 onFocus={e => {
                     e.target.style.borderColor = "var(--color-primary)";
-                    e.target.style.background = "rgba(96,252,198,.04)";
-                    e.target.style.boxShadow = "0 0 0 3px var(--nav-active-bg, rgba(96,252,198,.12))";
+                    e.target.style.background = "rgba(131,155,122,.04)";
+                    e.target.style.boxShadow = "0 0 0 3px var(--nav-active-bg, rgba(131,155,122,.12))";
                 }}
                 onBlur={e => {
                     e.target.style.borderColor = error ? "rgba(255,113,108,.5)" : "var(--glass-border)";

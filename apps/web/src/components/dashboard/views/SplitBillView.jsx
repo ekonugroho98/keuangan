@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLanguage } from "../../../i18n/LanguageContext";
+import { useMembers } from "../../../hooks/useMembers";
 
 const fmtRp = (n) => "Rp " + (n || 0).toLocaleString("id-ID");
 
@@ -50,6 +51,7 @@ const selectStyle = {
 
 const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
     const { t } = useLanguage();
+    const { members: householdMembers = [] } = useMembers();
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState(emptyForm());
     const [expanded, setExpanded] = useState(null);
@@ -70,6 +72,41 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
             ...p,
             members: p.members.map(m => m.id === id ? { ...m, [field]: val } : m),
         }));
+    };
+
+    const splitEqually = () => {
+        const total = parseInt(form.total_amount) || 0;
+        const count = form.members.length;
+        if (total <= 0 || count === 0) return;
+        const base = Math.floor(total / count);
+        const remainder = total - base * count;
+        setForm(p => ({
+            ...p,
+            members: p.members.map((m, idx) => ({
+                ...m,
+                amount: String(idx === 0 ? base + remainder : base),
+            })),
+        }));
+    };
+
+    const quickAddHouseholdMember = (displayName) => {
+        if (!displayName) return;
+        setForm(p => {
+            if (p.members.some(m => m.name.trim().toLowerCase() === displayName.toLowerCase())) {
+                return p;
+            }
+            const emptyIdx = p.members.findIndex(m => !m.name.trim());
+            if (emptyIdx !== -1) {
+                return {
+                    ...p,
+                    members: p.members.map((m, i) => i === emptyIdx ? { ...m, name: displayName } : m),
+                };
+            }
+            return {
+                ...p,
+                members: [...p.members, { id: genId(), name: displayName, amount: "" }],
+            };
+        });
     };
 
     const totalMemberAmount = useMemo(() =>
@@ -377,12 +414,56 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                         />
 
                         {/* Peserta */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
                             <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-muted)" }}>DAFTAR PESERTA</label>
-                            <span style={{ fontSize: 11, color: totalMemberAmount !== parseInt(form.total_amount || 0) ? "#ff716c" : "var(--color-primary)" }}>
-                                Total share: {fmtRp(totalMemberAmount)}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <button
+                                    type="button"
+                                    onClick={splitEqually}
+                                    disabled={!(parseInt(form.total_amount) > 0)}
+                                    style={{
+                                        padding: "5px 10px", borderRadius: 99,
+                                        border: "1px solid var(--color-primary)",
+                                        background: "var(--color-primary-soft)",
+                                        color: "var(--color-primary)",
+                                        fontSize: 11, fontWeight: 800,
+                                        cursor: parseInt(form.total_amount) > 0 ? "pointer" : "not-allowed",
+                                        opacity: parseInt(form.total_amount) > 0 ? 1 : 0.45,
+                                        fontFamily: "inherit",
+                                    }}
+                                >
+                                    ⚖️ Bagi Rata Otomatis
+                                </button>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: totalMemberAmount !== parseInt(form.total_amount || 0) ? "#ff716c" : "var(--color-primary)" }}>
+                                    Total share: {fmtRp(totalMemberAmount)}
+                                </span>
+                            </div>
                         </div>
+
+                        {householdMembers.length > 0 && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                                <span style={{ fontSize: 10.5, color: "var(--color-subtle)", fontWeight: 700 }}>Anggota Keluarga:</span>
+                                {householdMembers.map(hm => {
+                                    const added = form.members.some(m => m.name.trim().toLowerCase() === (hm.display_name || "").toLowerCase());
+                                    return (
+                                        <button
+                                            key={hm.id}
+                                            type="button"
+                                            onClick={() => quickAddHouseholdMember(hm.display_name)}
+                                            style={{
+                                                padding: "4px 10px", borderRadius: 99,
+                                                border: `1px solid ${added ? "var(--color-primary)" : "var(--glass-border)"}`,
+                                                background: added ? "var(--color-primary-soft)" : "var(--glass-2)",
+                                                color: added ? "var(--color-primary)" : "var(--color-muted)",
+                                                fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                                            }}
+                                        >
+                                            {added ? "✓ " : "+ "}{hm.display_name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                             {form.members.map((m, idx) => (

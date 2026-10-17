@@ -7,9 +7,9 @@ import OwnerSelect from "../../household/OwnerSelect";
 import OwnerBadge from "../../household/OwnerBadge";
 
 const EMOJI_OPTIONS = ["🏠","🚗","✈️","📱","💻","🎓","💍","🏖️","💰","🏋️","🎮","📚","🌟","🏦","🎁","🚀","🛍️","🍕","☕","🌿","❤️","🔧","🏪","🎵","🐾","⚡","🎬","💊","🌍","🏆"];
-const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899","#14b8a6","#f97316","var(--color-subtle)","#a855f7","#22c55e"];
+const COLOR_OPTIONS = ["#839B7A","#46634E","#C87D55","#D9A74A","#4FC3F7","#14b8a6","#f97316","#ff716c","#ec4899","#a855f7","#6366f1","#7D513B"];
 
-const emptyForm = () => ({ name: "", icon: "🏠", color: "var(--color-primary)", target: "", current: "", deadline: "", owner: "me" });
+const emptyForm = () => ({ name: "", icon: "🏠", color: "#839B7A", target: "", current: "", deadline: "", owner: "me" });
 
 // Hitung sisa hari dari hari ini ke deadline
 function getDaysLeft(deadline) {
@@ -309,7 +309,7 @@ const GoalsView = ({ goals, accounts = [], onAdd, onEdit, onDelete, onTopup }) =
                         {/* Toggle: catat sebagai transaksi */}
                         <div
                             onClick={() => setTopupRecord(p => !p)}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: topupRecord ? "rgba(96,252,198,.06)" : "var(--bg-surface-low)", border: `1px solid ${topupRecord ? "rgba(96,252,198,.25)" : "var(--color-border-soft)"}`, borderRadius: 10, padding: "11px 14px", marginBottom: topupRecord ? 10 : 18, cursor: "pointer", transition: "all .15s" }}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: topupRecord ? "rgba(131,155,122,.06)" : "var(--bg-surface-low)", border: `1px solid ${topupRecord ? "rgba(131,155,122,.25)" : "var(--color-border-soft)"}`, borderRadius: 10, padding: "11px 14px", marginBottom: topupRecord ? 10 : 18, cursor: "pointer", transition: "all .15s" }}
                         >
                             <div>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>Catat sebagai pengeluaran</div>
@@ -414,7 +414,7 @@ const GoalsView = ({ goals, accounts = [], onAdd, onEdit, onDelete, onTopup }) =
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
+                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "rgba(131,155,122,.45)" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(131,155,122,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
                                     {e}
                                 </button>
                             ))}

@@ -178,10 +178,10 @@ function PriceGuide({ type, brand }) {
 
 const TYPE_KEYS = ["reksa_dana","saham","emas","crypto","deposito","properti","obligasi","lainnya"];
 const TYPE_ICONS  = { reksa_dana:"📊", saham:"📈", emas:"🥇", crypto:"₿", deposito:"🏦", properti:"🏠", obligasi:"📜", lainnya:"💼" };
-const TYPE_COLORS = { reksa_dana:"var(--color-primary)", saham:"var(--color-primary)", emas:"#f59e0b", crypto:"#f97316", deposito:"#4FC3F7", properti:"var(--color-primary)", obligasi:"#ec4899", lainnya:"var(--color-subtle)" };
+const TYPE_COLORS = { reksa_dana:"#839B7A", saham:"#46634E", emas:"#D9A74A", crypto:"#f97316", deposito:"#4FC3F7", properti:"#C87D55", obligasi:"#ec4899", lainnya:"#7D513B" };
 
 const EMOJI_OPTIONS = ["📊","📈","🥇","₿","🏦","🏠","📜","💼","💎","🚀","⚡","🌿","🎯","💰","🔮","🏆","📱","🖥️","🚗","✈️"];
-const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#f59e0b","#ff716c","#ec4899","#f97316","#14b8a6","var(--color-subtle)","#a855f7","#22c55e"];
+const COLOR_OPTIONS = ["#839B7A","#46634E","#C87D55","#D9A74A","#4FC3F7","#14b8a6","#f97316","#ff716c","#ec4899","#a855f7","#6366f1","#7D513B"];
 
 // ── Default satuan per tipe aset ──
 const DEFAULT_UNITS = {
@@ -205,7 +205,7 @@ const GOLD_BRANDS = [
 ];
 
 const emptyForm = (type = "reksa_dana") => ({
-    name: "", type, icon: TYPE_ICONS[type] || "📊", color: TYPE_COLORS[type] || "var(--color-primary)",
+    name: "", type, icon: TYPE_ICONS[type] || "📊", color: TYPE_COLORS[type] || "#839B7A",
     brand: null,
     buy_price: "", current_value: "", quantity: "", unit: DEFAULT_UNITS[type] || "unit",
     buy_date: "", notes: "",
@@ -584,13 +584,13 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                 </div>
                             )}
                             {stockData && (
-                                <div style={{ fontSize: 11, color: stockData.change_pct >= 0 ? "var(--color-primary)" : "var(--color-expense, #ff716c)", background: stockData.change_pct >= 0 ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${stockData.change_pct >= 0 ? "rgba(96,252,198,.2)" : "rgba(255,113,108,.2)"}`, borderRadius: 10, padding: "5px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
+                                <div style={{ fontSize: 11, color: stockData.change_pct >= 0 ? "var(--color-primary)" : "var(--color-expense, #ff716c)", background: stockData.change_pct >= 0 ? "rgba(131,155,122,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${stockData.change_pct >= 0 ? "rgba(131,155,122,.2)" : "rgba(255,113,108,.2)"}`, borderRadius: 10, padding: "5px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
                                     <span className="num-tight mono">{inv.kode_saham} · {fmtRp(stockData.price)}/saham</span>
                                     <span className="num-tight" style={{ fontWeight: 700 }}>{formatChangePct(stockData.change_pct)}</span>
                                 </div>
                             )}
 
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.18)" : "rgba(255,113,108,.18)"}`, borderRadius: 12, padding: "8px 12px", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isProfit ? "rgba(131,155,122,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(131,155,122,.18)" : "rgba(255,113,108,.18)"}`, borderRadius: 12, padding: "8px 12px", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
                                 <div style={{ fontSize: 12, color: "var(--color-subtle)" }}>{t("inv.gainLoss")}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                     <span className="num-tight mono" style={{ fontSize: 13, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "var(--color-expense, #ff716c)" }}>
@@ -770,7 +770,7 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
+                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "rgba(131,155,122,.45)" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(131,155,122,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
                                     {e}
                                 </button>
                             ))}
@@ -849,15 +849,15 @@ const InvestasiView = ({ investments = [], onAdd, onEdit, onDelete, goldPrices, 
                                         <div style={{ background: "var(--bg-surface-low)", borderRadius: 12, padding: "12px 14px" }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
                                                 <span style={{ fontSize: 10, color: "var(--color-subtle)" }}>NILAI SEKARANG</span>
-                                                {live && <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 4, padding: "1px 5px" }}>⚡ LIVE</span>}
+                                                {live && <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(131,155,122,.15)", color: "var(--color-primary)", border: "1px solid rgba(131,155,122,.3)", borderRadius: 4, padding: "1px 5px" }}>⚡ LIVE</span>}
                                             </div>
                                             <div style={{ fontSize: 15, fontWeight: 700, color: live ? "var(--color-primary)" : "var(--color-text)" }}>{fmtRp(cur)}</div>
                                         </div>
-                                        <div style={{ gridColumn: "1/-1", background: isProfit ? "rgba(96,252,198,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(96,252,198,.15)" : "rgba(255,113,108,.15)"}`, borderRadius: 12, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div style={{ gridColumn: "1/-1", background: isProfit ? "rgba(131,155,122,.06)" : "rgba(255,113,108,.06)", border: `1px solid ${isProfit ? "rgba(131,155,122,.15)" : "rgba(255,113,108,.15)"}`, borderRadius: 12, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                             <span style={{ fontSize: 12, color: "var(--color-subtle)" }}>Gain / Loss</span>
                                             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                                 <span style={{ fontSize: 14, fontWeight: 700, color: isProfit ? "var(--color-primary)" : "#ff716c" }}>{isProfit ? "+" : ""}{fmtRp(gain)}</span>
-                                                <span style={{ fontSize: 11, fontWeight: 700, background: isProfit ? "rgba(96,252,198,.12)" : "rgba(255,113,108,.12)", color: isProfit ? "var(--color-primary)" : "#ff716c", padding: "2px 8px", borderRadius: 6 }}>{isProfit ? "▲" : "▼"} {Math.abs(pct)}%</span>
+                                                <span style={{ fontSize: 11, fontWeight: 700, background: isProfit ? "rgba(131,155,122,.12)" : "rgba(255,113,108,.12)", color: isProfit ? "var(--color-primary)" : "#ff716c", padding: "2px 8px", borderRadius: 6 }}>{isProfit ? "▲" : "▼"} {Math.abs(pct)}%</span>
                                             </div>
                                         </div>
                                     </div>
