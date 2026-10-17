@@ -447,18 +447,20 @@ const AddTransactionModal = ({
     ...(piutangName ? [piutangName] : []),
   ];
 
-  // Auto-select akun pertama jika belum ada yang dipilih
+  const postableAccounts = accounts.filter((a) => a.can_post !== false);
+
+  // Auto-select akun pertama yang bisa dipakai jika belum ada yang dipilih
   useEffect(() => {
     if (
       open &&
       autoSelectAccount &&
       !editMode &&
-      accounts.length > 0 &&
+      postableAccounts.length > 0 &&
       !txForm.account
     ) {
-      setTxForm((p) => ({ ...p, account: accounts[0].name }));
+      setTxForm((p) => ({ ...p, account: postableAccounts[0].name }));
     }
-  }, [open, autoSelectAccount, editMode, accounts, txForm.account, setTxForm]);
+  }, [open, autoSelectAccount, editMode, postableAccounts, txForm.account, setTxForm]);
 
   const fileRef = useRef(null);
   const fileRefGallery = useRef(null);
@@ -513,7 +515,7 @@ const AddTransactionModal = ({
         setScanItems(
           result.items.map((item, i) => ({ ...item, id: i, selected: true })),
         );
-        setScanAccount(txForm.account || accounts[0]?.name || "");
+        setScanAccount(txForm.account || postableAccounts[0]?.name || "");
       };
 
       let result;
@@ -1079,7 +1081,7 @@ const AddTransactionModal = ({
               <div>
                 <FieldLabel>AKUN (berlaku ke semua item)</FieldLabel>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {accounts.map((a) => (
+                  {postableAccounts.map((a) => (
                     <Chip
                       key={a.name}
                       active={scanAccount === a.name}
@@ -1598,7 +1600,7 @@ const AddTransactionModal = ({
               <div style={{ marginBottom: 14 }}>
                 <FieldLabel>DARI AKUN</FieldLabel>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {accounts.map((a) => {
+                  {postableAccounts.map((a) => {
                     const selected = txForm.account === a.name;
                     const isDestination = txForm.toAccount === a.name;
                     return (
@@ -1961,7 +1963,7 @@ const AddTransactionModal = ({
               <div style={{ marginBottom: 16 }}>
                 <FieldLabel>AKUN SUMBER</FieldLabel>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {accounts.map((a) => (
+                  {postableAccounts.map((a) => (
                     <Chip
                       key={a.name}
                       active={txForm.account === a.name}
