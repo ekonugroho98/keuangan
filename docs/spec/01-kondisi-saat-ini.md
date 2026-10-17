@@ -18,7 +18,7 @@ Audit dilakukan 2026-10-04 atas commit `182e076` (branch `main`) di `karaya-keua
 |---|---|
 | Frontend | React 18.3 + Vite 6, JSX (bukan TS), PWA via `vite-plugin-pwa` (workbox `NetworkFirst` untuk `*.supabase.co`, cache 5 menit). Tidak ada router; `App.jsx` memilih `LandingPage` / `Dashboard` / `ResetPasswordPage` berdasarkan session dan event `PASSWORD_RECOVERY`. |
 | Backend | 6 Supabase Edge Functions (Deno) di `supabase/functions/`: `transactions`, `financial-ops`, `auto-recurrings`, `ai-chat`, `payment-webhook`, `update-subscription`. **Koreksi**: prompt menyebut "5 edge function" tapi mendaftar 6; yang benar 6. |
-| Database | Supabase Postgres project ref `twcrflhvxzatpfrjmqzi`. Skema hanya ada sebagai 3 file SQL lepas (`supabase_schema.sql`, `scripts/add_piutang_table.sql`, `supabase/fix_subscription_security.sql`). **Tidak ada** `supabase/config.toml`, **tidak ada** `supabase/migrations/`. |
+| Database | Supabase Postgres project ref `<project-ref>`. Skema hanya ada sebagai 3 file SQL lepas (`supabase_schema.sql`, `scripts/add_piutang_table.sql`, `supabase/fix_subscription_security.sql`). **Tidak ada** `supabase/config.toml`, **tidak ada** `supabase/migrations/`. |
 | Auth | Supabase Auth (email+password, reset password via email). JWT 1 jam, refresh token. |
 | Hosting | Vercel (frontend). Edge function di Supabase. |
 | Harga emas/saham | Repo terpisah `../karaya-api` (Vercel), dipanggil langsung dari browser (`src/services/goldPrice.js`, `stockPrice.js`), base URL default `https://karaya-api-jec2.vercel.app`. |

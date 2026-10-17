@@ -38,7 +38,7 @@ Terakhir diperbarui: 2026-10-08
 
 ### File yang dibuat
 ```
-supabase/config.toml                                   — supabase init, linked ke twcrflhvxzatpfrjmqzi
+supabase/config.toml                                   — supabase init, linked ke <project-ref>
 supabase/migrations/00000000000001_extensions_enums.sql — pgcrypto, pg_trgm, unaccent, 10 enum, immutable_unaccent wrapper
 supabase/migrations/00000000000002_households.sql       — households, household_members, household_invitations
 supabase/migrations/00000000000003_domain_tables.sql    — categories, accounts, debts, goals, piutang, recurring_transactions,
@@ -90,8 +90,8 @@ DB lokal sungguhan dipakai (BUKAN mock): container Docker `postgres:17` resmi (i
 
 Semua 8 temuan di atas dicatat di tabel riwayat perubahan `03-database.md` dengan tanggal dan alasan.
 
-### Deployment ke produksi (`twcrflhvxzatpfrjmqzi`)
-Dijalankan 2026-10-04 via pooler IPv4 (`aws-1-ap-southeast-1.pooler.supabase.com:5432`, user `postgres.twcrflhvxzatpfrjmqzi`) karena direct host IPv6-only tidak terjangkau dari mesin dev. **Verifikasi state SEBELUM apply**: hanya `gold_prices` (358 baris) + 0 user, sesuai hasil wipe sebelumnya. Semua 11 file migrasi berhasil tanpa error (identik dengan yang sudah lolos di DB lokal).
+### Deployment ke produksi (`<project-ref>`)
+Dijalankan 2026-10-04 via pooler IPv4 (`aws-1-ap-southeast-1.pooler.supabase.com:5432`, user `postgres.<project-ref>`) karena direct host IPv6-only tidak terjangkau dari mesin dev. **Verifikasi state SEBELUM apply**: hanya `gold_prices` (358 baris) + 0 user, sesuai hasil wipe sebelumnya. Semua 11 file migrasi berhasil tanpa error (identik dengan yang sudah lolos di DB lokal).
 
 **Verifikasi SETELAH apply** (query langsung ke produksi):
 | Cek | Hasil |
@@ -259,7 +259,7 @@ pnpm --filter @karaya/api dev   # :8787
 ## Catatan lintas fase
 - 2026-10-04 16:10 WIB: DB produksi di-wipe (lihat entri sebelumnya di riwayat ini / pesan sesi sebelumnya).
 - 2026-10-04 18:xx WIB: DB produksi diisi skema target lengkap (F2 revisi greenfield), diuji identik dengan DB lokal sebelum apply.
-- Koneksi dev → DB produksi: pooler `aws-1-ap-southeast-1.pooler.supabase.com:5432` user `postgres.twcrflhvxzatpfrjmqzi` (IPv4). Direct host IPv6-only, tidak terjangkau.
+- Koneksi dev → DB produksi: pooler `aws-1-ap-southeast-1.pooler.supabase.com:5432` user `postgres.<project-ref>` (IPv4). Direct host IPv6-only, tidak terjangkau.
 - `supabase start` (stack lokal penuh: kong/gotrue/storage/studio) **tidak reliable** di mesin ini (pull image lambat/macet). Untuk pengujian SQL murni, pakai `postgres:17` resmi + bootstrap `auth` schema manual — jauh lebih cepat dan cukup untuk menguji DDL, RLS, dan fungsi. Untuk pengujian yang butuh Auth/Storage/Studio sungguhan (Fase 3+), perlu waktu lebih lama untuk `supabase start` atau jalankan dari mesin dengan bandwidth lebih baik.
 - Password DB produksi terakhir dipakai: `MZyEP4jRU4WBxSwS` (sudah beberapa kali lewat chat sepanjang sesi ini). **Harus direset** sebelum sesi berikutnya, dan jangan pakai ulang.
 - Password role `karaya_api` tersimpan sementara di `backups/karaya_api_role_password.txt` (gitignored). **Rotasi lagi** saat benar-benar menyambungkan `apps/api` di Fase 3, pindah ke secret manager / env Vercel, hapus file lokal.

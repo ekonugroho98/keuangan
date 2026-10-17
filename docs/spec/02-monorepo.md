@@ -248,7 +248,7 @@ Semua env di-parse oleh `src/env.ts` dengan zod saat boot; var wajib yang kosong
 ```bash
 # sekali
 nvm use && corepack enable && pnpm install
-supabase login && supabase link --project-ref twcrflhvxzatpfrjmqzi   # hanya yang punya akses
+supabase login && supabase link --project-ref <project-ref>   # hanya yang punya akses
 supabase start                      # Postgres lokal + Auth + Studio
 pnpm db:reset                       # jalankan semua migrations + seed.sql ke DB lokal
 

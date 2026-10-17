@@ -47,7 +47,7 @@ Fork artinya **menyalin aplikasi ini ke akun GitHub milikmu** sendiri. Kamu akan
 
 1. Pastikan sudah login ke GitHub
 2. Buka link berikut:
-   👉 **https://github.com/ekonugroho98/keuangan**
+   👉 **https://github.com/<owner>/keuangan**
 
 > 📸 _[SS-02: tampilan halaman repo keuangan di GitHub]_
 
@@ -124,7 +124,7 @@ Langkah ini membuat semua tabel yang dibutuhkan aplikasi di database kamu.
 
 2. Klik **"New query"**
 3. Buka link berikut di tab baru:
-   👉 **https://github.com/ekonugroho98/keuangan/blob/main/supabase_schema.sql**
+   👉 **https://github.com/<owner>/keuangan/blob/main/supabase_schema.sql**
 4. Klik tombol **"Copy raw file"** (icon copy di kanan atas kode)
 
 > 📸 _[SS-13: halaman supabase_schema.sql di GitHub, tunjukkan tombol copy]_

@@ -2,7 +2,7 @@
 
 Platform keuangan rumah tangga, sedang direvamp dari aplikasi pencatatan pribadi. Monorepo pnpm: `apps/web` (React + Vite, UI), `apps/api` (Hono, backend baru), `packages/shared` (tipe/konstanta/format bersama), `supabase/` (migrations + seed). Bahasa UI dan komentar kode: Indonesia. Nama identifier: Inggris.
 
-Repo: `github.com/ekonugroho98/keuangan`, branch `main`. Supabase project ref: `twcrflhvxzatpfrjmqzi` (nama "keuangan", region Singapore, free tier).
+Repo: `github.com/<owner>/keuangan`, branch `main`. Supabase project ref: `<project-ref>` (nama "keuangan", region Singapore, free tier).
 
 ## Status project: revamp sedang berjalan
 
@@ -23,7 +23,7 @@ pnpm --filter @karaya/web dev
 pnpm --filter @karaya/api dev
 pnpm lint / typecheck / test / build   # dari root, jalan di semua paket (pnpm -r)
 
-# Database (butuh Docker untuk supabase start; CLI harus ter-link ke twcrflhvxzatpfrjmqzi)
+# Database (butuh Docker untuk supabase start; CLI harus ter-link ke <project-ref>)
 supabase start             # Postgres lokal + Auth + Studio
 supabase db reset          # jalankan supabase/migrations/*.sql + supabase/seed.sql
 psql "$DATABASE_URL" -f supabase/migrations/<file>.sql   # apply satu migrasi manual kalau perlu

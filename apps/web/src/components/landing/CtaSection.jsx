@@ -5,9 +5,9 @@ const CtaSection = ({ onSignup }) => {
     const { t } = useLanguage();
 
     const stats = [
-        { v: "500+", l: t("lp.hero.users") || "Pengguna Aktif" },
-        { v: "2M+", l: t("lp.hero.tx") || "Transaksi Tercatat" },
-        { v: "98%", l: t("lp.hero.satisfaction") || "Kepuasan" },
+        { v: "100%", l: t("lp.hero.users") || "Privasi Keluarga" },
+        { v: "24/7", l: t("lp.hero.satisfaction") || "Asisten AI Siaga" },
+        { v: "1 Atap", l: t("lp.hero.tx") || "Keuangan & Rumah" },
     ];
 
     return (

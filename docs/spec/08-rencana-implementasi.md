@@ -44,7 +44,7 @@ Tabel fase di bawah ditulis untuk skenario migrasi data. Dengan DB kosong, berla
 
 | Tugas | Rincian | File |
 |---|---|---|
-| F0-T1 | `supabase init` (buat `supabase/config.toml`), `supabase link --project-ref twcrflhvxzatpfrjmqzi` | `supabase/config.toml` |
+| F0-T1 | `supabase init` (buat `supabase/config.toml`), `supabase link --project-ref <project-ref>` | `supabase/config.toml` |
 | F0-T2 | Dump skema live: `supabase db dump --schema public -f supabase/migrations/<ts>_baseline.sql`; bersihkan dan tandai sebagai applied di remote (`supabase migration repair --status applied <ts>`) | `supabase/migrations/*_baseline.sql` |
 | F0-T3 | Audit drift: bandingkan baseline dengan `supabase_schema.sql`; catat di `01-kondisi-saat-ini.md` §4 kolom mana yang ada di live (`transactions.account_id`? `goals.deadline`? CHECK `type`?) dan perbarui `04-migrasi-data.md` jika perlu | `docs/spec/01-…`, `04-…` |
 | F0-T4 | Backup data: `supabase db dump --data-only -f backups/<date>_data.sql` (folder `backups/` di-gitignore; file dienkripsi `age`/`gpg` dan disimpan di luar repo) | `.gitignore` |

@@ -33,10 +33,10 @@ cp apps/web/.env.example apps/web/.env       # isi VITE_SUPABASE_URL & VITE_SUPA
 cp apps/api/.env.example apps/api/.env.local # Fase 1: nilai default sudah cukup untuk jalan
 ```
 
-Supabase: project yang sudah ada (`twcrflhvxzatpfrjmqzi`) dipakai sebagai database. Untuk pengembangan skema lokal:
+Supabase: project yang sudah ada (`<project-ref>`) dipakai sebagai database. Untuk pengembangan skema lokal:
 
 ```bash
-supabase link --project-ref twcrflhvxzatpfrjmqzi   # hanya yang punya akses
+supabase link --project-ref <project-ref>   # hanya yang punya akses
 supabase start                                      # Postgres lokal + Auth + Studio (butuh Docker)
 supabase db reset                                   # jalankan semua migrations/ + seed.sql
 ```
