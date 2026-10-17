@@ -9,6 +9,7 @@ import { fetchGoldPrices } from "../services/goldPrice";
 import { APP_AI_NAME } from "../config/app";
 import { api, unwrap } from "../api/client";
 import Sidebar from "../components/dashboard/Sidebar";
+import { exportTransactionsCSV, exportTransactionsExcel } from "../utils/exportData";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useAccounts } from "../hooks/useAccounts";
@@ -248,35 +249,16 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   };
 
   const exportCSV = () => {
-    const headers = [
-      "Tanggal",
-      "Tipe",
-      "Kategori",
-      "Jumlah",
-      "Akun",
-      "Catatan",
-    ];
-    const rows = transactions.map((tx) => [
-      tx.date,
-      tx.type,
-      tx.category,
-      tx.amount,
-      tx.account_name || "",
-      (tx.note || "").replace(/"/g, '""'),
-    ]);
-    const csv = [headers, ...rows]
-      .map((r) => r.map((v) => `"${v}"`).join(","))
-      .join("\n");
-    const blob = new Blob(["﻿" + csv], {
-      type: "text/csv;charset=utf-8;",
+    exportTransactionsCSV(transactions, { periodLabel: "Semua Transaksi" });
+    showToast(`✅ ${transactions.length} transaksi berhasil diekspor ke CSV`);
+  };
+
+  const exportExcel = () => {
+    exportTransactionsExcel(transactions, {
+      periodLabel: "Semua Transaksi",
+      accounts,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `keluarga-berkembang-export-${toLocalDateStr()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(`✅ ${transactions.length} transaksi berhasil diekspor`);
+    showToast(`✅ ${transactions.length} transaksi berhasil diekspor ke Excel (.xlsx)`);
   };
 
   const deleteAccount = async () => {
@@ -600,6 +582,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         onUpdateName={updateName}
         onUpdatePassword={updatePassword}
         onExportCSV={exportCSV}
+        onExportExcel={exportExcel}
+        txCount={transactions.length}
         onDeleteAccount={deleteAccount}
         userSettings={userSettings}
         onSaveSettings={saveSettings}
