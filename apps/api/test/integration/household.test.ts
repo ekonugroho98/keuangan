@@ -61,8 +61,10 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('household integratio
     // global mencatat SETIAP request (bukan cuma mutasi), jadi request test di atas sudah pasti
     // meninggalkan baris audit_log yang mereferensikan household_members lewat actor_member_id.
     await admin`delete from audit_log where actor_member_id in (select id from household_members where user_id in (${EKO_USER_ID}, ${INVITEE_USER_ID}, ${MERGE_USER_ID}))`
+    await admin`delete from transactions where recorded_by_member_id in (select id from household_members where user_id in (${INVITEE_USER_ID}, ${MERGE_USER_ID}))`
     await admin`delete from household_invitations where invited_by in (select id from household_members where user_id = ${EKO_USER_ID})`
     await admin`delete from accounts where owner_member_id in (select id from household_members where user_id in (${INVITEE_USER_ID}, ${MERGE_USER_ID}))`
+    await admin`delete from categories where household_id in (select id from households where created_by in (${INVITEE_USER_ID}, ${MERGE_USER_ID}))`
     await admin`delete from household_members where user_id in (${INVITEE_USER_ID}, ${MERGE_USER_ID})`
     await admin`delete from households where created_by in (${INVITEE_USER_ID}, ${MERGE_USER_ID})`
     await admin`delete from user_settings where user_id in (${INVITEE_USER_ID}, ${MERGE_USER_ID})`
@@ -137,7 +139,7 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('household integratio
     expect((await selfDeleteRes.json()).error.code).toBe('cannot_remove_self')
   })
 
-  it('merge: akun & kategori household sumber pindah ke target, membership household lama tidak lagi muncul di /v1/me', async () => {
+  it('merge: akun, transaksi & kategori household sumber pindah ke target tanpa gagal trigger tx_same_household', async () => {
     const app = buildApp()
     const mergeUserToken = await mintJwt(MERGE_USER_ID)
 
@@ -151,9 +153,27 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('household integratio
     const addAccountRes = await app.request('/v1/accounts', {
       method: 'POST',
       headers: { Authorization: `Bearer ${mergeUserToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Dompet Merge Test', type: 'cash', opening_balance: 10_000, owner: 'me' }),
+      body: JSON.stringify({ name: 'Dompet Merge Test', type: 'cash', opening_balance: 50_000, owner: 'me' }),
     })
     expect(addAccountRes.status).toBe(201)
+    const srcAcc = await addAccountRes.json()
+
+    // Buat transaksi di household sumber sebelum merge (menguji pemetaan ulang category_id + tx_same_household)
+    const catsRes = await app.request('/v1/categories', { headers: { Authorization: `Bearer ${mergeUserToken}` } })
+    const foodCat = (await catsRes.json()).find((c: { name: string }) => c.name === 'Makanan')
+    const addTxRes = await app.request('/v1/transactions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${mergeUserToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'expense',
+        account_id: srcAcc.id,
+        category_id: foodCat.id,
+        amount: 15_000,
+        date: '2026-10-17',
+        note: 'Makan Siang Sebelum Merge',
+      }),
+    })
+    expect(addTxRes.status).toBe(201)
 
     const ownerToken = await mintJwt(EKO_USER_ID)
     const invRes = await app.request('/v1/invitations', {
@@ -174,10 +194,73 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('household integratio
     const accountNames = (await accountsRes.json()).data.map((a: { name: string }) => a.name)
     expect(accountNames).toContain('Dompet Merge Test')
 
+    const txRes = await app.request('/v1/transactions', { headers: { Authorization: `Bearer ${mergeUserToken}` } })
+    const txNotes = (await txRes.json()).data.map((t: { note: string }) => t.note)
+    expect(txNotes).toContain('Makan Siang Sebelum Merge')
+
     const meRes = await app.request('/v1/me', { headers: { Authorization: `Bearer ${mergeUserToken}` } })
     const memberships = (await meRes.json()).memberships
     expect(memberships).toHaveLength(1)
     expect(memberships[0].household_name).toBe('Keluarga Eko')
+  })
+
+  it('private vs shared: akun & transaksi privat tersembunyi dari pasangan, akun shared terlihat berdua', async () => {
+    const app = buildApp()
+    const ownerToken = await mintJwt(EKO_USER_ID)
+    const memberToken = await mintJwt(INVITEE_USER_ID)
+
+    // Member membuat 1 akun privat & 1 akun shared
+    const privAccRes = await app.request('/v1/accounts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${memberToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Dompet Rahasia Pasangan', type: 'ewallet', opening_balance: 500_000, owner: 'me', visibility: 'private' }),
+    })
+    expect(privAccRes.status).toBe(201)
+    const privAcc = await privAccRes.json()
+
+    const sharedAccRes = await app.request('/v1/accounts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${memberToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Rekening Belanja Pasangan', type: 'bank', opening_balance: 1_000_000, owner: 'me', visibility: 'shared' }),
+    })
+    expect(sharedAccRes.status).toBe(201)
+    const sharedAcc = await sharedAccRes.json()
+
+    const catsRes = await app.request('/v1/categories', { headers: { Authorization: `Bearer ${memberToken}` } })
+    const foodCat = (await catsRes.json()).find((c: { name: string }) => c.name === 'Makanan')
+
+    // Catat pengeluaran di akun privat & shared
+    const privTxRes = await app.request('/v1/transactions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${memberToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'expense', account_id: privAcc.id, category_id: foodCat.id, amount: 50_000, date: '2026-10-17', note: 'Transaksi Rahasia Pasangan' }),
+    })
+    expect(privTxRes.status).toBe(201)
+
+    const sharedTxRes = await app.request('/v1/transactions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${memberToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'expense', account_id: sharedAcc.id, category_id: foodCat.id, amount: 75_000, date: '2026-10-17', note: 'Transaksi Bersama Pasangan' }),
+    })
+    expect(sharedTxRes.status).toBe(201)
+
+    // Owner melihat akun privat pasangan dengan balance=null, can_view=false, can_post=false
+    const ownerAccsRes = await app.request('/v1/accounts', { headers: { Authorization: `Bearer ${ownerToken}` } })
+    const ownerAccs = (await ownerAccsRes.json()).data
+    const seenPrivAcc = ownerAccs.find((a: { id: string }) => a.id === privAcc.id)
+    const seenSharedAcc = ownerAccs.find((a: { id: string }) => a.id === sharedAcc.id)
+    expect(seenPrivAcc).toBeDefined()
+    expect(seenPrivAcc.balance).toBeNull()
+    expect(seenPrivAcc.can_view).toBe(false)
+    expect(seenPrivAcc.can_post).toBe(false)
+    expect(seenSharedAcc.balance).toBe(925_000)
+    expect(seenSharedAcc.can_view).toBe(true)
+
+    // Owner tidak bisa melihat transaksi privat pasangan, tapi melihat transaksi shared pasangan
+    const ownerTxsRes = await app.request('/v1/transactions', { headers: { Authorization: `Bearer ${ownerToken}` } })
+    const ownerTxNotes = (await ownerTxsRes.json()).data.map((t: { note: string }) => t.note)
+    expect(ownerTxNotes).not.toContain('Transaksi Rahasia Pasangan')
+    expect(ownerTxNotes).toContain('Transaksi Bersama Pasangan')
   })
 
   it('PATCH /v1/households/current settings langsung ter-reflect di response (bukan nilai lama)', async () => {

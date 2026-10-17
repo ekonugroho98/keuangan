@@ -761,13 +761,18 @@ const DasborView = ({
                                     {/* Corner accent */}
                                     <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: `radial-gradient(circle, color-mix(in srgb, ${accent} 35%, transparent), transparent 70%)`, pointerEvents: "none", filter: "blur(6px)" }} />
                                     <div style={{ position: "relative" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
                                             <span style={{ fontSize: 18 }}>{a.icon}</span>
                                             <span className="chip chip-ghost" style={{ fontSize: 9, padding: "3px 9px", background: "rgba(255,255,255,.08)", border: "1px solid var(--glass-border)" }}>{a.type}</span>
+                                            {a.visibility === "private" && (
+                                                <span className="chip" style={{ fontSize: 9, padding: "2px 7px", background: "rgba(245,158,11,.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,.3)" }}>🔒 Privat</span>
+                                            )}
                                         </div>
                                         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.01em" }}>{a.name}</div>
                                     </div>
-                                    <div className="num-tight mono" style={{ fontSize: 17, fontWeight: 800, color: "var(--color-text)", position: "relative" }}>{fmtRp(a.balance)}</div>
+                                    <div className="num-tight mono" style={{ fontSize: 17, fontWeight: 800, color: a.can_view === false || a.balance === null ? "var(--color-muted)" : "var(--color-text)", position: "relative" }}>
+                                        {a.can_view === false || a.balance === null ? "🔒 Privat" : fmtRp(a.balance)}
+                                    </div>
                                 </div>
                             );
                         })}

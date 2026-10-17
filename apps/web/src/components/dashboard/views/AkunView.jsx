@@ -99,7 +99,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
     const ewalletCount    = accounts.filter(a => a.type === "ewallet").length;
     const cashCount       = accounts.filter(a => a.type === "cash").length;
     const tabunganCount   = accounts.filter(a => a.type === "tabungan").length;
-    const tabunganBalance = accounts.filter(a => a.type === "tabungan").reduce((s, a) => s + a.balance, 0);
+    const tabunganBalance = accounts.filter(a => a.type === "tabungan").reduce((s, a) => s + (a.balance || 0), 0);
 
     const activeAccount = accounts.find(a => a.id === activeTab) || accounts[0];
     const recentTx = activeAccount
@@ -197,12 +197,13 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))", gap: 16 }}>
                     {accounts.map(a => {
                         const color   = accentColor(a.type);
+                        const isHiddenPrivate = a.can_view === false || a.balance === null;
                         const txCount = transactions.filter(tx => tx.account_name === a.name).length;
-                        const acctBalance = accounts.find(ac => ac.id === a.id)?.balance || 0;
+                        const acctBalance = accounts.find(ac => ac.id === a.id)?.balance ?? 0;
                         return (
                             <div
                                 key={a.id}
-                                style={{ ...card, borderLeft: `4px solid ${color}` }}
+                                style={{ ...card, borderLeft: `4px solid ${color}`, opacity: isHiddenPrivate ? 0.85 : 1 }}
                                 onMouseOver={e => {
                                     e.currentTarget.style.transform = "translateY(-3px)";
                                     e.currentTarget.style.boxShadow = `var(--glass-highlight), 0 12px 40px ${color}22`;
@@ -231,70 +232,82 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                 <div style={{ marginBottom: 14 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
                                         <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)" }}>{a.name}</div>
-                                        {members.length > 1 && <OwnerBadge owner={a.owner} />}
+                                        {(members.length > 1 || a.visibility === "private") && (
+                                            <OwnerBadge owner={a.owner} visibility={a.visibility} />
+                                        )}
                                     </div>
                                     <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                                        {txCount} {t("tx.summary") || "transaksi"}
+                                        {isHiddenPrivate
+                                            ? `Rekening privat milik ${a.owner?.display_name || "pasangan"}`
+                                            : `${txCount} ${t("tx.summary") || "transaksi"}`}
                                     </div>
                                 </div>
 
                                 {/* Balance */}
-                                <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 900, color, letterSpacing: "-.03em", marginBottom: 16, lineHeight: 1 }}>
-                                    {fmtRp(acctBalance)}
+                                <div className="num-tight mono" style={{ fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 900, color: isHiddenPrivate ? "var(--color-muted)" : color, letterSpacing: "-.03em", marginBottom: 16, lineHeight: 1 }}>
+                                    {isHiddenPrivate ? "🔒 Privat" : fmtRp(acctBalance)}
                                 </div>
 
                                 {/* Bottom: action buttons */}
                                 <div style={{ display: "flex", gap: 8, borderTop: "1px solid var(--color-border-soft)", paddingTop: 14 }}>
-                                    <button
-                                        onClick={() => onViewAccount ? onViewAccount(a.name) : setActiveMenu?.("transaksi")}
-                                        style={{
-                                            flex: 1, padding: "10px 0", borderRadius: 10,
-                                            border: `1px solid ${color}30`,
-                                            background: "transparent",
-                                            color, fontSize: 12, fontWeight: 700, minHeight: 42,
-                                            cursor: "pointer", fontFamily: "inherit",
-                                            transition: "background .15s",
-                                        }}
-                                        onMouseOver={e => e.currentTarget.style.background = `${color}10`}
-                                        onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                                    >
-                                        {t("acc.viewTx") || "Lihat Transaksi"}
-                                    </button>
-                                    <button
-                                        onClick={() => { setEditBalanceAcc(a); setNewBalanceInput(String(acctBalance)); }}
-                                        aria-label="Edit Saldo"
-                                        title="Edit Saldo"
-                                        style={{
-                                            padding: "10px 12px", borderRadius: 10,
-                                            border: `1px solid ${color}30`,
-                                            background: "transparent",
-                                            color, fontSize: 13, minHeight: 42,
-                                            cursor: "pointer", fontFamily: "inherit",
-                                            transition: "background .15s",
-                                        }}
-                                        onMouseOver={e => e.currentTarget.style.background = `${color}10`}
-                                        onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                                    >
-                                        ✏️
-                                    </button>
-                                    {members.length > 1 && (
-                                        <button
-                                            onClick={() => openOwnerEdit(a)}
-                                            aria-label="Pemilik & Visibilitas"
-                                            title="Pemilik & Visibilitas"
-                                            style={{
-                                                padding: "10px 12px", borderRadius: 10,
-                                                border: `1px solid ${color}30`,
-                                                background: "transparent",
-                                                color, fontSize: 13, minHeight: 42,
-                                                cursor: "pointer", fontFamily: "inherit",
-                                                transition: "background .15s",
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.background = `${color}10`}
-                                            onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                                        >
-                                            ⚙️
-                                        </button>
+                                    {isHiddenPrivate ? (
+                                        <div style={{ flex: 1, fontSize: 11, color: "var(--color-muted)", padding: "10px 4px", textAlign: "center" }}>
+                                            🔒 Saldo &amp; transaksi bersifat privat (masih bisa menerima transfer)
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => onViewAccount ? onViewAccount(a.name) : setActiveMenu?.("transaksi")}
+                                                style={{
+                                                    flex: 1, padding: "10px 0", borderRadius: 10,
+                                                    border: `1px solid ${color}30`,
+                                                    background: "transparent",
+                                                    color, fontSize: 12, fontWeight: 700, minHeight: 42,
+                                                    cursor: "pointer", fontFamily: "inherit",
+                                                    transition: "background .15s",
+                                                }}
+                                                onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                                onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                            >
+                                                {t("acc.viewTx") || "Lihat Transaksi"}
+                                            </button>
+                                            <button
+                                                onClick={() => { setEditBalanceAcc(a); setNewBalanceInput(String(acctBalance)); }}
+                                                aria-label="Edit Saldo"
+                                                title="Edit Saldo"
+                                                style={{
+                                                    padding: "10px 12px", borderRadius: 10,
+                                                    border: `1px solid ${color}30`,
+                                                    background: "transparent",
+                                                    color, fontSize: 13, minHeight: 42,
+                                                    cursor: "pointer", fontFamily: "inherit",
+                                                    transition: "background .15s",
+                                                }}
+                                                onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                                onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                            >
+                                                ✏️
+                                            </button>
+                                            {members.length > 1 && (
+                                                <button
+                                                    onClick={() => openOwnerEdit(a)}
+                                                    aria-label="Pemilik & Visibilitas"
+                                                    title="Pemilik & Visibilitas"
+                                                    style={{
+                                                        padding: "10px 12px", borderRadius: 10,
+                                                        border: `1px solid ${color}30`,
+                                                        background: "transparent",
+                                                        color, fontSize: 13, minHeight: 42,
+                                                        cursor: "pointer", fontFamily: "inherit",
+                                                        transition: "background .15s",
+                                                    }}
+                                                    onMouseOver={e => e.currentTarget.style.background = `${color}10`}
+                                                    onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                                                >
+                                                    ⚙️
+                                                </button>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </div>

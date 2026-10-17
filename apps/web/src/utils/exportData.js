@@ -466,8 +466,10 @@ export function exportTransactionsExcel(transactions = [], opts = {}) {
             ],
             ...opts.accounts.map((a) => [
                 { v: a.name, s: 3 },
-                { v: Number(a.balance || 0), s: 4 },
-                { v: `${a.type || "-"} (${a.owner?.display_name || "Bersama"})`, s: 3 },
+                a.can_view === false || a.balance === null
+                    ? { v: "Privat", s: 3 }
+                    : { v: Number(a.balance || 0), s: 4 },
+                { v: `${a.type || "-"} (${a.owner?.display_name || "Bersama"}${a.visibility === "private" ? " · Privat" : ""})`, s: 3 },
             ]),
             [
                 { v: "TOTAL SALDO REKENING", s: 5 },
