@@ -55,6 +55,8 @@ export function useTransactions() {
         invalidate();
         queryClient.invalidateQueries({ queryKey: ["accounts"] });
         queryClient.invalidateQueries({ queryKey: ["summary"] });
+        queryClient.invalidateQueries({ queryKey: ["shopping"] });
+        queryClient.invalidateQueries({ queryKey: ["prices"] });
     };
 
     const addTx = async ({ type, amount, category, note, account, date, beneficiary }) => {
@@ -71,7 +73,16 @@ export function useTransactions() {
     const addMultipleTx = async (items, accountName, date) => {
         const result = await unwrap(
             await api.POST("/v1/transactions/batch", {
-                body: { account: accountName, date, items: items.map((i) => ({ amount: i.amount, category: i.category, note: i.note })) },
+                body: {
+                    account: accountName,
+                    date,
+                    items: items.map((i) => ({
+                        amount: i.amount,
+                        qty: i.qty && Number(i.qty) > 0 ? Number(i.qty) : undefined,
+                        category: i.category,
+                        note: i.note,
+                    })),
+                },
             }),
         );
         invalidateMoney();

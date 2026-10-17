@@ -7,7 +7,7 @@ import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBenefic
 import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords, refineAgentCategory } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
-import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
+import { canonicalizeProducts, recordPrices, syncTransactionPrice, type PriceItem } from './prices'
 import { parseReceiptNote } from '@karaya/shared/format'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
@@ -261,6 +261,10 @@ export interface CreateTransactionInput {
 
 export async function createTransaction(actor: Actor, input: CreateTransactionInput, timezone: string) {
   const amount = parseAmount(input)
+  const parsedNote = input.type === 'expense' && input.note ? parseReceiptNote(input.note) : null
+  if (parsedNote?.merchant && parsedNote.name) {
+    await canonicalizeProducts(actor, [parsedNote.name])
+  }
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input)
     const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type)
@@ -268,19 +272,29 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
       ? await refineAgentCategory(tx, actor.householdId, input.note, resolvedCategoryId)
       : resolvedCategoryId
     const beneficiaryId = (await resolveBeneficiaryRef(tx, actor, input)) ?? null
+    const txDate = input.date ?? todayInTz(timezone)
     const [row] = await tx<{ id: string }[]>`
       select id from post_transaction(
         ${actor.householdId}, ${actor.memberId}, ${input.type}, ${accountId}, ${categoryId},
-        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ''}, ${txSource(actor)}, null, ${beneficiaryId}
+        ${amount}, ${txDate}, ${input.note ?? ''}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `
+    if (parsedNote?.merchant) {
+      await syncTransactionPrice(tx, actor.householdId, {
+        id: row!.id,
+        type: input.type,
+        amount,
+        date: txDate,
+        note: input.note ?? '',
+      })
+    }
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [row!.id])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
     return { transaction: mapTx(rows[0]!), account: { id: accountId, balance: Number(accRow!.balance) } }
   })
 }
 
-export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
+export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; qty?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
   // Item berformat struk "[Toko] Nama item" (modal scan web) → riwayat harga per toko (prices.ts).
   // Kanonikalisasi di luar transaksi DB; biasanya sudah ter-cache sejak scan, jadi tanpa panggilan AI.
   const parsedNotes = input.items.map((i) => (i.note ? parseReceiptNote(i.note) : null))
@@ -332,7 +346,7 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
       if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount })
       if (parsed?.merchant) {
         const list = pricesByMerchant.get(parsed.merchant) ?? []
-        list.push({ transaction_id: txId, name: parsed.name, amount: it.amount })
+        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty, amount: it.amount })
         pricesByMerchant.set(parsed.merchant, list)
       }
     }
@@ -360,6 +374,10 @@ export interface UpdateTransactionInput {
 }
 
 export async function updateTransaction(actor: Actor, id: string, input: UpdateTransactionInput) {
+  const parsedNote = input.note ? parseReceiptNote(input.note) : null
+  if (parsedNote?.merchant && parsedNote.name) {
+    await canonicalizeProducts(actor, [parsedNote.name])
+  }
   return withActor(actor, async (tx) => {
     const patch: Record<string, unknown> = {}
     if (input.amount !== undefined || input.amount_text !== undefined) patch.amount = parseAmount(input)
@@ -377,6 +395,16 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
+    // Sinkronkan juga ke product_prices bila nominal/tanggal/note/type berubah
+    if (patch.amount !== undefined || patch.date !== undefined || patch.note !== undefined || patch.type !== undefined) {
+      await syncTransactionPrice(tx, actor.householdId, {
+        id: rows[0]!.id,
+        type: rows[0]!.type,
+        amount: Number(rows[0]!.amount),
+        date: rows[0]!.date,
+        note: rows[0]!.note,
+      })
+    }
     // Koreksi kategori eksplisit (web maupun Hermes) = sinyal terkuat untuk gudang kata kunci.
     if (typeof patch.category_id === 'string') await learnKeywords(tx, actor.householdId, [{ note: rows[0]!.note, categoryId: patch.category_id }])
     return mapTx(rows[0]!)

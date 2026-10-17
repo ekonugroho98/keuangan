@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useShopping, useShoppingSuggestions, comparePrices } from "../../../hooks/useShopping";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useShopping, useShoppingSuggestions, comparePrices, mergeProducts } from "../../../hooks/useShopping";
 import { fmtRp } from "../../../utils/formatters";
 import { useHouseholdInfo } from "../../../hooks/useHouseholdInfo";
 
@@ -127,53 +127,186 @@ const CheapestLine = ({ c, onCompare }) => {
 
 /**
  * Panel Banding Harga Antar Toko (10-fitur-opsional-keluarga.md §6.8).
+ * Mendukung mode Katalog otomatis (tanpa ketik query), filter >1 toko, indikator tren historis,
+ * dan penggabungan nama produk (mergeProducts / POST /v1/prices/aliases + product_knowledge global).
  */
-const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQueryHandled }) => {
+const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQueryHandled, onAliasSaved }) => {
     const [q, setQ] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
+    const [filterMode, setFilterMode] = useState("all"); // "all" | "multi"
+    const [showMerge, setShowMerge] = useState(false);
+    const [mergeItem, setMergeItem] = useState("");
+    const [mergeTarget, setMergeTarget] = useState("");
+    const [merging, setMerging] = useState(false);
 
-    const runQuery = async (rawQuery) => {
-        const query = (rawQuery ?? q).trim();
-        if (query.length < 2) return;
+    const runQuery = useCallback(async (rawQuery) => {
+        const query = (rawQuery ?? "").trim();
+        if (query.length === 1) {
+            toast("Masukkan minimal 2 huruf untuk mencari produk, atau kosongkan untuk melihat katalog.", "error");
+            return;
+        }
         setQ(query);
         setLoading(true);
         try {
             setResult(await comparePrices(query));
         } catch (err) {
-            toast(err.message || "Gagal membandingkan harga", "error");
+            toast(err.message || "Gagal memuat perbandingan harga", "error");
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
 
-    if (externalQuery && externalQuery !== q && !loading) {
-        const target = externalQuery;
-        onExternalQueryHandled?.();
-        setTimeout(() => runQuery(target), 0);
-    }
+    // Muat katalog otomatis saat pertama kali dibuka
+    useEffect(() => {
+        runQuery("");
+    }, [runQuery]);
+
+    useEffect(() => {
+        if (externalQuery && externalQuery !== q && !loading) {
+            const target = externalQuery;
+            onExternalQueryHandled?.();
+            runQuery(target);
+        }
+    }, [externalQuery, q, loading, onExternalQueryHandled, runQuery]);
+
+    const handleMergeSubmit = async () => {
+        const item = mergeItem.trim();
+        const sameAs = mergeTarget.trim();
+        if (item.length < 2 || sameAs.length < 2) {
+            toast("Nama item struk dan nama produk tujuan minimal 2 huruf.", "error");
+            return;
+        }
+        setMerging(true);
+        try {
+            const res = await mergeProducts(item, sameAs);
+            toast(`✅ "${res.keyword}" disamakan menjadi "${res.canonical_name}"`);
+            setMergeItem("");
+            setMergeTarget("");
+            setShowMerge(false);
+            await runQuery(q);
+            onAliasSaved?.();
+        } catch (err) {
+            toast(err.message || "Gagal menyamakan produk", "error");
+        } finally {
+            setMerging(false);
+        }
+    };
 
     const cleanChipName = (name) =>
         name.replace(/\s*\([^)]*\)\s*/g, "").trim();
 
+    const allProducts = result?.products ?? [];
+    const multiStoreCount = allProducts.filter((p) => p.stores.length > 1).length;
+    const displayedProducts = filterMode === "multi"
+        ? allProducts.filter((p) => p.stores.length > 1)
+        : allProducts;
+
     return (
         <div style={glassCard}>
-            <div style={eyebrow}>RIWAYAT STRUK KELUARGA</div>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: "6px 0 6px", letterSpacing: "-.02em" }}>
-                ⚖️ Banding Harga Antar Toko
-            </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+                <div>
+                    <div style={eyebrow}>RIWAYAT STRUK &amp; KAMUS PRODUK</div>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", margin: "6px 0 6px", letterSpacing: "-.02em" }}>
+                        ⚖️ Banding Harga Antar Toko
+                    </h3>
+                </div>
+                <button
+                    onClick={() => setShowMerge((v) => !v)}
+                    style={{
+                        padding: "6px 11px",
+                        borderRadius: 10,
+                        border: "1px solid var(--glass-border)",
+                        background: showMerge ? "var(--color-primary-soft)" : "var(--bg-surface-low)",
+                        color: showMerge ? "var(--color-primary)" : "var(--color-muted)",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                    }}
+                    title="Gabungkan dua nama barang berbeda di struk menjadi satu produk yang sama"
+                >
+                    🔗 Samakan Nama
+                </button>
+            </div>
             <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 14, lineHeight: 1.5 }}>
-                Dihitung per satuan (<span className="mono">100g</span> / <span className="mono">100ml</span> / <span className="mono">pcs</span>) dari struk belanja keluarga supaya beda ukuran kemasan tetap adil.
+                Dihitung per satuan (<span className="mono">100g</span> / <span className="mono">100ml</span> / <span className="mono">pcs</span>) dari struk belanja supaya beda ukuran kemasan tetap adil. Kamus singkatan produk otomatis dibagi lintas keluarga.
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {/* Form Samakan / Gabungkan Nama Produk */}
+            {showMerge && (
+                <div style={{ padding: 14, borderRadius: 14, background: "rgba(131,155,122,.08)", border: "1px solid rgba(131,155,122,.28)", marginBottom: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "var(--color-text)", marginBottom: 4 }}>
+                        🔗 Gabungkan Singkatan Struk ke Produk yang Sama
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", marginBottom: 10, lineHeight: 1.4 }}>
+                        Jika 1 produk yang sama tertulis beda di struk (mis. <span className="mono">LFBY BS 85G</span> vs <span className="mono">lifebuoy sabun batang</span>), samakan di sini agar harganya diadu dalam 1 kartu.
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <input
+                            style={{ ...inputSt, padding: "9px 12px", fontSize: 12 }}
+                            placeholder="Nama/singkatan di struk (mis. LFBY BS 85G atau INDM GRG)..."
+                            value={mergeItem}
+                            onChange={(e) => setMergeItem(e.target.value)}
+                        />
+                        <input
+                            style={{ ...inputSt, padding: "9px 12px", fontSize: 12 }}
+                            placeholder="Samakan dengan nama produk (mis. lifebuoy sabun batang)..."
+                            value={mergeTarget}
+                            onChange={(e) => setMergeTarget(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleMergeSubmit(); }}
+                        />
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button
+                                onClick={() => setShowMerge(false)}
+                                style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid var(--glass-border)", background: "transparent", color: "var(--color-muted)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleMergeSubmit}
+                                disabled={merging}
+                                style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+                            >
+                                {merging ? "Menyimpan..." : "Simpan & Gabungkan"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Search bar */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 <input
                     style={inputSt}
-                    placeholder="Cari produk (mis. kecap, susu, minyak goreng)..."
+                    placeholder="Cari produk (mis. kecap, susu, minyak) atau kosongkan..."
                     value={q}
-                    onChange={(e) => setQ(e.target.value)}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        setQ(val);
+                        if (val.trim() === "") runQuery("");
+                    }}
                     onKeyDown={(e) => { if (e.key === "Enter") runQuery(q); }}
                 />
+                {q && (
+                    <button
+                        onClick={() => runQuery("")}
+                        title="Reset ke katalog semua produk"
+                        style={{
+                            padding: "0 12px",
+                            borderRadius: 12,
+                            border: "1px solid var(--glass-border)",
+                            background: "var(--bg-surface-low)",
+                            color: "var(--color-muted)",
+                            fontWeight: 700,
+                            fontSize: 12,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                        }}
+                    >
+                        ✕
+                    </button>
+                )}
                 <button
                     onClick={() => runQuery(q)}
                     disabled={loading}
@@ -194,8 +327,56 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                 </button>
             </div>
 
+            {/* Filter Mode Tabs (Semua vs Bisa Hemat >1 Toko) */}
+            {allProducts.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                            onClick={() => setFilterMode("all")}
+                            style={{
+                                padding: "5px 11px",
+                                borderRadius: 99,
+                                border: filterMode === "all" ? "1px solid var(--color-primary)" : "1px solid var(--glass-border)",
+                                background: filterMode === "all" ? "var(--color-primary-soft)" : "var(--bg-surface-low)",
+                                color: filterMode === "all" ? "var(--color-primary)" : "var(--color-muted)",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                            }}
+                        >
+                            Semua Produk ({allProducts.length})
+                        </button>
+                        <button
+                            onClick={() => setFilterMode("multi")}
+                            style={{
+                                padding: "5px 11px",
+                                borderRadius: 99,
+                                border: filterMode === "multi" ? "1px solid var(--color-primary)" : "1px solid var(--glass-border)",
+                                background: filterMode === "multi" ? "var(--color-primary-soft)" : "var(--bg-surface-low)",
+                                color: filterMode === "multi" ? "var(--color-primary)" : "var(--color-muted)",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                            }}
+                        >
+                            🔥 Beda Toko / Bisa Hemat ({multiStoreCount})
+                        </button>
+                    </div>
+                    {result?.query && (
+                        <button
+                            onClick={() => runQuery("")}
+                            style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                            ↺ Lihat Katalog Semua
+                        </button>
+                    )}
+                </div>
+            )}
+
             {quickItems.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-subtle)", marginBottom: 6 }}>
                         CEK CEPAT DARI DAFTAR BELANJA:
                     </div>
@@ -227,57 +408,113 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                 </div>
             )}
 
-            {!result && !loading && (
-                <div style={{ textAlign: "center", padding: "28px 12px", color: "var(--color-subtle)", fontSize: 12, borderRadius: 14, border: "1px dashed var(--glass-border)" }}>
-                    <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.45 }}>🏷️</div>
-                    Ketik nama barang atau klik chip di atas untuk melihat toko mana yang paling murah.
+            {loading && (
+                <div style={{ textAlign: "center", padding: "24px 12px", color: "var(--color-muted)", fontSize: 12 }}>
+                    Memuat data perbandingan harga...
                 </div>
             )}
 
-            {result && result.products.length === 0 && (
-                <div style={{ fontSize: 12, color: "var(--color-muted)", padding: "14px", borderRadius: 12, background: "var(--bg-surface-low)", border: "1px solid var(--glass-border)" }}>
-                    Belum ada riwayat harga untuk <strong>"{result.query}"</strong>. Harga tercatat otomatis setiap kali struk belanja disimpan.
+            {!loading && displayedProducts.length === 0 && (
+                <div style={{ fontSize: 12, color: "var(--color-muted)", padding: "18px 14px", borderRadius: 12, background: "var(--bg-surface-low)", border: "1px solid var(--glass-border)", textAlign: "center" }}>
+                    {filterMode === "multi" && allProducts.length > 0 ? (
+                        <>
+                            Belum ada produk yang tercatat di 2 toko berbeda untuk pencarian ini. Klik <strong>Semua Produk ({allProducts.length})</strong> untuk melihat riwayat harga 1 toko.
+                        </>
+                    ) : result?.query ? (
+                        <>
+                            Belum ada riwayat harga untuk <strong>"{result.query}"</strong>. Harga tercatat otomatis setiap kali struk belanja disimpan atau transaksi diberi nama toko <span className="mono">[Nama Toko] Nama Barang</span>.
+                        </>
+                    ) : (
+                        <>
+                            <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.45 }}>🏷️</div>
+                            Belum ada riwayat harga produk. Scan struk belanja atau catat pengeluaran dengan nama toko untuk mulai membangun database harga keluarga.
+                        </>
+                    )}
                 </div>
             )}
 
-            {result?.products.map((p) => (
+            {!loading && displayedProducts.map((p) => (
                 <div key={`${p.product_name}-${p.unit}`} style={{ ...itemCard, display: "block", padding: "14px 16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)", textTransform: "capitalize" }}>
-                            {p.product_name}
-                        </div>
-                        {p.savings_pct ? (
-                            <span className="chip chip-mint" style={{ fontSize: 10, padding: "3px 9px" }}>
-                                Hemat {p.savings_pct}%
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)", textTransform: "capitalize" }}>
+                                {p.product_name}
+                            </div>
+                            <span style={{ fontSize: 10, color: "var(--color-subtle)", padding: "2px 7px", borderRadius: 99, background: "rgba(255,255,255,.04)", border: "1px solid var(--glass-border)" }}>
+                                {p.compare_basis}
                             </span>
-                        ) : null}
-                    </div>
-                    {p.stores.map((s, i) => (
-                        <div
-                            key={s.merchant}
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                gap: 8,
-                                fontSize: 12,
-                                padding: "6px 0",
-                                borderTop: i ? "1px solid var(--glass-border)" : "none",
-                            }}
-                        >
-                            <div style={{ color: "var(--color-text)", minWidth: 0 }}>
-                                <span style={{ fontWeight: i === 0 ? 800 : 600 }}>
-                                    {i === 0 && p.stores.length > 1 ? "🏆 " : ""}{s.merchant}
-                                </span>
-                                <span style={{ color: "var(--color-muted)" }}>
-                                    {" "}· {fmtRp(s.price)}{s.size ? ` (${s.size})` : ""} · {shortDate(s.last_date)}
-                                </span>
-                            </div>
-                            <div className="mono num-tight" style={{ fontWeight: 800, color: i === 0 ? "var(--color-primary)" : "var(--color-text)", whiteSpace: "nowrap" }}>
-                                {fmtRp(s.per_unit_price)}{basisShort(p.compare_basis)}
-                            </div>
                         </div>
-                    ))}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            {p.savings_pct ? (
+                                <span className="chip chip-mint" style={{ fontSize: 10, padding: "3px 9px" }}>
+                                    Hemat {p.savings_pct}%
+                                </span>
+                            ) : null}
+                            <button
+                                onClick={() => {
+                                    setShowMerge(true);
+                                    if (!mergeItem) setMergeItem(p.product_name);
+                                    else setMergeTarget(p.product_name);
+                                }}
+                                title="Samakan produk ini dengan nama item lain"
+                                style={{
+                                    background: "none",
+                                    border: "1px solid var(--glass-border)",
+                                    borderRadius: 99,
+                                    padding: "2px 7px",
+                                    fontSize: 10,
+                                    color: "var(--color-muted)",
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                🔗
+                            </button>
+                        </div>
+                    </div>
+                    {p.stores.map((s, i) => {
+                        const isHistoricalLow = s.observations > 1 && s.per_unit_price <= s.lowest_per_unit_price;
+                        const isAboveHistoricalLow = s.observations > 1 && s.per_unit_price > s.lowest_per_unit_price;
+                        return (
+                            <div
+                                key={s.merchant}
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    fontSize: 12,
+                                    padding: "7px 0",
+                                    borderTop: i ? "1px solid var(--glass-border)" : "none",
+                                }}
+                            >
+                                <div style={{ color: "var(--color-text)", minWidth: 0 }}>
+                                    <div>
+                                        <span style={{ fontWeight: i === 0 ? 800 : 600 }}>
+                                            {i === 0 && p.stores.length > 1 ? "🏆 " : ""}{s.merchant}
+                                        </span>
+                                        <span style={{ color: "var(--color-muted)" }}>
+                                            {" "}· {fmtRp(s.price)}{s.size ? ` (${s.size})` : ""} · {shortDate(s.last_date)}
+                                            {s.observations > 1 ? ` · ${s.observations}x beli` : ""}
+                                        </span>
+                                    </div>
+                                    {isHistoricalLow && (
+                                        <div style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 700, marginTop: 2 }}>
+                                            🔥 Harga termurah historis di toko ini
+                                        </div>
+                                    )}
+                                    {isAboveHistoricalLow && (
+                                        <div style={{ fontSize: 10, color: "#f59e0b", fontWeight: 600, marginTop: 2 }}>
+                                            ↗ Naik dari rekor termurah {fmtRp(s.lowest_per_unit_price)}{basisShort(p.compare_basis)}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mono num-tight" style={{ fontWeight: 800, color: i === 0 ? "var(--color-primary)" : "var(--color-text)", whiteSpace: "nowrap" }}>
+                                    {fmtRp(s.per_unit_price)}{basisShort(p.compare_basis)}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             ))}
         </div>
@@ -294,6 +531,7 @@ const BelanjaView = ({ showToast, setActiveMenu }) => {
     const [newQty, setNewQty] = useState("");
     const [newNotes, setNewNotes] = useState("");
     const [search, setSearch] = useState("");
+    const [storeFilter, setStoreFilter] = useState("");
     const [showBought, setShowBought] = useState(false);
     const [editModal, setEditModal] = useState(null);
     const [compareTarget, setCompareTarget] = useState("");
@@ -301,35 +539,54 @@ const BelanjaView = ({ showToast, setActiveMenu }) => {
     const stats = useMemo(() => {
         let estTotal = 0;
         let pricedCount = 0;
+        const byStore = new Map();
         for (const item of needed) {
             if (item.cheapest?.price) {
                 estTotal += item.cheapest.price;
                 pricedCount += 1;
+                const m = item.cheapest.merchant;
+                const cur = byStore.get(m) || { merchant: m, count: 0, total: 0, items: [] };
+                cur.count += 1;
+                cur.total += item.cheapest.price;
+                cur.items.push(item.name);
+                byStore.set(m, cur);
             }
         }
-        return { estTotal, pricedCount };
+        const storeRecommendations = [...byStore.values()].sort((a, b) => b.count - a.count || a.total - b.total);
+        return { estTotal, pricedCount, storeRecommendations };
     }, [needed]);
 
     const filteredNeeded = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return needed;
-        return needed.filter(
-            (i) =>
+        return needed.filter((i) => {
+            if (storeFilter && i.cheapest?.merchant !== storeFilter) return false;
+            if (!q) return true;
+            return (
                 i.name.toLowerCase().includes(q) ||
                 (i.qty_text && i.qty_text.toLowerCase().includes(q)) ||
                 (i.notes && i.notes.toLowerCase().includes(q))
-        );
-    }, [needed, search]);
+            );
+        });
+    }, [needed, search, storeFilter]);
+
+    const toast = (msg, type) => showToast?.(msg, type);
 
     if (household && !enabled) {
         return (
-            <div style={{ textAlign: "center", padding: 40, color: "var(--color-muted)", fontSize: 13 }}>
-                Fitur Belanja &amp; Stok belum aktif. Buka Settings → Household → Fitur opsional untuk menyalakannya.
+            <div style={{ animation: "fadeIn .4s" }}>
+                <div style={{ marginBottom: 20 }}>
+                    <div style={{ ...eyebrow, marginBottom: 8 }}>KELUARGA &amp; RUMAH</div>
+                    <h1 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", margin: 0 }}>
+                        ⚖️ Banding Harga Antar Toko
+                    </h1>
+                    <div style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
+                        Bandingkan harga satuan barang dari riwayat struk belanja keluarga. Untuk mengaktifkan Daftar Belanja &amp; Stok Kulkas, buka <strong>Profil → Household → Fitur Opsional</strong>.
+                    </div>
+                </div>
+                <PriceComparePanel toast={toast} />
             </div>
         );
     }
-
-    const toast = (msg, type) => showToast?.(msg, type);
 
     const handleAdd = async (nameOverride, qtyOverride, notesOverride) => {
         const trimmed = (nameOverride ?? newName).trim();
@@ -537,6 +794,55 @@ const BelanjaView = ({ showToast, setActiveMenu }) => {
                         </div>
                     )}
 
+                    {/* Smart Basket: Rekomendasi Toko Termurah untuk Daftar Belanja */}
+                    {stats.storeRecommendations.length > 0 && (
+                        <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 14, background: "rgba(131,155,122,.08)", border: "1px solid rgba(131,155,122,.25)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                                <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)" }}>
+                                    🏪 Rekomendasi Toko untuk Daftar Belanja Ini (klik toko untuk filter):
+                                </div>
+                                {storeFilter && (
+                                    <button
+                                        onClick={() => setStoreFilter("")}
+                                        style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                                    >
+                                        ✕ Tampilkan Semua Toko
+                                    </button>
+                                )}
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                {stats.storeRecommendations.map((sr) => {
+                                    const active = storeFilter === sr.merchant;
+                                    return (
+                                        <button
+                                            key={sr.merchant}
+                                            onClick={() => setStoreFilter(active ? "" : sr.merchant)}
+                                            style={{
+                                                padding: "6px 12px",
+                                                borderRadius: 10,
+                                                border: active ? "1px solid var(--color-primary)" : "1px solid var(--glass-border)",
+                                                background: active ? "var(--color-primary-soft)" : "var(--bg-surface-low)",
+                                                color: "var(--color-text)",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: "pointer",
+                                                fontFamily: "inherit",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 6,
+                                            }}
+                                        >
+                                            <span>🏆 {sr.merchant}</span>
+                                            <span className="mono" style={{ color: "var(--color-primary)", fontWeight: 800 }}>
+                                                {sr.count} item · {fmtRp(sr.total)}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Search filter if many items */}
                     {needed.length > 5 && (
                         <div style={{ marginBottom: 12 }}>
@@ -555,7 +861,7 @@ const BelanjaView = ({ showToast, setActiveMenu }) => {
 
                     {!shoppingLoading && filteredNeeded.length === 0 && (
                         <div style={{ textAlign: "center", padding: 32, color: "var(--color-muted)", fontSize: 13 }}>
-                            {search ? "Tidak ada item yang cocok dengan pencarian." : "Daftar belanja kosong 🎉"}
+                            {search || storeFilter ? "Tidak ada item yang cocok dengan filter." : "Daftar belanja kosong 🎉"}
                         </div>
                     )}
 

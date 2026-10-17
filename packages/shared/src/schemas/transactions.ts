@@ -52,6 +52,7 @@ export const CreateTransactionBodySchema = z
 export const BatchItemSchema = z.object({
   amount: z.number().int().positive().optional(),
   amount_text: z.string().optional(),
+  qty: z.number().positive().optional(),
   category_id: UuidSchema.optional(),
   category: z.string().optional(),
   note: z.string().optional(),

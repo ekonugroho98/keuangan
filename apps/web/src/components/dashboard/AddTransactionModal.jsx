@@ -8,7 +8,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { api, unwrap } from "../../api/client";
 import { useBeneficiaries } from "../../hooks/useBeneficiaries";
 import { useCategories } from "../../hooks/useCategories";
-import { formatReceiptNote } from "@karaya/shared/format";
+import { formatReceiptNote, parseReceiptNote } from "@karaya/shared/format";
 
 /* ── Scan Struk: kirim gambar ke AI, ekstrak semua item transaksi ──
    Daftar kategori yang dipakai untuk validasi, tebakan fallback, dan dropdown per-item adalah
@@ -35,12 +35,14 @@ function sanitizeScanResult(raw, scanCategories) {
         typeof item.amount === "number"
           ? Math.round(item.amount)
           : parseInt(String(item.amount).replace(/\D/g, ""), 10);
+      const qtyRaw = Number(item.qty);
+      const qty = !Number.isNaN(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
       const note =
         typeof item.note === "string" ? item.note.trim() : String(item.note || "").trim();
       const category =
         matchCategory(item.category, scanCategories) || guessCategory(note, scanCategories);
       if (!note || isNaN(amount) || amount <= 0) return null;
-      return { note, amount, category };
+      return { note, qty, amount, category };
     })
     .filter(Boolean);
 
@@ -1974,17 +1976,72 @@ const AddTransactionModal = ({
                 </div>
               </div>
 
-              <div style={{ marginBottom: 16 }}>
-                <FieldLabel>CATATAN</FieldLabel>
-                <input
-                  value={txForm.note}
-                  onChange={(e) =>
-                    setTxForm((p) => ({ ...p, note: e.target.value }))
-                  }
-                  placeholder="Opsional"
-                  style={glassInputStyle}
-                />
-              </div>
+              {txForm.type === "expense" ? (() => {
+                const parsed = parseReceiptNote(txForm.note || "");
+                const curMerchant = parsed.merchant || "";
+                const curName = parsed.merchant ? parsed.name : (txForm.note || "");
+                const setMerchantAndName = (m, n) => {
+                  const cleanM = (m || "").trim();
+                  const cleanN = n ?? "";
+                  const nextNote = cleanM
+                    ? formatReceiptNote(cleanN || cleanM, cleanM, parsed.refNo)
+                    : cleanN;
+                  setTxForm((p) => ({ ...p, note: nextNote }));
+                };
+                const QUICK_STORES = ["Indomaret", "Alfamart", "Alfamidi", "Super Indo", "Pasar"];
+                return (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <FieldLabel hint="Isi ukuran (mis. 1L / 500g) agar masuk Banding Harga">
+                        NAMA BARANG / CATATAN
+                      </FieldLabel>
+                      <input
+                        value={curName}
+                        onChange={(e) => setMerchantAndName(curMerchant, e.target.value)}
+                        placeholder="Mis. Susu Ultra 1L, Minyak Goreng 2L, atau catatan..."
+                        style={glassInputStyle}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <FieldLabel hint="Opsional · otomatis masuk Banding Harga">
+                        🏪 TOKO / TEMPAT BELI
+                      </FieldLabel>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                        {QUICK_STORES.map((st) => {
+                          const isAct = curMerchant.toLowerCase() === st.toLowerCase();
+                          return (
+                            <Chip
+                              key={st}
+                              active={isAct}
+                              onClick={() => setMerchantAndName(isAct ? "" : st, curName)}
+                            >
+                              🏪 {st}
+                            </Chip>
+                          );
+                        })}
+                      </div>
+                      <input
+                        value={curMerchant}
+                        onChange={(e) => setMerchantAndName(e.target.value, curName)}
+                        placeholder="Atau ketik nama toko lain (kosongkan jika bukan belanja barang)..."
+                        style={{ ...glassInputStyle, padding: "10px 14px", fontSize: 13, minHeight: 40 }}
+                      />
+                    </div>
+                  </>
+                );
+              })() : (
+                <div style={{ marginBottom: 16 }}>
+                  <FieldLabel>CATATAN</FieldLabel>
+                  <input
+                    value={txForm.note}
+                    onChange={(e) =>
+                      setTxForm((p) => ({ ...p, note: e.target.value }))
+                    }
+                    placeholder="Opsional"
+                    style={glassInputStyle}
+                  />
+                </div>
+              )}
 
               <div style={{ marginBottom: 16 }}>
                 <FieldLabel>📅 TANGGAL</FieldLabel>
