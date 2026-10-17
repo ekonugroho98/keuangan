@@ -138,9 +138,58 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')('perbandingan harga a
     expect(alias.status).toBe(200)
     expect(await alias.json()).toEqual({ keyword: 'zz sabun kw 85g', canonical_name: 'lifebuoy sabun batang' })
 
+    // Pastikan alias juga memperkaya product_knowledge global untuk keluarga lain
+    const admin = postgres(ADMIN_URL, { prepare: false, max: 1 })
+    const [pkRow] = await admin<{ canonical_name: string }[]>`select canonical_name from product_knowledge where keyword = 'zz sabun kw 85g'`
+    await admin.end()
+    expect(pkRow?.canonical_name).toBe('lifebuoy sabun batang')
+
     const after = await (await app.request('/v1/prices/compare?q=lifebuoy', { headers: auth(token) })).json()
     expect(after.products[0].stores[0]).toMatchObject({ merchant: 'Warung Bu Siti', per_unit_price: 3529 })
     expect(after.products[0].stores).toHaveLength(3)
+  })
+
+  it('mode katalog (tanpa q) mengembalikan daftar produk; transaksi satuan manual & PATCH ikut tersinkron', async () => {
+    const app = buildApp()
+    const token = await mintJwt(EKO_USER_ID)
+
+    // Transaksi pengeluaran manual satuan dengan "[Toko] Nama Barang"
+    const txRes = await app.request('/v1/transactions', {
+      method: 'POST',
+      headers: json(token),
+      body: JSON.stringify({
+        type: 'expense',
+        account: 'BCA suami',
+        category: 'Shopping',
+        amount: 4_800,
+        note: '[Superindo] LFBY BS 85G',
+      }),
+    })
+    expect(txRes.status).toBe(201)
+    const txId = (await txRes.json()).transaction.id
+    createdTxIds.push(txId)
+
+    // Edit harga lewat PATCH → product_prices ikut ter-update
+    const patchRes = await app.request(`/v1/transactions/${txId}`, {
+      method: 'PATCH',
+      headers: json(token),
+      body: JSON.stringify({ amount: 3_400 }),
+    })
+    expect(patchRes.status).toBe(200)
+
+    // Mode katalog tanpa parameter q
+    const catalogRes = await app.request('/v1/prices/compare', { headers: auth(token) })
+    expect(catalogRes.status).toBe(200)
+    const catalog = await catalogRes.json()
+    expect(catalog.query).toBe('')
+    const lifebuoy = catalog.products.find((p: { product_name: string }) => p.product_name === 'lifebuoy sabun batang')
+    expect(lifebuoy).toBeTruthy()
+    const superindo = lifebuoy.stores.find((s: { merchant: string }) => s.merchant === 'Superindo')
+    expect(superindo).toMatchObject({ price: 3400, per_unit_price: 4000 })
+
+    // Hapus transaksi manual tadi supaya test berikutnya tetap konsisten
+    await app.request(`/v1/transactions/${txId}`, { method: 'DELETE', headers: auth(token) })
+    createdTxIds.pop()
   })
 
   it('transaksi dihapus tidak ikut dibandingkan', async () => {
