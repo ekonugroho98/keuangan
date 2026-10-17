@@ -12478,6 +12478,7 @@ var CreateTransactionBodySchema = external_exports.object({
 var BatchItemSchema = external_exports.object({
   amount: external_exports.number().int().positive().optional(),
   amount_text: external_exports.string().optional(),
+  qty: external_exports.number().positive().optional(),
   category_id: UuidSchema.optional(),
   category: external_exports.string().optional(),
   note: external_exports.string().optional(),
@@ -12966,7 +12967,7 @@ var IngestReceiptBodySchema = external_exports.object({
   pantry: external_exports.boolean().default(true).openapi({ description: "Tambah stok untuk item yang cocok di pantry." })
 }).openapi("IngestReceiptBody");
 var ComparePricesQuerySchema = external_exports.object({
-  q: external_exports.string().min(2).openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng"' }),
+  q: external_exports.string().optional().openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng". Kosongkan untuk katalog semua produk yang tercatat.' }),
   days: external_exports.coerce.number().int().min(1).max(730).default(180)
 });
 var StorePriceSchema = external_exports.object({
@@ -14343,6 +14344,17 @@ async function recordPrices(tx, householdId, merchant, date, items) {
   const [row] = await tx`select record_product_prices(${householdId}, ${m}, ${date}, ${tx.json(payload)}) as n`;
   return row?.n ?? 0;
 }
+async function syncTransactionPrice(tx, householdId, txRow) {
+  const [prev] = await tx`select qty::text from product_prices where transaction_id = ${txRow.id}`;
+  await tx`delete from product_prices where transaction_id = ${txRow.id}`;
+  if (txRow.type !== "expense" || !txRow.note || txRow.amount <= 0) return;
+  const parsed = parseReceiptNote(txRow.note);
+  if (!parsed.merchant || !parsed.name) return;
+  const prevQty = prev ? Number(prev.qty) : 1;
+  await recordPrices(tx, householdId, parsed.merchant, txRow.date, [
+    { transaction_id: txRow.id, name: parsed.name, qty: prevQty > 0 ? prevQty : 1, amount: txRow.amount }
+  ]);
+}
 function basisFor(unit) {
   if (unit === "g") return { label: "per 100 g", factor: 100 };
   if (unit === "ml") return { label: "per 100 ml", factor: 100 };
@@ -14402,7 +14414,9 @@ function summarizeObservations(rows) {
     const summary = list.length > 1 ? `${name}: termurah di ${list[0].merchant}. ${parts2.join("; ")}.${savings ? ` Selisih ${savings}%.` : ""}` : `${name}: baru tercatat di ${parts2[0]}. Belum ada pembanding dari toko lain.`;
     out.push({ product_name: name, unit, compare_basis: basis.label, stores: list, cheapest, savings_pct: savings, summary });
   }
-  return out.sort((a, b2) => b2.stores.length - a.stores.length || b2.stores.reduce((s, x) => s + x.observations, 0) - a.stores.reduce((s, x) => s + x.observations, 0));
+  return out.sort(
+    (a, b2) => b2.stores.length - a.stores.length || (b2.savings_pct ?? 0) - (a.savings_pct ?? 0) || b2.stores.reduce((s, x) => s + x.observations, 0) - a.stores.reduce((s, x) => s + x.observations, 0)
+  );
 }
 var OBS_SELECT = `
   select product_name, product_key, keyword, merchant, merchant_key, qty::float as qty, unit_price::float as unit_price,
@@ -14416,9 +14430,22 @@ function queryTokens(q) {
   return normText(q).replace(/[^a-z0-9 ]/g, " ").split(" ").filter((t) => t.length >= 2);
 }
 async function comparePrices(actor, input) {
-  const tokens = queryTokens(input.q);
-  if (!tokens.length) throw ApiError.fromCode("validation_error", { message: "q minimal 2 huruf.", details: { field: "q" } });
+  const rawQ = (input.q ?? "").trim();
   const days = Math.min(Math.max(input.days ?? DEFAULT_DAYS, 1), 730);
+  if (!rawQ) {
+    const rows2 = await withActor(
+      actor,
+      (tx) => tx.unsafe(
+        `${OBS_SELECT}
+         where household_id = $1 and date >= $2
+         order by date desc limit 1500`,
+        [actor.householdId, sinceDate(days)]
+      )
+    );
+    return { query: "", days, products: summarizeObservations(rows2).slice(0, 20) };
+  }
+  const tokens = queryTokens(rawQ);
+  if (!tokens.length) throw ApiError.fromCode("validation_error", { message: "q minimal 2 huruf.", details: { field: "q" } });
   const patterns = tokens.map((t) => `%${t}%`);
   const qn = tokens.join(" ");
   const rows = await withActor(
@@ -14431,7 +14458,7 @@ async function comparePrices(actor, input) {
       [actor.householdId, sinceDate(days), patterns, qn]
     )
   );
-  return { query: input.q, days, products: summarizeObservations(rows).slice(0, 8) };
+  return { query: rawQ, days, products: summarizeObservations(rows).slice(0, 12) };
 }
 async function cheapestForNames(tx, householdId, names) {
   const out = /* @__PURE__ */ new Map();
@@ -14466,6 +14493,11 @@ async function setProductAlias(actor, input) {
       insert into product_aliases (household_id, keyword, canonical_name) values (${actor.householdId}, ${row.keyword}, ${canonical})
       on conflict (household_id, keyword) do update set canonical_name = excluded.canonical_name
     `;
+    const [existingPk] = await tx`
+      select product_group::text from product_knowledge where keyword in (${row.keyword}, item_keyword(${input.same_as})) limit 1
+    `;
+    const group2 = existingPk?.product_group ?? ruleGroup(canonical) ?? "other";
+    await tx`select learn_product_knowledge(${row.keyword}, ${group2}::product_group, ${canonical}, 'user'::keyword_source, ${canonical})`;
     return { keyword: row.keyword, canonical_name: canonical };
   });
 }
@@ -14633,17 +14665,31 @@ async function getTransaction(actor, id) {
 }
 async function createTransaction(actor, input, timezone) {
   const amount = parseAmount(input);
+  const parsedNote = input.type === "expense" && input.note ? parseReceiptNote(input.note) : null;
+  if (parsedNote?.merchant && parsedNote.name) {
+    await canonicalizeProducts(actor, [parsedNote.name]);
+  }
   return withActor(actor, async (tx) => {
     const accountId = await resolveAccountRef(tx, actor, input);
     const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type);
     const categoryId = actor.credential === "api_key" && input.type === "expense" ? await refineAgentCategory(tx, actor.householdId, input.note, resolvedCategoryId) : resolvedCategoryId;
     const beneficiaryId = await resolveBeneficiaryRef(tx, actor, input) ?? null;
+    const txDate = input.date ?? todayInTz(timezone);
     const [row] = await tx`
       select id from post_transaction(
         ${actor.householdId}, ${actor.memberId}, ${input.type}, ${accountId}, ${categoryId},
-        ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? ""}, ${txSource(actor)}, null, ${beneficiaryId}
+        ${amount}, ${txDate}, ${input.note ?? ""}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `;
+    if (parsedNote?.merchant) {
+      await syncTransactionPrice(tx, actor.householdId, {
+        id: row.id,
+        type: input.type,
+        amount,
+        date: txDate,
+        note: input.note ?? ""
+      });
+    }
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [row.id]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
     return { transaction: mapTx(rows[0]), account: { id: accountId, balance: Number(accRow.balance) } };
@@ -14687,7 +14733,7 @@ async function createTransactionBatch(actor, input, timezone) {
       if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount });
       if (parsed?.merchant) {
         const list = pricesByMerchant.get(parsed.merchant) ?? [];
-        list.push({ transaction_id: txId, name: parsed.name, amount: it.amount });
+        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty, amount: it.amount });
         pricesByMerchant.set(parsed.merchant, list);
       }
     }
@@ -14700,6 +14746,10 @@ async function createTransactionBatch(actor, input, timezone) {
   });
 }
 async function updateTransaction(actor, id, input) {
+  const parsedNote = input.note ? parseReceiptNote(input.note) : null;
+  if (parsedNote?.merchant && parsedNote.name) {
+    await canonicalizeProducts(actor, [parsedNote.name]);
+  }
   return withActor(actor, async (tx) => {
     const patch = {};
     if (input.amount !== void 0 || input.amount_text !== void 0) patch.amount = parseAmount(input);
@@ -14713,6 +14763,15 @@ async function updateTransaction(actor, id, input) {
     }
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch)})`;
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
+    if (patch.amount !== void 0 || patch.date !== void 0 || patch.note !== void 0 || patch.type !== void 0) {
+      await syncTransactionPrice(tx, actor.householdId, {
+        id: rows[0].id,
+        type: rows[0].type,
+        amount: Number(rows[0].amount),
+        date: rows[0].date,
+        note: rows[0].note
+      });
+    }
     if (typeof patch.category_id === "string") await learnKeywords(tx, actor.householdId, [{ note: rows[0].note, categoryId: patch.category_id }]);
     return mapTx(rows[0]);
   });
@@ -18239,14 +18298,15 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
   "date": "2026-04-06",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk 1", "amount": 15000, "category": "<nama kategori dari daftar>" },
-    { "note": "Nama Produk 2", "amount": 8500, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk 1", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" },
+    { "note": "Nama Produk 2", "qty": 2, "amount": 17000, "category": "<nama kategori dari daftar>" }
   ]
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
 - note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus \u2014 dipakai untuk mengenali produk yang sama lain kali)
-- amount: harga total untuk item itu (qty \xD7 harga satuan), angka bulat tanpa titik/koma
+- qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (angka bulat/desimal, default 1 jika tidak tertulis)
+- amount: harga total untuk baris item itu (qty \xD7 harga satuan), angka bulat tanpa titik/koma
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
 - Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
@@ -18263,10 +18323,10 @@ Kembalikan HANYA JSON (tanpa penjelasan lain):
   "date": "YYYY-MM-DD atau null",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk", "amount": 15000, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: note = nama item persis seperti di struk; amount = harga total per item (qty\xD7satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
+Aturan: note = nama item persis seperti di struk; qty = jumlah unit yang dibeli (default 1); amount = harga total per baris item (qty\xD7satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:

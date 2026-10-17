@@ -191,10 +191,12 @@ const Sidebar = ({
             { id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" },
             { id: "laporan",   label: t("nav.reports"),      icon: "📑" },
         ]},
-        { key: "home", group: t("nav.home"), collapsible: true, highlight: true, items: features?.shopping_stock?.enabled ? [
+        { key: "home", group: t("nav.home"), collapsible: true, highlight: true, items: [
             { id: "belanja",   label: t("nav.shopping"),     icon: "🛒" },
-            { id: "pantry",    label: t("nav.pantry"),       icon: "🧊" },
-        ] : []},
+            ...(features?.shopping_stock?.enabled ? [
+                { id: "pantry",    label: t("nav.pantry"),       icon: "🧊" },
+            ] : []),
+        ]},
         { key: "transactions", group: t("nav.transactions"), collapsible: true, items: [
             { id: "transaksi", label: t("nav.transaction"),  icon: "💳" },
             { id: "akun",      label: t("nav.accounts"),     icon: "🏦" },

@@ -1,17 +1,17 @@
 import type postgres from 'postgres'
 import { ApiError } from '@karaya/shared/errors'
-import { fmtRp } from '@karaya/shared/format'
+import { fmtRp, parseReceiptNote } from '@karaya/shared/format'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { buildTextRequest, callProviderJson, tryGetAiConfig } from './ai/provider'
-import { normText } from './categorize'
+import { normText, ruleGroup } from './categorize'
 import { GROUP_LABEL_ID, PRODUCT_GROUPS, isProductGroup } from './product-groups'
 
 /**
  * Perbandingan harga produk antar toko (migrasi 0025, 10-fitur-opsional-keluarga.md §6.8).
  *   - canonicalizeProducts: nama kasir → nama produk kanonik (AI BYOK, satu panggilan per struk, cache global
  *     product_knowledge.canonical_name). Best-effort: gagal/tanpa BYOK → riwayat tetap tercatat dengan nama dasar.
- *   - recordPrices: dipanggil DI DALAM transaksi ingest/batch → record_product_prices().
+ *   - recordPrices / syncTransactionPrice: dipanggil DI DALAM transaksi ingest/batch/single/update → record_product_prices().
  *   - comparePrices / cheapestForNames: baca v_product_prices, kelompokkan per (produk, satuan), urutkan per satuan.
  */
 
@@ -104,6 +104,26 @@ export async function recordPrices(tx: postgres.TransactionSql, householdId: str
   return row?.n ?? 0
 }
 
+/**
+ * Sinkronkan 1 baris transaksi tunggal (createTransaction / updateTransaction) ke product_prices.
+ * Bila di-edit (nominal/tanggal/note berubah), baris lama dihapus lalu dicatat ulang dengan mempertahankan qty sebelumnya.
+ */
+export async function syncTransactionPrice(
+  tx: postgres.TransactionSql,
+  householdId: string,
+  txRow: { id: string; type: string; amount: number; date: string; note: string | null | undefined },
+): Promise<void> {
+  const [prev] = await tx<{ qty: string }[]>`select qty::text from product_prices where transaction_id = ${txRow.id}`
+  await tx`delete from product_prices where transaction_id = ${txRow.id}`
+  if (txRow.type !== 'expense' || !txRow.note || txRow.amount <= 0) return
+  const parsed = parseReceiptNote(txRow.note)
+  if (!parsed.merchant || !parsed.name) return
+  const prevQty = prev ? Number(prev.qty) : 1
+  await recordPrices(tx, householdId, parsed.merchant, txRow.date, [
+    { transaction_id: txRow.id, name: parsed.name, qty: prevQty > 0 ? prevQty : 1, amount: txRow.amount },
+  ])
+}
+
 // ── Perbandingan ────────────────────────────────────────────────────────────────────────────
 
 export interface PriceObservation {
@@ -164,7 +184,7 @@ function fmtDateId(d: string): string {
 /**
  * Observasi → perbandingan per (produk kanonik, satuan). Tiap toko diwakili harga TERAKHIR-nya
  * (paling relevan untuk keputusan belanja), dibandingkan per satuan dasar supaya beda ukuran kemasan adil.
- * Kelompok diurutkan dari yang paling banyak tokonya/observasinya. Pure — diuji unit.
+ * Kelompok diurutkan dari yang paling banyak tokonya, selisih hemat terbesar, lalu jumlah observasinya. Pure — diuji unit.
  */
 export function summarizeObservations(rows: PriceObservation[]): ProductComparison[] {
   const groups = new Map<string, PriceObservation[]>()
@@ -210,7 +230,12 @@ export function summarizeObservations(rows: PriceObservation[]): ProductComparis
         : `${name}: baru tercatat di ${parts[0]}. Belum ada pembanding dari toko lain.`
     out.push({ product_name: name, unit, compare_basis: basis.label, stores: list, cheapest, savings_pct: savings, summary })
   }
-  return out.sort((a, b) => b.stores.length - a.stores.length || b.stores.reduce((s, x) => s + x.observations, 0) - a.stores.reduce((s, x) => s + x.observations, 0))
+  return out.sort(
+    (a, b) =>
+      b.stores.length - a.stores.length ||
+      (b.savings_pct ?? 0) - (a.savings_pct ?? 0) ||
+      b.stores.reduce((s, x) => s + x.observations, 0) - a.stores.reduce((s, x) => s + x.observations, 0),
+  )
 }
 
 const OBS_SELECT = `
@@ -227,10 +252,26 @@ function queryTokens(q: string): string[] {
   return normText(q).replace(/[^a-z0-9 ]/g, ' ').split(' ').filter((t) => t.length >= 2)
 }
 
-export async function comparePrices(actor: Actor, input: { q: string; days?: number }): Promise<{ query: string; days: number; products: ProductComparison[] }> {
-  const tokens = queryTokens(input.q)
-  if (!tokens.length) throw ApiError.fromCode('validation_error', { message: 'q minimal 2 huruf.', details: { field: 'q' } })
+export async function comparePrices(actor: Actor, input: { q?: string; days?: number }): Promise<{ query: string; days: number; products: ProductComparison[] }> {
+  const rawQ = (input.q ?? '').trim()
   const days = Math.min(Math.max(input.days ?? DEFAULT_DAYS, 1), 730)
+
+  // Mode Katalog: bila q tidak diisi / kosong, kembalikan produk teratas yang tercatat di household
+  // (diurutkan dari yang punya >1 toko & selisih hemat terbesar, lalu jumlah observasi terbanyak).
+  if (!rawQ) {
+    const rows = await withActor(actor, (tx) =>
+      tx.unsafe<PriceObservation[]>(
+        `${OBS_SELECT}
+         where household_id = $1 and date >= $2
+         order by date desc limit 1500`,
+        [actor.householdId, sinceDate(days)],
+      ),
+    )
+    return { query: '', days, products: summarizeObservations(rows).slice(0, 20) }
+  }
+
+  const tokens = queryTokens(rawQ)
+  if (!tokens.length) throw ApiError.fromCode('validation_error', { message: 'q minimal 2 huruf.', details: { field: 'q' } })
   const patterns = tokens.map((t) => `%${t}%`)
   const qn = tokens.join(' ')
   const rows = await withActor(actor, (tx) =>
@@ -242,7 +283,7 @@ export async function comparePrices(actor: Actor, input: { q: string; days?: num
       [actor.householdId, sinceDate(days), patterns, qn],
     ),
   )
-  return { query: input.q, days, products: summarizeObservations(rows).slice(0, 8) }
+  return { query: rawQ, days, products: summarizeObservations(rows).slice(0, 12) }
 }
 
 /** Untuk daftar belanja: nama item belanja → toko termurah (kelompok produk paling banyak datanya). */
@@ -271,7 +312,10 @@ export async function cheapestForNames(
   return out
 }
 
-/** Koreksi manual: "item struk X itu produk Y" (per household, menang atas kanonik global). */
+/**
+ * Koreksi manual: "item struk X itu produk Y" (per household di product_aliases, DAN ikut memperkaya
+ * kamus global product_knowledge supaya keluarga lain yang menemukan singkatan struk serupa ikut terbantu).
+ */
 export async function setProductAlias(actor: Actor, input: { item: string; same_as: string }): Promise<{ keyword: string; canonical_name: string }> {
   return withActor(actor, async (tx) => {
     const [row] = await tx<{ keyword: string; canonical: string }[]>`select item_keyword(${input.item}) as keyword, left(norm_text(${input.same_as}), 120) as canonical`
@@ -286,6 +330,13 @@ export async function setProductAlias(actor: Actor, input: { item: string; same_
       insert into product_aliases (household_id, keyword, canonical_name) values (${actor.householdId}, ${row.keyword}, ${canonical})
       on conflict (household_id, keyword) do update set canonical_name = excluded.canonical_name
     `
+    // Ikut perkaya product_knowledge lintas keluarga (source = 'user', rank tertinggi)
+    const [existingPk] = await tx<{ product_group: string }[]>`
+      select product_group::text from product_knowledge where keyword in (${row.keyword}, item_keyword(${input.same_as})) limit 1
+    `
+    const group = existingPk?.product_group ?? ruleGroup(canonical) ?? 'other'
+    await tx`select learn_product_knowledge(${row.keyword}, ${group}::product_group, ${canonical}, 'user'::keyword_source, ${canonical})`
     return { keyword: row.keyword, canonical_name: canonical }
   })
 }
+

@@ -128,7 +128,7 @@ export const IngestReceiptBodySchema = z
 
 // ── Perbandingan harga antar toko (10-fitur-opsional-keluarga.md §6.8) ──────────────────────
 export const ComparePricesQuerySchema = z.object({
-  q: z.string().min(2).openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng"' }),
+  q: z.string().optional().openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng". Kosongkan untuk katalog semua produk yang tercatat.' }),
   days: z.coerce.number().int().min(1).max(730).default(180),
 })
 

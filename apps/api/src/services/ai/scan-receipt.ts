@@ -34,14 +34,15 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
   "date": "2026-04-06",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk 1", "amount": 15000, "category": "<nama kategori dari daftar>" },
-    { "note": "Nama Produk 2", "amount": 8500, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk 1", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" },
+    { "note": "Nama Produk 2", "qty": 2, "amount": 17000, "category": "<nama kategori dari daftar>" }
   ]
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
 - note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus — dipakai untuk mengenali produk yang sama lain kali)
-- amount: harga total untuk item itu (qty × harga satuan), angka bulat tanpa titik/koma
+- qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (angka bulat/desimal, default 1 jika tidak tertulis)
+- amount: harga total untuk baris item itu (qty × harga satuan), angka bulat tanpa titik/koma
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
 - Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
@@ -59,10 +60,10 @@ Kembalikan HANYA JSON (tanpa penjelasan lain):
   "date": "YYYY-MM-DD atau null",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk", "amount": 15000, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: note = nama item persis seperti di struk; amount = harga total per item (qty×satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
+Aturan: note = nama item persis seperti di struk; qty = jumlah unit yang dibeli (default 1); amount = harga total per baris item (qty×satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:
