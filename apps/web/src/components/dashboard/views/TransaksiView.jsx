@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { fmtRp, fmtDate } from "../../../utils/formatters";
+import { exportTransactionsCSV, exportTransactionsExcel } from "../../../utils/exportData";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useMembers } from "../../../hooks/useMembers";
 import { useBeneficiaries } from "../../../hooks/useBeneficiaries";
@@ -249,11 +250,68 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                         {t("tx.subtitle") || "Kelola arus kas dengan presisi."}
                     </p>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                    <span className="eyebrow" style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.8, textTransform: "uppercase", color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
-                        {t("tx.activePeriod") || "Periode Aktif"}
-                    </span>
-                    <div className="num-tight" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.02em" }}>{periodLabel}</div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 14, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button
+                            type="button"
+                            disabled={filtered.length === 0}
+                            onClick={() => {
+                                const slug = periodLabel.toLowerCase().replace(/\s+/g, "-");
+                                exportTransactionsExcel(filtered, {
+                                    filename: `keluarga-berkembang-transaksi-${slug}.xlsx`,
+                                    periodLabel,
+                                    scopeLabel: filterAccount ? `Rekening ${filterAccount}` : "Semua Rekening",
+                                    summary: { income: sumIn, expense: sumOut, transfer: sumTransfer, net },
+                                    accounts: activeAccount ? [activeAccount] : accounts,
+                                });
+                            }}
+                            style={{
+                                padding: "8px 14px", borderRadius: 10,
+                                border: "1px solid rgba(131,155,122,.35)",
+                                background: "var(--color-primary-soft)",
+                                color: "var(--color-primary)",
+                                fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+                                cursor: filtered.length === 0 ? "not-allowed" : "pointer",
+                                opacity: filtered.length === 0 ? 0.45 : 1,
+                                display: "flex", alignItems: "center", gap: 6,
+                                transition: "all .15s",
+                            }}
+                            title="Unduh transaksi sesuai filter aktif dalam format Excel (.xlsx)"
+                        >
+                            📊 Export Excel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={filtered.length === 0}
+                            onClick={() => {
+                                const slug = periodLabel.toLowerCase().replace(/\s+/g, "-");
+                                exportTransactionsCSV(filtered, {
+                                    filename: `keluarga-berkembang-transaksi-${slug}.csv`,
+                                    periodLabel,
+                                });
+                            }}
+                            style={{
+                                padding: "8px 12px", borderRadius: 10,
+                                border: "1px solid var(--glass-border)",
+                                background: "var(--glass-1)",
+                                color: "var(--color-text)",
+                                fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+                                cursor: filtered.length === 0 ? "not-allowed" : "pointer",
+                                opacity: filtered.length === 0 ? 0.45 : 1,
+                                display: "flex", alignItems: "center", gap: 5,
+                                transition: "all .15s",
+                            }}
+                            title="Unduh transaksi sesuai filter aktif dalam format CSV (.csv)"
+                        >
+                            📄 CSV
+                        </button>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                        <span className="eyebrow" style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.8, textTransform: "uppercase", color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
+                            {t("tx.activePeriod") || "Periode Aktif"}
+                        </span>
+                        <div className="num-tight" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.02em" }}>{periodLabel}</div>
+                    </div>
                 </div>
             </div>
 

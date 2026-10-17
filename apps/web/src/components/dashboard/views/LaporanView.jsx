@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { parseReceiptNote } from "@karaya/shared/format";
 import { fmtRp } from "../../../utils/formatters";
+import { exportTransactionsCSV, exportTransactionsExcel } from "../../../utils/exportData";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import ScopeSwitcher from "../../household/ScopeSwitcher";
 import PrediksiView from "./PrediksiView";
@@ -778,42 +779,113 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                         </p>
                     </div>
 
-                    {/* Period chips + custom selector (shown for Ringkasan & Kebiasaan tabs) */}
-                    {activeTab !== "proyeksi" && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                    {/* Period chips + custom selector + Export buttons */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                        {activeTab !== "proyeksi" && (
                             <PeriodChips value={useCustom ? "" : quickPeriod} onChange={v => { setUseCustom(false); setQuickPeriod(v); }} />
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                <button onClick={() => setUseCustom(v => !v)}
-                                    className={useCustom ? "chip chip-mint" : "chip chip-ghost"}
-                                    style={{ fontSize: 11, padding: "6px 12px", cursor: "pointer", border: "none", fontFamily: "inherit" }}>
-                                    {useCustom ? "✓ " : ""}Custom
-                                </button>
-                                {useCustom && (
-                                    <>
-                                        <select value={customYear} onChange={e => setCustomYear(e.target.value)} style={{
-                                            padding: "6px 10px", borderRadius: 8, minHeight: 32,
-                                            background: "var(--glass-1)",
-                                            backdropFilter: "var(--glass-blur-sm)",
-                                            border: "1px solid var(--glass-border)",
-                                            color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
-                                        }}>
-                                            {years.map(y => <option key={y} value={y}>{y}</option>)}
-                                        </select>
-                                        <select value={customMonth} onChange={e => setCustomMonth(e.target.value)} style={{
-                                            padding: "6px 10px", borderRadius: 8, minHeight: 32,
-                                            background: "var(--glass-1)",
-                                            backdropFilter: "var(--glass-blur-sm)",
-                                            border: "1px solid var(--glass-border)",
-                                            color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
-                                        }}>
-                                            <option value="">Setahun</option>
-                                            {MONTHS.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-                                        </select>
-                                    </>
-                                )}
-                            </div>
+                        )}
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            {activeTab !== "proyeksi" && (
+                                <>
+                                    <button onClick={() => setUseCustom(v => !v)}
+                                        className={useCustom ? "chip chip-mint" : "chip chip-ghost"}
+                                        style={{ fontSize: 11, padding: "6px 12px", cursor: "pointer", border: "none", fontFamily: "inherit" }}>
+                                        {useCustom ? "✓ " : ""}Custom
+                                    </button>
+                                    {useCustom && (
+                                        <>
+                                            <select value={customYear} onChange={e => setCustomYear(e.target.value)} style={{
+                                                padding: "6px 10px", borderRadius: 8, minHeight: 32,
+                                                background: "var(--glass-1)",
+                                                backdropFilter: "var(--glass-blur-sm)",
+                                                border: "1px solid var(--glass-border)",
+                                                color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+                                            }}>
+                                                {years.map(y => <option key={y} value={y}>{y}</option>)}
+                                            </select>
+                                            <select value={customMonth} onChange={e => setCustomMonth(e.target.value)} style={{
+                                                padding: "6px 10px", borderRadius: 8, minHeight: 32,
+                                                background: "var(--glass-1)",
+                                                backdropFilter: "var(--glass-blur-sm)",
+                                                border: "1px solid var(--glass-border)",
+                                                color: "var(--color-text)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+                                            }}>
+                                                <option value="">Setahun</option>
+                                                {MONTHS.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                                            </select>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                            <button
+                                type="button"
+                                disabled={filtered.length === 0}
+                                onClick={() => {
+                                    const slug = periodLabel.toLowerCase().replace(/\s+/g, "-");
+                                    const ym = filterYear && filterMonth ? `${filterYear}-${filterMonth}` : "";
+                                    const activeBudgetsList = scope.scope === "member" && personalBudgets.length > 0 ? personalBudgets : budgets;
+                                    const budgetMap = ym
+                                        ? Object.fromEntries(
+                                              activeBudgetsList
+                                                  .filter((b) => b.month === ym)
+                                                  .map((b) => [b.category, b.amount]),
+                                          )
+                                        : undefined;
+                                    const scopeLabel =
+                                        scope.scope === "member"
+                                            ? `Anggota: ${scope.member || "Pribadi"}`
+                                            : scope.scope === "account"
+                                              ? `Rekening: ${scope.account || ""}`
+                                              : "Seluruh Keluarga";
+                                    exportTransactionsExcel(filtered, {
+                                        filename: `keluarga-berkembang-laporan-${slug}.xlsx`,
+                                        periodLabel,
+                                        scopeLabel,
+                                        summary: { income: totalIncome, expense: totalExpense, net },
+                                        budgetMap,
+                                        accounts,
+                                    });
+                                }}
+                                style={{
+                                    padding: "6px 12px", borderRadius: 999,
+                                    border: "1px solid rgba(131,155,122,.35)",
+                                    background: "var(--color-primary-soft)",
+                                    color: "var(--color-primary)",
+                                    fontSize: 11, fontWeight: 700, fontFamily: "inherit",
+                                    cursor: filtered.length === 0 ? "not-allowed" : "pointer",
+                                    opacity: filtered.length === 0 ? 0.45 : 1,
+                                    display: "flex", alignItems: "center", gap: 5,
+                                }}
+                                title="Unduh Laporan & Transaksi dalam format Excel (.xlsx)"
+                            >
+                                📊 Export Excel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={filtered.length === 0}
+                                onClick={() => {
+                                    const slug = periodLabel.toLowerCase().replace(/\s+/g, "-");
+                                    exportTransactionsCSV(filtered, {
+                                        filename: `keluarga-berkembang-laporan-${slug}.csv`,
+                                        periodLabel,
+                                    });
+                                }}
+                                style={{
+                                    padding: "6px 11px", borderRadius: 999,
+                                    border: "1px solid var(--glass-border)",
+                                    background: "var(--glass-1)",
+                                    color: "var(--color-text)",
+                                    fontSize: 11, fontWeight: 700, fontFamily: "inherit",
+                                    cursor: filtered.length === 0 ? "not-allowed" : "pointer",
+                                    opacity: filtered.length === 0 ? 0.45 : 1,
+                                    display: "flex", alignItems: "center", gap: 4,
+                                }}
+                                title="Unduh transaksi periode ini dalam format CSV (.csv)"
+                            >
+                                📄 CSV
+                            </button>
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* ═══ 3 SUB-TABS (OPSI A: RINGKASAN · KEBIASAAN · PROYEKSI) ═══ */}

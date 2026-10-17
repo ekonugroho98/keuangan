@@ -17,7 +17,7 @@ const AVATAR_COLORS = [
 const Sidebar = ({
     open, activeMenu, setActiveMenu, user, onAddTx,
     onToggleSidebar, onLogout,
-    onUpdateName, onUpdatePassword, onExportCSV, onDeleteAccount,
+    onUpdateName, onUpdatePassword, onExportCSV, onExportExcel, txCount = 0, onDeleteAccount,
     userSettings, onSaveSettings,
     aiConfig, onSaveAiConfig,
     aiSettingsTrigger, showToast,
@@ -529,6 +529,63 @@ const Sidebar = ({
             );
         }
 
+        /* ── Export Data (Excel & CSV) ── */
+        if (profileView === "export") {
+            return (
+                <div>
+                    <button style={backBtn} onClick={() => setProfileView("menu")}>← Kembali</button>
+                    <div style={sectionLabel}>EXPORT DATA KEUANGAN</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 14, lineHeight: 1.5 }}>
+                        Unduh seluruh riwayat transaksi ({txCount} transaksi) ke format spreadsheet pilihanmu.
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <button
+                            onClick={() => { if (onExportExcel) onExportExcel(); closeProfile(); }}
+                            disabled={txCount === 0}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 12,
+                                width: "100%", padding: "14px 16px", borderRadius: 12,
+                                border: "1px solid var(--color-border-strong)",
+                                background: "var(--color-primary-soft)",
+                                color: "var(--color-text)", cursor: txCount === 0 ? "not-allowed" : "pointer",
+                                fontFamily: "inherit", textAlign: "left", opacity: txCount === 0 ? 0.5 : 1,
+                            }}>
+                            <span style={{ fontSize: 22 }}>📊</span>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>
+                                    Unduh Excel (.xlsx)
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>
+                                    2 Sheet: Ringkasan Kategori, Saldo Rekening & Daftar Transaksi
+                                </div>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => { if (onExportCSV) onExportCSV(); closeProfile(); }}
+                            disabled={txCount === 0}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 12,
+                                width: "100%", padding: "14px 16px", borderRadius: 12,
+                                border: "1px solid var(--glass-border)",
+                                background: "rgba(255,255,255,.03)",
+                                color: "var(--color-text)", cursor: txCount === 0 ? "not-allowed" : "pointer",
+                                fontFamily: "inherit", textAlign: "left", opacity: txCount === 0 ? 0.5 : 1,
+                            }}>
+                            <span style={{ fontSize: 22 }}>📄</span>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 800 }}>
+                                    Unduh CSV (.csv)
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>
+                                    Format tabel standar (Google Sheets, Numbers, Excel)
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
         /* ── Main Menu — premium bento tiles ── */
         const aiStatus = aiConfig?.apiKey ? `${AI_PROVIDERS[aiConfig.provider]?.label || ""} · Aktif` : "Belum diatur";
         const aiActive = !!aiConfig?.apiKey;
@@ -597,13 +654,13 @@ const Sidebar = ({
             },
             {
                 id: "export",
-                label: "Export CSV",
-                sub: "Unduh data",
+                label: "Export Data",
+                sub: "Excel (.xlsx) & CSV",
                 grad: "linear-gradient(135deg, #46634E, #2D3B30)",
                 tint: "rgba(70,99,78,.14)",
                 iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>),
-                action: () => { onExportCSV(); closeProfile(); },
+                action: () => setProfileView("export"),
             },
             {
                 id: "menus",
