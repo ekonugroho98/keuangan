@@ -299,7 +299,7 @@ pengiriman terjadwal, bukan endpoint ini). Respons:
   "totals": { "income": 15000000, "expense": 7962592, "net": 7037408, "saving_rate_pct": 46.9,
               "vs_prev": { "income_pct": null, "expense_pct": null } },
   "top_categories": [ { "name": "Makanan", "amount": 3100000, "pct": 38.9 } ],
-  "by_member":      [ { "member": "ekonugroho181", "income": 15000000, "expense": 3744200 } ],
+  "by_member":      [ { "member": "ayah", "income": 15000000, "expense": 3744200 } ],
   "by_beneficiary": [ ],                                   // hanya kalau F-A aktif
   "budgets": { "over": [ { "category": "Makanan", "amount": 2000000, "spent": 3100000 } ], "warning": [] },
   "piutang_open": [ { "id": "...", "borrower_name": "Ayah", "remaining": 45000, "days_open": 6 } ],

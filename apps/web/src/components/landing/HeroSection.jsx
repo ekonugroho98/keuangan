@@ -129,9 +129,9 @@ const HeroSection = ({ onSignup, onDemo }) => {
     const { t } = useLanguage();
 
     const stats = [
-        { v: 500, s: "+", l: t("lp.hero.users") },
-        { v: 98, s: "%", l: t("lp.hero.satisfaction") },
-        { v: 2, s: "M+", l: t("lp.hero.tx") },
+        { v: 100, s: "%", l: t("lp.hero.users") },
+        { v: 24, s: "/7", l: t("lp.hero.satisfaction") },
+        { v: 1, s: " Atap", l: t("lp.hero.tx") },
     ];
 
     return (
