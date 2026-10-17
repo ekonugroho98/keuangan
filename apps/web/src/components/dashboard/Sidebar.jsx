@@ -900,7 +900,7 @@ const Sidebar = ({
 
             {/* ═══ Add Transaction — Warm Terracotta (#B06443) CTA pill ═══ */}
             <div style={{ padding: "12px 12px 6px" }}>
-                <button onClick={onAddTx}
+                <button onClick={() => { if (isMobile) onToggleSidebar?.(); onAddTx(); }}
                     style={{
                         width: "100%", padding: "10px 14px",
                         background: "linear-gradient(135deg, #B06443, #965032)",
@@ -921,12 +921,14 @@ const Sidebar = ({
                         fontSize: 14, fontWeight: 700, lineHeight: 1, flexShrink: 0,
                     }}>+</span>
                     <span style={{ flex: 1, textAlign: "left" }}>{t("nav.transaction")}</span>
-                    <kbd style={{
-                        fontSize: 9, fontFamily: "inherit", fontWeight: 700,
-                        padding: "2px 6px", borderRadius: 5,
-                        background: "rgba(0,0,0,.18)", color: "rgba(255,255,255,.88)",
-                        letterSpacing: .5,
-                    }}>⌘N</kbd>
+                    {!isMobile && (
+                        <kbd style={{
+                            fontSize: 9, fontFamily: "inherit", fontWeight: 700,
+                            padding: "2px 6px", borderRadius: 5,
+                            background: "rgba(0,0,0,.18)", color: "rgba(255,255,255,.88)",
+                            letterSpacing: .5,
+                        }}>⌘N</kbd>
+                    )}
                 </button>
             </div>
 

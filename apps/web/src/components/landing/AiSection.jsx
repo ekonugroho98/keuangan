@@ -108,7 +108,7 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                                     <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-text)" }}>{APP_AI_NAME}</div>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-primary)", fontWeight: 600, marginTop: 2 }}>
                                         <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--color-primary)" }} />
-                                        {t("lp.ai.online")}
+                                        {(t("lp.ai.online") || "").replace(/^●\s*/, "")}
                                     </div>
                                 </div>
                             </div>

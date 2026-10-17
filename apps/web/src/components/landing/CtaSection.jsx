@@ -11,7 +11,7 @@ const CtaSection = ({ onSignup }) => {
     ];
 
     return (
-        <section style={{ padding: "100px 24px", position: "relative", overflow: "hidden" }}>
+        <section className="cta-section" style={{ padding: "100px 24px", position: "relative", overflow: "hidden" }}>
             <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative", zIndex: 1 }}>
                 <FadeIn>
                     <div
@@ -128,7 +128,7 @@ const CtaSection = ({ onSignup }) => {
             <style>{`
                 @media (max-width: 640px) {
                     .cta-stats { grid-template-columns: 1fr !important; }
-                    section { padding: 60px 20px !important; }
+                    section.cta-section { padding: 60px 20px !important; }
                 }
             `}</style>
         </section>

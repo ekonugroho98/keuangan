@@ -756,6 +756,12 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                         grid-column: span 6 !important;
                         grid-row: auto !important;
                     }
+                    .lap-header-controls { align-items: flex-start !important; width: 100%; }
+                    .lap-header-actions { justify-content: flex-start !important; }
+                    .lap-subtabs { flex-direction: column !important; gap: 4px !important; }
+                    .lap-subtab-btn { flex: 1 1 auto !important; padding: 9px 12px !important; }
+                    .lap-kpi-divider { width: 100% !important; height: 1px !important; }
+                    .lap-kpi-row { flex-direction: column !important; gap: 14px !important; }
                 }
             `}</style>
 
@@ -780,11 +786,11 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                     </div>
 
                     {/* Period chips + custom selector + Export buttons */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                    <div className="lap-header-controls" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                         {activeTab !== "proyeksi" && (
                             <PeriodChips value={useCustom ? "" : quickPeriod} onChange={v => { setUseCustom(false); setQuickPeriod(v); }} />
                         )}
-                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <div className="lap-header-actions" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
                             {activeTab !== "proyeksi" && (
                                 <>
                                     <button onClick={() => setUseCustom(v => !v)}
@@ -889,7 +895,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                 </div>
 
                 {/* ═══ 3 SUB-TABS (OPSI A: RINGKASAN · KEBIASAAN · PROYEKSI) ═══ */}
-                <div style={{
+                <div className="lap-subtabs" style={{
                     display: "flex", gap: 6, padding: 5, borderRadius: 14,
                     background: "var(--glass-1)",
                     border: "1px solid var(--glass-border)",
@@ -905,6 +911,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                         return (
                             <button
                                 key={tab.id}
+                                className="lap-subtab-btn"
                                 onClick={() => setActiveTab(tab.id)}
                                 style={{
                                     flex: "1 1 200px",
@@ -951,14 +958,14 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                     <div className="lap-hero" style={{
                         ...glassCard,
                         background: "var(--glass-hero)",
-                        padding: "28px 30px",
+                        padding: "24px 22px",
                         borderRadius: 24,
                     }}>
                         {/* Ambient orb */}
                         <div style={{ position: "absolute", top: -100, right: -60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.14), transparent 70%)", pointerEvents: "none", filter: "blur(8px)" }} />
                         <div style={{ position: "relative" }}>
                             <div style={{ ...eyebrow, marginBottom: 18 }}>RINGKASAN KEUANGAN</div>
-                            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                            <div className="lap-kpi-row" style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
                                 <KpiCard
                                     label="Pemasukan"
                                     value={fmtRp(income)}
@@ -967,7 +974,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                                     icon="📈"
                                     accent="var(--color-primary)"
                                 />
-                                <div style={{ width: 1, background: "var(--glass-border)", alignSelf: "stretch" }} />
+                                <div className="lap-kpi-divider" style={{ width: 1, background: "var(--glass-border)", alignSelf: "stretch" }} />
                                 <KpiCard
                                     label="Pengeluaran"
                                     value={fmtRp(expense)}
@@ -976,7 +983,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                                     icon="📉"
                                     accent="var(--color-expense)"
                                 />
-                                <div style={{ width: 1, background: "var(--glass-border)", alignSelf: "stretch" }} />
+                                <div className="lap-kpi-divider" style={{ width: 1, background: "var(--glass-border)", alignSelf: "stretch" }} />
                                 <KpiCard
                                     label={isOngoingMonth ? "Sisa Kas Bulan Ini" : "Saldo Bersih"}
                                     value={`${net >= 0 ? "+" : "−"}${fmtRp(Math.abs(net))}`}

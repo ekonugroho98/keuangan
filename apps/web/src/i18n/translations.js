@@ -306,7 +306,7 @@ const translations = {
         "rep.breakdown": "Breakdown Pengeluaran",
         "rep.breakdownSub": "Per kategori",
         // Split Bill
-        "split.title": "Split Bill", "split.addNew": "+ Tagihan Baru",
+        "split.title": "Split Bill", "split.addNew": "+ Tagihan Baru", "split.activeBills": "tagihan aktif",
         "split.noData": "Belum ada tagihan", "split.noDataSub": "Bagi tagihan makan, liburan, atau acara bareng teman",
         "split.addFirst": "+ Buat Tagihan Pertama", "split.deleteConfirm": "Hapus Tagihan?",
         "split.total": "Total", "split.paid": "Sudah Bayar", "split.unpaid": "Belum Bayar",

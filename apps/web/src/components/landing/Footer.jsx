@@ -144,7 +144,7 @@ const Footer = () => {
                     }}
                 >
                     <p style={{ color: "var(--color-subtle)", fontSize: 12, margin: 0 }}>
-                        © {new Date().getFullYear()} {APP_NAME}. {t("lp.footer.rights")}
+                        {t("lp.footer.rights")}
                     </p>
                     <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12 }}>
                         <span style={{

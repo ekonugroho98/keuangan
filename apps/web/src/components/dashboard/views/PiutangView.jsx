@@ -228,12 +228,12 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                             setTerimaAccount(accounts[0]?.name || "");
                                         }}
                                         className="btn-primary"
-                                        style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}>
+                                        style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 12px", whiteSpace: "nowrap" }}>
                                         {t("piu.receiveBtn")}
                                     </button>
                                 )}
                                 <button onClick={() => openEdit(p)} className="btn-ghost"
-                                    style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 10px" }}>
+                                    style={{ flex: 1, minHeight: 42, fontSize: 12, padding: "8px 12px", whiteSpace: "nowrap" }}>
                                     {t("piu.editBtn")}
                                 </button>
                                 <button onClick={() => setConfirmDelete(p)} aria-label="Delete piutang"

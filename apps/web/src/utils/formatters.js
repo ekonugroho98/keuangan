@@ -1,4 +1,4 @@
-export const fmtRp = (n) => `Rp ${n.toLocaleString("id")}`;
+export const fmtRp = (n) => `Rp ${(Number(n) || 0).toLocaleString("id")}`;
 
 export const fmtDate = (d) => {
     const dt = new Date(d);

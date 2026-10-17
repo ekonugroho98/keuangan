@@ -736,9 +736,9 @@ const BelanjaView = ({ showToast, setActiveMenu }) => {
                                 onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
                             />
                         </div>
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <input
-                                style={{ ...inputSt, flex: 1 }}
+                                style={{ ...inputSt, flex: "3 1 200px" }}
                                 placeholder="Catatan opsional (merk, ukuran, atau titipan siapa)..."
                                 value={newNotes}
                                 onChange={(e) => setNewNotes(e.target.value)}
@@ -747,7 +747,9 @@ const BelanjaView = ({ showToast, setActiveMenu }) => {
                             <button
                                 onClick={() => handleAdd()}
                                 style={{
-                                    padding: "0 20px",
+                                    padding: "10px 20px",
+                                    minHeight: 42,
+                                    flex: "1 0 auto",
                                     borderRadius: 12,
                                     border: "none",
                                     background: "var(--color-primary)",

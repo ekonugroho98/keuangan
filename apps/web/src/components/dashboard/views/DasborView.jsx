@@ -342,7 +342,7 @@ const DasborView = ({
     const tabunganAccountNames = new Set(accounts.filter(a => a.type === "tabungan").map(a => a.name));
     // investments belum punya atribusi pemilik yang terekspos di sini, jadi dibiarkan 0 saat scope
     // bukan household — daripada mencampur "investasi household" dengan "tabungan milik anggota".
-    const investmentSaving = scope.scope !== "household" ? 0 : investments.filter(inv => { const d = new Date(inv.created_at); return d.getMonth() === m && d.getFullYear() === y; }).reduce((s, inv) => s + (inv.buy_price || 0), 0);
+    const investmentSaving = scope.scope !== "household" ? 0 : investments.filter(inv => { const d = new Date(inv.created_at); return d.getMonth() === m && d.getFullYear() === y; }).reduce((s, inv) => s + (Number(inv.buy_price) || 0), 0);
     const tabunganSaving = txThis.filter(tx => isScopeIncome(tx) && tabunganAccountNames.has(tx.account_name || tx.to_account_name)).reduce((s, tx) => s + tx.amount, 0);
     const actualSavingAmt = investmentSaving + tabunganSaving;
     const actualSavingRate = thisIncome > 0 ? Math.round((actualSavingAmt / thisIncome) * 100) : 0;

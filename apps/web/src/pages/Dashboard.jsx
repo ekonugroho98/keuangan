@@ -88,6 +88,7 @@ const NAV_LABELS = {
   berulang: "nav.recurring",
   goals: "nav.goals",
   hutang: "nav.debts",
+  piutang: "nav.piutang",
   investasi: "nav.investments",
   anggaran: "nav.budgets",
   laporan: "nav.reports",

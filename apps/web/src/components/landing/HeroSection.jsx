@@ -7,7 +7,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
  * Menampilkan Keuangan Keluarga, Transfer Pasangan, Belanja & Stok Rumah
  * ───────────────────────────────────────────────────────────── */
 const FloatingBento = () => (
-    <div style={{ position: "relative", width: "100%", maxWidth: 520, margin: "0 auto", aspectRatio: "1/1" }}>
+    <div className="hero-bento-stage" style={{ position: "relative", width: "100%", maxWidth: 520, margin: "0 auto", aspectRatio: "1/1" }}>
         {/* Ambient orb */}
         <div style={{
             position: "absolute", inset: "-10%",
@@ -17,7 +17,7 @@ const FloatingBento = () => (
         }} />
 
         {/* Big hero card — Kas & Aset Keluarga */}
-        <div style={{
+        <div className="hero-bento-card hero-bento-main" style={{
             position: "absolute", top: "5%", left: "3%", width: "63%",
             background: "var(--bg-elevated)",
             border: "1px solid var(--color-border)",
@@ -28,7 +28,7 @@ const FloatingBento = () => (
             animation: "float 6s ease-in-out infinite",
         }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-primary)", boxShadow: "0 0 8px var(--color-primary)", animation: "pulse 2s infinite" }} />
+                <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-primary)", boxShadow: "0 0 8px var(--color-primary)", animation: "pulse 2s infinite", flexShrink: 0 }} />
                 <span style={{ fontSize: 10, color: "var(--color-subtle)", letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>🏠 Kas &amp; Tabungan Keluarga</span>
             </div>
             <div style={{ fontSize: 30, fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.02em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
@@ -49,7 +49,7 @@ const FloatingBento = () => (
         </div>
 
         {/* Saving rate ring card */}
-        <div style={{
+        <div className="hero-bento-card hero-bento-ring" style={{
             position: "absolute", top: "2%", right: "2%", width: "36%",
             background: "var(--bg-elevated)",
             border: "1px solid var(--color-border)",
@@ -76,33 +76,8 @@ const FloatingBento = () => (
             </div>
         </div>
 
-        {/* Family & Household Activity card */}
-        <div style={{
-            position: "absolute", bottom: "5%", right: "4%", width: "60%",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 20,
-            padding: "18px 20px",
-            boxShadow: "var(--shadow-lg)",
-            backdropFilter: "blur(20px)",
-            animation: "float 8s ease-in-out infinite 1s",
-        }}>
-            <div style={{ fontSize: 10, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.3, fontWeight: 700, marginBottom: 10 }}>Aktivitas Rumah Tangga</div>
-            {[
-                { icon: "💸", name: "Transfer Belanja Istri", amount: "+Rp 5,8 jt", color: "var(--color-primary)", bg: "var(--color-primary-soft)" },
-                { icon: "🛒", name: "Belanja Dapur & Susu Anak", amount: "−Rp 645K", color: "var(--color-expense)", bg: "var(--color-expense-soft)" },
-                { icon: "🧊", name: "Stok Kulkas: Susu UHT", amount: "4 kotak", color: "var(--color-transfer)", bg: "var(--color-transfer-soft)" },
-            ].map((tx, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: i > 0 ? "1px solid var(--color-border-soft)" : "none" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: tx.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{tx.icon}</div>
-                    <span style={{ flex: 1, fontSize: 11.5, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.name}</span>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: tx.color, fontVariantNumeric: "tabular-nums" }}>{tx.amount}</span>
-                </div>
-            ))}
-        </div>
-
         {/* Small family goal card */}
-        <div style={{
+        <div className="hero-bento-card hero-bento-goal" style={{
             position: "absolute", bottom: "18%", left: "1%", width: "37%",
             background: "var(--bg-elevated)",
             border: "1px solid var(--color-border)",
@@ -122,6 +97,31 @@ const FloatingBento = () => (
             </div>
             <div style={{ fontSize: 10.5, color: "var(--color-muted)", fontWeight: 600 }}>68% tercapai</div>
         </div>
+
+        {/* Family & Household Activity card */}
+        <div className="hero-bento-card hero-bento-activity" style={{
+            position: "absolute", bottom: "5%", right: "4%", width: "60%",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 20,
+            padding: "18px 20px",
+            boxShadow: "var(--shadow-lg)",
+            backdropFilter: "blur(20px)",
+            animation: "float 8s ease-in-out infinite 1s",
+        }}>
+            <div style={{ fontSize: 10, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.3, fontWeight: 700, marginBottom: 10 }}>Aktivitas Rumah Tangga</div>
+            {[
+                { icon: "💸", name: "Transfer Belanja Istri", amount: "+Rp 5,8 jt", color: "var(--color-primary)", bg: "var(--color-primary-soft)" },
+                { icon: "🛒", name: "Belanja Dapur & Susu Anak", amount: "−Rp 645K", color: "var(--color-expense)", bg: "var(--color-expense-soft)" },
+                { icon: "🧊", name: "Stok Kulkas: Susu UHT", amount: "4 kotak", color: "var(--color-transfer)", bg: "var(--color-transfer-soft)" },
+            ].map((tx, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: i > 0 ? "1px solid var(--color-border-soft)" : "none" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: tx.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{tx.icon}</div>
+                    <span style={{ flex: 1, fontSize: 11.5, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.name}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: tx.color, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{tx.amount}</span>
+                </div>
+            ))}
+        </div>
     </div>
 );
 
@@ -135,7 +135,7 @@ const HeroSection = ({ onSignup, onDemo }) => {
     ];
 
     return (
-        <section style={{
+        <section className="hero-section" style={{
             minHeight: "100vh", display: "flex", alignItems: "center",
             position: "relative", overflow: "hidden",
             padding: "120px 24px 80px",
@@ -155,20 +155,22 @@ const HeroSection = ({ onSignup, onDemo }) => {
                                 border: "1px solid var(--color-border)",
                                 marginBottom: 24,
                                 backdropFilter: "blur(12px)",
+                                maxWidth: "100%",
                             }}>
                                 <span style={{
                                     display: "inline-flex", alignItems: "center", gap: 6,
                                     padding: "3px 10px", borderRadius: 99,
                                     background: "var(--color-primary)",
                                     color: "var(--color-on-primary)", fontSize: 10, fontWeight: 700, letterSpacing: .5,
+                                    flexShrink: 0,
                                 }}>KELUARGA</span>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary)" }}>{t("lp.hero.badge")}</span>
+                                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--color-primary)", lineHeight: 1.3 }}>{t("lp.hero.badge")}</span>
                             </div>
                         </FadeIn>
 
                         <FadeIn delay={0.1}>
                             <h1 style={{
-                                fontSize: "clamp(38px,5vw,64px)",
+                                fontSize: "clamp(36px,5vw,64px)",
                                 fontWeight: 600, lineHeight: 1.06,
                                 marginBottom: 22,
                                 letterSpacing: "-.02em", color: "var(--color-text)",
@@ -182,7 +184,7 @@ const HeroSection = ({ onSignup, onDemo }) => {
                             <p style={{
                                 fontSize: "clamp(15px,1.5vw,17px)",
                                 color: "var(--color-muted)",
-                                maxWidth: 520, marginBottom: 34,
+                                maxWidth: 520, marginBottom: 30,
                                 lineHeight: 1.7,
                             }}>
                                 {t("lp.hero.desc")}
@@ -190,9 +192,9 @@ const HeroSection = ({ onSignup, onDemo }) => {
                         </FadeIn>
 
                         <FadeIn delay={0.3}>
-                            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 44 }}>
-                                <button className="btn-primary" style={{ fontSize: 15, padding: "15px 34px" }} onClick={onSignup}>{t("lp.hero.cta")}</button>
-                                <button className="btn-secondary" style={{ fontSize: 15, padding: "15px 34px" }} onClick={onDemo}>
+                            <div className="hero-cta-row" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 38 }}>
+                                <button className="btn-primary" style={{ fontSize: 15, padding: "15px 30px" }} onClick={onSignup}>{t("lp.hero.cta")}</button>
+                                <button className="btn-secondary" style={{ fontSize: 15, padding: "15px 28px" }} onClick={onDemo}>
                                     <span style={{ marginRight: 6 }}>▶</span>{t("lp.hero.demo")}
                                 </button>
                             </div>
@@ -212,14 +214,14 @@ const HeroSection = ({ onSignup, onDemo }) => {
                                 boxShadow: "var(--shadow-sm)",
                             }}>
                                 {stats.map((s, i) => (
-                                    <div key={i} style={{
-                                        padding: "16px 18px",
+                                    <div key={i} className="hero-stat-cell" style={{
+                                        padding: "16px 14px",
                                         background: "var(--bg-elevated)",
                                     }}>
-                                        <div style={{ fontSize: 26, fontWeight: 800, color: "var(--color-primary)", letterSpacing: "-.02em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                                        <div style={{ fontSize: "clamp(20px, 4.8vw, 26px)", fontWeight: 800, color: "var(--color-primary)", letterSpacing: "-.02em", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                                             <CountUp end={s.v} suffix={s.s} />
                                         </div>
-                                        <div style={{ fontSize: 10, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1.4, fontWeight: 700, marginTop: 6 }}>{s.l}</div>
+                                        <div style={{ fontSize: 9.5, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1.1, fontWeight: 700, marginTop: 6, lineHeight: 1.3 }}>{s.l}</div>
                                     </div>
                                 ))}
                             </div>
@@ -234,7 +236,32 @@ const HeroSection = ({ onSignup, onDemo }) => {
             </div>
             <style>{`
                 @media (max-width: 900px) {
-                    .hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+                    .hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
+                }
+                @media (max-width: 640px) {
+                    section.hero-section { padding: 92px 18px 48px !important; min-height: auto !important; }
+                    .hero-cta-row { flex-direction: column; }
+                    .hero-cta-row button { width: 100%; justify-content: center; }
+                    .hero-stat-cell { padding: 14px 10px !important; }
+                    .hero-bento-stage {
+                        aspect-ratio: auto !important;
+                        display: grid !important;
+                        grid-template-columns: 1fr 1fr !important;
+                        gap: 12px !important;
+                    }
+                    .hero-bento-card {
+                        position: relative !important;
+                        top: auto !important;
+                        left: auto !important;
+                        right: auto !important;
+                        bottom: auto !important;
+                        width: 100% !important;
+                        animation: none !important;
+                    }
+                    .hero-bento-main { grid-column: span 2 !important; padding: 20px !important; }
+                    .hero-bento-ring { grid-column: span 1 !important; padding: 14px 12px !important; justify-content: center; }
+                    .hero-bento-goal { grid-column: span 1 !important; padding: 14px !important; display: flex; flex-direction: column; justify-content: center; }
+                    .hero-bento-activity { grid-column: span 2 !important; padding: 16px 18px !important; }
                 }
             `}</style>
         </section>

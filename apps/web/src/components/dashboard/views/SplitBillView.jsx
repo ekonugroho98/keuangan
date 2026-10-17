@@ -149,7 +149,7 @@ const SplitBillView = ({ splitBills, onAdd, onDelete, onTogglePaid }) => {
                     <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 8 }}>SPLIT BILL</div>
                     <h1 style={{ fontSize: "clamp(22px, 3vw, 32px)", fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.025em", margin: 0 }}>{t("split.title")}</h1>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6 }}>
-                        {splitBills.length} {t("split.activeBills") || "tagihan aktif"}
+                        {splitBills.length} {t("split.activeBills") === "split.activeBills" ? "tagihan aktif" : t("split.activeBills")}
                     </p>
                 </div>
                 <button onClick={openAdd} className="btn-primary" style={{ minHeight: 42 }}>

@@ -66,12 +66,12 @@ const FeatureCard = ({ feature, meta, featured }) => (
 
         {meta.stat && (
             <div style={{
-                display: "flex", alignItems: "baseline", gap: 8,
+                display: "flex", alignItems: "baseline", gap: "6px 10px", flexWrap: "wrap",
                 paddingTop: 16,
                 borderTop: "1px solid var(--color-border-soft)",
                 position: "relative", zIndex: 1,
             }}>
-                <span className="num-tight" style={{ fontSize: 26, fontWeight: 900, color: "var(--color-text)" }}>{meta.stat}</span>
+                <span className="num-tight" style={{ fontSize: "clamp(20px, 2.4vw, 26px)", fontWeight: 900, color: "var(--color-text)", whiteSpace: "nowrap" }}>{meta.stat}</span>
                 <span style={{ fontSize: 11, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: 1.4, fontWeight: 700 }}>{meta.statLabel}</span>
             </div>
         )}

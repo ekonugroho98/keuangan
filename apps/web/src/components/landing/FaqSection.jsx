@@ -29,8 +29,8 @@ const FaqSection = () => {
                             border: "1px solid rgba(200,150,62,.28)",
                             marginBottom: 20, backdropFilter: "blur(12px)",
                         }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-warn)", animation: "pulse 2s infinite" }} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-warn)", letterSpacing: 1.2 }}>{t("lp.faq.tag")}</span>
+                            <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-amber, #C8963E)", animation: "pulse 2s infinite" }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-amber, #C8963E)", letterSpacing: 1.2 }}>{t("lp.faq.tag")}</span>
                         </div>
                         <h2 style={{
                             fontSize: "clamp(32px, 5vw, 52px)",
