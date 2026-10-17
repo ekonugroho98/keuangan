@@ -16309,6 +16309,40 @@ householdApp.openapi(
 );
 
 // src/services/investments.ts
+var DEFAULT_ICONS = {
+  reksa_dana: "\u{1F4CA}",
+  saham: "\u{1F4C8}",
+  emas: "\u{1F947}",
+  crypto: "\u20BF",
+  deposito: "\u{1F3E6}",
+  properti: "\u{1F3E0}",
+  obligasi: "\u{1F4DC}",
+  lainnya: "\u{1F4BC}"
+};
+var DEFAULT_COLORS = {
+  reksa_dana: "#839B7A",
+  saham: "#46634E",
+  emas: "#D9A74A",
+  crypto: "#f97316",
+  deposito: "#4FC3F7",
+  properti: "#C87D55",
+  obligasi: "#ec4899",
+  lainnya: "#7D513B"
+};
+function mapInvestment(r) {
+  const type = String(r.type || "lainnya");
+  const ownerId = r.owner_member_id ? String(r.owner_member_id) : null;
+  const ownerName = r.owner_display_name ? String(r.owner_display_name) : null;
+  return {
+    ...r,
+    buy_price: Number(r.buy_price ?? 0),
+    current_value: Number(r.current_value ?? 0),
+    quantity: r.quantity != null ? Number(r.quantity) : null,
+    icon: r.icon || DEFAULT_ICONS[type] || "\u{1F4CA}",
+    color: r.color || DEFAULT_COLORS[type] || "#839B7A",
+    owner: ownerId ? { member_id: ownerId, display_name: ownerName } : null
+  };
+}
 async function listInvestments(actor) {
   return withActor(actor, async (tx) => {
     const rows = await tx`
@@ -16316,20 +16350,26 @@ async function listInvestments(actor) {
       left join household_members m on m.id = i.owner_member_id
       where i.household_id = ${actor.householdId} and i.deleted_at is null order by i.created_at
     `;
-    return rows;
+    return rows.map(mapInvestment);
   });
 }
 async function createInvestment(actor, input) {
   return withActor(actor, async (tx) => {
     const ownerMemberId = await resolveOwnerMemberId(tx, actor, input.owner);
+    const icon = input.icon ?? DEFAULT_ICONS[input.type] ?? "\u{1F4CA}";
+    const color = input.color ?? DEFAULT_COLORS[input.type] ?? "#839B7A";
     const [row] = await tx`
       insert into investments (household_id, owner_member_id, name, type, icon, color, brand, buy_price, current_value, quantity, unit, kode_saham, buy_date, notes)
-      values (${actor.householdId}, ${ownerMemberId}, ${input.name}, ${input.type}, ${input.icon ?? null}, ${input.color ?? null}, ${input.brand ?? null},
+      values (${actor.householdId}, ${ownerMemberId}, ${input.name}, ${input.type}, ${icon}, ${color}, ${input.brand ?? null},
               ${input.buy_price ?? 0}, ${input.current_value ?? 0}, ${input.quantity ?? null}, ${input.unit ?? "unit"}, ${input.kode_saham ?? null}, ${input.buy_date ?? null}, ${input.notes ?? ""})
       returning id
     `;
-    const [full] = await tx`select * from investments where id = ${row.id}`;
-    return full;
+    const [full] = await tx`
+      select i.*, m.display_name as owner_display_name from investments i
+      left join household_members m on m.id = i.owner_member_id
+      where i.id = ${row.id}
+    `;
+    return mapInvestment(full);
   });
 }
 async function updateInvestment(actor, id, input) {
@@ -16342,8 +16382,12 @@ async function updateInvestment(actor, id, input) {
         quantity = coalesce(${input.quantity ?? null}, quantity), notes = coalesce(${input.notes ?? null}, notes), updated_at = now()
       where id = ${id}
     `;
-    const [full] = await tx`select * from investments where id = ${id}`;
-    return full;
+    const [full] = await tx`
+      select i.*, m.display_name as owner_display_name from investments i
+      left join household_members m on m.id = i.owner_member_id
+      where i.id = ${id}
+    `;
+    return mapInvestment(full);
   });
 }
 async function deleteInvestment(actor, id) {
@@ -20319,11 +20363,20 @@ function auditMiddleware() {
 // src/app.ts
 function buildApp() {
   const app2 = new OpenAPIHono();
+  const allowedOrigins = Array.from(
+    /* @__PURE__ */ new Set([
+      ...env.CORS_ORIGINS,
+      "https://localhost",
+      "http://localhost",
+      "capacitor://localhost",
+      "http://localhost:5173"
+    ])
+  );
   app2.use("*", logger());
   app2.use(
     "*",
     cors({
-      origin: env.CORS_ORIGINS,
+      origin: allowedOrigins,
       allowHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Household-Id", "X-Request-Id"],
       exposeHeaders: ["X-Request-Id", "Idempotent-Replayed", "X-RateLimit-Limit-Minute", "X-RateLimit-Remaining-Minute"],
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]

@@ -38,11 +38,21 @@ import { auditMiddleware } from './middleware/audit'
 export function buildApp() {
   const app = new OpenAPIHono()
 
+  const allowedOrigins = Array.from(
+    new Set([
+      ...env.CORS_ORIGINS,
+      'https://localhost',
+      'http://localhost',
+      'capacitor://localhost',
+      'http://localhost:5173',
+    ]),
+  )
+
   app.use('*', logger())
   app.use(
     '*',
     cors({
-      origin: env.CORS_ORIGINS,
+      origin: allowedOrigins,
       allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Household-Id', 'X-Request-Id'],
       exposeHeaders: ['X-Request-Id', 'Idempotent-Replayed', 'X-RateLimit-Limit-Minute', 'X-RateLimit-Remaining-Minute'],
       allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
