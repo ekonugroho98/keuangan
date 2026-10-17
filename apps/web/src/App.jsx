@@ -309,7 +309,7 @@ html, body { overflow-x: hidden; width: 100%; max-width: 100vw; }
  *  - Chips & buttons shrink gracefully
  * ═══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .btn-primary, .btn-secondary { padding: 13px 24px !important; font-size: 14px !important; min-height: 44px; }
+  .btn-primary, .btn-secondary { padding: 13px 24px !important; font-size: 14px !important; min-height: 44px; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
   .nav-link { padding: 10px 12px; font-size: 15px; }
   .bento, .glass, .glass-hero, .bento-hero { padding: 18px 18px !important; border-radius: 18px !important; }
   .chip { padding: 4px 10px !important; font-size: 10px !important; }

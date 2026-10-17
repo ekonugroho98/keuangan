@@ -240,7 +240,7 @@ const AnggaranView = ({ budgets, personalBudgets = [], transactions, accounts = 
             {/* Summary cards */}
             {monthBudgets.length > 0 && (
                 <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 12, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 16 }}>
                     {[
                         { label: t("budget.totalBudget") || "Total Anggaran", value: fmtRp(totalBudget), color: "var(--color-primary)" },
                         { label: t("budget.totalSpent")  || "Total Terpakai", value: fmtRp(totalSpent),  color: totalSpent > totalBudget ? "var(--color-expense)" : "var(--color-text)" },

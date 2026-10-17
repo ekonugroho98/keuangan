@@ -19,6 +19,7 @@ supabase/.branches/
 # Generated artifacts (dicek diff-nya di CI, tapi di-gitignore dari commit biasa)
 # packages/shared/src/api-client/schema.d.ts  -- di-track (lihat 02-monorepo.md §4), bukan ignore
 
-# OS
+# OS & Binaries
 .DS_Store
 .vercel
+*.apk

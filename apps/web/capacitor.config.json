@@ -1,0 +1,8 @@
+{
+  "appId": "com.keluargaberkembang.app",
+  "appName": "Keluarga Berkembang",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#F5F3EC"
+  }
+}

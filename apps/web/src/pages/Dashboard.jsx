@@ -178,6 +178,37 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Android hardware Back button handler (tutup modal → tutup drawer → kembali ke Dasbor)
+  useEffect(() => {
+    window.__handleAndroidBack = () => {
+      if (showAddTx) {
+        setShowAddTx(false);
+        return "handled";
+      }
+      if (showEditTx) {
+        setShowEditTx(false);
+        setEditingTx(null);
+        return "handled";
+      }
+      if (showAddAccount) {
+        setShowAddAccount(false);
+        return "handled";
+      }
+      if (isMobile && sidebarOpen) {
+        setSidebarOpen(false);
+        return "handled";
+      }
+      if (activeMenu !== "dasbor") {
+        setActiveMenu("dasbor");
+        return "handled";
+      }
+      return "exit";
+    };
+    return () => {
+      delete window.__handleAndroidBack;
+    };
+  }, [showAddTx, showEditTx, showAddAccount, isMobile, sidebarOpen, activeMenu]);
+
   // ── AI GREETING ──────────────────────────────────────────
   const makeGreeting = useCallback(() => {
     const name = userName.split(" ")[0];

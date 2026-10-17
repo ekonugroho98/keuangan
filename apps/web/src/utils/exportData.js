@@ -268,6 +268,23 @@ export function buildXlsxBlob(sheets) {
 }
 
 function triggerDownload(blob, filename) {
+    const fileExportPlugin =
+        typeof window !== "undefined" ? window.Capacitor?.Plugins?.FileExport : null;
+    if (fileExportPlugin?.saveBase64File || (typeof window !== "undefined" && window.AndroidBridge?.saveBase64File)) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const dataUrl = typeof reader.result === "string" ? reader.result : "";
+            const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
+            const mimeType = blob.type || "application/octet-stream";
+            if (fileExportPlugin?.saveBase64File) {
+                fileExportPlugin.saveBase64File({ base64, filename, mimeType });
+            } else if (window.AndroidBridge?.saveBase64File) {
+                window.AndroidBridge.saveBase64File(base64, filename, mimeType);
+            }
+        };
+        reader.readAsDataURL(blob);
+        return;
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

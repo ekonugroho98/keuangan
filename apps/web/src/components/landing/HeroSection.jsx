@@ -9,7 +9,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 const FloatingBento = () => (
     <div className="hero-bento-stage" style={{ position: "relative", width: "100%", maxWidth: 520, margin: "0 auto", aspectRatio: "1/1" }}>
         {/* Ambient orb */}
-        <div style={{
+        <div className="hero-bento-orb" style={{
             position: "absolute", inset: "-10%",
             background: "radial-gradient(circle at 60% 40%, rgba(131,155,122,.20), transparent 55%), radial-gradient(circle at 20% 80%, rgba(181,105,74,.10), transparent 60%)",
             pointerEvents: "none",
@@ -249,6 +249,7 @@ const HeroSection = ({ onSignup, onDemo }) => {
                         grid-template-columns: 1fr 1fr !important;
                         gap: 12px !important;
                     }
+                    .hero-bento-orb { display: none !important; }
                     .hero-bento-card {
                         position: relative !important;
                         top: auto !important;
@@ -257,6 +258,8 @@ const HeroSection = ({ onSignup, onDemo }) => {
                         bottom: auto !important;
                         width: 100% !important;
                         animation: none !important;
+                        backdrop-filter: none !important;
+                        -webkit-backdrop-filter: none !important;
                     }
                     .hero-bento-main { grid-column: span 2 !important; padding: 20px !important; }
                     .hero-bento-ring { grid-column: span 1 !important; padding: 14px 12px !important; justify-content: center; }

@@ -15,8 +15,14 @@ async function getToken(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL
+const resolvedBaseUrl =
+  import.meta.env.PROD && (!rawBaseUrl || rawBaseUrl.includes('localhost:5173'))
+    ? 'https://karaya-api-v1.vercel.app'
+    : rawBaseUrl
+
 export const api = createKaryaClient({
-  baseUrl: import.meta.env.VITE_API_BASE_URL,
+  baseUrl: resolvedBaseUrl,
   getToken,
   getHouseholdId: () => activeHouseholdId,
 })

@@ -35,6 +35,31 @@ const LandingPage = ({ showToast }) => {
         return () => window.removeEventListener("scroll", h);
     }, []);
 
+    useEffect(() => {
+        window.__handleAndroidBack = () => {
+            if (showForgotPassword) {
+                setShowForgotPassword(false);
+                return "handled";
+            }
+            if (showSignup) {
+                setShowSignup(false);
+                return "handled";
+            }
+            if (showLogin) {
+                setShowLogin(false);
+                return "handled";
+            }
+            if (showDemo) {
+                setShowDemo(false);
+                return "handled";
+            }
+            return "exit";
+        };
+        return () => {
+            delete window.__handleAndroidBack;
+        };
+    }, [showForgotPassword, showSignup, showLogin, showDemo]);
+
     const handleSignup = async () => {
         // Validasi frontend
         const err = {};
