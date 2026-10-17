@@ -99,7 +99,7 @@ export default function JoinHouseholdPage({ code, session, showToast }) {
     };
     const btn = (disabled) => ({
         width: "100%", padding: "12px 0", borderRadius: 10, border: "none",
-        background: "var(--color-primary, #60fcc6)", color: "#0b0d13", fontWeight: 700,
+        background: "var(--color-primary, #46634E)", color: "var(--color-on-primary, #fff)", fontWeight: 700,
         fontSize: 14, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.6 : 1,
     });
 
@@ -122,8 +122,8 @@ export default function JoinHouseholdPage({ code, session, showToast }) {
     return (
         <div style={wrap}>
             <div style={card}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 6 }}>UNDANGAN HOUSEHOLD</div>
-                <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6, color: "var(--color-text)" }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-subtle)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 6 }}>UNDANGAN RUMAH TANGGA</div>
+                <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6, color: "var(--color-text)", fontFamily: "var(--font-display)" }}>
                     {preview.inviter_name} mengundangmu ke "{preview.household_name}"
                 </h1>
                 <p style={{ fontSize: 13, color: "var(--color-muted)", marginBottom: 20 }}>
@@ -142,20 +142,20 @@ export default function JoinHouseholdPage({ code, session, showToast }) {
                     </>
                 ) : (
                     <>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>Nama kamu di household ini</label>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>Nama kamu di rumah tangga ini</label>
                         <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
 
                         <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", display: "block", marginBottom: 6 }}>Data keuanganmu saat ini</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                             <button
                                 onClick={() => setMode("fresh")}
-                                style={{ flex: 1, padding: "9px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${mode === "fresh" ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: mode === "fresh" ? "var(--color-primary-soft, rgba(96,252,198,.12))" : "transparent", color: mode === "fresh" ? "var(--color-primary)" : "var(--color-muted)" }}
+                                style={{ flex: 1, padding: "9px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${mode === "fresh" ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: mode === "fresh" ? "var(--color-primary-soft)" : "transparent", color: mode === "fresh" ? "var(--color-primary)" : "var(--color-muted)" }}
                             >
                                 Mulai baru
                             </button>
                             <button
                                 onClick={() => setMode("merge")}
-                                style={{ flex: 1, padding: "9px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${mode === "merge" ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: mode === "merge" ? "var(--color-primary-soft, rgba(96,252,198,.12))" : "transparent", color: mode === "merge" ? "var(--color-primary)" : "var(--color-muted)" }}
+                                style={{ flex: 1, padding: "9px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${mode === "merge" ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: mode === "merge" ? "var(--color-primary-soft)" : "transparent", color: mode === "merge" ? "var(--color-primary)" : "var(--color-muted)" }}
                             >
                                 Gabungkan data lama
                             </button>

@@ -18,7 +18,7 @@ const EMOJI_GROUPS = [
     { label: "Hewan",        emojis: ["🐾","🐶","🐱","🐠","🐰","🐦","🦮","🐹","🐢","🦜","🐠","🐇"] },
     { label: "Lainnya",      emojis: ["🌟","⚡","🔧","🚀","🌿","🎁","🏪","🏦","🌸","🔑","📱","🖥️","🌈","🎀","💌","🧿","☀️","🌙","❄️","🔥","🎗️"] },
 ];
-const COLOR_OPTIONS = ["var(--color-primary)","var(--color-primary)","#4FC3F7","#a78bfa","#f59e0b","#ff716c","#ec4899","#14b8a6","#f97316","var(--color-subtle)","#a855f7","#22c55e"];
+const COLOR_OPTIONS = ["#839B7A","#46634E","#C87D55","#D9A74A","#4FC3F7","#14b8a6","#f97316","#ff716c","#ec4899","#a855f7","#6366f1","#7D513B"];
 
 /* ─── sub-components ─── */
 const SummaryCard = ({ label, value, sub, borderColor, valueStyle }) => (
@@ -30,52 +30,90 @@ const SummaryCard = ({ label, value, sub, borderColor, valueStyle }) => (
 );
 
 /* ─── main ─── */
-const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEditCategory, onDeleteCategory, onViewCategory }) => {
+const KategoriView = ({ transactions = [], customCategories, allCategoriesFromApi = [], onAddCategory, onEditCategory, onDeleteCategory, onViewCategory }) => {
     const { t } = useLanguage();
 
     /* Terjemahkan nama kategori default; custom tetap pakai nama aslinya */
+    const DEFAULT_SET = useMemo(() => new Set(Object.keys(categoryIcons).map(k => k.toLowerCase())), []);
     const tCat = (name, isDefault) => { if (!isDefault) return name; const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
     const [showModal,     setShowModal]     = useState(false);
     const [editTarget,    setEditTarget]    = useState(null);
-    const [form,          setForm]          = useState({ name: "", icon: "📦", type: "expense", color: "var(--color-primary)" });
+    const [form,          setForm]          = useState({ name: "", icon: "📦", type: "expense", color: "#839B7A" });
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [filterType,    setFilterType]    = useState("all");  // all | expense | income
     const [search,        setSearch]        = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
 
-    /* ── Hitung catTotals BULAN INI saja ── */
+    /* ── Hitung expenseTotals & incomeTotals BULAN INI saja ── */
     const now = new Date();
     const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const monthLabel = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
     const monthTxs = transactions.filter(tx => tx.date?.startsWith(currentYM));
 
-    const catTotals = useMemo(() => {
-        const totals = {};
+    const { expenseTotals, incomeTotals } = useMemo(() => {
+        const exp = {};
+        const inc = {};
         monthTxs.forEach(tx => {
-            if (tx.category) totals[tx.category] = (totals[tx.category] || 0) + tx.amount;
+            if (!tx.category) return;
+            if (tx.type === "expense") {
+                exp[tx.category] = (exp[tx.category] || 0) + tx.amount;
+            } else if (tx.type === "income" && tx.category === "Piutang") {
+                exp.Piutang = Math.max(0, (exp.Piutang || 0) - tx.amount);
+            } else if (tx.type === "income") {
+                inc[tx.category] = (inc[tx.category] || 0) + tx.amount;
+            }
         });
-        return totals;
+        return { expenseTotals: exp, incomeTotals: inc };
     }, [monthTxs]);
 
-    /* ── build category list ── */
-    const defaultCats = Object.entries(categoryIcons).map(([name, icon]) => ({
-        id: null, name, icon,
-        color: categoryColors[name] || "var(--color-subtle)",
-        isDefault: true,
-    }));
-    const allCats = [
-        ...defaultCats,
-        ...(customCategories || []).map(c => ({ ...c, isDefault: false })),
-    ];
+    /* ── build category list dari DB (allCategoriesFromApi) dengan fallback ── */
+    const allCats = useMemo(() => {
+        if (allCategoriesFromApi && allCategoriesFromApi.length > 0) {
+            return allCategoriesFromApi
+                .filter(c => {
+                    if (!c.is_system) return true;
+                    // Sembunyikan Transfer & Koreksi Saldo dari manajemen kategori;
+                    // kategori sistem pengeluaran (Tabungan & Goal, Hutang & Cicilan, Piutang) tetap ditampilkan bila ada transaksi
+                    if (c.system_key === "transfer" || c.system_key === "balance_adjustment") return false;
+                    return (expenseTotals[c.name] || 0) > 0;
+                })
+                .map(c => ({
+                    ...c,
+                    isSystem: !!c.is_system,
+                    isDefault: DEFAULT_SET.has(c.name.toLowerCase()),
+                }));
+        }
+        const INCOME_FALLBACK = ["Gaji","Freelance","Bisnis","Investasi"];
+        const defaultCats = Object.entries(categoryIcons)
+            .filter(([name]) => name !== "Transfer" && name !== "Makanan")
+            .map(([name, icon]) => ({
+                id: null, name, icon,
+                type: INCOME_FALLBACK.includes(name) ? "income" : name === "Lainnya" ? "both" : "expense",
+                color: categoryColors[name] || "#7D513B",
+                isDefault: true,
+                isSystem: false,
+            }));
+        return [
+            ...defaultCats,
+            ...(customCategories || []).map(c => ({ ...c, isDefault: false, isSystem: false })),
+        ];
+    }, [allCategoriesFromApi, customCategories, expenseTotals, DEFAULT_SET]);
 
-    const INCOME_DEFAULTS = ["Gaji","Freelance","Bisnis","Investasi","Transfer"];
-    const expenseCats = allCats.filter(c => c.isDefault ? !INCOME_DEFAULTS.includes(c.name) : c.type !== "income");
-    const incomeCats  = allCats.filter(c => c.isDefault ? INCOME_DEFAULTS.includes(c.name)  : c.type !== "expense");
+    const expenseCats = useMemo(() => allCats.filter(c => c.type !== "income"), [allCats]);
+    const incomeCats  = useMemo(() => allCats.filter(c => !c.isSystem && c.type !== "expense"), [allCats]);
+
+    const getCatAmt = (c) => {
+        if (filterType === "income") return incomeTotals[c.name] || 0;
+        if (filterType === "expense") return expenseTotals[c.name] || 0;
+        if (c.type === "income") return incomeTotals[c.name] || 0;
+        if (c.type === "expense") return expenseTotals[c.name] || 0;
+        return (expenseTotals[c.name] || 0) + (incomeTotals[c.name] || 0);
+    };
 
     /* ── totals for summary ── */
-    const totalExpenseAmt = expenseCats.reduce((s, c) => s + (catTotals[c.name] || 0), 0);
-    const totalIncomeAmt  = incomeCats.reduce((s, c)  => s + (catTotals[c.name] || 0), 0);
+    const totalExpenseAmt = Object.values(expenseTotals).reduce((s, v) => s + v, 0);
+    const totalIncomeAmt  = Object.values(incomeTotals).reduce((s, v) => s + v, 0);
 
     /* ── filtered display list ── */
     const displayCats = useMemo(() => {
@@ -90,13 +128,11 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
             );
         }
         // sort: by amount desc, then alphabetical
-        return [...list].sort((a, b) => (catTotals[b.name] || 0) - (catTotals[a.name] || 0));
-    }, [filterType, search, allCats, catTotals]);
-
-    const totalRef = filterType === "income" ? totalIncomeAmt : totalExpenseAmt;
+        return [...list].sort((a, b) => getCatAmt(b) - getCatAmt(a));
+    }, [filterType, search, allCats, expenseCats, incomeCats, expenseTotals, incomeTotals]);
 
     /* ── modal handlers ── */
-    const openAdd  = () => { setEditTarget(null); setForm({ name: "", icon: "📦", type: "expense", color: "var(--color-primary)" }); setShowModal(true); };
+    const openAdd  = () => { setEditTarget(null); setForm({ name: "", icon: "📦", type: "expense", color: "#839B7A" }); setShowModal(true); };
     const openEdit = (cat) => { setEditTarget(cat); setForm({ name: cat.name, icon: cat.icon, type: cat.type, color: cat.color }); setShowModal(true); };
     const handleSubmit = () => {
         if (!form.name.trim()) return;
@@ -174,7 +210,7 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
                                     <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                                         {group.emojis.map(e => (
                                             <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                                style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${form.icon === e ? "#60fcc655" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 17, cursor: "pointer", flexShrink: 0 }}>
+                                                style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${form.icon === e ? "rgba(131,155,122,.45)" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(131,155,122,.15)" : "transparent", fontSize: 17, cursor: "pointer", flexShrink: 0 }}>
                                                 {e}
                                             </button>
                                         ))}
@@ -252,12 +288,13 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
             {/* ── Category Grid ── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 180px), 1fr))", gap: 14 }}>
                 {displayCats.map((c) => {
-                    const amt      = catTotals[c.name] || 0;
-                    const total    = filterType === "income" ? totalIncomeAmt : totalExpenseAmt;
+                    const amt      = getCatAmt(c);
+                    const total    = filterType === "income" ? totalIncomeAmt : c.type === "income" ? totalIncomeAmt : totalExpenseAmt;
                     const pct      = total > 0 ? Math.min((amt / total) * 100, 100) : 0;
                     const color    = c.color || "var(--color-subtle)";
                     const isHov    = hoveredId === (c.id || c.name);
-                    const isCustom = !c.isDefault;
+                    const isCustom = !c.isDefault && !c.isSystem;
+                    const canEdit  = !c.isSystem && !!c.id;
 
                     return (
                         <div key={c.id || c.name}
@@ -285,16 +322,19 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
                                     {c.icon}
                                 </div>
                                 <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                    {isCustom && isHov && (
+                                    {canEdit && isHov && (
                                         <>
-                                            <button onClick={() => openEdit(c)} style={{ width: 28, height: 28, borderRadius: 7, border: "none", background: "rgba(96,252,198,.12)", color: "var(--color-primary)", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✏️</button>
-                                            <button onClick={() => setConfirmDelete(c)} style={{ width: 28, height: 28, borderRadius: 7, border: "none", background: "rgba(255,113,108,.1)", color: "#ff716c", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>🗑️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); openEdit(c); }} title="Edit kategori" style={{ width: 28, height: 28, borderRadius: 7, border: "none", background: "rgba(131,155,122,.12)", color: "var(--color-primary)", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✏️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(c); }} title="Hapus kategori" style={{ width: 28, height: 28, borderRadius: 7, border: "none", background: "rgba(255,113,108,.1)", color: "#ff716c", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>🗑️</button>
                                         </>
                                     )}
-                                    {isCustom && !isHov && (
+                                    {(!canEdit || !isHov) && c.isSystem && (
+                                        <span style={{ fontSize: 8, fontWeight: 700, color: "#4FC3F7", background: "rgba(79,195,247,.12)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>SISTEM</span>
+                                    )}
+                                    {(!canEdit || !isHov) && isCustom && (
                                         <span style={{ fontSize: 8, fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,.12)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>KUSTOM</span>
                                     )}
-                                    {!isCustom && (
+                                    {(!canEdit || !isHov) && !c.isSystem && !isCustom && (
                                         <span style={{ fontSize: 8, fontWeight: 700, color: "#48474f", background: "var(--color-border-soft)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>DEFAULT</span>
                                     )}
                                 </div>
@@ -342,11 +382,11 @@ const KategoriView = ({ transactions = [], customCategories, onAddCategory, onEd
 
                 {/* ── Add Category Card ── */}
                 <div onClick={openAdd}
-                    style={{ minHeight: 160, borderRadius: 16, border: "2px dashed rgba(96,252,198,.2)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", gap: 8, transition: "border-color .2s, background .2s" }}
-                    onMouseOver={e => { e.currentTarget.style.borderColor = "rgba(96,252,198,.45)"; e.currentTarget.style.background = "rgba(96,252,198,.03)"; }}
-                    onMouseOut={e => { e.currentTarget.style.borderColor = "rgba(96,252,198,.2)"; e.currentTarget.style.background = "transparent"; }}
+                    style={{ minHeight: 160, borderRadius: 16, border: "2px dashed rgba(131,155,122,.2)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", gap: 8, transition: "border-color .2s, background .2s" }}
+                    onMouseOver={e => { e.currentTarget.style.borderColor = "rgba(131,155,122,.45)"; e.currentTarget.style.background = "rgba(131,155,122,.03)"; }}
+                    onMouseOut={e => { e.currentTarget.style.borderColor = "rgba(131,155,122,.2)"; e.currentTarget.style.background = "transparent"; }}
                 >
-                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: "var(--color-primary)" }}>+</div>
+                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(131,155,122,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: "var(--color-primary)" }}>+</div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary)" }}>{t("cat.addNew") || "+ Kategori Baru"}</span>
                 </div>
             </div>

@@ -1,64 +1,73 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
 /* ─────────────────────────────────────────────────────────────
- * Design tokens — bento grid minimal
- * Surface tiers, refined borders, shadow system, radius scale.
- * Legacy variables preserved so existing views keep rendering.
+ * Design tokens — Keluarga Berkembang (Eye-Friendly Soft Sage & Calm Forest)
+ * Dirancang khusus untuk penggunaan layar lama (low eye-strain):
+ * - Latar utama netral sejuk-hangat (#F3F5F2 Sage Mist), BUKAN kuning/sepia
+ * - Kartu putih bersih lembut (#FFFFFF) dengan kontras natural terhadap input (#F7F9F6)
+ * - Warna identitas Sage Forest (#46634E) & Mellow Sage (#839B7A)
+ * - Aksen Terracotta (#B86B4B) & Mustard (#C9963E) lembut tidak menyengat
  * ───────────────────────────────────────────────────────────── */
 export const THEMES = {
-    dark: {
-        id: "dark", name: "Gelap", icon: "🌙",
+    light: {
+        id: "light", name: "Sejuk (Soft Sage)", icon: "🌿",
         vars: {
-            /* Base surfaces — --bg-surface is now translucent glass tint.
-             * Solid alternatives: --bg-surface-low (inputs), --bg-surface-hover (hover states). */
-            "--bg-app": "#0a0a10",
-            "--bg-deep": "#0c0c14",
-            "--bg-surface": "rgba(22,22,30,.58)",
-            "--bg-surface-low": "#101018",
-            "--bg-surface-hover": "#1b1b25",
-            "--bg-glass": "rgba(21,21,29,.72)",
-            "--bg-alt-row": "rgba(37,37,47,.35)",
+            /* Base surfaces — Soft Alabaster Sage Mist (anti-silau & tidak kuning) */
+            "--bg-app": "#F2F5F1",
+            "--bg-deep": "#FFFFFF",
+            "--bg-surface": "rgba(255, 255, 255, 0.94)",
+            "--bg-surface-low": "#F7F9F6",
+            "--bg-surface-hover": "#EDF2EC",
+            "--bg-glass": "rgba(255, 255, 255, 0.92)",
+            "--bg-alt-row": "rgba(63, 81, 66, 0.03)",
 
-            /* NEW tiered surfaces for bento cards */
-            "--bg-elevated": "#181821",
-            "--bg-sunk": "#0b0b12",
-            "--bg-highlight": "rgba(96,252,198,.06)",
-            "--bg-mesh-1": "radial-gradient(1200px 600px at 15% -10%, rgba(96,252,198,.08), transparent 60%)",
-            "--bg-mesh-2": "radial-gradient(900px 500px at 110% 110%, rgba(79,195,247,.05), transparent 60%)",
+            /* Tiered surfaces for bento cards */
+            "--bg-elevated": "#FFFFFF",
+            "--bg-sunk": "#E9EFE8",
+            "--bg-highlight": "rgba(131, 155, 122, 0.12)",
+            "--bg-mesh-1": "radial-gradient(1200px 600px at 10% -10%, rgba(131, 155, 122, 0.12), transparent 60%)",
+            "--bg-mesh-2": "radial-gradient(900px 500px at 110% 110%, rgba(74, 111, 124, 0.06), transparent 60%)",
 
-            /* Text */
-            "--color-text": "#f0eef7",
-            "--color-muted": "#a3a1ad",
-            "--color-subtle": "#6d6b76",
-            "--color-faint": "#3e3c46",
+            /* Text — Soft Charcoal Sage (nyaman dibaca, tidak terlalu hitam pekat) */
+            "--color-text": "#232E26",
+            "--color-muted": "#556459",
+            "--color-subtle": "#78877C",
+            "--color-faint": "#A3B0A6",
 
-            /* Brand */
-            "--color-primary": "#60fcc6",
-            "--color-primary-deep": "#19ce9b",
-            "--color-primary-soft": "rgba(96,252,198,.12)",
-            "--color-on-primary": "#003828",
+            /* Brand — Softened Sage Forest (#46634E) & Mellow Sage (#839B7A) */
+            "--color-primary": "#46634E",
+            "--color-primary-deep": "#364E3D",
+            "--color-primary-soft": "rgba(70, 99, 78, 0.10)",
+            "--color-on-primary": "#FFFFFF",
 
-            /* Signals */
-            "--color-expense": "#ff716c",
-            "--color-expense-soft": "rgba(255,113,108,.1)",
-            "--color-transfer": "#4FC3F7",
-            "--color-transfer-soft": "rgba(79,195,247,.1)",
-            "--color-purple": "#a78bfa",
-            "--color-purple-soft": "rgba(167,139,250,.1)",
-            "--color-amber": "#f59e0b",
-            "--color-amber-soft": "rgba(245,158,11,.1)",
+            /* Brand Accent Tokens */
+            "--color-sage-mellow": "#839B7A",
+            "--color-soil": "#7D513B",
+            "--color-sand": "#E8D3A7",
+            "--color-terracotta": "#B5694A",
+            "--color-mustard": "#C8963E",
 
-            /* Borders */
-            "--color-border": "rgba(255,255,255,.07)",
-            "--color-border-soft": "rgba(255,255,255,.04)",
-            "--color-border-strong": "rgba(255,255,255,.14)",
+            /* Signals — Pastel/Muted Earth Tones (tidak menusuk mata) */
+            "--color-expense": "#C25E4C",
+            "--color-expense-soft": "rgba(194, 94, 76, 0.10)",
+            "--color-transfer": "#4B7B8C",
+            "--color-transfer-soft": "rgba(75, 123, 140, 0.10)",
+            "--color-purple": "#73638A",
+            "--color-purple-soft": "rgba(115, 99, 138, 0.10)",
+            "--color-amber": "#C48B2C",
+            "--color-amber-soft": "rgba(196, 139, 44, 0.12)",
 
-            /* Shadows */
-            "--shadow-sm": "0 1px 2px rgba(0,0,0,.4)",
-            "--shadow-md": "0 8px 24px rgba(0,0,0,.35)",
-            "--shadow-lg": "0 20px 60px rgba(0,0,0,.55)",
-            "--shadow-glow": "0 0 80px rgba(96,252,198,.14)",
-            "--shadow-inset": "inset 0 1px 0 rgba(255,255,255,.04)",
+            /* Borders — halus & bersih */
+            "--color-border": "rgba(35, 46, 38, 0.10)",
+            "--color-border-soft": "rgba(35, 46, 38, 0.06)",
+            "--color-border-strong": "rgba(70, 99, 78, 0.24)",
+
+            /* Shadows — sangat lembut */
+            "--shadow-sm": "0 1px 3px rgba(35, 46, 38, 0.04)",
+            "--shadow-md": "0 6px 20px rgba(35, 46, 38, 0.06)",
+            "--shadow-lg": "0 16px 44px rgba(35, 46, 38, 0.10)",
+            "--shadow-glow": "0 0 40px rgba(131, 155, 122, 0.14)",
+            "--shadow-inset": "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
 
             /* Radii */
             "--r-xs": "10px",
@@ -68,76 +77,88 @@ export const THEMES = {
             "--r-xl": "36px",
             "--r-pill": "9999px",
 
-            /* ═══ Aurora Glass System ═══ */
-            "--glass-1": "rgba(22,22,30,.55)",
-            "--glass-2": "rgba(28,28,38,.6)",
-            "--glass-hero": "rgba(24,24,34,.52)",
-            "--glass-sidebar": "rgba(12,12,20,.72)",
-            "--glass-blur": "saturate(180%) blur(28px)",
-            "--glass-blur-sm": "saturate(160%) blur(14px)",
-            "--glass-border": "rgba(255,255,255,.08)",
-            "--glass-border-strong": "rgba(255,255,255,.14)",
-            "--glass-highlight": "inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(255,255,255,.02)",
-            "--aurora-1": "rgba(96,252,198,.32)",
-            "--aurora-2": "rgba(167,139,250,.22)",
-            "--aurora-3": "rgba(79,195,247,.2)",
-            "--aurora-4": "rgba(255,113,108,.14)",
-            "--grain-opacity": ".025",
+            /* Clean Soft Glass System */
+            "--glass-1": "rgba(255, 255, 255, 0.92)",
+            "--glass-2": "rgba(255, 255, 255, 0.96)",
+            "--glass-hero": "rgba(255, 255, 255, 0.95)",
+            "--glass-sidebar": "rgba(248, 250, 247, 0.96)",
+            "--glass-blur": "saturate(140%) blur(20px)",
+            "--glass-blur-sm": "saturate(130%) blur(10px)",
+            "--glass-border": "rgba(35, 46, 38, 0.08)",
+            "--glass-border-strong": "rgba(70, 99, 78, 0.18)",
+            "--glass-highlight": "inset 0 1px 0 rgba(255, 255, 255, 1)",
+            "--aurora-1": "rgba(131, 155, 122, 0.10)",
+            "--aurora-2": "rgba(131, 155, 122, 0.06)",
+            "--aurora-3": "rgba(75, 123, 140, 0.05)",
+            "--aurora-4": "rgba(131, 155, 122, 0.05)",
+            "--grain-opacity": ".008",
 
-            /* Scrollbar & nav */
-            "--scrollbar-bg": "#0a0a10",
-            "--scrollbar-thumb": "#60fcc6",
-            "--nav-active-bg": "rgba(96,252,198,.1)",
+            "--scrollbar-bg": "#E9EFE8",
+            "--scrollbar-thumb": "#839B7A",
+            "--nav-active-bg": "rgba(70, 99, 78, 0.10)",
         },
     },
-    light: {
-        id: "light", name: "Terang", icon: "☀️",
+    dark: {
+        id: "dark", name: "Teduh (Dark Sage)", icon: "🌙",
         vars: {
-            /* Mint whisper — soft near-white with faint mint echo.
-             * --bg-surface is now translucent so views auto-glass. */
-            "--bg-app": "#f6fbf9",
-            "--bg-deep": "#ffffff",
-            "--bg-surface": "rgba(255,255,255,.72)",
-            "--bg-surface-low": "#ecf3ef",
-            "--bg-surface-hover": "#e3ece7",
-            "--bg-glass": "rgba(255,255,255,.78)",
-            "--bg-alt-row": "rgba(15,23,42,.022)",
+            /* Base surfaces — Soft Matte Forest Slate (adem di mata saat malam) */
+            "--bg-app": "#151B17",
+            "--bg-deep": "#111613",
+            "--bg-surface": "rgba(27, 35, 30, 0.88)",
+            "--bg-surface-low": "#1F2822",
+            "--bg-surface-hover": "#28332C",
+            "--bg-glass": "rgba(24, 31, 27, 0.90)",
+            "--bg-alt-row": "rgba(255, 255, 255, 0.025)",
 
-            "--bg-elevated": "#ffffff",
-            "--bg-sunk": "#e3ece7",
-            "--bg-highlight": "rgba(5,150,105,.1)",
-            "--bg-mesh-1": "radial-gradient(1200px 600px at 10% -10%, rgba(5,150,105,.2), transparent 60%)",
-            "--bg-mesh-2": "radial-gradient(900px 500px at 110% 110%, rgba(37,99,235,.12), transparent 60%)",
+            /* Tiered surfaces for bento cards */
+            "--bg-elevated": "#202A23",
+            "--bg-sunk": "#111613",
+            "--bg-highlight": "rgba(131, 155, 122, 0.10)",
+            "--bg-mesh-1": "radial-gradient(1200px 600px at 15% -10%, rgba(131, 155, 122, 0.10), transparent 60%)",
+            "--bg-mesh-2": "radial-gradient(900px 500px at 110% 110%, rgba(75, 123, 140, 0.06), transparent 60%)",
 
-            "--color-text": "#0b1120",
-            "--color-muted": "#475569",
-            "--color-subtle": "#7a8699",
-            "--color-faint": "#a8b3c4",
+            /* Text — Soft Sage Off-White (tidak menyilaukan di latar gelap) */
+            "--color-text": "#E5ECE7",
+            "--color-muted": "#9AA89E",
+            "--color-subtle": "#6E7D72",
+            "--color-faint": "#47544B",
 
-            "--color-primary": "#059669",
-            "--color-primary-deep": "#047857",
-            "--color-primary-soft": "rgba(5,150,105,.1)",
-            "--color-on-primary": "#ffffff",
+            /* Brand — Mellow Sage (#839B7A) */
+            "--color-primary": "#8CA882",
+            "--color-primary-deep": "#6E8B65",
+            "--color-primary-soft": "rgba(140, 168, 130, 0.15)",
+            "--color-on-primary": "#131A15",
 
-            "--color-expense": "#dc2626",
-            "--color-expense-soft": "rgba(220,38,38,.08)",
-            "--color-transfer": "#2563eb",
-            "--color-transfer-soft": "rgba(37,99,235,.08)",
-            "--color-purple": "#7c3aed",
-            "--color-purple-soft": "rgba(124,58,237,.08)",
-            "--color-amber": "#d97706",
-            "--color-amber-soft": "rgba(217,119,6,.08)",
+            /* Brand Accent Tokens */
+            "--color-sage-mellow": "#839B7A",
+            "--color-soil": "#B8876E",
+            "--color-sand": "#E8D3A7",
+            "--color-terracotta": "#C97A5B",
+            "--color-mustard": "#D49D3F",
 
-            "--color-border": "rgba(15,23,42,.12)",
-            "--color-border-soft": "rgba(15,23,42,.07)",
-            "--color-border-strong": "rgba(15,23,42,.18)",
+            /* Signals */
+            "--color-expense": "#D97B6C",
+            "--color-expense-soft": "rgba(217, 123, 108, 0.14)",
+            "--color-transfer": "#6FA3B8",
+            "--color-transfer-soft": "rgba(111, 163, 184, 0.14)",
+            "--color-purple": "#A594BD",
+            "--color-purple-soft": "rgba(165, 148, 189, 0.14)",
+            "--color-amber": "#D49D3F",
+            "--color-amber-soft": "rgba(212, 157, 63, 0.14)",
 
-            "--shadow-sm": "0 1px 3px rgba(15,23,42,.06)",
-            "--shadow-md": "0 6px 24px rgba(15,23,42,.1)",
-            "--shadow-lg": "0 20px 56px rgba(15,23,42,.15)",
-            "--shadow-glow": "0 0 60px rgba(5,150,105,.12)",
-            "--shadow-inset": "inset 0 1px 0 rgba(255,255,255,.7)",
+            /* Borders */
+            "--color-border": "rgba(229, 236, 231, 0.09)",
+            "--color-border-soft": "rgba(229, 236, 231, 0.05)",
+            "--color-border-strong": "rgba(140, 168, 130, 0.25)",
 
+            /* Shadows */
+            "--shadow-sm": "0 1px 3px rgba(0, 0, 0, 0.3)",
+            "--shadow-md": "0 8px 24px rgba(0, 0, 0, 0.3)",
+            "--shadow-lg": "0 20px 56px rgba(0, 0, 0, 0.45)",
+            "--shadow-glow": "0 0 60px rgba(131, 155, 122, 0.12)",
+            "--shadow-inset": "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+
+            /* Radii */
             "--r-xs": "10px",
             "--r-sm": "14px",
             "--r-md": "20px",
@@ -145,26 +166,26 @@ export const THEMES = {
             "--r-xl": "36px",
             "--r-pill": "9999px",
 
-            /* Tinted glass — crisp on mint whisper, text stays razor-sharp */
-            "--glass-1": "rgba(255,255,255,.72)",
-            "--glass-2": "rgba(255,255,255,.82)",
-            "--glass-hero": "rgba(255,255,255,.66)",
-            "--glass-sidebar": "rgba(255,255,255,.76)",
-            "--glass-blur": "saturate(180%) blur(24px)",
-            "--glass-blur-sm": "saturate(160%) blur(12px)",
-            "--glass-border": "rgba(15,60,45,.08)",
-            "--glass-border-strong": "rgba(15,60,45,.16)",
-            "--glass-highlight": "inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.35)",
-            /* Aurora — softer on mint whisper so it feels calm not tropical */
-            "--aurora-1": "rgba(16,185,129,.28)",
-            "--aurora-2": "rgba(139,92,246,.22)",
-            "--aurora-3": "rgba(59,130,246,.18)",
-            "--aurora-4": "rgba(244,114,182,.18)",
-            "--grain-opacity": ".014",
+            /* Deep Sage Glass System */
+            "--glass-1": "rgba(27, 35, 30, 0.85)",
+            "--glass-2": "rgba(33, 42, 36, 0.90)",
+            "--glass-hero": "rgba(30, 39, 33, 0.88)",
+            "--glass-sidebar": "rgba(19, 25, 21, 0.94)",
+            "--glass-blur": "saturate(140%) blur(22px)",
+            "--glass-blur-sm": "saturate(130%) blur(12px)",
+            "--glass-border": "rgba(229, 236, 231, 0.08)",
+            "--glass-border-strong": "rgba(229, 236, 231, 0.16)",
+            "--glass-highlight": "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+            "--aurora-1": "rgba(131, 155, 122, 0.12)",
+            "--aurora-2": "rgba(70, 99, 78, 0.10)",
+            "--aurora-3": "rgba(75, 123, 140, 0.08)",
+            "--aurora-4": "rgba(176, 100, 67, 0.06)",
+            "--grain-opacity": ".015",
 
-            "--scrollbar-bg": "#eef1f5",
-            "--scrollbar-thumb": "#059669",
-            "--nav-active-bg": "rgba(5,150,105,.08)",
+            /* Scrollbar & nav */
+            "--scrollbar-bg": "#151B17",
+            "--scrollbar-thumb": "#46634E",
+            "--nav-active-bg": "rgba(140, 168, 130, 0.14)",
         },
     },
 };
@@ -172,10 +193,10 @@ export const THEMES = {
 const ThemeContext = createContext(null);
 
 export const ThemeProvider = ({ children }) => {
-    const [themeId, setThemeId] = useState(() => localStorage.getItem("karaya_theme") || "dark");
+    const [themeId, setThemeId] = useState(() => localStorage.getItem("karaya_theme_kb") || "light");
 
     const applyTheme = (id) => {
-        const theme = THEMES[id] || THEMES.dark;
+        const theme = THEMES[id] || THEMES.light;
         const root = document.documentElement;
         Object.entries(theme.vars).forEach(([k, v]) => root.style.setProperty(k, v));
         let el = document.getElementById("karaya-theme-style");
@@ -192,7 +213,7 @@ export const ThemeProvider = ({ children }) => {
 
     const setTheme = (id) => {
         setThemeId(id);
-        localStorage.setItem("karaya_theme", id);
+        localStorage.setItem("karaya_theme_kb", id);
     };
 
     const toggleTheme = () => setTheme(themeId === "dark" ? "light" : "dark");

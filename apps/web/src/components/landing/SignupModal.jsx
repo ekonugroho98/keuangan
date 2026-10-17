@@ -78,7 +78,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
                     position: "relative", overflow: "hidden",
                 }}>
                     {/* Ambient aurora orbs */}
-                    <div style={{ position: "absolute", top: -120, left: -60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,252,198,.2), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
+                    <div style={{ position: "absolute", top: -120, left: -60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.2), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
                     <div style={{ position: "absolute", bottom: -140, right: -80, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,.15), transparent 70%)", pointerEvents: "none", filter: "blur(14px)" }} />
 
                     {/* Close */}
@@ -105,7 +105,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
                                 background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: 26,
-                                boxShadow: "0 8px 24px rgba(96,252,198,.3), inset 0 1px 0 rgba(255,255,255,.35)",
+                                boxShadow: "0 8px 24px rgba(131,155,122,.3), inset 0 1px 0 rgba(255,255,255,.35)",
                             }}>✨</div>
                             <h2 style={{
                                 fontSize: "clamp(22px, 3vw, 28px)",
@@ -133,7 +133,7 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
                                             background: done || active
                                                 ? "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))"
                                                 : "rgba(255,255,255,.12)",
-                                            boxShadow: active ? "0 0 12px rgba(96,252,198,.5)" : "none",
+                                            boxShadow: active ? "0 0 12px rgba(131,155,122,.5)" : "none",
                                             transition: "all .3s",
                                         }} />
                                     </div>

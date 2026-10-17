@@ -26,7 +26,7 @@ const SHIMMER_CSS = `
         90deg,
         transparent 0%,
         rgba(255,255,255,.06) 45%,
-        rgba(96,252,198,.08) 50%,
+        rgba(131,155,122,.08) 50%,
         rgba(255,255,255,.06) 55%,
         transparent 100%
     );

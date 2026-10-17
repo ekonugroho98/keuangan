@@ -27,24 +27,24 @@ function AuthedApp({ session, onLogout, showToast }) {
 }
 
 const globalStyles = `
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Quicksand:wght@400;500;600;700&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  background: var(--bg-app, #0a0a10);
+  background: var(--bg-app, #F4EBD9);
   color: var(--color-text);
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "ss01","cv11";
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
 }
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--scrollbar-bg, #0a0a10); }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #60fcc6); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-primary-deep, #19ce9b); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-bg, #EFE2C6); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #3F5142); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary-deep, #2D3B30); }
 ::selection { background: var(--color-primary-soft); color: var(--color-text); }
-input::placeholder, textarea::placeholder { color: var(--color-subtle, #6d6b76); }
+input::placeholder, textarea::placeholder { color: var(--color-subtle, #7D513B); opacity: 0.65; }
 input, select, textarea { color: var(--color-text); background: var(--bg-surface-low); font-family: inherit; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -61,14 +61,17 @@ input, select, textarea { color: var(--color-text); background: var(--bg-surface
 @keyframes glow-pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
 @keyframes count-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* ═══ Typography Utilities ═══ */
-.gradient-text { background: linear-gradient(135deg,#60fcc6,#19ce9b,#60fcc6,#4FC3F7); background-size: 200% 200%; animation: gradient 4s ease infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+/* ═══ Typography Utilities — Keluarga Berkembang ═══ */
+*, *::before, *::after { font-synthesis: none; }
+.gradient-text { background: linear-gradient(135deg, #3F5142, #839B7A, #7D513B, #B06443); background-size: 200% 200%; animation: gradient 5s ease infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: "tnum", "zero"; letter-spacing: -0.02em; }
-.num-tight { font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
-.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--color-subtle); }
-.display-hero { font-size: clamp(44px, 6vw, 80px); font-weight: 900; line-height: 1; letter-spacing: -0.04em; }
-.display-lg { font-size: clamp(32px, 4vw, 48px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; }
-.display-md { font-size: clamp(22px, 2.4vw, 32px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+.num-tight { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--color-subtle); }
+.font-heading, h1, h2, h3, h4 { font-family: 'Fredoka', -apple-system, sans-serif; font-weight: 600 !important; letter-spacing: -0.005em; }
+.font-quote { font-family: 'Caveat', cursive; font-weight: 500; }
+.display-hero { font-family: 'Fredoka', sans-serif; font-size: clamp(44px, 6vw, 80px); font-weight: 600 !important; line-height: 1.04; letter-spacing: -0.015em; }
+.display-lg { font-family: 'Fredoka', sans-serif; font-size: clamp(32px, 4vw, 48px); font-weight: 600 !important; line-height: 1.08; letter-spacing: -0.01em; }
+.display-md { font-family: 'Fredoka', sans-serif; font-size: clamp(22px, 2.4vw, 32px); font-weight: 600 !important; line-height: 1.12; letter-spacing: -0.005em; }
 
 /* ═══ Bento Card System ═══ */
 .bento {
@@ -85,15 +88,15 @@ input, select, textarea { color: var(--color-text); background: var(--bg-surface
 .bento-glow { position: relative; }
 .bento-glow::before {
   content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px;
-  background: linear-gradient(135deg, rgba(96,252,198,.4), transparent 40%, transparent 60%, rgba(96,252,198,.2));
+  background: linear-gradient(135deg, rgba(131,155,122,.45), transparent 40%, transparent 60%, rgba(176,100,67,.25));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
   pointer-events: none; opacity: .6;
 }
 .bento-hero {
   background:
-    radial-gradient(600px 300px at 20% 0%, rgba(96,252,198,.12), transparent 60%),
-    radial-gradient(400px 300px at 100% 100%, rgba(79,195,247,.08), transparent 60%),
+    radial-gradient(600px 300px at 20% 0%, rgba(131,155,122,.16), transparent 60%),
+    radial-gradient(400px 300px at 100% 100%, rgba(176,100,67,.10), transparent 60%),
     var(--bg-elevated, var(--bg-surface));
   border: 1px solid var(--color-border);
   border-radius: var(--r-lg, 28px);
@@ -103,7 +106,7 @@ input, select, textarea { color: var(--color-text); background: var(--bg-surface
 }
 .bento-hero::after {
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
   pointer-events: none;
 }
 
@@ -116,18 +119,18 @@ input, select, textarea { color: var(--color-text); background: var(--bg-surface
 .chip-ghost { background: var(--color-border-soft); color: var(--color-muted); border: 1px solid var(--color-border-soft); }
 
 /* ═══ Buttons ═══ */
-.nav-link { color: var(--color-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: all .25s; padding: 8px 14px; border-radius: 10px; cursor: pointer; border: none; background: none; font-family: inherit; letter-spacing: -0.01em; }
+.nav-link { color: var(--color-muted); text-decoration: none; font-size: 14px; font-weight: 600; transition: all .25s; padding: 8px 14px; border-radius: 10px; cursor: pointer; border: none; background: none; font-family: inherit; letter-spacing: -0.01em; }
 .nav-link:hover { color: var(--color-text); background: var(--color-primary-soft); }
 .btn-primary {
-  background: linear-gradient(135deg,#60fcc6,#19ce9b);
-  color: #003828; border: none;
+  background: linear-gradient(135deg, var(--color-primary, #3F5142), var(--color-primary-deep, #2D3B30));
+  color: var(--color-on-primary, #FAF5EA); border: none;
   padding: 14px 32px; border-radius: 9999px;
   font-weight: 700; font-size: 15px; cursor: pointer;
   transition: all .3s cubic-bezier(.2,.8,.2,1);
-  font-family: inherit; letter-spacing: -0.01em;
-  box-shadow: 0 4px 16px rgba(96,252,198,.2), inset 0 1px 0 rgba(255,255,255,.3);
+  font-family: 'Fredoka', inherit; letter-spacing: -0.01em;
+  box-shadow: 0 4px 16px rgba(63,81,66,.22), inset 0 1px 0 rgba(255,255,255,.25);
 }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(96,252,198,.4), inset 0 1px 0 rgba(255,255,255,.4); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(63,81,66,.35), inset 0 1px 0 rgba(255,255,255,.35); }
 .btn-primary:active { transform: translateY(0); }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-secondary {
@@ -160,10 +163,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 /* ═══ Divider ═══ */
 .div-soft { height: 1px; background: linear-gradient(90deg, transparent, var(--color-border), transparent); }
 
-/* ═══ Cross-view typography nudges — inherited by all 12 dashboard views ═══ */
-h1, h2, h3, h4 { letter-spacing: -.02em; }
-h2 { font-weight: 800; }
-h3 { font-weight: 700; }
+/* ═══ Cross-view typography nudges ═══ */
 /* Any element showing money in Rp format gets tabular nums */
 [class*="num-"], .mono { font-variant-numeric: tabular-nums; }
 
@@ -208,9 +208,9 @@ h3 { font-weight: 700; }
   background: radial-gradient(circle, var(--aurora-4), transparent 60%);
   animation: aurora-drift-4 34s ease-in-out infinite;
 }
-/* Light mode: blend aurora into the warm grey bg for richer mixing */
-[data-theme="light"] .aurora-layer { mix-blend-mode: multiply; filter: blur(80px) saturate(150%); }
-[data-theme="light"] .grain-layer { mix-blend-mode: multiply; }
+/* Light mode: keep aurora ultra-subtle and clean */
+[data-theme="light"] .aurora-layer { opacity: 0.45; filter: blur(90px); }
+[data-theme="light"] .grain-layer { opacity: 0.006; }
 
 /* Grain texture layer — sits on top of aurora but below content */
 .grain-layer {
@@ -246,7 +246,7 @@ h3 { font-weight: 700; }
 .glass-hero::before,
 .bento-glow::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
-  background: linear-gradient(135deg, rgba(96,252,198,.55), rgba(167,139,250,.15) 30%, transparent 55%, transparent 70%, rgba(79,195,247,.3));
+  background: linear-gradient(135deg, rgba(131,155,122,.55), rgba(125,81,59,.2) 30%, transparent 55%, transparent 70%, rgba(212,157,63,.35));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
   pointer-events: none;
@@ -403,7 +403,7 @@ export default function App() {
             <div style={{ minHeight: "100vh", background: "var(--bg-app)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <style>{globalStyles}</style>
                 <div style={{ textAlign: "center" }}>
-                    <div style={{ width: 40, height: 40, border: "3px solid rgba(96,252,198,.25)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(131,155,122,.3)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
                     <div style={{ color: "var(--color-muted)", fontSize: 13 }}>Memuat...</div>
                 </div>
             </div>
@@ -411,7 +411,7 @@ export default function App() {
     }
 
     return (
-        <div style={{ fontFamily: "'Plus Jakarta Sans',-apple-system,sans-serif", position: "relative", minHeight: "100vh" }}>
+        <div style={{ fontFamily: "'Quicksand',-apple-system,sans-serif", position: "relative", minHeight: "100vh" }}>
             <style>{globalStyles}</style>
             {/* Aurora + grain — fixed layers behind everything */}
             <div className="aurora-layer" aria-hidden="true">

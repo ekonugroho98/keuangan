@@ -423,7 +423,10 @@ const AddTransactionModal = ({
   const { t } = useLanguage();
   // F-A (10-fitur-opsional-keluarga.md §3.5): hook di-gate oleh `enabled` supaya household yang
   // belum mengaktifkan fitur ini tidak pernah memicu GET /v1/beneficiaries (403 feature_disabled).
-  const { beneficiaries } = useBeneficiaries(beneficiaryEnabled);
+  const { beneficiaries, addBeneficiary } = useBeneficiaries(beneficiaryEnabled);
+  const [showAddBen, setShowAddBen] = useState(false);
+  const [newBenName, setNewBenName] = useState("");
+  const [addingBen, setAddingBen] = useState(false);
 
   // Kategori pengeluaran household untuk scan struk: dari API kalau sudah dimuat (nama persis
   // seperti di DB, termasuk yang di-rename user), fallback ke default + custom sebelum itu.
@@ -573,14 +576,38 @@ const AddTransactionModal = ({
     return v === k ? name : v;
   };
 
+  const apiIncomeNames = allCategoriesFromApi
+    .filter((c) => !c.is_system && c.type !== "expense")
+    .map((c) => c.name);
   const extraExpense = customCategories
     .filter((c) => c.type !== "income")
     .map((c) => c.name);
   const extraIncome = customCategories
     .filter((c) => c.type !== "expense")
     .map((c) => c.name);
-  const allExpense = [...expenseCategories, ...extraExpense];
-  const allIncome = [...incomeCategories, ...extraIncome];
+  const baseExpense = apiExpenseNames.length
+    ? apiExpenseNames
+    : [...expenseCategories.filter((c) => c !== "Makanan"), ...extraExpense];
+  const baseIncome = apiIncomeNames.length
+    ? apiIncomeNames
+    : [...incomeCategories, ...extraIncome];
+  const allExpense =
+    editMode && txForm.type === "expense" && txForm.category && !baseExpense.includes(txForm.category)
+      ? [txForm.category, ...baseExpense]
+      : baseExpense;
+  const allIncome =
+    editMode && txForm.type === "income" && txForm.category && !baseIncome.includes(txForm.category)
+      ? [txForm.category, ...baseIncome]
+      : baseIncome;
+
+  // Pastikan txForm.category selalu merujuk ke kategori aktif di DB saat tambah baru
+  useEffect(() => {
+    if (!open || editMode || txForm.type === "transfer") return;
+    const validList = txForm.type === "income" ? baseIncome : baseExpense;
+    if (validList.length > 0 && !validList.includes(txForm.category)) {
+      setTxForm((p) => ({ ...p, category: validList[0] }));
+    }
+  }, [open, editMode, txForm.type, txForm.category, baseExpense, baseIncome, setTxForm]);
 
   const isTransfer = txForm.type === "transfer";
   const activeType = TYPES.find((tt) => tt.v === txForm.type) || TYPES[0];
@@ -1465,13 +1492,17 @@ const AddTransactionModal = ({
                   border:
                     "1px solid color-mix(in srgb, var(--color-transfer) 25%, transparent)",
                   borderRadius: 12,
-                  padding: "10px 14px",
+                  padding: "12px 14px",
                   marginBottom: 16,
                   fontSize: 12,
                   color: "var(--color-muted)",
                   lineHeight: 1.55,
                 }}
               >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontWeight: 800, color: "var(--color-text)", fontSize: 13 }}>
+                  <span>🔄 {txForm.account}{txForm.toAccount ? ` → ${txForm.toAccount}` : ""}</span>
+                  <span className="mono num-tight" style={{ color: "var(--color-transfer)" }}>Rp {fmtAmount(txForm.amount)}</span>
+                </div>
                 ℹ️ Transfer hanya bisa diubah catatan &amp; tanggalnya. Untuk
                 mengubah akun / jumlah,{" "}
                 <strong style={{ color: "var(--color-expense)" }}>
@@ -1492,18 +1523,9 @@ const AddTransactionModal = ({
               </div>
               <div style={{ marginBottom: 16 }}>
                 <FieldLabel>📅 TANGGAL</FieldLabel>
-                <input
-                  type="date"
-                  value={txForm.date || ""}
-                  onChange={(e) =>
-                    setTxForm((p) => ({ ...p, date: e.target.value }))
-                  }
-                  onClick={(e) => e.target.showPicker?.()}
-                  style={{
-                    ...glassInputStyle,
-                    colorScheme: "dark",
-                    cursor: "pointer",
-                  }}
+                <DatePicker
+                  value={txForm.date}
+                  onChange={(date) => setTxForm((p) => ({ ...p, date }))}
                 />
               </div>
             </>
@@ -1816,7 +1838,7 @@ const AddTransactionModal = ({
               {beneficiaryEnabled && (
                 <div style={{ marginBottom: 16 }}>
                   <FieldLabel>UNTUK</FieldLabel>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     <Chip
                       active={!txForm.beneficiary}
                       onClick={() => setTxForm((p) => ({ ...p, beneficiary: "" }))}
@@ -1829,9 +1851,107 @@ const AddTransactionModal = ({
                         active={txForm.beneficiary === b.name}
                         onClick={() => setTxForm((p) => ({ ...p, beneficiary: b.name }))}
                       >
-                        {b.icon} {b.name}
+                        {b.icon || "👤"} {b.name}
                       </Chip>
                     ))}
+                    {!showAddBen ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddBen(true)}
+                        style={{
+                          padding: "6px 11px",
+                          borderRadius: 99,
+                          border: "1px dashed var(--color-border)",
+                          background: "transparent",
+                          color: "var(--color-primary)",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        + Tambah
+                      </button>
+                    ) : (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <input
+                          value={newBenName}
+                          onChange={(e) => setNewBenName(e.target.value)}
+                          placeholder="Nama (mis. Adik)..."
+                          autoFocus
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter" && newBenName.trim() && !addingBen) {
+                              e.preventDefault();
+                              setAddingBen(true);
+                              try {
+                                const created = await addBeneficiary({ name: newBenName.trim(), kind: "child", icon: "👶" });
+                                setTxForm((p) => ({ ...p, beneficiary: created.name || newBenName.trim() }));
+                                setNewBenName("");
+                                setShowAddBen(false);
+                              } finally {
+                                setAddingBen(false);
+                              }
+                            } else if (e.key === "Escape") {
+                              setShowAddBen(false);
+                            }
+                          }}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 99,
+                            border: "1px solid var(--color-primary)",
+                            background: "var(--bg-surface-low)",
+                            color: "var(--color-text)",
+                            fontSize: 12,
+                            fontFamily: "inherit",
+                            outline: "none",
+                            width: 130,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={!newBenName.trim() || addingBen}
+                          onClick={async () => {
+                            if (!newBenName.trim() || addingBen) return;
+                            setAddingBen(true);
+                            try {
+                              const created = await addBeneficiary({ name: newBenName.trim(), kind: "child", icon: "👶" });
+                              setTxForm((p) => ({ ...p, beneficiary: created.name || newBenName.trim() }));
+                              setNewBenName("");
+                              setShowAddBen(false);
+                            } finally {
+                              setAddingBen(false);
+                            }
+                          }}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 99,
+                            border: "none",
+                            background: "var(--color-primary)",
+                            color: "var(--color-on-primary)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          {addingBen ? "..." : "Simpan"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddBen(false); setNewBenName(""); }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--color-muted)",
+                            cursor: "pointer",
+                            fontSize: 12,
+                            padding: "0 4px",
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

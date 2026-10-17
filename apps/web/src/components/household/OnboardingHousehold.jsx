@@ -42,37 +42,37 @@ export default function OnboardingHousehold({ userEmail, onLogout }) {
                     padding: 28, border: "1px solid var(--color-border-soft, rgba(255,255,255,.08))",
                 }}
             >
-                <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6, color: "var(--color-text, #fff)" }}>
-                    Selamat datang di Karaya 👋
+                <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6, color: "var(--color-text, #fff)", fontFamily: "var(--font-display)" }}>
+                    Selamat datang di Keluarga Berkembang 👋
                 </h1>
-                <p style={{ fontSize: 13, color: "var(--color-muted, #9aa)", marginBottom: 20 }}>
-                    Buat household untuk mulai mencatat keuangan. Kamu bisa mengundang pasangan belakangan di Settings.
+                <p style={{ fontSize: 13, color: "var(--color-muted, #9aa)", marginBottom: 20, lineHeight: 1.5 }}>
+                    Buat ruang rumah tangga untuk mulai mencatat keuangan, belanja dapur, dan stok kulkas. Kamu bisa mengundang pasangan belakangan di Pengaturan.
                 </p>
 
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted, #9aa)", display: "block", marginBottom: 6 }}>
-                    Nama kamu
+                    Nama panggilanmu
                 </label>
                 <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Eko"
+                    placeholder="Ayah / Bunda"
                     style={inputStyle}
                     required
                 />
 
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted, #9aa)", display: "block", margin: "14px 0 6px" }}>
-                    Nama household
+                    Nama Rumah Tangga
                 </label>
                 <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Keluarga Eko"
+                    placeholder="Keluarga Harmonis"
                     style={inputStyle}
                     required
                 />
 
                 {error && (
-                    <div style={{ marginTop: 12, fontSize: 12, color: "#ff716c" }}>{error}</div>
+                    <div style={{ marginTop: 12, fontSize: 12, color: "var(--color-expense, #ff716c)" }}>{error}</div>
                 )}
 
                 <button
@@ -80,11 +80,11 @@ export default function OnboardingHousehold({ userEmail, onLogout }) {
                     disabled={loading}
                     style={{
                         width: "100%", marginTop: 20, padding: "12px 0", borderRadius: 10, border: "none",
-                        background: "var(--color-primary, #60fcc6)", color: "#0b0d13", fontWeight: 700,
+                        background: "var(--color-primary, #46634E)", color: "var(--color-on-primary, #fff)", fontWeight: 700,
                         fontSize: 14, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1,
                     }}
                 >
-                    {loading ? "Membuat..." : "Buat Household"}
+                    {loading ? "Membuat..." : "Mulai Rumah Tangga"}
                 </button>
 
                 {onLogout && (

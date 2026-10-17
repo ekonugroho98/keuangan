@@ -169,9 +169,9 @@ export async function getSummary(
       period: { label: period.label, from: period.from, to: period.to },
       scope: opts.scope,
       totals: {
-        income: totals.income, expense: totals.expense, net: totals.income - totals.expense,
+        income: totals.income, expense: totals.expense, net: totals.net,
         transfer_volume: totals.transfer,
-        saving_rate_pct: totals.income > 0 ? Math.round(((totals.income - totals.expense) / totals.income) * 1000) / 10 : 0,
+        saving_rate_pct: totals.income > 0 ? Math.max(0, Math.round((totals.net / totals.income) * 1000) / 10) : 0,
       },
       ...(compare ? { compare } : {}),
       balance: { total_visible: Number(balanceRow!.total), hidden_private_accounts: Number(balanceRow!.hidden) },
@@ -188,18 +188,37 @@ export async function getSummary(
 
 async function computeTotals(tx: postgres.TransactionSql, householdId: string, from: string, to: string, scope: string, accountId: string | undefined, memberId: string | undefined, attribution: 'owner' | 'recorded_by', beneficiaryId?: string) {
   const { accountClause, params } = buildScopeFilter(scope, accountId, memberId, attribution, beneficiaryId)
-  const [row] = await tx.unsafe<{ income: string; expense: string; transfer: string }[]>(
+  const notPiutang = `(c.system_key is distinct from 'piutang')`
+  const isPiutang = `(c.system_key = 'piutang')`
+  let incomeExpr = `case when t.type='income' and ${notPiutang} then t.amount end`
+  let expenseExpr = `case when t.type='expense' then t.amount when t.type='income' and ${isPiutang} then -t.amount end`
+  let transferOutExpr = `0`
+  if (scope === 'account' && accountId) {
+    incomeExpr = `case when t.type='income' and ${notPiutang} and t.account_id = $1 then t.amount when t.type='transfer' and t.to_account_id = $1 and t.account_id is distinct from $1 then t.amount end`
+    expenseExpr = `case when t.type='expense' and t.account_id = $1 then t.amount when t.type='income' and ${isPiutang} and t.account_id = $1 then -t.amount end`
+    transferOutExpr = `case when t.type='transfer' and t.account_id = $1 and t.to_account_id is distinct from $1 then t.amount end`
+  } else if (scope === 'member' && memberId && attribution === 'owner') {
+    incomeExpr = `case when t.type='income' and ${notPiutang} and a.owner_member_id = $1 then t.amount when t.type='transfer' and ta.owner_member_id = $1 and a.owner_member_id is distinct from $1 then t.amount end`
+    expenseExpr = `case when t.type='expense' and a.owner_member_id = $1 then t.amount when t.type='income' and ${isPiutang} and a.owner_member_id = $1 then -t.amount end`
+    transferOutExpr = `case when t.type='transfer' and a.owner_member_id = $1 and ta.owner_member_id is distinct from $1 then t.amount end`
+  }
+  const [row] = await tx.unsafe<{ income: string; expense: string; transfer: string; transfer_out: string }[]>(
     `select
-       coalesce(sum(case when t.type='income' then t.amount end),0)::text as income,
-       coalesce(sum(case when t.type='expense' then t.amount end),0)::text as expense,
-       coalesce(sum(case when t.type='transfer' then t.amount end),0)::text as transfer
+       coalesce(sum(${incomeExpr}),0)::text as income,
+       greatest(0, coalesce(sum(${expenseExpr}),0))::text as expense,
+       coalesce(sum(case when t.type='transfer' then t.amount end),0)::text as transfer,
+       coalesce(sum(${transferOutExpr}),0)::text as transfer_out
      from transactions t
+     join categories c on c.id = t.category_id
      join accounts a on a.id = t.account_id left join accounts ta on ta.id = t.to_account_id
      where t.household_id = $${params.length + 1} and t.deleted_at is null and t.date between $${params.length + 2} and $${params.length + 3}
        ${accountClause}`,
     [...params, householdId, from, to],
   )
-  return { income: Number(row!.income), expense: Number(row!.expense), transfer: Number(row!.transfer) }
+  const income = Number(row!.income)
+  const expense = Number(row!.expense)
+  const transferOut = Number(row!.transfer_out)
+  return { income, expense, transfer: Number(row!.transfer), net: income - expense - transferOut }
 }
 
 function pctDelta(prev: number, cur: number): number | null {

@@ -32,9 +32,18 @@ const prevMonth = (val) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const AnggaranView = ({ budgets, personalBudgets = [], transactions, onAdd, onEdit, onDelete, onCopyMonth, customCategories = [] }) => {
+const AnggaranView = ({ budgets, personalBudgets = [], transactions, accounts = [], onAdd, onEdit, onDelete, onCopyMonth, customCategories = [], allCategoriesFromApi = [] }) => {
     const { t } = useLanguage();
     const { members } = useMembers();
+    const meMember = useMemo(() => members.find(m => m.is_me), [members]);
+    const myAccountNames = useMemo(() => {
+        if (!meMember) return new Set();
+        return new Set(
+            (accounts || [])
+                .filter(a => a.owner?.member_id === meMember.id || a.owner?.display_name === meMember.display_name)
+                .map(a => a.name)
+        );
+    }, [accounts, meMember]);
 
     const [selectedMonth, setSelectedMonth] = useState(() => {
         const now = new Date();
@@ -65,23 +74,41 @@ const AnggaranView = ({ budgets, personalBudgets = [], transactions, onAdd, onEd
         [activeBudgets, selectedMonth]
     );
 
-    /* spending for selected month */
+    /* spending for selected month (scoped to personal accounts when tab === "pribadi") */
     const spending = useMemo(() => {
         const [y, m] = selectedMonth.split("-");
         const map = {};
         transactions.forEach(tx => {
-            if (tx.type !== "expense") return;
             if (!(tx.date || "").startsWith(`${y}-${m}`)) return;
-            map[tx.category] = (map[tx.category] || 0) + tx.amount;
+            if (tab === "pribadi" && myAccountNames.size > 0 && !myAccountNames.has(tx.account_name)) return;
+            if (tx.type === "expense") {
+                map[tx.category] = (map[tx.category] || 0) + tx.amount;
+            } else if (tx.type === "income" && tx.category === "Piutang") {
+                map.Piutang = Math.max(0, (map.Piutang || 0) - tx.amount);
+            }
         });
         return map;
-    }, [transactions, selectedMonth]);
+    }, [transactions, selectedMonth, tab, myAccountNames]);
 
     /* categories already budgeted this month */
     const budgetedCats = useMemo(() => new Set(monthBudgets.map(b => b.category)), [monthBudgets]);
 
+    /* categories with spending this month that don't have a budget set yet */
+    const unbudgetedSpending = useMemo(() => {
+        return Object.entries(spending)
+            .filter(([cat, amt]) => amt > 0 && !budgetedCats.has(cat))
+            .sort((a, b) => b[1] - a[1]);
+    }, [spending, budgetedCats]);
+    const totalUnbudgeted = useMemo(
+        () => unbudgetedSpending.reduce((s, [, amt]) => s + amt, 0),
+        [unbudgetedSpending]
+    );
+
+    const apiExpenseNames = allCategoriesFromApi.filter(c => !c.is_system && c.type !== "income").map(c => c.name);
     const extraExpense = customCategories.filter(c => c.type !== "income").map(c => c.name);
-    const allCats = [...expenseCategories, ...extraExpense];
+    const allCats = apiExpenseNames.length > 0
+        ? apiExpenseNames
+        : [...new Set([...expenseCategories.filter(c => c !== "Makanan"), ...extraExpense])];
     const availableCats = allCats.filter(c => !budgetedCats.has(c) || (editTarget && editTarget.category === c));
 
     /* summary */
@@ -96,7 +123,12 @@ const AnggaranView = ({ budgets, personalBudgets = [], transactions, onAdd, onEd
 
     const tCat = (name) => { const k = "cat.name." + name; const v = t(k); return v === k ? name : v; };
 
-    const openAdd  = () => { setEditTarget(null); setForm({ category: availableCats[0] || "", amount: "", month: selectedMonth }); setShowModal(true); };
+    const openAdd  = (prefillCat) => {
+        const cat = typeof prefillCat === "string" && prefillCat ? prefillCat : (availableCats[0] || "");
+        setEditTarget(null);
+        setForm({ category: cat, amount: "", month: selectedMonth });
+        setShowModal(true);
+    };
     const openEdit = (b) => { setEditTarget(b); setForm({ category: b.category, amount: String(b.amount), month: b.month }); setShowModal(true); };
 
     const handleSubmit = () => {
@@ -324,6 +356,65 @@ const AnggaranView = ({ budgets, personalBudgets = [], transactions, onAdd, onEd
                     );
                 })}
             </div>
+
+            {/* Pengeluaran Belum Dianggarkan Bulan Ini */}
+            {unbudgetedSpending.length > 0 && (
+                <div style={{
+                    marginTop: 24,
+                    background: "var(--glass-1)",
+                    backdropFilter: "var(--glass-blur)",
+                    WebkitBackdropFilter: "var(--glass-blur)",
+                    border: "1px dashed var(--color-amber-soft)",
+                    borderRadius: 20, padding: "20px 22px",
+                    boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
+                }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+                        <div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-amber)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 }}>
+                                ⚡ Pengeluaran Tanpa Anggaran
+                            </div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.01em" }}>
+                                {unbudgetedSpending.length} kategori keluar uang bulan ini tapi belum dianggarkan
+                            </div>
+                        </div>
+                        <div className="num-tight mono" style={{ fontSize: 14, fontWeight: 800, color: "var(--color-amber)" }}>
+                            Total {fmtRp(totalUnbudgeted)}
+                        </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 }}>
+                        {unbudgetedSpending.map(([cat, amt]) => (
+                            <div key={cat} style={{
+                                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                                padding: "11px 14px", borderRadius: 14,
+                                background: "var(--glass-2)", border: "1px solid var(--glass-border)",
+                            }}>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {tCat(cat)}
+                                    </div>
+                                    <div className="num-tight mono" style={{ fontSize: 11, color: "var(--color-expense)", fontWeight: 700, marginTop: 2 }}>
+                                        {fmtRp(amt)} keluar
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => openAdd(cat)}
+                                    style={{
+                                        padding: "6px 11px", minHeight: 32, borderRadius: 10, flexShrink: 0,
+                                        border: "1px solid var(--color-primary)",
+                                        background: "var(--color-primary-soft)",
+                                        color: "var(--color-primary)",
+                                        fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    + Anggarkan
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
 
         {/* Add/Edit Modal */}

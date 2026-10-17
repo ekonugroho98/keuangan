@@ -117,19 +117,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const [txForm, setTxForm] = useState({
     type: "expense",
     amount: "",
-    category: "Makanan",
+    category: "Bahan Makanan",
     note: "",
     account: "",
     toAccount: "",
     date: toLocalDateStr(),
     beneficiary: "", // F-A (10-fitur-opsional-keluarga.md §3) — "" = Bersama, hanya terpakai kalau feature aktif
   });
-
-  // Auto-select akun pertama saat modal dibuka agar tidak pernah kosong
-  const openAddTxModal = () => {
-    setTxForm((p) => ({ ...p, account: p.account || accounts[0]?.name || "" }));
-    setShowAddTx(true);
-  };
   const [accForm, setAccForm] = useState({
     name: "",
     type: "bank",
@@ -143,7 +137,19 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const { accounts, accountsLoading, addAccount, adjustBalance } = useAccounts();
   const { transactions, transactionsLoading, addTx, addMultipleTx, editTx: editTxApi, deleteTx: deleteTxApi } = useTransactions();
   const { addTransfer: addTransferApi } = useTransfers();
-  const { customCategories, addCategory, editCategory, deleteCategory } = useCategories();
+  const { customCategories, allCategoriesFromApi, addCategory, editCategory, deleteCategory } = useCategories();
+  const defaultExpenseCat =
+    allCategoriesFromApi.find((c) => !c.is_system && c.type !== "income")?.name || "Bahan Makanan";
+
+  // Auto-select akun & kategori pertama saat modal dibuka agar tidak pernah kosong/invalid
+  const openAddTxModal = () => {
+    setTxForm((p) => ({
+      ...p,
+      account: p.account || accounts[0]?.name || "",
+      category: p.category || defaultExpenseCat,
+    }));
+    setShowAddTx(true);
+  };
   const { investments, addInvestment, editInvestment, deleteInvestment } = useInvestments();
   const { budgets, personalBudgets, addBudget, editBudget, deleteBudget, copyBudgetMonth } = useBudgets();
   const { goals, addGoal, editGoal, deleteGoal, topupGoal } = useGoals();
@@ -267,7 +273,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `karaya-export-${toLocalDateStr()}.csv`;
+    a.download = `keluarga-berkembang-export-${toLocalDateStr()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     showToast(`✅ ${transactions.length} transaksi berhasil diekspor`);
@@ -287,11 +293,17 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   // ── COMPUTED VALUES ──────────────────────────────────────
   const totalBalance = accounts.reduce((a, b) => a + (b.balance || 0), 0);
   const totalIncome = transactions
-    .filter((t) => t.type === "income")
+    .filter((t) => t.type === "income" && t.category !== "Piutang")
     .reduce((a, t) => a + t.amount, 0);
-  const totalExpense = transactions
-    .filter((t) => t.type === "expense")
+  const totalPiutangOffset = transactions
+    .filter((t) => t.type === "income" && t.category === "Piutang")
     .reduce((a, t) => a + t.amount, 0);
+  const totalExpense = Math.max(
+    0,
+    transactions
+      .filter((t) => t.type === "expense")
+      .reduce((a, t) => a + t.amount, 0) - totalPiutangOffset,
+  );
   const netBalance = totalIncome - totalExpense;
   const savingRate =
     totalIncome > 0 ? Math.round((1 - totalExpense / totalIncome) * 100) : 0;
@@ -300,10 +312,15 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
   const catTotals = {};
   transactions.forEach((t) => {
-    if (t.category)
+    if (t.type === "expense" && t.category) {
       catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+    } else if (t.type === "income" && t.category === "Piutang") {
+      catTotals.Piutang = Math.max(0, (catTotals.Piutang || 0) - t.amount);
+    }
   });
-  const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  const sortedCats = Object.entries(catTotals)
+    .filter(([, amt]) => amt > 0)
+    .sort((a, b) => b[1] - a[1]);
 
   // ── TRANSAKSI (POST /v1/transactions, apps/api) ──────────────────────────
   const addTx_ = async () => {
@@ -326,7 +343,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         // gate ini nilai lama tetap terkirim dan ditolak backend (400) alih-alih diam-diam dibuang.
         ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),
       });
-      setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr(), beneficiary: "" });
+      setTxForm({ type: "expense", amount: "", category: defaultExpenseCat, note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr(), beneficiary: "" });
       setShowAddTx(false);
       showToast("Transaksi berhasil ditambahkan!");
     } catch (err) {
@@ -361,7 +378,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       category: tx.category,
       note: tx.note,
       account: tx.account_name,
-      toAccount: "",
+      toAccount: tx.to_account_name || "",
       date: tx.date || toLocalDateStr(),
       beneficiary: tx.beneficiary || "",
     });
@@ -375,17 +392,24 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
     setIsSavingTx(true);
     try {
-      await editTxApi(editingTx.id, {
-        type: txForm.type,
-        amount: newAmount,
-        category: txForm.category,
-        note: txForm.note || txForm.category,
-        date: txForm.date || editingTx.date,
-        account: txForm.account || editingTx.account_name,
-        // Hanya ikut kalau fitur aktif — lihat catatan panjang di editTx (useTransactions.js) soal
-        // kenapa "" di sini beda arti dari key yang tidak ada sama sekali.
-        ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),
-      });
+      if (editingTx.type === "transfer") {
+        await editTxApi(editingTx.id, {
+          note: txForm.note ?? "",
+          date: txForm.date || editingTx.date,
+        });
+      } else {
+        await editTxApi(editingTx.id, {
+          type: txForm.type,
+          amount: newAmount,
+          category: txForm.category,
+          note: txForm.note || txForm.category,
+          date: txForm.date || editingTx.date,
+          account: txForm.account || editingTx.account_name,
+          // Hanya ikut kalau fitur aktif — lihat catatan panjang di editTx (useTransactions.js) soal
+          // kenapa "" di sini beda arti dari key yang tidak ada sama sekali.
+          ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),
+        });
+      }
       setShowEditTx(false);
       setEditingTx(null);
       showToast("Transaksi berhasil diperbarui");
@@ -420,7 +444,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         date: txForm.date || toLocalDateStr(),
         note: txForm.note || `Transfer ${txForm.account} → ${txForm.toAccount}`,
       });
-      setTxForm({ type: "expense", amount: "", category: "Makanan", note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
+      setTxForm({ type: "expense", amount: "", category: defaultExpenseCat, note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
       setShowAddTx(false);
       showToast(`Transfer Rp ${amount.toLocaleString("id-ID")} berhasil!`);
     } catch (err) {
@@ -602,7 +626,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       <main
         style={{
           flex: 1,
-          marginLeft: isMobile ? 0 : sidebarOpen ? 232 : 0,
+          marginLeft: isMobile ? 0 : sidebarOpen ? 256 : 0,
           transition: "margin-left .35s cubic-bezier(.2,.8,.2,1)",
           minHeight: "100vh",
           minWidth: 0,
@@ -685,17 +709,16 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 padding: isMobile ? "8px 14px" : "9px 18px",
                 borderRadius: 9999,
                 border: "none",
-                background:
-                  "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))",
-                color: "var(--color-on-primary)",
+                background: "linear-gradient(135deg, #B06443, #965032)",
+                color: "#FAF5EA",
                 fontSize: isMobile ? 12 : 13,
                 fontWeight: 700,
                 cursor: "pointer",
-                fontFamily: "inherit",
+                fontFamily: "'Fredoka', inherit",
                 whiteSpace: "nowrap",
-                letterSpacing: "-.01em",
+                letterSpacing: ".01em",
                 boxShadow:
-                  "0 4px 14px rgba(96,252,198,.2), inset 0 1px 0 rgba(255,255,255,.25)",
+                  "0 4px 14px rgba(176,100,67,.26), inset 0 1px 0 rgba(255,255,255,.25)",
               }}
             >
               + {isMobile ? "Tx" : t("nav.transaction")}
@@ -706,9 +729,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 style={{
                   padding: "9px 16px",
                   borderRadius: 9999,
-                  background: "rgba(255,113,108,.08)",
-                  border: "1px solid rgba(255,113,108,.18)",
-                  color: "#ff716c",
+                  background: "var(--color-expense-soft)",
+                  border: "1px solid rgba(176,100,67,.24)",
+                  color: "var(--color-expense)",
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: "pointer",
@@ -726,9 +749,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                   width: 36,
                   height: 36,
                   borderRadius: 10,
-                  background: "rgba(255,113,108,.08)",
-                  border: "1px solid rgba(255,113,108,.18)",
-                  color: "#ff716c",
+                  background: "var(--color-expense-soft)",
+                  border: "1px solid rgba(176,100,67,.24)",
+                  color: "var(--color-expense)",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -811,6 +834,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
               <KategoriView
                 transactions={transactions}
                 customCategories={customCategories}
+                allCategoriesFromApi={allCategoriesFromApi}
                 onAddCategory={addCategory}
                 onEditCategory={editCategory}
                 onDeleteCategory={deleteCategory}
@@ -829,6 +853,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 onEdit={editRecurring}
                 onDelete={deleteRecurring}
                 customCategories={customCategories}
+                allCategoriesFromApi={allCategoriesFromApi}
               />
             )}
             {activeMenu === "goals" && (
@@ -877,15 +902,17 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 budgets={budgets}
                 personalBudgets={personalBudgets}
                 transactions={transactions}
+                accounts={accounts}
                 onAdd={addBudget}
                 onEdit={editBudget}
                 onDelete={deleteBudget}
                 onCopyMonth={copyBudgetMonth}
                 customCategories={customCategories}
+                allCategoriesFromApi={allCategoriesFromApi}
               />
             )}
             {activeMenu === "laporan" && (
-              <LaporanView transactions={transactions} accounts={accounts} />
+              <LaporanView transactions={transactions} accounts={accounts} budgets={budgets} personalBudgets={personalBudgets} />
             )}
             {activeMenu === "ai" && (
               <AiView
@@ -913,11 +940,12 @@ const Dashboard = ({ session, onLogout, showToast }) => {
               <PrediksiView
                 transactions={transactions}
                 budgets={budgets}
+                personalBudgets={personalBudgets}
                 accounts={accounts}
               />
             )}
-            {activeMenu === "belanja" && <BelanjaView showToast={showToast} />}
-            {activeMenu === "pantry" && <PantryView showToast={showToast} />}
+            {activeMenu === "belanja" && <BelanjaView showToast={showToast} setActiveMenu={setActiveMenu} />}
+            {activeMenu === "pantry" && <PantryView showToast={showToast} setActiveMenu={setActiveMenu} />}
           </Suspense>
         </div>
       </main>

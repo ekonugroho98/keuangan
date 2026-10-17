@@ -55,7 +55,7 @@ const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
                 }}>
                     {/* Ambient aurora orbs */}
                     <div style={{ position: "absolute", top: -110, right: -70, width: 250, height: 250, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,.14), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
-                    <div style={{ position: "absolute", bottom: -120, left: -70, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,252,198,.14), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
+                    <div style={{ position: "absolute", bottom: -120, left: -70, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.14), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
 
                     {/* Close */}
                     <button
@@ -84,7 +84,7 @@ const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: 26,
                                 boxShadow: sent
-                                    ? "0 8px 24px rgba(96,252,198,.3), inset 0 1px 0 rgba(255,255,255,.35)"
+                                    ? "0 8px 24px rgba(131,155,122,.3), inset 0 1px 0 rgba(255,255,255,.35)"
                                     : "0 8px 24px rgba(251,191,36,.3), inset 0 1px 0 rgba(255,255,255,.35)",
                             }}>{sent ? "✉️" : "🔑"}</div>
                             <h2 style={{

@@ -104,7 +104,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
     const activeAccount = accounts.find(a => a.id === activeTab) || accounts[0];
     const recentTx = activeAccount
         ? transactions
-            .filter(tx => tx.account_name === activeAccount.name)
+            .filter(tx => tx.account_name === activeAccount.name || (tx.type === "transfer" && tx.to_account_name === activeAccount.name))
             .slice(0, 5)
         : [];
 
@@ -306,7 +306,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                         onClick={() => setShowAddAccount(true)}
                         style={{
                             minHeight: 210, borderRadius: 18,
-                            border: "2px dashed rgba(96,252,198,.2)",
+                            border: "2px dashed rgba(131,155,122,.2)",
                             background: "transparent",
                             display: "flex", flexDirection: "column",
                             alignItems: "center", justifyContent: "center",
@@ -314,15 +314,15 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                             transition: "border-color .2s, background .2s",
                         }}
                         onMouseOver={e => {
-                            e.currentTarget.style.borderColor = "rgba(96,252,198,.45)";
-                            e.currentTarget.style.background = "rgba(96,252,198,.03)";
+                            e.currentTarget.style.borderColor = "rgba(131,155,122,.45)";
+                            e.currentTarget.style.background = "rgba(131,155,122,.03)";
                         }}
                         onMouseOut={e => {
-                            e.currentTarget.style.borderColor = "rgba(96,252,198,.2)";
+                            e.currentTarget.style.borderColor = "rgba(131,155,122,.2)";
                             e.currentTarget.style.background = "transparent";
                         }}
                     >
-                        <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(96,252,198,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "var(--color-primary)" }}>+</div>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(131,155,122,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "var(--color-primary)" }}>+</div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary)" }}>{t("acc.addNew")?.replace("+ ", "") || "Tambah Rekening"}</div>
                         <div style={{ fontSize: 11, color: "var(--color-muted)" }}>{t("acc.addNewSub") || "Bank, e-wallet, atau tunai"}</div>
                     </div>
@@ -374,11 +374,12 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                     ) : (
                         <>
                             {recentTx.map((tx, idx) => {
-                                const isIncome   = tx.type === "income";
-                                const isTransfer = tx.type === "transfer";
-                                const amtColor   = isIncome ? "var(--color-primary)" : isTransfer ? "#4FC3F7" : "#ff716c";
-                                const sign       = isIncome ? "+" : isTransfer ? "↔ " : "-";
-                                const iconBg     = isIncome ? "rgba(96,252,198,.1)" : isTransfer ? "rgba(79,195,247,.1)" : "rgba(255,113,108,.08)";
+                                const isIncome     = tx.type === "income";
+                                const isTransfer   = tx.type === "transfer";
+                                const isTransferIn = isTransfer && tx.to_account_name === activeAccount.name;
+                                const amtColor     = isIncome ? "var(--color-primary)" : isTransfer ? "#4FC3F7" : "#ff716c";
+                                const sign         = isIncome ? "+" : isTransfer ? (isTransferIn ? "+" : "-") : "-";
+                                const iconBg       = isIncome ? "rgba(131,155,122,.1)" : isTransfer ? "rgba(79,195,247,.1)" : "rgba(255,113,108,.08)";
                                 return (
                                     <div key={tx.id} style={{
                                         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -392,7 +393,9 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                                             </div>
                                             <div style={{ minWidth: 0 }}>
                                                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.note}</div>
-                                                <div style={{ fontSize: 10, color: "var(--color-subtle)" }}>{fmtDate(tx.date)} · {tCat(tx.category)}</div>
+                                                <div style={{ fontSize: 10, color: "var(--color-subtle)" }}>
+                                                    {fmtDate(tx.date)} · {isTransfer && tx.to_account_name ? `${tx.account_name} → ${tx.to_account_name}` : tCat(tx.category)}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="num-tight mono" style={{ fontSize: 13, fontWeight: 800, color: amtColor, flexShrink: 0, whiteSpace: "nowrap", letterSpacing: "-.02em" }}>
@@ -403,7 +406,7 @@ const AkunView = ({ accounts, transactions, setShowAddAccount, setActiveMenu, on
                             })}
                             <button
                                 onClick={() => onViewAccount ? onViewAccount(activeAccount.name) : setActiveMenu?.("transaksi")}
-                                style={{ width: "100%", marginTop: 12, padding: "9px 0", borderRadius: 10, border: "1px dashed rgba(96,252,198,.2)", background: "transparent", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                style={{ width: "100%", marginTop: 12, padding: "9px 0", borderRadius: 10, border: "1px dashed rgba(131,155,122,.2)", background: "transparent", color: "var(--color-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                             >
                                 {t("dash.viewAll") || "Lihat Semua"} →
                             </button>

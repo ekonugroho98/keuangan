@@ -10,8 +10,8 @@ import ApiKeysPanel from "../household/ApiKeysPanel";
 import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
 
 const AVATAR_COLORS = [
-    "#60fcc6","#4FC3F7","#f59e0b","#ff716c",
-    "#a855f7","#ec4899","#14b8a6","#f97316",
+    "#3F5142","#839B7A","#7D513B","#B06443",
+    "#D49D3F","#4A6F7C","#6B8E63","#965032",
 ];
 
 const Sidebar = ({
@@ -56,19 +56,32 @@ const Sidebar = ({
     const [hiddenMenus,     setHiddenMenus]     = useState(
         () => JSON.parse(localStorage.getItem("karaya_hidden_menus") || "[]")
     );
+    const [collapsedGroups, setCollapsedGroups] = useState(
+        () => JSON.parse(localStorage.getItem("karaya_collapsed_groups") || "[]")
+    );
     const [newName,     setNewName]     = useState(user.name);
     const [newPass,     setNewPass]     = useState("");
     const [confirmPass, setConfirmPass] = useState("");
     const [passError,   setPassError]   = useState("");
     const [isSaving,    setIsSaving]    = useState(false);
+    const normalizeAvatarColor = (c) => {
+        if (!c) return "#46634E";
+        const low = String(c).trim().toLowerCase();
+        if (["#60fcc6", "#19ce9b", "#10b981", "#00d4aa", "#34d399", "#00e5a3"].includes(low)) {
+            return "#46634E";
+        }
+        return c;
+    };
     const [avatarColor, setAvatarColor] = useState(
-        () => localStorage.getItem("karaya_avatar_color") || "var(--color-primary)"
+        () => normalizeAvatarColor(localStorage.getItem("karaya_avatar_color"))
     );
+    const normalizeBrandName = (v) => (!v || v === "Karaya" || v === "Eko Nugroho") ? APP_NAME : v;
+    const normalizeTagline = (v) => (!v || v === "Wealth Ledger" || v === "Catatan Keuangan Pribadi") ? APP_TAGLINE : v;
     const [appName,    setAppName]    = useState(
-        () => localStorage.getItem("karaya_app_name")    || APP_NAME
+        () => normalizeBrandName(localStorage.getItem("karaya_app_name"))
     );
     const [appTagline, setAppTagline] = useState(
-        () => localStorage.getItem("karaya_app_tagline") || APP_TAGLINE
+        () => normalizeTagline(localStorage.getItem("karaya_app_tagline"))
     );
     const [editAppName,    setEditAppName]    = useState("");
     const [editAppTagline, setEditAppTagline] = useState("");
@@ -87,10 +100,14 @@ const Sidebar = ({
     /* sync state from DB when userSettings loads (overrides localStorage cache) */
     useEffect(() => {
         if (!userSettings) return;
-        if (userSettings.avatar_color) setAvatarColor(userSettings.avatar_color);
+        if (userSettings.avatar_color) {
+            const normColor = normalizeAvatarColor(userSettings.avatar_color);
+            setAvatarColor(normColor);
+            localStorage.setItem("karaya_avatar_color", normColor);
+        }
         if (userSettings.hidden_menus) setHiddenMenus(userSettings.hidden_menus);
-        if (userSettings.app_name)    { setAppName(userSettings.app_name);    localStorage.setItem("karaya_app_name", userSettings.app_name); }
-        if (userSettings.app_tagline) { setAppTagline(userSettings.app_tagline); localStorage.setItem("karaya_app_tagline", userSettings.app_tagline); }
+        if (userSettings.app_name)    { const n = normalizeBrandName(userSettings.app_name); setAppName(n);    localStorage.setItem("karaya_app_name", n); }
+        if (userSettings.app_tagline) { const tl = normalizeTagline(userSettings.app_tagline); setAppTagline(tl); localStorage.setItem("karaya_app_tagline", tl); }
         if (userSettings.ai_config?.provider) { setAiProvider(userSettings.ai_config.provider); setAiModel(userSettings.ai_config.model || DEFAULT_MODEL[userSettings.ai_config.provider]); }
         if (userSettings.ai_config?.apiKey)   setAiKey(userSettings.ai_config.apiKey);
         if (userSettings.ai_config?.disabled !== undefined) setAiDisabled(userSettings.ai_config.disabled);
@@ -98,8 +115,8 @@ const Sidebar = ({
 
     /* sync browser tab title with custom app name on mount */
     useEffect(() => {
-        if (appName !== APP_NAME) document.title = `${appName} — Duit Lu, Kendali Lu`;
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        document.title = `${appName} — ${appTagline}`;
+    }, [appName, appTagline]);
 
     /* open AI settings panel when triggered externally (from AiView "⚙️ Ganti" button) */
     useEffect(() => {
@@ -142,7 +159,7 @@ const Sidebar = ({
         setAppTagline(tagline);
         localStorage.setItem("karaya_app_name",    name);
         localStorage.setItem("karaya_app_tagline", tagline);
-        document.title = `${name} — Duit Lu, Kendali Lu`;
+        document.title = `${name} — ${tagline}`;
         onSaveSettings?.({ app_name: name, app_tagline: tagline });
         setProfileView("menu");
     };
@@ -158,37 +175,40 @@ const Sidebar = ({
         });
     };
 
-    /* ── nav config ── */
+    const toggleCollapseGroup = (groupName) => {
+        setCollapsedGroups(prev => {
+            const next = prev.includes(groupName)
+                ? prev.filter(x => x !== groupName)
+                : [...prev, groupName];
+            localStorage.setItem("karaya_collapsed_groups", JSON.stringify(next));
+            return next;
+        });
+    };
+
+    /* ── nav config — Ringkasan (Dasbor + Laporan & Evaluasi), Keluarga & Rumah, Transaksi, Perencanaan ── */
     const allSidebarItems = [
-        { group: t("nav.summary"), items: [
+        { key: "summary", group: t("nav.summary"), collapsible: false, items: [
             { id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" },
+            { id: "laporan",   label: t("nav.reports"),      icon: "📑" },
         ]},
-        { group: t("nav.transactions"), items: [
+        { key: "home", group: t("nav.home"), collapsible: true, highlight: true, items: features?.shopping_stock?.enabled ? [
+            { id: "belanja",   label: t("nav.shopping"),     icon: "🛒" },
+            { id: "pantry",    label: t("nav.pantry"),       icon: "🧊" },
+        ] : []},
+        { key: "transactions", group: t("nav.transactions"), collapsible: true, items: [
             { id: "transaksi", label: t("nav.transaction"),  icon: "💳" },
             { id: "akun",      label: t("nav.accounts"),     icon: "🏦" },
             { id: "kategori",  label: t("nav.categories"),   icon: "🏷️" },
             { id: "berulang",  label: t("nav.recurring"),    icon: "🔄" },
             { id: "splitbill", label: t("nav.splitbill"),    icon: "🧾" },
         ]},
-        { group: t("nav.planning"), items: [
+        { key: "planning", group: t("nav.planning"), collapsible: true, items: [
+            { id: "anggaran",  label: t("nav.budgets"),      icon: "💰" },
             { id: "goals",     label: t("nav.goals"),        icon: "🎯" },
             { id: "hutang",    label: t("nav.debts"),        icon: "📋" },
             { id: "piutang",   label: t("nav.piutang"),      icon: "🤝" },
             { id: "investasi", label: t("nav.investments"),  icon: "📈" },
-            { id: "anggaran",  label: t("nav.budgets"),      icon: "💰" },
         ]},
-        { group: t("nav.insight"), items: [
-            { id: "laporan",   label: t("nav.reports"),      icon: "📉" },
-            { id: "ai",        label: t("nav.ai"),           icon: "🤖" },
-            { id: "prediksi",  label: t("nav.prediksi"),     icon: "🔮" },
-        ]},
-        // Grup "Rumah" (F-D, 10-fitur-opsional-keluarga.md §2.3.1): paling bawah, HANYA ada kalau
-        // flag household menyalakannya — flag mati berarti array items kosong, difilter habis oleh
-        // `.filter(g => g.items.length > 0)` di bawah, jadi sidebar identik seperti sebelum fitur ini ada.
-        { group: t("nav.home"), items: features?.shopping_stock?.enabled ? [
-            { id: "belanja",   label: t("nav.shopping"),     icon: "🛒" },
-            { id: "pantry",    label: t("nav.pantry"),       icon: "🥫" },
-        ] : []},
     ];
 
     const sidebarItems = allSidebarItems.map(g => ({
@@ -380,18 +400,18 @@ const Sidebar = ({
                     value={editAppTagline}
                     onChange={e => setEditAppTagline(e.target.value)}
                     style={{ ...inputSt, marginBottom: 16 }}
-                    placeholder={`Tagline (default: Wealth Ledger)`}
-                    maxLength={32}
+                    placeholder={`Tagline (default: ${APP_TAGLINE})`}
+                    maxLength={48}
                     onKeyDown={e => e.key === "Enter" && handleSaveAppName()}
                 />
                 {/* Preview */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--bg-surface-low)", borderRadius: 10, marginBottom: 14 }}>
-                    <img src="/favicon.svg" alt="icon" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
+                    <img src="/logo-icon.png" alt="icon" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, objectFit: "cover" }} />
                     <div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", lineHeight: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", lineHeight: 1, fontFamily: "var(--font-display)" }}>
                             {editAppName.trim() || appName}
                         </div>
-                        <div style={{ fontSize: 9, color: "var(--color-primary)", letterSpacing: 2, textTransform: "uppercase", marginTop: 3 }}>
+                        <div style={{ fontSize: 11, color: "var(--color-primary)", fontFamily: "var(--font-hand)", marginTop: 3 }}>
                             {editAppTagline.trim() || appTagline}
                         </div>
                     </div>
@@ -404,7 +424,7 @@ const Sidebar = ({
                         setAppName(APP_NAME); setAppTagline(APP_TAGLINE);
                         localStorage.removeItem("karaya_app_name");
                         localStorage.removeItem("karaya_app_tagline");
-                        document.title = "Karaya — Duit Lu, Kendali Lu";
+                        document.title = `${APP_NAME} — ${APP_TAGLINE}`;
                         onSaveSettings?.({ app_name: APP_NAME, app_tagline: APP_TAGLINE });
                         setProfileView("menu");
                     }} style={{ marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
@@ -440,11 +460,11 @@ const Sidebar = ({
                             const active = aiProvider === id;
                             return (
                                 <button key={id} onClick={() => { setAiProvider(id); setAiModel(DEFAULT_MODEL[id]); setAiTestMsg(""); }}
-                                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: active ? "rgba(96,252,198,.1)" : "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: `1px solid ${active ? "var(--color-primary)" : "var(--color-border-soft)"}`, background: active ? "var(--color-primary-soft)" : "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                                     <span style={{ fontSize: 18 }}>{p.icon}</span>
                                     <div style={{ flex: 1 }}>
                                         <span style={{ fontSize: 13, fontWeight: 600, color: active ? "var(--color-primary)" : "var(--color-text)" }}>{p.label}</span>
-                                        {p.badge && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, background: "rgba(96,252,198,.15)", color: "var(--color-primary)", border: "1px solid rgba(96,252,198,.3)", borderRadius: 4, padding: "1px 5px" }}>{p.badge}</span>}
+                                        {p.badge && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, background: "var(--color-primary-soft)", color: "var(--color-primary)", border: "1px solid var(--color-border-strong)", borderRadius: 4, padding: "1px 5px" }}>{p.badge}</span>}
                                     </div>
                                     {active && <span style={{ color: "var(--color-primary)", fontSize: 14 }}>✓</span>}
                                 </button>
@@ -496,7 +516,7 @@ const Sidebar = ({
                     )}
 
                     <button onClick={handleSaveAi} disabled={aiSaving || (!aiKey.trim() && !aiDisabled)}
-                        style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: (!aiKey.trim() || aiSaving) ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: (!aiKey.trim() || aiSaving) ? "var(--color-muted)" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: (!aiKey.trim() || aiSaving) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: (!aiKey.trim() || aiSaving) ? 0.5 : 1 }}>
+                        style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: (!aiKey.trim() || aiSaving) ? "var(--color-border-soft)" : "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))", color: (!aiKey.trim() || aiSaving) ? "var(--color-muted)" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: (!aiKey.trim() || aiSaving) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: (!aiKey.trim() || aiSaving) ? 0.5 : 1 }}>
                         {aiSaving ? "Menyimpan..." : "Simpan"}
                     </button>
                     {aiKey.trim() && (
@@ -519,9 +539,9 @@ const Sidebar = ({
                 id: "household",
                 label: "Household",
                 sub: "Anggota & undangan",
-                grad: "linear-gradient(135deg, #4FC3F7, #0288D1)",
-                tint: "rgba(79,195,247,.12)",
-                iconColor: "#002b3d",
+                grad: "linear-gradient(135deg, #46634E, #364E3D)",
+                tint: "rgba(70,99,78,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12 12 3l9 9" /><path d="M5 10v10h14V10" /></svg>),
                 action: () => setProfileView("household"),
             },
@@ -529,9 +549,9 @@ const Sidebar = ({
                 id: "apikeys",
                 label: "API Key",
                 sub: "Agent & Hermes",
-                grad: "linear-gradient(135deg, #fbbf24, #d97706)",
-                tint: "rgba(251,191,36,.12)",
-                iconColor: "#3b2300",
+                grad: "linear-gradient(135deg, #D49D3F, #B58129)",
+                tint: "rgba(212,157,63,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5 19 4M17 6l2 2M14 9l2 2"/></svg>),
                 action: () => setProfileView("apikeys"),
             },
@@ -539,9 +559,9 @@ const Sidebar = ({
                 id: "name",
                 label: "Ganti Nama",
                 sub: user.name,
-                grad: "linear-gradient(135deg, #60fcc6, #19ce9b)",
-                tint: "rgba(96,252,198,.12)",
-                iconColor: "#003828",
+                grad: "linear-gradient(135deg, #839B7A, #5F7A56)",
+                tint: "rgba(131,155,122,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>),
                 action: () => { setNewName(user.name); setProfileView("name"); },
             },
@@ -549,9 +569,9 @@ const Sidebar = ({
                 id: "password",
                 label: "Password",
                 sub: "••••••••",
-                grad: "linear-gradient(135deg, #f59e0b, #d97706)",
-                tint: "rgba(245,158,11,.12)",
-                iconColor: "#3b1d00",
+                grad: "linear-gradient(135deg, #7D513B, #5E3B29)",
+                tint: "rgba(125,81,59,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>),
                 action: () => setProfileView("password"),
             },
@@ -559,30 +579,19 @@ const Sidebar = ({
                 id: "color",
                 label: "Warna Avatar",
                 sub: "Personalisasi",
-                grad: "linear-gradient(135deg, #a78bfa, #7c3aed)",
-                tint: "rgba(167,139,250,.12)",
-                iconColor: "#2e1a6b",
+                grad: "linear-gradient(135deg, #B06443, #965032)",
+                tint: "rgba(176,100,67,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="13" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="10" cy="19" r="2.5"/><path d="M12 2a10 10 0 1 0 0 20"/></svg>),
                 action: () => setProfileView("color"),
-            },
-            {
-                id: "ai",
-                label: "AI Coach",
-                sub: aiStatus,
-                grad: "linear-gradient(135deg, #4FC3F7, #0288d1)",
-                tint: "rgba(79,195,247,.12)",
-                iconColor: "#003952",
-                badge: aiActive ? "●" : null,
-                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M12 2v4M9 13h.01M15 13h.01M9 17h6"/></svg>),
-                action: () => { setAiProvider(aiConfig?.provider || "groq"); setAiModel(aiConfig?.model || DEFAULT_MODEL[aiConfig?.provider || "groq"]); setAiKey(aiConfig?.apiKey || ""); setProfileView("ai"); },
             },
             {
                 id: "appname",
                 label: "Nama App",
                 sub: appName,
-                grad: "linear-gradient(135deg, #ec4899, #be185d)",
-                tint: "rgba(236,72,153,.12)",
-                iconColor: "#4a0c28",
+                grad: "linear-gradient(135deg, #73638A, #594B6D)",
+                tint: "rgba(115,99,138,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 18h.01"/></svg>),
                 action: () => { setEditAppName(appName); setEditAppTagline(appTagline); setProfileView("appname"); },
             },
@@ -590,9 +599,9 @@ const Sidebar = ({
                 id: "export",
                 label: "Export CSV",
                 sub: "Unduh data",
-                grad: "linear-gradient(135deg, #14b8a6, #0d9488)",
-                tint: "rgba(20,184,166,.12)",
-                iconColor: "#003936",
+                grad: "linear-gradient(135deg, #46634E, #2D3B30)",
+                tint: "rgba(70,99,78,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>),
                 action: () => { onExportCSV(); closeProfile(); },
             },
@@ -600,9 +609,9 @@ const Sidebar = ({
                 id: "menus",
                 label: "Kelola Menu",
                 sub: `${hiddenMenus.length} tersembunyi`,
-                grad: "linear-gradient(135deg, #f97316, #ea580c)",
-                tint: "rgba(249,115,22,.12)",
-                iconColor: "#4a1a00",
+                grad: "linear-gradient(135deg, #C8963E, #A37628)",
+                tint: "rgba(200,150,62,.14)",
+                iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>),
                 action: () => setProfileView("menus"),
             },
@@ -648,7 +657,7 @@ const Sidebar = ({
                     <div style={{ minWidth: 0, flex: 1, position: "relative", zIndex: 1 }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", letterSpacing: "-.02em", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-muted)", letterSpacing: 1.4, textTransform: "uppercase", marginTop: 6 }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 99, background: "rgba(96,252,198,.15)", border: "1px solid rgba(96,252,198,.25)", color: "var(--color-primary)" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 99, background: "var(--color-primary-soft)", border: "1px solid var(--color-border-strong)", color: "var(--color-primary)" }}>
                                 <span style={{ width: 5, height: 5, borderRadius: 99, background: "currentColor", animation: "glow-pulse 2s infinite" }} />
                                 AKTIF
                             </span>
@@ -669,7 +678,7 @@ const Sidebar = ({
                                 background: tile.grad,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 color: tile.iconColor,
-                                boxShadow: `0 4px 12px color-mix(in srgb, ${tile.tint.replace('rgba(','rgb(').replace(',.12)',')')} 50%, transparent), inset 0 1px 0 rgba(255,255,255,.3)`,
+                                boxShadow: `0 4px 12px color-mix(in srgb, ${tile.tint.replace('rgba(','rgb(').replace(',.14)',')')} 50%, transparent), inset 0 1px 0 rgba(255,255,255,.3)`,
                                 flexShrink: 0, position: "relative",
                             }}>
                                 {tile.icon}
@@ -793,129 +802,173 @@ const Sidebar = ({
         )}
 
         <aside className="glass-sidebar" style={{
-            width: open ? 232 : 0,
+            width: open ? 256 : 0,
             height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 50,
             transition: "width 0.35s cubic-bezier(.2,.8,.2,1)", overflow: "hidden",
             display: "flex", flexDirection: "column",
-            backgroundImage: "radial-gradient(500px 300px at 0% 0%, rgba(96,252,198,.05), transparent 55%), radial-gradient(400px 300px at 100% 100%, rgba(167,139,250,.03), transparent 60%)",
+            backgroundImage: "radial-gradient(500px 300px at 0% 0%, rgba(131,155,122,.12), transparent 55%), radial-gradient(400px 300px at 100% 100%, rgba(176,100,67,.07), transparent 60%)",
         }}>
-            {/* ═══ Workspace brand row ═══ */}
+            {/* ═══ Workspace brand row — Keluarga Berkembang (utuh tanpa terpotong) ═══ */}
             <div style={{
-                padding: "16px 14px 12px",
-                display: "flex", alignItems: "center", gap: 10,
+                padding: "14px 14px 12px",
+                display: "flex", alignItems: "center", gap: 11,
                 borderBottom: "1px solid var(--glass-border)",
             }}>
                 <div style={{
-                    width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                    background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
+                    width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+                    background: "#FFFDF8",
+                    border: "1px solid rgba(125,81,59,.20)",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: "0 4px 14px rgba(96,252,198,.28), inset 0 1px 0 rgba(255,255,255,.28)",
+                    boxShadow: "0 4px 12px rgba(63,81,66,.12)",
+                    overflow: "hidden",
                 }}>
-                    <img src="/favicon.svg" alt={appName} style={{ width: 20, height: 20, filter: "brightness(0) invert(1) opacity(.95)" }} />
+                    <img src="/logo-icon.png" alt={appName} style={{ width: 38, height: 38, objectFit: "contain" }} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                    <h1 style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text)", margin: 0, lineHeight: 1.15, letterSpacing: "-.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{appName}</h1>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
-                        <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--color-primary)", boxShadow: "0 0 6px var(--color-primary)" }} />
-                        <p style={{ fontSize: 10, color: "var(--color-muted)", margin: 0, fontWeight: 600, letterSpacing: ".3px" }}>Workspace aktif</p>
-                    </div>
+                    {appName.toLowerCase() === "keluarga berkembang" ? (
+                        <h1 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 13.5, fontWeight: 600, margin: 0, lineHeight: 1.15, letterSpacing: ".01em" }}>
+                            <span style={{ color: "var(--color-soil, #7D513B)" }}>KELUARGA </span>
+                            <span style={{ color: "var(--color-primary, #46634E)" }}>BERKEMBANG</span>
+                        </h1>
+                    ) : (
+                        <h1 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--color-text)", margin: 0, lineHeight: 1.15 }}>{appName}</h1>
+                    )}
+                    <p className="font-quote" style={{ fontSize: 12.5, color: "var(--color-muted)", margin: "2px 0 0", fontWeight: 500, lineHeight: 1.15 }}>
+                        {appTagline}
+                    </p>
                 </div>
             </div>
 
-            {/* ═══ Add Transaction — compact pill ═══ */}
+            {/* ═══ Add Transaction — Warm Terracotta (#B06443) CTA pill ═══ */}
             <div style={{ padding: "12px 12px 6px" }}>
                 <button onClick={onAddTx}
                     style={{
                         width: "100%", padding: "10px 14px",
-                        background: "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))",
-                        color: "var(--color-on-primary)",
-                        fontWeight: 700, fontSize: 13, borderRadius: 10, border: "none",
+                        background: "linear-gradient(135deg, #B06443, #965032)",
+                        color: "#FAF5EA",
+                        fontWeight: 600, fontSize: 13, borderRadius: 12, border: "none",
                         display: "flex", alignItems: "center", gap: 10,
-                        cursor: "pointer", fontFamily: "inherit",
-                        letterSpacing: "-.01em",
-                        boxShadow: "0 4px 14px rgba(96,252,198,.22), inset 0 1px 0 rgba(255,255,255,.28)",
+                        cursor: "pointer", fontFamily: "'Fredoka', inherit",
+                        letterSpacing: ".01em",
+                        boxShadow: "0 4px 14px rgba(176,100,67,.26), inset 0 1px 0 rgba(255,255,255,.25)",
                         transition: "transform .2s, box-shadow .25s",
                     }}
-                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(96,252,198,.36), inset 0 1px 0 rgba(255,255,255,.38)"; }}
-                    onMouseOut={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 14px rgba(96,252,198,.22), inset 0 1px 0 rgba(255,255,255,.28)"; }}>
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(176,100,67,.36), inset 0 1px 0 rgba(255,255,255,.35)"; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 14px rgba(176,100,67,.26), inset 0 1px 0 rgba(255,255,255,.25)"; }}>
                     <span style={{
-                        width: 18, height: 18, borderRadius: 6,
-                        background: "rgba(0,56,40,.2)",
+                        width: 20, height: 20, borderRadius: 7,
+                        background: "rgba(255,255,255,.2)",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, fontWeight: 900, lineHeight: 1, flexShrink: 0,
+                        fontSize: 14, fontWeight: 700, lineHeight: 1, flexShrink: 0,
                     }}>+</span>
                     <span style={{ flex: 1, textAlign: "left" }}>{t("nav.transaction")}</span>
                     <kbd style={{
                         fontSize: 9, fontFamily: "inherit", fontWeight: 700,
-                        padding: "2px 6px", borderRadius: 4,
-                        background: "rgba(0,56,40,.22)", color: "rgba(0,56,40,.7)",
+                        padding: "2px 6px", borderRadius: 5,
+                        background: "rgba(0,0,0,.18)", color: "rgba(255,255,255,.88)",
                         letterSpacing: .5,
                     }}>⌘N</kbd>
                 </button>
             </div>
 
-            {/* ═══ Nav — minimal, accent-bar style ═══ */}
+            {/* ═══ Nav — collapsible groups + soft icon badges ═══ */}
             <nav style={{
                 flex: 1, overflowY: "auto",
-                padding: "6px 8px 12px",
-                maskImage: "linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%)",
-                WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%)",
+                padding: "4px 10px 12px",
             }}>
-                {sidebarItems.map((g, gi) => (
-                    <div key={g.group} style={{ marginBottom: 4 }}>
-                        {/* Group header with subtle divider */}
-                        <div style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            padding: gi === 0 ? "6px 12px 6px" : "14px 12px 6px",
+                {sidebarItems.map((g, gi) => {
+                    const hasActiveChild = g.items.some(item => item.id === activeMenu);
+                    const isCollapsed = g.collapsible && collapsedGroups.includes(g.key) && !hasActiveChild;
+                    return (
+                        <div key={g.key || g.group} style={{
+                            marginBottom: 6,
+                            ...(g.highlight ? {
+                                background: "var(--bg-surface-low)",
+                                border: "1px solid var(--color-border-soft)",
+                                borderRadius: 12,
+                                padding: "4px 6px 6px",
+                                marginTop: 4,
+                            } : {}),
                         }}>
-                            <span style={{
-                                fontSize: 9, fontWeight: 700,
-                                color: "var(--color-subtle)",
-                                letterSpacing: 1.4, textTransform: "uppercase",
-                            }}>{g.group}</span>
-                            <span style={{ flex: 1, height: 1, background: "linear-gradient(to right, var(--glass-border), transparent)" }} />
+                            {/* Group header (clickable when collapsible) */}
+                            <button
+                                type="button"
+                                onClick={() => g.collapsible && toggleCollapseGroup(g.key)}
+                                style={{
+                                    display: "flex", alignItems: "center", gap: 8,
+                                    width: "100%",
+                                    padding: g.highlight ? "6px 8px 4px" : (gi === 0 ? "6px 10px 4px" : "10px 10px 4px"),
+                                    background: "transparent", border: "none",
+                                    cursor: g.collapsible ? "pointer" : "default",
+                                    fontFamily: "inherit", textAlign: "left",
+                                }}
+                            >
+                                <span style={{
+                                    fontSize: 9.5, fontWeight: 800,
+                                    color: g.highlight ? "var(--color-primary)" : "var(--color-subtle)",
+                                    letterSpacing: 1.3, textTransform: "uppercase",
+                                }}>{g.group}</span>
+                                <span style={{ flex: 1, height: 1, background: "linear-gradient(to right, var(--glass-border), transparent)" }} />
+                                {g.collapsible && (
+                                    <span style={{
+                                        fontSize: 10, color: "var(--color-subtle)",
+                                        transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+                                        transition: "transform .2s ease",
+                                        lineHeight: 1,
+                                    }}>▾</span>
+                                )}
+                            </button>
+
+                            {!isCollapsed && g.items.map(item => {
+                                const isActive = activeMenu === item.id;
+                                return (
+                                    <button key={item.id} onClick={() => setActiveMenu(item.id)}
+                                        style={{
+                                            display: "flex", alignItems: "center", gap: 10,
+                                            width: "100%", padding: "7px 10px 7px 12px",
+                                            borderRadius: 10, border: "none",
+                                            background: isActive ? "var(--color-primary-soft)" : "transparent",
+                                            color: isActive ? "var(--color-primary)" : "var(--color-text)",
+                                            opacity: isActive ? 1 : 0.86,
+                                            fontSize: 13, fontWeight: isActive ? 700 : 500,
+                                            cursor: "pointer", fontFamily: "inherit",
+                                            transition: "all .15s",
+                                            textAlign: "left", position: "relative",
+                                            letterSpacing: "-.01em",
+                                            minHeight: 36,
+                                            marginTop: 1,
+                                        }}
+                                        onMouseOver={e => { if (!isActive) { e.currentTarget.style.background = "var(--color-border-soft)"; e.currentTarget.style.opacity = "1"; } }}
+                                        onMouseOut={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.opacity = "0.86"; } }}>
+                                        {/* Left accent bar */}
+                                        <span style={{
+                                            position: "absolute", left: 3, top: "50%",
+                                            transform: `translateY(-50%) scaleY(${isActive ? 1 : 0})`,
+                                            width: 3, height: 18, borderRadius: 99,
+                                            background: "var(--color-primary)",
+                                            transition: "transform .25s cubic-bezier(.2,.8,.2,1)",
+                                            transformOrigin: "center",
+                                        }} />
+                                        {/* Soft icon badge — keeps dark emojis like 🛒 clearly visible in dark & light themes */}
+                                        <span style={{
+                                            width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                                            background: isActive
+                                                ? "var(--color-primary-soft)"
+                                                : (isDark ? "rgba(229, 236, 231, 0.08)" : "rgba(70, 99, 78, 0.07)"),
+                                            border: isActive
+                                                ? "1px solid var(--color-border-strong)"
+                                                : "1px solid var(--color-border-soft)",
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: 14,
+                                            transition: "all .2s",
+                                        }}>{item.icon}</span>
+                                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
-                        {g.items.map(item => {
-                            const isActive = activeMenu === item.id;
-                            return (
-                                <button key={item.id} onClick={() => setActiveMenu(item.id)}
-                                    style={{
-                                        display: "flex", alignItems: "center", gap: 10,
-                                        width: "100%", padding: "8px 10px 8px 14px",
-                                        borderRadius: 8, border: "none",
-                                        background: isActive ? "var(--color-primary-soft)" : "transparent",
-                                        color: isActive ? "var(--color-primary)" : "var(--color-muted)",
-                                        fontSize: 13, fontWeight: isActive ? 700 : 500,
-                                        cursor: "pointer", fontFamily: "inherit",
-                                        transition: "color .15s, background .15s",
-                                        textAlign: "left", position: "relative",
-                                        letterSpacing: "-.01em",
-                                        minHeight: 34,
-                                    }}
-                                    onMouseOver={e => { if (!isActive) { e.currentTarget.style.background = "var(--color-border-soft)"; e.currentTarget.style.color = "var(--color-text)"; } }}
-                                    onMouseOut={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--color-muted)"; } }}>
-                                    {/* Left accent bar */}
-                                    <span style={{
-                                        position: "absolute", left: 4, top: "50%",
-                                        transform: `translateY(-50%) scaleY(${isActive ? 1 : 0})`,
-                                        width: 3, height: 18, borderRadius: 99,
-                                        background: "var(--color-primary)",
-                                        boxShadow: "0 0 8px var(--color-primary)",
-                                        transition: "transform .25s cubic-bezier(.2,.8,.2,1)",
-                                        transformOrigin: "center",
-                                    }} />
-                                    {/* Icon — inline, no tile */}
-                                    <span style={{
-                                        fontSize: 15, flexShrink: 0, width: 20, textAlign: "center",
-                                        filter: isActive ? "none" : "saturate(.6) opacity(.85)",
-                                        transition: "filter .2s",
-                                    }}>{item.icon}</span>
-                                    <span style={{ flex: 1 }}>{item.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                ))}
+                    );
+                })}
             </nav>
 
             {/* ═══ Install prompt — compact, subtle ═══ */}
@@ -924,7 +977,7 @@ const Sidebar = ({
                     <button onClick={handleInstallFromSidebar} style={{
                         display: "flex", alignItems: "center", gap: 10, width: "100%",
                         padding: "9px 12px", borderRadius: 10,
-                        border: "1px dashed rgba(96,252,198,.28)",
+                        border: "1px dashed var(--color-border-strong)",
                         background: "transparent",
                         color: "var(--color-primary)",
                         fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
@@ -934,12 +987,12 @@ const Sidebar = ({
                     onMouseOut={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderStyle = "dashed"; }}>
                         <span style={{
                             width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-                            background: "rgba(96,252,198,.12)",
+                            background: "var(--color-primary-soft)",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 11,
                         }}>⬇</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "-.01em" }}>Install {APP_NAME}</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "-.01em" }}>Pasang {APP_NAME}</div>
                             <div style={{ fontSize: 9, color: "var(--color-subtle)", marginTop: 1, fontWeight: 500 }}>PWA · akses cepat</div>
                         </div>
                     </button>

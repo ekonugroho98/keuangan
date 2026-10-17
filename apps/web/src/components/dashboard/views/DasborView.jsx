@@ -54,7 +54,7 @@ const sectionTitle = {
 };
 
 /* ═══ Smooth SVG area chart ═══ */
-function AreaChart({ transactions }) {
+function AreaChart({ transactions, isScopeIncome, isScopeExpense }) {
     const now = new Date();
     const m = now.getMonth(), y = now.getFullYear();
 
@@ -68,8 +68,8 @@ function AreaChart({ transactions }) {
         });
         return {
             label: date.toLocaleString("id-ID", { month: "short" }),
-            income: txM.filter(tx => tx.type === "income").reduce((s, tx) => s + tx.amount, 0),
-            expense: txM.filter(tx => tx.type === "expense").reduce((s, tx) => s + tx.amount, 0),
+            income: txM.filter(isScopeIncome).reduce((s, tx) => s + tx.amount, 0),
+            expense: txM.filter(isScopeExpense).reduce((s, tx) => s + tx.amount, 0),
         };
     });
 
@@ -201,18 +201,18 @@ function MiniSpark({ values, color = "var(--color-primary)", width = 200, height
     );
 }
 
-/* ═══ Fallback palette — cycles through distinct colors for custom categories ═══ */
+/* ═══ Fallback palette — Keluarga Berkembang Earth Tones ═══ */
 const FALLBACK_PALETTE = [
-    "#60fcc6", // mint
-    "#a78bfa", // purple
-    "#4FC3F7", // sky blue
-    "#f59e0b", // amber
-    "#ff716c", // red
-    "#ec4899", // pink
-    "#14b8a6", // teal
-    "#f97316", // orange
-    "#6366f1", // indigo
-    "#22c55e", // green
+    "#3F5142", // Sage Forest
+    "#B06443", // Warm Terracotta
+    "#D49D3F", // Sunlit Mustard
+    "#839B7A", // Mellow Sage
+    "#7D513B", // Rich Soil
+    "#4A6F7C", // Warm Slate
+    "#965032", // Deep Terracotta
+    "#6B8E63", // Leaf Green
+    "#C88A32", // Ochre
+    "#5C4D42", // Earth Umber
 ];
 const colorForCategory = (cat, index) =>
     categoryColors[cat] || FALLBACK_PALETTE[index % FALLBACK_PALETTE.length];
@@ -269,11 +269,26 @@ const DasborView = ({
     // jadi satu sumber kebenaran untuk semua kartu di bawah: transaksi ikut masuk scope kalau akun
     // sumber ATAU akun tujuannya (untuk transfer) dimiliki anggota/akun yang sedang dipilih — sama
     // persis dengan definisi atribusi "owner" di GET /v1/summary (apps/api/src/services/summary.ts).
+    const isScoped = scope.scope !== "household";
     const scopedAccountNames = new Set(displayAccounts.map(a => a.name));
-    const scopedTransactions = scope.scope === "household"
+    const scopedTransactions = !isScoped
         ? transactions
         : transactions.filter(tx => scopedAccountNames.has(tx.account_name) || scopedAccountNames.has(tx.to_account_name));
     const scopedBalance = displayAccounts.reduce((a, acc) => a + (acc.balance || 0), 0);
+
+    // Di scope member/account, transfer yang MASUK dari luar scope (mis. suami transfer alokasi ke
+    // rekening istri) adalah uang masuk nyata bagi scope itu; sedangkan transfer internal antar
+    // rekening milik anggota yang sama (mis. BRI Istri -> Kas Ibu) tetap netral.
+    const isScopeTransferIn = (tx) =>
+        isScoped && tx.type === "transfer" && scopedAccountNames.has(tx.to_account_name) && !scopedAccountNames.has(tx.account_name);
+    const isScopeTransferOut = (tx) =>
+        isScoped && tx.type === "transfer" && scopedAccountNames.has(tx.account_name) && !scopedAccountNames.has(tx.to_account_name);
+    const isScopeIncome = (tx) =>
+        (tx.type === "income" && tx.category !== "Piutang" && (!isScoped || scopedAccountNames.has(tx.account_name))) || isScopeTransferIn(tx);
+    const isScopePiutangOffset = (tx) =>
+        tx.type === "income" && tx.category === "Piutang" && (!isScoped || scopedAccountNames.has(tx.account_name));
+    const isScopeExpense = (tx) =>
+        tx.type === "expense" && (!isScoped || scopedAccountNames.has(tx.account_name));
 
     const now = new Date();
     const m = now.getMonth(), y = now.getFullYear();
@@ -282,11 +297,23 @@ const DasborView = ({
     const txThis = scopedTransactions.filter(t => { const d = new Date(t.date); return d.getMonth() === m && d.getFullYear() === y; });
     const txLast = scopedTransactions.filter(t => { const d = new Date(t.date); return d.getMonth() === lm && d.getFullYear() === ly; });
 
-    const thisIncome = txThis.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
-    const thisExpense = txThis.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
-    const lastIncome = txLast.filter(tx => tx.type === "income").reduce((a, tx) => a + tx.amount, 0);
-    const lastExpense = txLast.filter(tx => tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
-    const thisNet = thisIncome - thisExpense;
+    const thisIncome = txThis.filter(isScopeIncome).reduce((a, tx) => a + tx.amount, 0);
+    const thisTransferIn = txThis.filter(isScopeTransferIn).reduce((a, tx) => a + tx.amount, 0);
+    const thisTransferOut = txThis.filter(isScopeTransferOut).reduce((a, tx) => a + tx.amount, 0);
+    const thisPiutangOffset = txThis.filter(isScopePiutangOffset).reduce((a, tx) => a + tx.amount, 0);
+    const thisExpense = Math.max(0, txThis.filter(isScopeExpense).reduce((a, tx) => a + tx.amount, 0) - thisPiutangOffset);
+    const lastIncome = txLast.filter(isScopeIncome).reduce((a, tx) => a + tx.amount, 0);
+    const lastPiutangOffset = txLast.filter(isScopePiutangOffset).reduce((a, tx) => a + tx.amount, 0);
+    const lastExpense = Math.max(0, txLast.filter(isScopeExpense).reduce((a, tx) => a + tx.amount, 0) - lastPiutangOffset);
+    const lastTransferOut = txLast.filter(isScopeTransferOut).reduce((a, tx) => a + tx.amount, 0);
+    const thisNet = thisIncome - thisExpense - thisTransferOut;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const todayDate = now.getDate();
+    const remainingDays = Math.max(0, daysInMonth - todayDate);
+    const isMonthEnd = remainingDays <= 1;
+    const safeDailyAllowance = remainingDays > 0 && thisNet > 0
+        ? Math.floor(thisNet / remainingDays)
+        : 0;
 
     const pctChange = (cur, prev) => {
         if (prev === 0 || cur === 0) return null;
@@ -295,13 +322,28 @@ const DasborView = ({
     };
     const incomePct = pctChange(thisIncome, lastIncome);
     const expensePct = pctChange(thisExpense, lastExpense);
-    const thisSavingRate = thisIncome > 0 ? Math.round((1 - thisExpense / thisIncome) * 100) : 0;
+    const thisSavingRate = thisIncome > 0 ? Math.max(0, Math.round((thisNet / thisIncome) * 100)) : 0;
+    const thisExpenseRate = thisIncome > 0 ? Math.round((thisExpense / thisIncome) * 100) : 0;
+
+    const scopedSortedCats = (() => {
+        const map = {};
+        txThis.filter(isScopeExpense).forEach(tx => {
+            map[tx.category] = (map[tx.category] || 0) + tx.amount;
+        });
+        txThis.filter(isScopePiutangOffset).forEach(tx => {
+            map.Piutang = Math.max(0, (map.Piutang || 0) - tx.amount);
+        });
+        return Object.entries(map).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    })();
+    const scopedTotalExpense = thisExpense;
+    const scopedSavingRate = thisSavingRate;
+    const scopedExpenseRate = thisExpenseRate;
 
     const tabunganAccountNames = new Set(accounts.filter(a => a.type === "tabungan").map(a => a.name));
     // investments belum punya atribusi pemilik yang terekspos di sini, jadi dibiarkan 0 saat scope
     // bukan household — daripada mencampur "investasi household" dengan "tabungan milik anggota".
     const investmentSaving = scope.scope !== "household" ? 0 : investments.filter(inv => { const d = new Date(inv.created_at); return d.getMonth() === m && d.getFullYear() === y; }).reduce((s, inv) => s + (inv.buy_price || 0), 0);
-    const tabunganSaving = txThis.filter(tx => tx.type === "income" && tabunganAccountNames.has(tx.account_name)).reduce((s, tx) => s + tx.amount, 0);
+    const tabunganSaving = txThis.filter(tx => isScopeIncome(tx) && tabunganAccountNames.has(tx.account_name || tx.to_account_name)).reduce((s, tx) => s + tx.amount, 0);
     const actualSavingAmt = investmentSaving + tabunganSaving;
     const actualSavingRate = thisIncome > 0 ? Math.round((actualSavingAmt / thisIncome) * 100) : 0;
 
@@ -309,7 +351,7 @@ const DasborView = ({
     const achievedGoals = goals.filter(g => g.current >= g.target).length;
     const totalDebtRemaining = debts.reduce((a, d) => a + (d.remaining || 0), 0);
     const overBudgets = budgets.filter(b => {
-        const spent = txThis.filter(tx => tx.category === b.category && tx.type === "expense").reduce((a, tx) => a + tx.amount, 0);
+        const spent = txThis.filter(tx => tx.category === b.category && isScopeExpense(tx)).reduce((a, tx) => a + tx.amount, 0);
         return spent > b.amount;
     }).length;
 
@@ -321,9 +363,10 @@ const DasborView = ({
             const [txY, txM2] = ds.split("-").map(Number);
             return txM2 - 1 === mo && txY === yr;
         });
-        const inc = txM.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
-        const exp = txM.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-        return inc - exp;
+        const inc = txM.filter(isScopeIncome).reduce((s, t) => s + t.amount, 0);
+        const exp = txM.filter(isScopeExpense).reduce((s, t) => s + t.amount, 0);
+        const trOut = txM.filter(isScopeTransferOut).reduce((s, t) => s + t.amount, 0);
+        return inc - exp - trOut;
     });
 
     const acctAccent = (a) => {
@@ -423,7 +466,7 @@ const DasborView = ({
                     justifyContent: "space-between",
                 }}>
                     {/* Ambient orbs */}
-                    <div style={{ position: "absolute", top: -120, right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,252,198,.22), transparent 70%)", pointerEvents: "none", filter: "blur(10px)" }} />
+                    <div style={{ position: "absolute", top: -120, right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.22), transparent 70%)", pointerEvents: "none", filter: "blur(10px)" }} />
                     <div style={{ position: "absolute", bottom: -80, left: -60, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,.14), transparent 70%)", pointerEvents: "none", filter: "blur(10px)" }} />
 
                     {/* Top row */}
@@ -492,11 +535,15 @@ const DasborView = ({
                 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div>
-                            <div style={eyebrow}>Rasio Tabungan</div>
-                            <h3 style={{ ...sectionTitle, fontSize: 13, marginTop: 6 }}>Bulan ini</h3>
+                            <div style={eyebrow}>{isMonthEnd ? "Rasio Tabungan" : "Sisa Kas vs Pemasukan"}</div>
+                            <h3 style={{ ...sectionTitle, fontSize: 13, marginTop: 6 }}>
+                                {isMonthEnd ? "Akhir bulan ini" : `Sisa ${remainingDays} hari lagi`}
+                            </h3>
                         </div>
                         <span className={thisSavingRate > 20 ? "chip chip-mint" : "chip chip-amber"}>
-                            {thisSavingRate > 20 ? "Mantap" : "Tingkatkan"}
+                            {isMonthEnd
+                                ? (thisSavingRate > 20 ? "Mantap" : "Tingkatkan")
+                                : `${thisSavingRate}% tersisa`}
                         </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -508,7 +555,7 @@ const DasborView = ({
                                     strokeWidth="8"
                                     strokeDasharray={`${Math.min(thisSavingRate, 100) * 2.262} 226.2`}
                                     strokeLinecap="round"
-                                    style={{ transition: "stroke-dasharray 1s ease", filter: "drop-shadow(0 0 10px rgba(96,252,198,.5))" }}
+                                    style={{ transition: "stroke-dasharray 1s ease", filter: "drop-shadow(0 0 10px rgba(131,155,122,.5))" }}
                                 />
                             </svg>
                             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
@@ -518,8 +565,10 @@ const DasborView = ({
                         </div>
                         <div style={{ fontSize: 11, color: "var(--color-muted)", lineHeight: 1.6 }}>
                             {actualSavingAmt > 0 ? (
-                                <>Aktual <strong style={{ color: "var(--color-transfer)", fontSize: 15 }}>{actualSavingRate}%</strong><br /><span className="mono" style={{ fontSize: 10, opacity: .8 }}>{fmtRp(actualSavingAmt)}</span></>
-                            ) : "Belum ada tabungan bulan ini"}
+                                <>Tabungan aktual <strong style={{ color: "var(--color-transfer)", fontSize: 15 }}>{actualSavingRate}%</strong><br /><span className="mono" style={{ fontSize: 10, opacity: .8 }}>{fmtRp(actualSavingAmt)}</span></>
+                            ) : (
+                                <>Terpakai <strong style={{ color: "var(--color-text)" }}>{thisExpenseRate}%</strong> dari pemasukan<br /><span style={{ fontSize: 10, color: "var(--color-subtle)" }}>Belum disisihkan ke tabungan</span></>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -563,8 +612,8 @@ const DasborView = ({
                 <div className="b-income" style={{
                     ...cardBase,
                     padding: "22px 24px",
-                    background: "linear-gradient(145deg, rgba(96,252,198,.1), rgba(96,252,198,.02))",
-                    border: "1px solid rgba(96,252,198,.18)",
+                    background: "linear-gradient(145deg, rgba(131,155,122,.1), rgba(131,155,122,.02))",
+                    border: "1px solid rgba(131,155,122,.18)",
                     backdropFilter: "var(--glass-blur-sm)",
                     WebkitBackdropFilter: "var(--glass-blur-sm)",
                     boxShadow: "var(--glass-highlight)",
@@ -578,9 +627,12 @@ const DasborView = ({
                     </div>
                     <div>
                         <div className="num-tight" style={{ fontSize: "clamp(26px, 2.6vw, 36px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(thisIncome)}</div>
-                        <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 8, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                             <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--color-primary)" }} />
                             Lalu: <span className="mono" style={{ fontWeight: 600 }}>{fmtRp(lastIncome)}</span>
+                            {thisTransferIn > 0 && (
+                                <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>· Transfer masuk {fmtRp(thisTransferIn)}</span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -606,23 +658,26 @@ const DasborView = ({
                     </div>
                     <div>
                         <div className="num-tight" style={{ fontSize: "clamp(26px, 2.6vw, 36px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", lineHeight: 1 }}>{fmtRp(thisExpense)}</div>
-                        <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 11, color: "var(--color-subtle)", marginTop: 8, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                             <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--color-expense)" }} />
                             Lalu: <span className="mono" style={{ fontWeight: 600 }}>{fmtRp(lastExpense)}</span>
+                            {thisTransferOut > 0 && (
+                                <span style={{ color: "var(--color-transfer)", fontWeight: 600 }}>· Transfer keluar {fmtRp(thisTransferOut)}</span>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════
-                 * 6. NET — gradient mint→blue bold card
+                 * 6. NET / SISA KAS BULAN INI — smart mid-month runway vs end-of-month surplus
                  * ═══════════════════════════════════════════════════════ */}
                 <div className="b-net" style={{
                     ...cardBase,
                     padding: "22px 24px",
                     background: thisNet >= 0
-                        ? "linear-gradient(135deg, rgba(96,252,198,.22), rgba(79,195,247,.12))"
+                        ? "linear-gradient(135deg, rgba(131,155,122,.22), rgba(79,195,247,.12))"
                         : "linear-gradient(135deg, rgba(255,113,108,.22), rgba(245,158,11,.12))",
-                    border: `1px solid ${thisNet >= 0 ? "rgba(96,252,198,.28)" : "rgba(255,113,108,.28)"}`,
+                    border: `1px solid ${thisNet >= 0 ? "rgba(131,155,122,.28)" : "rgba(255,113,108,.28)"}`,
                     backdropFilter: "var(--glass-blur-sm)",
                     WebkitBackdropFilter: "var(--glass-blur-sm)",
                     boxShadow: "var(--glass-highlight), 0 6px 20px rgba(0,0,0,.08)",
@@ -632,17 +687,35 @@ const DasborView = ({
                     overflow: "hidden",
                 }}>
                     {/* Corner flare */}
-                    <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: thisNet >= 0 ? "radial-gradient(circle, rgba(96,252,198,.3), transparent 70%)" : "radial-gradient(circle, rgba(255,113,108,.25), transparent 70%)", filter: "blur(10px)", pointerEvents: "none" }} />
-                    <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div style={eyebrow}>Net Bulan Ini</div>
-                        <span style={{ fontSize: 20 }}>{thisNet >= 0 ? "💚" : "🔴"}</span>
+                    <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: thisNet >= 0 ? "radial-gradient(circle, rgba(131,155,122,.3), transparent 70%)" : "radial-gradient(circle, rgba(255,113,108,.25), transparent 70%)", filter: "blur(10px)", pointerEvents: "none" }} />
+                    <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <div style={eyebrow}>{isMonthEnd ? "Hasil Akhir Bulan Ini" : "Sisa Kas Bulan Ini"}</div>
+                        {!isMonthEnd && thisNet > 0 ? (
+                            <span className="chip chip-mint" style={{ fontSize: 10, padding: "3px 9px" }}>
+                                ⏳ Sisa {remainingDays} hr
+                            </span>
+                        ) : (
+                            <span style={{ fontSize: 20 }}>{thisNet >= 0 ? "💚" : "🔴"}</span>
+                        )}
                     </div>
                     <div style={{ position: "relative" }}>
                         <div className="num-tight" style={{ fontSize: "clamp(28px, 2.8vw, 38px)", fontWeight: 900, color: thisNet >= 0 ? "var(--color-primary)" : "var(--color-expense)", letterSpacing: "-.03em", lineHeight: 1 }}>
                             {thisNet >= 0 ? "+" : "−"}{fmtRp(Math.abs(thisNet))}
                         </div>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 8, fontWeight: 500 }}>
-                            {thisNet >= 0 ? "Surplus — pertahankan 👏" : "Defisit — cek pengeluaran"}
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 8, fontWeight: 500, lineHeight: 1.4 }}>
+                            {thisIncome === 0 && thisExpense === 0 ? (
+                                "Belum ada arus kas bulan ini"
+                            ) : !isMonthEnd ? (
+                                thisNet > 0 ? (
+                                    <>Jatah aman sisa bulan: <strong className="mono" style={{ color: "var(--color-text)", fontWeight: 700 }}>~{fmtRp(safeDailyAllowance)}/hari</strong></>
+                                ) : thisNet === 0 ? (
+                                    `Kas bulan ini pas habis · sisa ${remainingDays} hari`
+                                ) : (
+                                    `Pengeluaran melampaui pemasukan · sisa ${remainingDays} hari ⚠️`
+                                )
+                            ) : (
+                                thisNet >= 0 ? "Surplus akhir bulan — pertahankan! 👏" : "Defisit bulan ini — evaluasi pengeluaran"
+                            )}
                         </div>
                     </div>
                 </div>
@@ -719,7 +792,7 @@ const DasborView = ({
                  * 8. CHART — 8 cols × 2 rows (wide)
                  * ═══════════════════════════════════════════════════════ */}
                 <div className="b-chart">
-                    <AreaChart transactions={scopedTransactions} />
+                    <AreaChart transactions={scopedTransactions} isScopeIncome={isScopeIncome} isScopeExpense={isScopeExpense} />
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════
@@ -740,24 +813,28 @@ const DasborView = ({
                         </div>
                     ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, overflowY: "auto" }}>
-                            {scopedTransactions.slice(0, 7).map(tx => (
-                                <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 6px", borderRadius: 10, transition: "background .15s" }}
-                                    onMouseOver={e => e.currentTarget.style.background = "var(--color-border-soft)"}
-                                    onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                                    <div style={{
-                                        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
-                                        background: tx.type === "income" ? "var(--color-primary-soft)" : tx.type === "transfer" ? "var(--color-transfer-soft)" : "var(--color-expense-soft)",
-                                    }}>{tx.icon}</div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.01em" }}>{tx.note || tx.category}</div>
-                                        <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 2 }}>{fmtDate(tx.date)}</div>
+                            {scopedTransactions.slice(0, 7).map(tx => {
+                                const txIsIncome = isScopeIncome(tx);
+                                const txIsExpense = isScopeExpense(tx) || isScopeTransferOut(tx);
+                                return (
+                                    <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 6px", borderRadius: 10, transition: "background .15s" }}
+                                        onMouseOver={e => e.currentTarget.style.background = "var(--color-border-soft)"}
+                                        onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                                        <div style={{
+                                            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
+                                            background: txIsIncome ? "var(--color-primary-soft)" : tx.type === "transfer" ? "var(--color-transfer-soft)" : "var(--color-expense-soft)",
+                                        }}>{tx.icon}</div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-.01em" }}>{tx.note || tx.category}</div>
+                                            <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 2 }}>{fmtDate(tx.date)}</div>
+                                        </div>
+                                        <div className="num-tight mono" style={{ fontSize: 12, fontWeight: 800, color: txIsIncome ? "var(--color-primary)" : tx.type === "transfer" ? "var(--color-transfer)" : "var(--color-expense)", flexShrink: 0 }}>
+                                            {txIsIncome ? "+" : txIsExpense ? "−" : "↔"}{fmtRp(tx.amount)}
+                                        </div>
                                     </div>
-                                    <div className="num-tight mono" style={{ fontSize: 12, fontWeight: 800, color: tx.type === "income" ? "var(--color-primary)" : tx.type === "transfer" ? "var(--color-transfer)" : "var(--color-expense)", flexShrink: 0 }}>
-                                        {tx.type === "income" ? "+" : tx.type === "transfer" ? "↔" : "−"}{fmtRp(tx.amount)}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                     <button onClick={() => setShowAddTx(true)} style={{
@@ -781,16 +858,16 @@ const DasborView = ({
                         <div style={eyebrow}>Distribusi Pengeluaran</div>
                         <h3 style={{ ...sectionTitle, fontSize: 16, marginTop: 6 }}>{t("dash.topCategories")}</h3>
                     </div>
-                    {sortedCats.length === 0 ? (
+                    {scopedSortedCats.length === 0 ? (
                         <div style={{ textAlign: "center", padding: "24px 0", color: "var(--color-subtle)", fontSize: 13 }}>
                             Belum ada pengeluaran
                         </div>
                     ) : (
                         <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
-                            <CategoryDonut sortedCats={sortedCats} totalExpense={totalExpense} />
+                            <CategoryDonut sortedCats={scopedSortedCats} totalExpense={scopedTotalExpense} />
                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-                                {sortedCats.slice(0, 5).map(([cat, amt], i) => {
-                                    const pct = totalExpense > 0 ? (amt / totalExpense) * 100 : 0;
+                                {scopedSortedCats.slice(0, 5).map(([cat, amt], i) => {
+                                    const pct = scopedTotalExpense > 0 ? (amt / scopedTotalExpense) * 100 : 0;
                                     const color = colorForCategory(cat, i);
                                     return (
                                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -853,7 +930,7 @@ const DasborView = ({
                     padding: "22px 24px",
                     background: debts.length > 0
                         ? "linear-gradient(145deg, rgba(245,158,11,.08), rgba(255,113,108,.04))"
-                        : "linear-gradient(145deg, rgba(96,252,198,.08), rgba(96,252,198,.02))",
+                        : "linear-gradient(145deg, rgba(131,155,122,.08), rgba(131,155,122,.02))",
                     border: `1px solid ${debts.length > 0 ? "rgba(245,158,11,.2)" : "var(--color-primary-soft)"}`,
                     backdropFilter: "var(--glass-blur-sm)",
                     WebkitBackdropFilter: "var(--glass-blur-sm)",
@@ -892,18 +969,51 @@ const DasborView = ({
                  * 13. FINANCIAL HEALTH — full-width tiles
                  * ═══════════════════════════════════════════════════════ */}
                 <div className="b-health" style={{ ...glassCard, padding: "22px 26px", borderRadius: 24 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
                         <div>
                             <div style={eyebrow}>{t("dash.financialHealth")}</div>
                             <h3 style={{ ...sectionTitle, fontSize: 18, marginTop: 6 }}>Skor Keuangan</h3>
                         </div>
-                        <span style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 600 }}>3 indikator</span>
+                        <button
+                            type="button"
+                            onClick={() => setActiveMenu && setActiveMenu("laporan")}
+                            style={{
+                                padding: "8px 14px", borderRadius: 99,
+                                background: "var(--color-primary-soft)",
+                                border: "1px solid var(--color-primary)",
+                                color: "var(--color-primary)",
+                                fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+                                display: "flex", alignItems: "center", gap: 6,
+                            }}
+                        >
+                            📑 Buka Evaluasi Lengkap →
+                        </button>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
                         {[
-                            { label: t("dash.savingRate"), val: savingRate, color: savingRate > 20 ? "var(--color-primary)" : "var(--color-amber)", note: savingRate > 20 ? t("dash.goodRate") : t("dash.needImprove"), icon: "💰" },
-                            { label: t("dash.expenseRatio"), val: expenseRate, color: expenseRate < 70 ? "var(--color-primary)" : "var(--color-expense)", note: expenseRate < 70 ? t("dash.veryGood") : t("dash.tooHigh"), icon: "📊" },
-                            { label: t("dash.actualSaving"), val: actualSavingRate, color: "var(--color-transfer)", note: actualSavingAmt > 0 ? fmtRp(actualSavingAmt) : "Belum ada", icon: "🏆" },
+                            {
+                                label: isMonthEnd ? t("dash.savingRate") : "Sisa Kas vs Pemasukan",
+                                val: scopedSavingRate,
+                                color: scopedSavingRate > 20 ? "var(--color-primary)" : "var(--color-amber)",
+                                note: isMonthEnd
+                                    ? (scopedSavingRate > 20 ? t("dash.goodRate") : t("dash.needImprove"))
+                                    : (remainingDays > 0 ? `${fmtRp(Math.max(0, thisNet))} untuk ${remainingDays} hari tersisa` : t("dash.goodRate")),
+                                icon: "💰",
+                            },
+                            {
+                                label: t("dash.expenseRatio"),
+                                val: scopedExpenseRate,
+                                color: scopedExpenseRate < 70 ? "var(--color-primary)" : "var(--color-expense)",
+                                note: scopedExpenseRate < 70 ? t("dash.veryGood") : t("dash.tooHigh"),
+                                icon: "📊",
+                            },
+                            {
+                                label: t("dash.actualSaving"),
+                                val: actualSavingRate,
+                                color: overBudgets > 0 ? "var(--color-amber)" : "var(--color-transfer)",
+                                note: `${actualSavingAmt > 0 ? fmtRp(actualSavingAmt) : "Belum disisihkan"}${budgets.length > 0 ? (overBudgets > 0 ? ` · ⚠️ ${overBudgets} anggaran lewat` : ` · ✅ ${budgets.length} anggaran aman`) : ""}`,
+                                icon: "🏆",
+                            },
                         ].map((h, i) => (
                             <div key={i} style={{ padding: "16px 18px", borderRadius: 16, background: "rgba(255,255,255,.03)", border: "1px solid var(--glass-border)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.04)" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>

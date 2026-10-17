@@ -30,7 +30,7 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
                     position: "relative", overflow: "hidden",
                 }}>
                     {/* Ambient aurora orbs */}
-                    <div style={{ position: "absolute", top: -100, right: -60, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,252,198,.18), transparent 70%)", pointerEvents: "none", filter: "blur(10px)" }} />
+                    <div style={{ position: "absolute", top: -100, right: -60, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.18), transparent 70%)", pointerEvents: "none", filter: "blur(10px)" }} />
                     <div style={{ position: "absolute", bottom: -120, left: -80, width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,189,248,.12), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
 
                     {/* Close button */}
@@ -57,7 +57,7 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
                                 background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: 26,
-                                boxShadow: "0 8px 24px rgba(96,252,198,.3), inset 0 1px 0 rgba(255,255,255,.35)",
+                                boxShadow: "0 8px 24px rgba(131,155,122,.3), inset 0 1px 0 rgba(255,255,255,.35)",
                             }}>🔐</div>
                             <h2 style={{
                                 fontSize: "clamp(22px, 3vw, 28px)",

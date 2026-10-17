@@ -27,7 +27,7 @@ export function useRecurrings() {
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ["recurrings", activeHouseholdId] });
 
     const addRecurring = async (form) => {
-        const type = incomeCategories.includes(form.category) ? "income" : "expense";
+        const type = form.type || (incomeCategories.includes(form.category) ? "income" : "expense");
         const result = await unwrap(await api.POST("/v1/recurrings", { body: { ...toApiPayload(form), type } }));
         invalidate();
         return result;

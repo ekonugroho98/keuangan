@@ -80,14 +80,14 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
     // t() returns the key itself when translation not found → fallback ke string default
     const tq = (key, fallback) => { const v = t(key); return v === key ? fallback : v; };
     const quickQuestions = [
-        tq("ai.q1", "Analisis pengeluaran bulan ini"),
-        tq("ai.q2", "Tips hemat bulan ini"),
-        tq("ai.q3", "Cek kondisi hutangku"),
-        tq("ai.q4", "Gimana saving rate-ku?"),
+        tq("ai.q1", "Analisis pengeluaran rumah tangga bulan ini"),
+        tq("ai.q2", "Berapa jatah harian aman sisa bulan ini?"),
+        "Cek daftar belanja & stok kulkas yang menipis",
         "Bandingkan pengeluaran bulan ini vs bulan lalu",
-        "Tren keuangan 6 bulan terakhir",
-        "Kategori apa yang paling boros bulan ini?",
-        "Cari transaksi listrik",
+        tq("ai.q3", "Cek kondisi cicilan & hutang keluarga"),
+        "Kategori apa yang paling besar bulan ini?",
+        "Tren keuangan keluarga 6 bulan terakhir",
+        "Cari transaksi belanja dapur atau listrik",
     ];
 
     return (
@@ -108,7 +108,7 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                             {provider?.icon || "🤖"}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)", letterSpacing: "-.01em" }}>{APP_AI_NAME} Financial Coach</div>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)", letterSpacing: "-.01em", fontFamily: "var(--font-display)" }}>{APP_AI_NAME} — Asisten Keluarga & Keuangan</div>
                             <div style={{ fontSize: 11, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 4 }}>
                                 ● {provider?.label} · {modelLabel}
                             </div>

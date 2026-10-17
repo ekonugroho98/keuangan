@@ -7,12 +7,12 @@ import OwnerSelect from "../../household/OwnerSelect";
 import OwnerBadge from "../../household/OwnerBadge";
 
 const EMOJI_OPTIONS = ["🤝","👤","👫","🧑‍💼","👨‍👩‍👧","🏠","🚗","💼","📱","💻","🎓","🏪","🛒","💰","🎮","📚","☕","🍕","✈️","🎯"];
-const COLOR_OPTIONS = ["var(--color-primary)","#4FC3F7","#14b8a6","#22c55e","#f59e0b","#f97316","#ff716c","#ec4899","#a855f7","var(--color-subtle)"];
+const COLOR_OPTIONS = ["#839B7A","#46634E","#C87D55","#D9A74A","#4FC3F7","#14b8a6","#f97316","#ff716c","#ec4899","#a855f7","#6366f1","#7D513B"];
 
 const emptyForm = (defaultAccount = "") => ({
     borrower_name: "",
     icon: "🤝",
-    color: "var(--color-primary)",
+    color: "#839B7A",
     total: "",
     remaining: "",
     from_account: defaultAccount,
@@ -152,7 +152,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                             background: "var(--glass-1)",
                             backdropFilter: "var(--glass-blur)",
                             WebkitBackdropFilter: "var(--glass-blur)",
-                            border: `1px solid ${lunas ? "rgba(96,252,198,.4)" : overdue ? "rgba(255,113,108,.35)" : "var(--glass-border)"}`,
+                            border: `1px solid ${lunas ? "rgba(131,155,122,.4)" : overdue ? "rgba(255,113,108,.35)" : "var(--glass-border)"}`,
                             borderRadius: 20, padding: 22, position: "relative", overflow: "hidden",
                             boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
                         }}>
@@ -334,7 +334,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                             {EMOJI_OPTIONS.map(e => (
                                 <button key={e} onClick={() => setForm(p => ({ ...p, icon: e }))}
-                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "rgba(96,252,198,.5)" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(96,252,198,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
+                                    style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${form.icon === e ? "rgba(131,155,122,.5)" : "var(--color-border-soft)"}`, background: form.icon === e ? "rgba(131,155,122,.15)" : "transparent", fontSize: 18, cursor: "pointer" }}>
                                     {e}
                                 </button>
                             ))}
@@ -350,7 +350,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                         </div>
 
                         <button onClick={handleSubmit} disabled={!canSubmit}
-                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: !canSubmit ? "var(--color-muted)" : "#0a2e22", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .5 : 1, fontFamily: "inherit" }}>
+                            style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: !canSubmit ? "var(--color-border-soft)" : "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))", color: !canSubmit ? "var(--color-muted)" : "var(--color-on-primary, #fff)", fontWeight: 700, fontSize: 13, cursor: !canSubmit ? "not-allowed" : "pointer", opacity: !canSubmit ? .5 : 1, fontFamily: "inherit" }}>
                             {editTarget ? t("piu.submitEdit") : t("piu.submitAdd")}
                         </button>
                     </div>
@@ -362,7 +362,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                 <div onClick={() => setTerimaTarget(null)}
                     style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
                     <div onClick={e => e.stopPropagation()}
-                        style={{ background: "var(--bg-deep)", border: "1px solid rgba(96,252,198,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 400 }}>
+                        style={{ background: "var(--bg-deep)", border: "1px solid rgba(131,155,122,.2)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 400 }}>
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                             <div>
@@ -373,7 +373,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                 style={{ background: "var(--color-border-soft)", border: "none", color: "var(--color-muted)", width: 32, height: 32, borderRadius: 8, cursor: "pointer", fontSize: 16 }}>✕</button>
                         </div>
 
-                        <div style={{ background: "rgba(96,252,198,.06)", border: "1px solid rgba(96,252,198,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)" }}>
+                        <div style={{ background: "rgba(131,155,122,.06)", border: "1px solid rgba(131,155,122,.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "var(--color-muted)" }}>
                             {t("piu.remainingDebt")} <strong style={{ color: "var(--color-primary)" }}>{fmtRp(terimaTarget.remaining)}</strong>
                         </div>
 
@@ -412,7 +412,7 @@ const PiutangView = ({ piutang = [], onAdd, onEdit, onDelete, onTerima, accounts
                                     setTerimaTarget(null);
                                     setTerimaAmount("");
                                 }}
-                                style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: !terimaAmount ? "var(--color-border-soft)" : "linear-gradient(135deg,#60fcc6,#19ce9b)", color: !terimaAmount ? "var(--color-muted)" : "#0a2e22", fontSize: 13, fontWeight: 700, cursor: !terimaAmount ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                                style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: !terimaAmount ? "var(--color-border-soft)" : "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))", color: !terimaAmount ? "var(--color-muted)" : "var(--color-on-primary, #fff)", fontSize: 13, fontWeight: 700, cursor: !terimaAmount ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
                                 {t("piu.confirmBtn")}
                             </button>
                         </div>

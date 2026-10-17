@@ -93,14 +93,14 @@ export default function ApiKeysPanel({ onBack, showToast }) {
             <button style={backBtn} onClick={onBack}>← Kembali</button>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>🔑 API Key</div>
             <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 10 }}>
-                Dipakai agent/Hermes untuk akses API Karaya atas nama anggota tertentu — catat sendiri siapa yang record
+                Dipakai asisten/Hermes untuk akses API Keluarga Berkembang atas nama anggota tertentu — catat sendiri siapa yang merekam
                 transaksi lewat key masing-masing, bukan satu key dipakai bersama.
             </div>
 
             {justCreated && (
                 <div style={{
                     padding: 12, borderRadius: 10, marginBottom: 14,
-                    background: "rgba(96,252,198,.08)", border: "1px solid rgba(96,252,198,.25)",
+                    background: "var(--color-primary-soft)", border: "1px solid var(--color-border-strong)",
                 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)", marginBottom: 6 }}>
                         ✅ Key "{justCreated.name}" dibuat — salin SEKARANG, tidak akan ditampilkan lagi

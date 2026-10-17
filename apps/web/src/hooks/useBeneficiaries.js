@@ -15,11 +15,18 @@ export function useBeneficiaries(enabled = true) {
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ["beneficiaries", activeHouseholdId] });
 
-    const addBeneficiary = async ({ name, kind, aliases }) => {
-        const result = await unwrap(await api.POST("/v1/beneficiaries", { body: { name, kind: kind || "other", aliases: aliases || [] } }));
+    const addBeneficiary = async ({ name, kind, icon, aliases }) => {
+        const body = { name, kind: kind || "other", aliases: aliases || [] };
+        if (icon) body.icon = icon;
+        const result = await unwrap(await api.POST("/v1/beneficiaries", { body }));
         invalidate();
         return result;
     };
 
-    return { beneficiaries: query.data ?? [], beneficiariesLoading: query.isLoading, addBeneficiary };
+    const deleteBeneficiary = async (id) => {
+        await unwrap(await api.DELETE("/v1/beneficiaries/{id}", { params: { path: { id } } }));
+        invalidate();
+    };
+
+    return { beneficiaries: query.data ?? [], beneficiariesLoading: query.isLoading, addBeneficiary, deleteBeneficiary };
 }

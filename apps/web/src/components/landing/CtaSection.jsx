@@ -22,29 +22,29 @@ const CtaSection = ({ onSignup }) => {
                             borderRadius: 32,
                             textAlign: "center",
                             overflow: "hidden",
-                            background: "linear-gradient(145deg, rgba(30,30,40,.7), rgba(16,18,24,.6))",
+                            background: "var(--bg-elevated)",
                             backdropFilter: "blur(24px)",
-                            borderColor: "rgba(96,252,198,.35)",
-                            boxShadow: "0 40px 100px rgba(0,0,0,.5), 0 0 0 1px rgba(96,252,198,.3)",
+                            borderColor: "var(--color-border)",
+                            boxShadow: "0 24px 64px rgba(35,46,38,.12), 0 0 0 1px var(--color-border-soft)",
                         }}
                     >
                         {/* Ambient aurora orbs */}
                         <div aria-hidden style={{
                             position: "absolute", top: "-40%", left: "-10%",
                             width: "60%", height: "180%",
-                            background: "radial-gradient(circle, rgba(96,252,198,.25), transparent 60%)",
+                            background: "radial-gradient(circle, rgba(70,99,78,.14), transparent 60%)",
                             filter: "blur(80px)", pointerEvents: "none",
                         }} />
                         <div aria-hidden style={{
                             position: "absolute", bottom: "-40%", right: "-10%",
                             width: "60%", height: "180%",
-                            background: "radial-gradient(circle, rgba(79,195,247,.22), transparent 60%)",
+                            background: "radial-gradient(circle, rgba(181,105,74,.14), transparent 60%)",
                             filter: "blur(80px)", pointerEvents: "none",
                         }} />
                         <div aria-hidden style={{
                             position: "absolute", top: "20%", right: "20%",
                             width: 200, height: 200,
-                            background: "radial-gradient(circle, rgba(167,139,250,.18), transparent 60%)",
+                            background: "radial-gradient(circle, rgba(131,155,122,.16), transparent 60%)",
                             filter: "blur(60px)", pointerEvents: "none",
                         }} />
 
@@ -53,8 +53,8 @@ const CtaSection = ({ onSignup }) => {
                             <div style={{
                                 display: "inline-flex", alignItems: "center", gap: 8,
                                 padding: "6px 14px", borderRadius: 99,
-                                background: "rgba(96,252,198,.12)",
-                                border: "1px solid rgba(96,252,198,.3)",
+                                background: "var(--bg-surface-low)",
+                                border: "1px solid var(--color-border)",
                                 marginBottom: 24, backdropFilter: "blur(12px)",
                             }}>
                                 <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-primary)", animation: "pulse 2s infinite" }} />
@@ -64,9 +64,9 @@ const CtaSection = ({ onSignup }) => {
                             </div>
 
                             <h2 style={{
-                                fontSize: "clamp(32px, 5.5vw, 64px)",
-                                fontWeight: 900, letterSpacing: "-.04em",
-                                color: "var(--color-text)", lineHeight: 1.02,
+                                fontSize: "clamp(32px, 5.5vw, 60px)",
+                                fontWeight: 600, letterSpacing: "-.03em",
+                                color: "var(--color-text)", lineHeight: 1.08,
                                 marginBottom: 20,
                             }}>
                                 {t("lp.cta.h2")}
@@ -96,7 +96,7 @@ const CtaSection = ({ onSignup }) => {
                                     gap: 1, padding: 1,
                                     maxWidth: 620, margin: "0 auto",
                                     borderRadius: 20,
-                                    background: "rgba(255,255,255,.05)",
+                                    background: "var(--color-border-soft)",
                                     border: "1px solid var(--color-border-soft)",
                                     overflow: "hidden",
                                 }}
@@ -104,13 +104,13 @@ const CtaSection = ({ onSignup }) => {
                                 {stats.map((s, i) => (
                                     <div key={i} style={{
                                         padding: "18px 14px",
-                                        background: "rgba(14,14,21,.5)",
+                                        background: "var(--bg-surface-low)",
                                         backdropFilter: "blur(10px)",
                                     }}>
                                         <div className="num-tight" style={{
                                             fontSize: "clamp(20px, 2.4vw, 28px)",
-                                            fontWeight: 900, color: "var(--color-text)",
-                                            lineHeight: 1, letterSpacing: "-.03em",
+                                            fontWeight: 700, color: "var(--color-text)",
+                                            lineHeight: 1, letterSpacing: "-.02em",
                                         }}>{s.v}</div>
                                         <div style={{
                                             fontSize: 10.5, color: "var(--color-muted)",

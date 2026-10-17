@@ -30,8 +30,8 @@ const AmountInput = ({
     // Glass surface shared focus/blur behaviour
     const applyFocus = (e) => {
         e.target.style.borderColor = "var(--color-primary)";
-        e.target.style.background = "rgba(96,252,198,.04)";
-        e.target.style.boxShadow = "0 0 0 3px var(--nav-active-bg, rgba(96,252,198,.12))";
+        e.target.style.background = "rgba(131,155,122,.04)";
+        e.target.style.boxShadow = "0 0 0 3px var(--nav-active-bg, rgba(131,155,122,.12))";
     };
     const applyBlur = (e) => {
         e.target.style.borderColor = "var(--glass-border)";

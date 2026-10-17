@@ -7,7 +7,7 @@ import OwnerSelect from "../../household/OwnerSelect";
 import OwnerBadge from "../../household/OwnerBadge";
 
 const EMOJI_OPTIONS = ["🏦","🏠","🚗","💳","📱","💻","🎓","💍","🏪","🛒","💰","🔧","🏋️","🎮","📚","⚡","🌍","✈️","🍕","☕"];
-const COLOR_OPTIONS = ["#ff716c","#f97316","#f59e0b","var(--color-primary)","var(--color-primary)","#4FC3F7","var(--color-primary)","#ec4899","#14b8a6","var(--color-subtle)","#a855f7","#22c55e"];
+const COLOR_OPTIONS = ["#ff716c","#f97316","#D9A74A","#C87D55","#839B7A","#46634E","#4FC3F7","#14b8a6","#ec4899","#a855f7","#6366f1","#7D513B"];
 
 const emptyForm = () => ({ name: "", icon: "🏦", color: "#ff716c", total: "", remaining: "", monthly: "", due_date: "", owner: "me" });
 
@@ -119,7 +119,7 @@ const HutangView = ({ debts, onAdd, onEdit, onDelete, onPayDebt, accounts = [] }
                             background: "var(--glass-1)",
                             backdropFilter: "var(--glass-blur)",
                             WebkitBackdropFilter: "var(--glass-blur)",
-                            border: `1px solid ${lunas ? "rgba(96,252,198,.4)" : overdue ? "rgba(255,113,108,.35)" : "var(--glass-border)"}`,
+                            border: `1px solid ${lunas ? "rgba(131,155,122,.4)" : overdue ? "rgba(255,113,108,.35)" : "var(--glass-border)"}`,
                             borderRadius: 20, padding: 22, position: "relative", overflow: "hidden",
                             boxShadow: "var(--glass-highlight), 0 2px 10px rgba(0,0,0,.08)",
                         }}>

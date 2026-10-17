@@ -3,6 +3,7 @@ import { useHousehold } from "../../auth/HouseholdProvider";
 import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
 import { useMembers } from "../../hooks/useMembers";
 import { useInvitations } from "../../hooks/useInvitations";
+import { useBeneficiaries } from "../../hooks/useBeneficiaries";
 
 const backBtn = {
     background: "none", border: "none", color: "var(--color-primary)", fontSize: 12, fontWeight: 700,
@@ -266,6 +267,7 @@ export default function HouseholdPanel({ onBack, showToast }) {
                     isOwner={isOwner}
                     busy={featureBusy}
                     onPatch={patchFeature}
+                    toast={toast}
                 />
             )}
         </div>
@@ -287,6 +289,13 @@ function Toggle({ on, disabled, onClick }) {
 const fieldLabel = { fontSize: 11, color: "var(--color-muted)", marginBottom: 4, display: "block" };
 const miniInputSt = { ...inputSt, padding: "6px 8px", fontSize: 12 };
 
+const BENEFICIARY_KINDS = [
+    { v: "child", l: "👶 Anak", icon: "👶" },
+    { v: "relative", l: "👵 Ortu/Kerabat", icon: "👵" },
+    { v: "property", l: "🏠 Aset/Properti", icon: "🏠" },
+    { v: "other", l: "✨ Lainnya", icon: "✨" },
+];
+
 /**
  * Tab "Fitur opsional" (10-fitur-opsional-keluarga.md §2.3): toggle per-fitur, PARTIAL merge
  * (setiap onPatch hanya mengirim satu fitur, backend menjaga yang lain tidak ikut berubah).
@@ -296,13 +305,47 @@ const miniInputSt = { ...inputSt, padding: "6px 8px", fontSize: 12 };
  * mengikuti pola HouseholdPanel/ApiKeysPanel yang sudah ada (i18n 6 bahasa untuk UI household/fitur
  * baru dicatat sebagai utang teknis di PROGRESS.md, bukan konvensi baru yang disengaja di sini).
  */
-function FeaturesTab({ features, isOwner, busy, onPatch }) {
+function FeaturesTab({ features, isOwner, busy, onPatch, toast }) {
+    const ben = features?.beneficiary ?? { enabled: false };
+    const { beneficiaries, addBeneficiary, deleteBeneficiary } = useBeneficiaries(!!ben.enabled);
+    const [newBenName, setNewBenName] = useState("");
+    const [newBenKind, setNewBenKind] = useState("child");
+    const [benBusy, setBenBusy] = useState(false);
+
     if (!features) return <div style={{ fontSize: 12, color: "var(--color-muted)", textAlign: "center", padding: 10 }}>Memuat...</div>;
 
-    const ben = features.beneficiary ?? { enabled: false };
     const report = features.monthly_report ?? { enabled: false, day: 1, hour: 8, channel: "both" };
     const stock = features.shopping_stock ?? { enabled: false, expiry_reminder: { enabled: false, hour: 7, days_before: 2 } };
     const expiry = stock.expiry_reminder ?? { enabled: false, hour: 7, days_before: 2 };
+
+    const handleAddBen = async () => {
+        const trimmed = newBenName.trim();
+        if (!trimmed || benBusy) return;
+        setBenBusy(true);
+        try {
+            const kMeta = BENEFICIARY_KINDS.find(k => k.v === newBenKind);
+            await addBeneficiary({ name: trimmed, kind: newBenKind, icon: kMeta?.icon });
+            setNewBenName("");
+            toast?.(`✅ "${trimmed}" ditambahkan ke daftar penerima`);
+        } catch (err) {
+            toast?.(err.message || "Gagal menambah penerima", "error");
+        } finally {
+            setBenBusy(false);
+        }
+    };
+
+    const handleDeleteBen = async (b) => {
+        if (benBusy) return;
+        setBenBusy(true);
+        try {
+            await deleteBeneficiary(b.id);
+            toast?.(`Penerima "${b.name}" dihapus`);
+        } catch (err) {
+            toast?.(err.message || "Gagal menghapus penerima", "error");
+        } finally {
+            setBenBusy(false);
+        }
+    };
 
     return (
         <div style={{ marginTop: 10 }}>
@@ -315,10 +358,66 @@ function FeaturesTab({ features, isOwner, busy, onPatch }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>👪 Untuk siapa (beneficiary)</div>
-                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>Catat pengeluaran untuk anak, orang tua, dst. Bisa dilihat per penerima di Laporan.</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>Catat pengeluaran untuk anak, orang tua, dst. Bisa dilihat per penerima di Laporan & Evaluasi.</div>
                     </div>
                     <Toggle on={ben.enabled} disabled={!isOwner || busy === "beneficiary"} onClick={() => onPatch("beneficiary", { enabled: !ben.enabled })} />
                 </div>
+
+                {ben.enabled && (
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--glass-border)" }}>
+                        <label style={fieldLabel}>Daftar Penerima ({beneficiaries.length})</label>
+                        {beneficiaries.length > 0 ? (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                                {beneficiaries.map((b) => (
+                                    <span key={b.id} style={{
+                                        display: "inline-flex", alignItems: "center", gap: 6,
+                                        padding: "4px 9px", borderRadius: 99,
+                                        background: "var(--color-primary-soft)",
+                                        border: "1px solid var(--glass-border)",
+                                        fontSize: 11, fontWeight: 700, color: "var(--color-text)",
+                                    }}>
+                                        <span>{b.icon || "👤"} {b.name}</span>
+                                        <button
+                                            onClick={() => handleDeleteBen(b)}
+                                            disabled={benBusy}
+                                            title={`Hapus ${b.name}`}
+                                            style={{
+                                                background: "none", border: "none", padding: 0,
+                                                color: "var(--color-muted)", cursor: "pointer", fontSize: 11, lineHeight: 1,
+                                            }}
+                                        >✕</button>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: 11, color: "var(--color-subtle)", marginBottom: 8 }}>
+                                Belum ada nama penerima (contoh: Adik, Kakak, Ibu, Mobil). Tambahkan di bawah:
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <select
+                                value={newBenKind}
+                                onChange={(e) => setNewBenKind(e.target.value)}
+                                style={{ ...miniInputSt, width: "auto", flex: "0 0 auto" }}
+                            >
+                                {BENEFICIARY_KINDS.map(k => <option key={k.v} value={k.v}>{k.l}</option>)}
+                            </select>
+                            <input
+                                value={newBenName}
+                                onChange={(e) => setNewBenName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleAddBen()}
+                                placeholder="Nama (mis. Kakak Dinda)..."
+                                style={{ ...miniInputSt, flex: 1, minWidth: 110 }}
+                            />
+                            <button
+                                style={smallBtn()}
+                                onClick={handleAddBen}
+                                disabled={!newBenName.trim() || benBusy}
+                            >+ Tambah</button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div style={featureCard}>

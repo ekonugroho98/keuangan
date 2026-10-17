@@ -3,9 +3,9 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { APP_AI_NAME } from "../../config/app";
 
 const SAMPLE_PROMPTS = [
-    "Berapa sisa budget makan?",
-    "Analisa spending bulan ini",
-    "Bikinin target tabungan",
+    "Sisa anggaran belanja dapur?",
+    "Susu UHT paling murah di mana?",
+    "Stok kulkas apa yang hampir habis?",
 ];
 
 const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat }) => {
@@ -23,7 +23,7 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
             {/* Ambient aurora */}
             <div aria-hidden style={{
                 position: "absolute", inset: 0, pointerEvents: "none",
-                background: "radial-gradient(700px 500px at 85% 30%, rgba(167,139,250,.10), transparent 60%), radial-gradient(500px 400px at 10% 80%, rgba(96,252,198,.06), transparent 60%)",
+                background: "radial-gradient(700px 500px at 85% 30%, rgba(131,155,122,.10), transparent 60%), radial-gradient(500px 400px at 10% 80%, rgba(181,105,74,.06), transparent 60%)",
             }} />
 
             <div style={{ maxWidth: 1240, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -38,18 +38,18 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                         <div style={{
                             display: "inline-flex", alignItems: "center", gap: 8,
                             padding: "6px 14px", borderRadius: 99,
-                            background: "rgba(167,139,250,.10)",
-                            border: "1px solid rgba(167,139,250,.26)",
+                            background: "var(--color-primary-soft)",
+                            border: "1px solid var(--color-border)",
                             marginBottom: 20, backdropFilter: "blur(12px)",
                         }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 99, background: "#a78bfa", animation: "pulse 2s infinite" }} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "#a78bfa", letterSpacing: 1.2 }}>{t("lp.ai.tag")}</span>
+                            <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--color-primary)", animation: "pulse 2s infinite" }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)", letterSpacing: 1.2 }}>{t("lp.ai.tag")}</span>
                         </div>
 
                         <h2 style={{
                             fontSize: "clamp(32px,4.5vw,52px)",
-                            fontWeight: 900, letterSpacing: "-.04em",
-                            color: "var(--color-text)", lineHeight: 1.05, marginBottom: 20,
+                            fontWeight: 600, letterSpacing: "-.02em",
+                            color: "var(--color-text)", lineHeight: 1.08, marginBottom: 20,
                         }}>
                             {t("lp.ai.h2")}<br />
                             <span className="gradient-text">{t("lp.ai.h2g")}</span>
@@ -66,13 +66,13 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                     <span style={{
                                         width: 26, height: 26, borderRadius: 8,
-                                        background: "linear-gradient(135deg, rgba(96,252,198,.22), rgba(25,206,155,.14))",
-                                        border: "1px solid rgba(96,252,198,.3)",
+                                        background: "var(--color-primary-soft)",
+                                        border: "1px solid var(--color-border)",
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 13, color: "var(--color-primary)", fontWeight: 900,
+                                        fontSize: 13, color: "var(--color-primary)", fontWeight: 800,
                                         flexShrink: 0,
                                     }}>✓</span>
-                                    <span style={{ color: "var(--color-text)", fontSize: 14.5, fontWeight: 500 }}>{f}</span>
+                                    <span style={{ color: "var(--color-text)", fontSize: 14.5, fontWeight: 600 }}>{f}</span>
                                 </div>
                             ))}
                         </div>
@@ -80,12 +80,12 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
 
                     {/* Right: Chat preview */}
                     <FadeIn direction="left">
-                        <div className="bento bento-glow" style={{
+                        <div className="bento" style={{
                             padding: 24,
                             borderRadius: 24,
-                            background: "linear-gradient(145deg, rgba(30,30,40,.7), rgba(20,20,28,.6))",
-                            backdropFilter: "blur(24px)",
-                            boxShadow: "0 40px 90px rgba(0,0,0,.45)",
+                            background: "var(--bg-elevated)",
+                            border: "1px solid var(--color-border)",
+                            boxShadow: "var(--shadow-lg)",
                             position: "relative",
                         }}>
                             {/* Header */}
@@ -96,15 +96,18 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                             }}>
                                 <div style={{
                                     width: 40, height: 40, borderRadius: 12,
-                                    background: "linear-gradient(135deg,#a78bfa,#7c3aed)",
+                                    background: "#FFFDF8",
+                                    border: "1px solid var(--color-border)",
                                     display: "flex", alignItems: "center", justifyContent: "center",
-                                    fontSize: 18,
-                                    boxShadow: "0 8px 20px rgba(167,139,250,.35)",
-                                }}>🤖</div>
+                                    overflow: "hidden",
+                                    boxShadow: "var(--shadow-sm)",
+                                }}>
+                                    <img src="/logo-icon.png" alt={APP_AI_NAME} style={{ width: 34, height: 34, objectFit: "contain" }} />
+                                </div>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 800, fontSize: 14, color: "var(--color-text)", letterSpacing: "-.01em" }}>{APP_AI_NAME}</div>
+                                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-text)" }}>{APP_AI_NAME}</div>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-primary)", fontWeight: 600, marginTop: 2 }}>
-                                        <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--color-primary)", boxShadow: "0 0 8px var(--color-primary)" }} />
+                                        <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--color-primary)" }} />
                                         {t("lp.ai.online")}
                                     </div>
                                 </div>
@@ -130,23 +133,21 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                                         padding: "11px 15px",
                                         borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                                         background: m.role === "user"
-                                            ? "linear-gradient(135deg,#60fcc6,#19ce9b)"
-                                            : "rgba(255,255,255,.06)",
+                                            ? "var(--color-primary)"
+                                            : "var(--bg-surface-low)",
                                         border: m.role === "user" ? "none" : "1px solid var(--color-border-soft)",
-                                        color: m.role === "user" ? "#003828" : "var(--color-text)",
+                                        color: m.role === "user" ? "var(--color-on-primary)" : "var(--color-text)",
                                         fontSize: 12.5, lineHeight: 1.6,
                                         fontWeight: m.role === "user" ? 600 : 500,
                                         animation: "slideUp .3s",
-                                        boxShadow: m.role === "user"
-                                            ? "0 6px 18px rgba(96,252,198,.25)"
-                                            : "0 4px 12px rgba(0,0,0,.15)",
+                                        boxShadow: "var(--shadow-sm)",
                                     }}>{m.text}</div>
                                 ))}
                                 {isTyping && (
                                     <div style={{
                                         alignSelf: "flex-start", padding: "11px 15px",
                                         borderRadius: "16px 16px 16px 4px",
-                                        background: "rgba(255,255,255,.06)",
+                                        background: "var(--bg-surface-low)",
                                         border: "1px solid var(--color-border-soft)",
                                         color: "var(--color-muted)", fontSize: 12,
                                     }}>
@@ -164,8 +165,8 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                                     placeholder={t("lp.ai.placeholder")}
                                     style={{
                                         flex: 1,
-                                        background: "rgba(255,255,255,.04)",
-                                        border: "1px solid var(--color-border-soft)",
+                                        background: "var(--bg-surface-low)",
+                                        border: "1px solid var(--color-border)",
                                         borderRadius: 12, padding: "12px 16px",
                                         color: "var(--color-text)", fontSize: 13,
                                         outline: "none", fontFamily: "inherit",
@@ -176,10 +177,10 @@ const AiSection = ({ chatMessages, chatInput, setChatInput, isTyping, handleChat
                                     aria-label="Send message"
                                     style={{
                                         width: 44, height: 44, borderRadius: 12,
-                                        background: "linear-gradient(135deg,#60fcc6,#19ce9b)",
-                                        border: "none", color: "#003828",
-                                        fontSize: 18, fontWeight: 900, cursor: "pointer",
-                                        boxShadow: "0 6px 18px rgba(96,252,198,.35)",
+                                        background: "var(--color-primary)",
+                                        border: "none", color: "var(--color-on-primary)",
+                                        fontSize: 18, fontWeight: 700, cursor: "pointer",
+                                        boxShadow: "var(--shadow-sm)",
                                         transition: "transform .2s",
                                     }}
                                     onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
