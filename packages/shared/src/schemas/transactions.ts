@@ -33,6 +33,7 @@ export const TransactionSchema = z
     category: CategoryRefOutSchema,
     beneficiary: BeneficiaryRefOutSchema,
     recorded_by: z.object({ member_id: UuidSchema, display_name: z.string() }),
+    receipt_url: z.string().url().nullable().optional(),
     source: TxSourceSchema,
     recurring_id: UuidSchema.nullable(),
     created_at: z.string(),
@@ -56,6 +57,9 @@ export const CreateTransactionBodySchema = z
     beneficiary: z.string().optional().openapi({ description: 'F-A (10-fitur-opsional-keluarga.md §3), hanya berlaku kalau feature beneficiary aktif.' }),
     recorded_by_id: UuidSchema.optional(),
     recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transaksi ini (mis. "Ibu", "Ayah"). Jika kosong pada panggilan API key, otomatis mengikuti pemilik akun pembayar (atau pemilik API key untuk akun bersama).' }),
+    receipt_url: z.string().url().max(1000).optional().openapi({ description: 'URL foto bukti struk/nota (mis. dari POST /v1/receipts/upload atau /v1/ai/scan-receipt).' }),
+    receipt_image_base64: z.string().optional().openapi({ description: 'Opsional: base64 foto struk/nota untuk langsung diunggah dan ditempelkan sebagai receipt_url.' }),
+    receipt_mime_type: z.string().optional().openapi({ description: 'Tipe MIME foto (image/webp, image/jpeg, image/png).' }),
   })
   .openapi('CreateTransactionBody')
 
@@ -79,6 +83,9 @@ export const CreateTransactionBatchBodySchema = z
     date: DateStringSchema.optional(),
     recorded_by_id: UuidSchema.optional(),
     recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").' }),
+    receipt_url: z.string().url().max(1000).optional().openapi({ description: 'URL foto struk yang berlaku untuk seluruh item pada batch ini.' }),
+    receipt_image_base64: z.string().optional().openapi({ description: 'Opsional: base64 foto struk untuk langsung diunggah dan ditempelkan ke seluruh item batch ini.' }),
+    receipt_mime_type: z.string().optional(),
     items: z.array(BatchItemSchema).min(1).max(100),
   })
   .openapi('CreateTransactionBatchBody')
@@ -86,6 +93,7 @@ export const CreateTransactionBatchBodySchema = z
 export const UpdateTransactionBodySchema = z
   .object({
     amount: z.number().int().positive().max(100_000_000_000).optional(),
+    amount_text: z.string().min(1).optional(),
     type: z.enum(['income', 'expense']).optional(),
     account_id: UuidSchema.optional(),
     account: z.string().optional(),
@@ -99,6 +107,9 @@ export const UpdateTransactionBodySchema = z
     beneficiary: z.string().optional().openapi({ description: 'null eksplisit pada beneficiary_id = kembali ke bersama.' }),
     recorded_by_id: UuidSchema.optional(),
     recorded_by: z.string().max(80).optional().openapi({ description: 'Ubah atribut anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").' }),
+    receipt_url: z.string().url().max(1000).nullable().optional().openapi({ description: 'URL bukti struk/nota (kirim null untuk menghapus lampiran struk).' }),
+    receipt_image_base64: z.string().optional().openapi({ description: 'Opsional: base64 foto bukti struk baru untuk langsung diunggah.' }),
+    receipt_mime_type: z.string().optional(),
   })
   .openapi('UpdateTransactionBody')
 

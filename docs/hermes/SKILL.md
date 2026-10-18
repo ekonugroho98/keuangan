@@ -50,47 +50,66 @@ Di server ini sudah terpasang CLI resmi **`karaya`** (`/usr/local/bin/karaya`) y
 **DILARANG membuat file script `.py` baru atau merakit `curl` panjang sendiri** — selalu jalankan perintah `karaya` lewat terminal:
 
 ```bash
-# 1. Info Household, Saldo, & Kategori
+# 1. Info Household, Member, Saldo Akun, Kategori, & Resolusi Nama
 karaya info                                  # Cek fitur aktif (beneficiary, shopping_stock, dll.)
+karaya member                                # Daftar anggota keluarga & alias (GET /v1/members)
 karaya saldo                                 # Cek saldo semua akun/dompet (GET /v1/accounts)
-karaya kategori                              # Daftar kategori valid (GET /v1/categories)
+karaya akun detail <id_atau_nama>            # Detail satu akun (GET /v1/accounts/{id})
+karaya akun tambah --nama "Tabungan" --tipe bank [--saldo-awal 1jt] [--pemilik me|joint|Ibu] [--visibility shared|private]
+karaya akun ubah <id_atau_nama> [--nama ...] [--visibility shared|private] [--pemilik ...]
+karaya koreksi-saldo "BCA" 3250000           # Koreksi saldo aktual (POST /v1/accounts/{id}/adjust-balance)
+karaya kategori [--type expense|income|all]  # Daftar kategori valid (GET /v1/categories)
+karaya resolve --kind <account|category|member|debt|goal|piutang> --query "<teks>"
 
-# 2. Catat Keuangan (Pengeluaran, Pemasukan, Transfer, Struk)
-karaya keluar --akun BCA --kategori "Bahan Makanan" --nominal 45rb --catatan "sayur" --oleh Ibu
-karaya masuk  --akun BCA --kategori Gaji --nominal 15jt --catatan "gaji bulanan" --oleh Ayah
-karaya transfer --dari BCA --ke GoPay --nominal 200rb --catatan "isi gopay" --oleh Ayah
+# 2. Catat Keuangan (Pengeluaran, Pemasukan, Batch, Transfer, Struk, Cari, Ubah, Hapus, Pulihkan)
+karaya keluar --akun BCA --kategori "Bahan Makanan" --nominal 45rb --catatan "sayur" [--oleh Ibu] [--untuk Anak] [--toko "Pasar"]
+karaya masuk  --akun BCA --kategori Gaji --nominal 15jt --catatan "gaji bulanan" [--oleh Ayah]
+karaya batch  '{"account":"BRI","recorded_by":"Ibu","items":[{"amount_text":"20rb","category":"Bahan Makanan","note":"sayur"},{"amount_text":"15rb","note":"sabun","titipan":"Ayah"}]}'
+karaya transfer --dari BCA --ke GoPay --nominal 200rb --catatan "isi gopay" [--oleh Ayah]
 karaya struk '{"account":"BRI","merchant":"Alfamart","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600,"category":"Bahan Makanan"}]}'
-karaya cari --periode this_month --q indomaret
-karaya ubah <tx_id> --nominal 54rb --catatan "sayur pasar"
-karaya hapus <tx_id>
-karaya koreksi-saldo "BCA" 3250000
+karaya cari [--periode this_month] [--dari YYYY-MM-DD] [--sampai YYYY-MM-DD] [--akun BCA] [--kategori ...] [--member Ibu] [--untuk Anak] [--q indomaret] [--min 10000] [--max 500000]
+karaya detail <tx_id>                        # Detail 1 transaksi (GET /v1/transactions/{id})
+karaya ubah <tx_id> [--nominal 54rb] [--akun ...] [--kategori ...] [--catatan "sayur pasar"] [--oleh ...] [--untuk ...] [--qty 2] [--diskon 6600]
+karaya hapus <tx_id>                         # Soft-delete transaksi (DELETE /v1/transactions/{id})
+karaya pulihkan <tx_id>                      # Pulihkan transaksi terhapus (POST /v1/transactions/{id}/restore)
 
-# 3. Rekap, Analisa Pengeluaran, Budget, Laporan Bulanan, & Banding Harga Toko
-karaya ringkasan --periode this_month
-karaya analisa --periode this_month --kategori "Makan Beli & Jajan"
-karaya budget
-karaya laporan
-karaya harga "sabun lifebuoy"
+# 3. Rekap, Analisa Pengeluaran, Laporan Bulanan, & Banding Harga Toko
+karaya ringkasan [--periode this_month] [--scope household|member|account|beneficiary] [--member Ibu] [--akun BCA] [--untuk Anak]
+karaya analisa   [--periode this_month] [--kategori "Makan Beli & Jajan"] [--untuk Anak] [--akun BCA] [--member Ibu] [--q bakso]
+karaya laporan   [--bulan YYYY-MM]           # Laporan bulanan lengkap + text_id siap kirim (GET /v1/reports/monthly)
+karaya harga "sabun lifebuoy" [--hari 180]   # Banding harga barang antar toko (GET /v1/prices/compare)
+karaya harga samakan "LFBY BS 85G" "LIFEBUOY SABUN 85GR" # Samakan alias produk (POST /v1/prices/aliases)
 
 # 4. Daftar Belanja (Shopping List — saat shopping_stock aktif)
-karaya belanja list                          # Daftar belanja berstatus needed
+karaya belanja list [--status needed|bought|cancelled|all]
 karaya belanja tambah "sabun cuci" --qty "2 pcs" --catatan "sunlight"
 karaya belanja beli "sabun cuci"             # Tandai sudah dibeli (bisa langsung nama barang atau UUID!)
+karaya belanja ubah "sabun cuci" [--nama ...] [--qty ...] [--catatan ...] [--status needed|bought|cancelled]
+karaya belanja hapus "sabun cuci"
 karaya belanja saran                         # Saran belanja dari stok rumah yang menipis
 
 # 5. Bahan Pokok / Stok Kulkas & Dapur (Pantry — saat shopping_stock aktif)
-karaya stok list                             # Lihat isi kulkas/freezer/lemari
+karaya stok list [--lokasi kulkas|freezer|lemari|lainnya]
 karaya stok tambah "Telur" --qty 10 --unit butir --lokasi kulkas --min 4 --exp YYYY-MM-DD
+karaya stok ubah "Telur" [--nama ...] [--unit ...] [--lokasi kulkas|freezer|lemari] [--min 4] [--exp YYYY-MM-DD]
 karaya stok pakai "Telur" --delta -2 --alasan consume --catatan "masak pagi"
-karaya stok exp --hari 3                     # Cek stok yang mau basi/kedaluwarsa
+karaya stok hapus "Telur"
+karaya stok exp --hari 3 [--include-expired] [--exclude-acked]
+karaya stok exp-ack <id1,id2,...>            # Tandai stok kedaluwarsa sudah diingatkan hari ini
 
-# 6. Titipan / Piutang & Untuk Siapa (Beneficiary)
-karaya piutang list
-karaya piutang tambah --peminjam Ayah --nominal 45rb --akun BRI --catatan "titipan pampers"
-karaya piutang terima Ayah --nominal 45rb --akun "Kas Ibu" --catatan "lunas"
-karaya untuk list
+# 6. Titipan / Piutang, Hutang & Cicilan, Target Tabungan (Goals), & Anggaran (Budget)
+karaya piutang list | tambah --peminjam Ayah --nominal 45rb --akun BRI --catatan "titipan pampers" | ubah | hapus | terima Ayah --nominal 45rb --akun "Kas Ibu" | riwayat Ayah
+karaya hutang  list | tambah --nama "Cicilan Motor" --total 9.6jt --cicilan 1.2jt | ubah | hapus | bayar "Cicilan Motor" --nominal 1.2jt --akun BCA | riwayat "Cicilan Motor"
+karaya goal    list | tambah --nama "Dana Darurat" --target 30jt [--awal 5jt] | ubah | hapus | tabung "Dana Darurat" --nominal 500rb --akun BCA | riwayat "Dana Darurat"
+karaya budget  [status|list] [--bulan YYYY-MM] | tambah --kategori "Bahan Makanan" --nominal 3jt | ubah <id> --nominal 3.5jt | hapus <id> | salin --dari YYYY-MM --ke YYYY-MM
 
-# 7. Panggil 35 Tool Resmi hermes-tools.json atau Raw Endpoint
+# 7. Tagihan Rutin, Penerima Manfaat (Untuk Siapa), Investasi, & Patungan
+karaya rutin     list | tambah --nama "Listrik PLN" --nominal 500rb --kategori "Tagihan & Utilitas" --akun BCA --tanggal-berikutnya YYYY-MM-DD | ubah | hapus | jalankan
+karaya untuk     list | tambah <nama> [--kind member|child|relative|property|other] | ubah <id_atau_nama> --nama <baru> | hapus <id_atau_nama>
+karaya investasi list | tambah --nama "Emas Antam" --tipe emas --harga-beli 10jt --nilai-sekarang 12jt --qty 10 --unit gram | ubah | hapus
+karaya patungan  list | tambah --judul "Makan Keluarga" --total 300rb --members '[{"name":"Budi","amount":150000}]' | lunas <split_id> <member_id> | hapus <split_id>
+
+# 8. Panggil 35 Tool Resmi hermes-tools.json atau Raw Endpoint
 karaya call <nama_tool> '<json_args>'        # mis: karaya call record_expense '{"account":"BCA",...}'
 karaya raw <GET|POST|PATCH|DELETE> /v1/... ['<json_body>']
 ```
@@ -175,15 +194,16 @@ Tiap transaksi belanja struk mengembalikan `qty`, `unit_price` (harga satuan ber
 `discount` (total potongan diskon baris tersebut), `normal_unit_price` (harga satuan normal sebelum
 diskon), `total_size_label` (mis. `"2 L"` kalau beli 2 kemasan 1 liter), dan `canonical_name`.
 
-### Ubah atau hapus transaksi
+### Ubah, hapus, atau pulihkan transaksi
 Kalau user salah catat nominal, kategori, akun, tanggal, jumlah (`qty`), atau diskon (`discount`):
-- Cari ID transaksinya dulu lewat `GET /v1/transactions` (jika belum ada di konteks sesi).
-- Ubah: `PATCH /v1/transactions/{transaction_id}` dengan field yang ingin diperbaiki, misal
-  `{"amount_text":"54rb"}`, `{"account":"BCA","note":"sayur pasar"}`, atau `{"qty":2,"discount":6600}`.
-- Hapus: `DELETE /v1/transactions/{transaction_id}`.
+- Cari ID transaksinya dulu lewat `karaya cari` (`GET /v1/transactions`) jika belum ada di konteks sesi.
+- Ubah: `karaya ubah <tx_id> --nominal 54rb` (`PATCH /v1/transactions/{transaction_id}` dengan field yang ingin diperbaiki, misal
+  `{"amount":54000}`, `{"account":"BCA","note":"sayur pasar"}`, atau `{"qty":2,"discount":6600}`).
+- Hapus: `karaya hapus <tx_id>` (`DELETE /v1/transactions/{transaction_id}`).
+- Pulihkan transaksi terhapus: `karaya pulihkan <tx_id>` (`POST /v1/transactions/{transaction_id}/restore`).
 
 ### Koreksi saldo
-`POST /v1/accounts/{account_id}/adjust-balance` dengan `{"balance": <saldo_real_sekarang>}` — ini
+`karaya koreksi-saldo "<nama_akun>" <saldo_real_sekarang>` (`POST /v1/accounts/{account_id}/adjust-balance` dengan `{"new_balance": <saldo_real_sekarang>}`) — ini
 membuat transaksi "Koreksi Saldo" otomatis, bukan transaksi manual kategori lain.
 
 ## Untuk siapa (beneficiary) — opsional
@@ -200,12 +220,12 @@ tua, dll) — berbeda dari akun mana yang kepotong, dan berbeda dari piutang (it
 - Nilai **"bersama"** atau **"keluarga"** berarti "tanpa penerima tertentu" — pakai untuk
   mengosongkan ("itu bukan buat anak, balikin ke bersama") atau untuk memfilter transaksi yang bukan
   untuk siapa-siapa.
-- Lihat daftar penerima yang sudah ada: `GET /v1/beneficiaries`.
+- Lihat daftar penerima yang sudah ada: `karaya untuk list` (`GET /v1/beneficiaries`).
 - Tambah penerima baru kalau user eksplisit meminta:
-  `POST /v1/beneficiaries` dengan `{"name":"Anak","kind":"child"}` (`kind` wajib salah satu:
-  `child`, `parent`, `dependent`, `other`).
+  `karaya untuk tambah "Anak" --kind child` (`POST /v1/beneficiaries` dengan `{"name":"Anak","kind":"child"}` — `kind` wajib salah satu:
+  `member`, `child`, `relative`, `property`, `other`).
 - Nama tidak ketemu saat mencatat transaksi → `404 beneficiary_not_found` beserta `candidates`;
-  tawarkan memilih yang ada atau menambah baru via `POST /v1/beneficiaries`.
+  tawarkan memilih yang ada atau menambah baru via `karaya untuk tambah` (`POST /v1/beneficiaries`).
 
 ## Titipan antar anggota keluarga (piutang)
 
