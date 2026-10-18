@@ -36,13 +36,64 @@ diminta langsung.
 
 ## Auth & aturan request
 
-- Header wajib: `Authorization: Bearer <API_KEY>`
+- Header wajib: `Authorization: Bearer <API_KEY>` (atau otomatis via CLI `karaya` / `vault-proxy`)
 - Semua `POST`/`PATCH`/`DELETE` WAJIB header `Idempotency-Key: <uuid4>` — **baru** untuk tiap niat
   transaksi baru, **SAMA** kalau cuma retry request yang gagal karena network/timeout. Jangan pernah
   retry dengan body berbeda memakai key yang sama (ditolak `422 idempotency_key_reused`).
 - Format error seragam: `{"error":{"code":"...","message":"...","hint":"...","candidates":[...]}}`.
   `candidates` muncul khusus pada error `409 ambiguous_*` — isinya pilihan yang harus **ditanyakan ke
   user**, bukan ditebak sendiri.
+
+## WAJIB: Gunakan CLI Resmi `/usr/local/bin/karaya` (JANGAN Buat Script Python / curl Sendiri!)
+
+Di server ini sudah terpasang CLI resmi **`karaya`** (`/usr/local/bin/karaya`) yang otomatis membaca URL & 1 API key Household dari `~/.hermes/.env` (atau `vault-proxy`), otomatis membuat `Idempotency-Key` (UUIDv4), dan otomatis menghitung tanggal zona waktu WIB (`Asia/Jakarta`).
+**DILARANG membuat file script `.py` baru atau merakit `curl` panjang sendiri** — selalu jalankan perintah `karaya` lewat terminal:
+
+```bash
+# 1. Info Household, Saldo, & Kategori
+karaya info                                  # Cek fitur aktif (beneficiary, shopping_stock, dll.)
+karaya saldo                                 # Cek saldo semua akun/dompet (GET /v1/accounts)
+karaya kategori                              # Daftar kategori valid (GET /v1/categories)
+
+# 2. Catat Keuangan (Pengeluaran, Pemasukan, Transfer, Struk)
+karaya keluar --akun BCA --kategori "Bahan Makanan" --nominal 45rb --catatan "sayur" --oleh Ibu
+karaya masuk  --akun BCA --kategori Gaji --nominal 15jt --catatan "gaji bulanan" --oleh Ayah
+karaya transfer --dari BCA --ke GoPay --nominal 200rb --catatan "isi gopay" --oleh Ayah
+karaya struk '{"account":"BRI","merchant":"Alfamart","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600,"category":"Bahan Makanan"}]}'
+karaya cari --periode this_month --q indomaret
+karaya ubah <tx_id> --nominal 54rb --catatan "sayur pasar"
+karaya hapus <tx_id>
+karaya koreksi-saldo "BCA" 3250000
+
+# 3. Rekap, Analisa Pengeluaran, Budget, Laporan Bulanan, & Banding Harga Toko
+karaya ringkasan --periode this_month
+karaya analisa --periode this_month --kategori "Makan Beli & Jajan"
+karaya budget
+karaya laporan
+karaya harga "sabun lifebuoy"
+
+# 4. Daftar Belanja (Shopping List — saat shopping_stock aktif)
+karaya belanja list                          # Daftar belanja berstatus needed
+karaya belanja tambah "sabun cuci" --qty "2 pcs" --catatan "sunlight"
+karaya belanja beli "sabun cuci"             # Tandai sudah dibeli (bisa langsung nama barang atau UUID!)
+karaya belanja saran                         # Saran belanja dari stok rumah yang menipis
+
+# 5. Bahan Pokok / Stok Kulkas & Dapur (Pantry — saat shopping_stock aktif)
+karaya stok list                             # Lihat isi kulkas/freezer/lemari
+karaya stok tambah "Telur" --qty 10 --unit butir --lokasi kulkas --min 4 --exp YYYY-MM-DD
+karaya stok pakai "Telur" --delta -2 --alasan consume --catatan "masak pagi"
+karaya stok exp --hari 3                     # Cek stok yang mau basi/kedaluwarsa
+
+# 6. Titipan / Piutang & Untuk Siapa (Beneficiary)
+karaya piutang list
+karaya piutang tambah --peminjam Ayah --nominal 45rb --akun BRI --catatan "titipan pampers"
+karaya piutang terima Ayah --nominal 45rb --akun "Kas Ibu" --catatan "lunas"
+karaya untuk list
+
+# 7. Panggil 35 Tool Resmi hermes-tools.json atau Raw Endpoint
+karaya call <nama_tool> '<json_args>'        # mis: karaya call record_expense '{"account":"BCA",...}'
+karaya raw <GET|POST|PATCH|DELETE> /v1/... ['<json_body>']
+```
 
 ## Fitur opsional per household — cek SEKALI di awal sesi
 
@@ -193,62 +244,51 @@ sendiri tiap bulan.
 
 ## Belanja & Stok — opsional
 
-HANYA kalau `features.shopping_stock.enabled`:
+HANYA kalau `features.shopping_stock.enabled` (gunakan CLI `karaya belanja ...` dan `karaya stok ...`):
 
-- **Lihat daftar belanja**: `GET /v1/shopping` (default mengembalikan item berstatus `open` yang
-  belum dibeli; tambah `?status=bought` atau `?status=all` bila perlu).
+- **Lihat daftar belanja**: `karaya belanja list` (`GET /v1/shopping`, default mengembalikan item berstatus `needed` yang
+  belum dibeli; tambah `--status bought` atau `--status all` bila perlu).
 - **Tambah item belanja** (tanpa harga, misal "ingat beli sabun cuci"):
-  ```
-  POST /v1/shopping
-  {"name":"sabun cuci","qty":1,"unit":"pcs","note":"opsional"}
-  ```
-- **Tandai sudah dibeli** (butuh `id` dari `GET /v1/shopping`) — **tanpa** mencatat uang:
-  ```
-  PATCH /v1/shopping/{shopping_item_id}
-  {"status":"bought"}
-  ```
+  `karaya belanja tambah "sabun cuci" --qty "1 pcs" --catatan "opsional"`
+  (`POST /v1/shopping` dengan `{"name":"sabun cuci","qty_text":"1 pcs","notes":"opsional"}`).
+- **Tandai sudah dibeli** — **tanpa** mencatat uang:
+  `karaya belanja beli "sabun cuci"` (atau `PATCH /v1/shopping/{shopping_item_id}` dengan `{"status":"bought"}`).
   Kalau user juga menyebut harga dan akun pembayaran ("telur udah dibeli 28rb pakai kas"), panggil
-  `PATCH /v1/shopping/{id}` **dan** catat pengeluarannya lewat `POST /v1/transactions` (atau gunakan
-  `POST /v1/receipts/ingest`).
+  `karaya belanja beli ...` **dan** catat pengeluarannya lewat `karaya keluar ...` (atau gunakan
+  `karaya struk ...`).
 - **Saran belanja otomatis** (barang yang stoknya menipis tapi belum masuk daftar belanja):
-  `GET /v1/shopping/suggestions` — tawarkan proaktif kalau relevan.
-- **Lihat stok rumah (pantry)**: `GET /v1/pantry` — mengembalikan daftar stok beserta `grouped` per
-  `location` (`fridge` = kulkas, `freezer` = freezer, `shelf` = lemari/rak, `other` = lainnya).
+  `karaya belanja saran` (`GET /v1/shopping/suggestions`) — tawarkan proaktif kalau relevan.
+- **Lihat stok rumah (pantry)**: `karaya stok list` (`GET /v1/pantry` — mengembalikan daftar stok per
+  `location`: `fridge` = kulkas, `freezer` = freezer, `shelf` = lemari/rak, `other` = lainnya).
 - **Tambah atau perbarui item stok rumah**:
-  ```
-  POST /v1/pantry
-  {"name":"Telur","qty_on_hand":10,"unit":"butir","location":"fridge","min_threshold":4,"expires_at":"YYYY-MM-DD"}
-  ```
-- **Ubah jumlah stok** (terpakai, basi, koreksi hitungan, atau beli di luar struk — butuh `id` dari
-  `GET /v1/pantry`):
-  ```
-  POST /v1/pantry/{pantry_item_id}/movements
-  {"delta":-2,"reason":"consume","note":"masak pagi"}
-  ```
+  `karaya stok tambah "Telur" --qty 10 --unit butir --lokasi kulkas --min 4 --exp YYYY-MM-DD`
+  (`POST /v1/pantry` dengan `{"name":"Telur","qty":10,"unit":"butir","location":"fridge","min_qty":4,"expires_at":"YYYY-MM-DD"}`).
+- **Ubah jumlah stok** (terpakai, basi, koreksi hitungan, atau beli di luar struk):
+  `karaya stok pakai "Telur" --delta -2 --alasan consume --catatan "masak pagi"`
+  (`POST /v1/pantry/{pantry_item_id}/movements` dengan `{"delta":-2,"reason":"consume","note":"masak pagi"}`).
   `delta` negatif untuk mengurangi, positif untuk menambah. `reason` wajib salah satu: `consume`
   (terpakai normal), `expired` (dibuang basi), `adjust` (koreksi hitungan), `purchase` (menambah di
-  luar struk). Kalau user bilang "gula tinggal 1 kg" atau "telur habis", cek `qty_on_hand` sekarang
+  luar struk). Kalau user bilang "gula tinggal 1 kg" atau "telur habis", cek `qty` sekarang
   lalu kirim `delta` selisihnya dengan `reason:"adjust"` atau `reason:"consume"`.
-- **Cek stok hampir kedaluwarsa**: `GET /v1/pantry/expiring?within_days=3`.
+- **Cek stok hampir kedaluwarsa**: `karaya stok exp --hari 3` (`GET /v1/pantry/expiring?within_days=3`).
 - **Catat struk belanja sekaligus** (kalau user mengirim **foto struk** atau menyebut beberapa
   barang berharga dari **satu** transaksi):
-  ```
-  POST /v1/receipts/ingest
-  {"account":"Kas","merchant":"Alfamart","date":"YYYY-MM-DD","default_location":"shelf","items":[{"name":"Minyak Goreng 1L","qty":2,"unit":"pcs","amount":40380,"discount":6600},{"name":"Telur","qty":1,"unit":"kg","unit_price":28500}]}
+  ```bash
+  karaya struk '{"account":"Kas","merchant":"Alfamart","date":"YYYY-MM-DD","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600},{"name":"Telur","qty":1,"amount":28500}]}'
   ```
   - Isi `amount` dengan **total harga bersih yang dibayar** untuk baris itu (setelah dipotong diskon), dan isi `discount` dengan **nominal potongan diskon baris itu** (angka positif, default `0`).
   - Satu panggilan ini sekaligus mencatat transaksi pengeluaran, mencoret item yang cocok di daftar
     belanja, menambah stok pantry, dan menyimpan riwayat harga barang (lengkap dengan harga normal,
     diskon, dan harga bersih). Responsnya melaporkan per item apa yang terjadi, termasuk `unmatched`
     untuk yang tidak cocok — **laporkan yang `unmatched` dengan jujur**, jangan diam-diam diabaikan.
-- **Bandingkan harga barang antar toko**: `GET /v1/prices/compare?q=beras` — mengembalikan harga
+- **Bandingkan harga barang antar toko**: `karaya harga "beras"` (`GET /v1/prices/compare?q=beras`) — mengembalikan harga
   bersih (`price`), harga normal sebelum diskon (`normal_price`), diskon satuan (`discount`),
   berapa kali toko tersebut memberi promo (`promo_count`), dan total penghematan diskon
   (`total_discount_saved`).
 
-> **Catatan foto struk**: membaca gambar hanya berfungsi pada model AI yang vision-capable. Model
-> gratis bawaan secara default **bukan** vision-capable — ganti model dulu lewat `/model` kalau fitur
-> struk mau dipakai.
+> **Catatan foto struk (Vision AI + Fallback OCR `ocr-baca`)**:
+> 1. **Utamakan Vision AI bawaan** untuk membaca foto struk/nota secara langsung.
+> 2. **Fallback OCR Lokal**: Jika model AI yang sedang aktif tidak bisa membaca gambar (mis. model gratis text-only) atau terkena limit gambar (429), **JANGAN menolak dan JANGAN menulis script OCR sendiri** — jalankan perintah **`ocr-baca /path/ke/foto.jpg`** (atau `ocr-struk /path/ke/foto.jpg`) di terminal untuk mengekstrak teks struk, lalu catat hasilnya dengan `karaya struk '...'`.
 
 ## Aturan perilaku
 
