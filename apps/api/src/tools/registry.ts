@@ -544,7 +544,8 @@ export const TOOLS: ToolDefinition[] = [
             properties: {
               name: str('Nama item persis seperti di struk atau diucapkan user'),
               qty: num('Jumlah unit, default 1'),
-              amount: num('Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)'),
+              amount: num('Harga bersih item ini dalam rupiah SETELAH dikurangi diskon item (bukan per-unit kalau qty>1, total baris item ini)'),
+              discount: num('Total potongan diskon baris item ini dalam rupiah (opsional, 0 kalau tidak diskon)'),
               category: str('Nama kategori dari list_categories, dipilih dari JENIS barang ini (bukan toko). Ragu → "Lainnya" atau kosongkan: API menebak dari nama item, dan nama tak dikenal dipetakan ke kategori household terdekat (tidak pernah error).'),
               for: str('F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini'),
               titipan: str('Nama orang yang MENITIP, HANYA kalau user bilang item ini titipan/dibelikan untuk orang lain yang akan mengganti uangnya ("sabunnya titipan Bu Ani"). Item itu masuk kategori Piutang + otomatis dibuatkan catatan piutang atas nama orang itu (bukan pengeluaran keluarga). Jangan isi kalau tidak disebut.'),
@@ -565,13 +566,21 @@ export const TOOLS: ToolDefinition[] = [
     handler: async (actor, args) => {
       // Number(): model internal bisa mengirim angka sebagai string ("25000") — tanpa coerce,
       // reduce() di ingestReceipt akan MENYAMBUNG string, bukan menjumlah (review 2026-10-08).
-      const items = (args.items as Array<{ name: string; qty?: unknown; amount: unknown; category?: string; for?: unknown; titipan?: unknown }>) ?? []
+      const items = (args.items as Array<{ name: string; qty?: unknown; amount: unknown; discount?: unknown; category?: string; for?: unknown; titipan?: unknown }>) ?? []
       return ingestReceipt(actor, {
         account: args.account as string | undefined,
         date: args.date as string | undefined,
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
-        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for), titipan: optStr(i.titipan) })),
+        items: items.map((i) => ({
+          name: i.name,
+          qty: i.qty == null ? 1 : Number(i.qty),
+          amount: Number(i.amount),
+          discount: i.discount != null && Number(i.discount) > 0 ? Math.round(Number(i.discount)) : undefined,
+          category: i.category,
+          for: optStr(i.for),
+          titipan: optStr(i.titipan),
+        })),
         total: args.total == null ? undefined : Number(args.total),
         shopping: args.shopping !== false,
         pantry: args.pantry !== false,

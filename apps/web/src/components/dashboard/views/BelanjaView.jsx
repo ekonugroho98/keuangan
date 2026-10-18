@@ -198,9 +198,28 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
 
     const allProducts = result?.products ?? [];
     const multiStoreCount = allProducts.filter((p) => p.stores.length > 1).length;
+    const promoCount = allProducts.filter((p) => p.stores.some((s) => (s.discount ?? 0) > 0 || (s.promo_count ?? 0) > 0)).length;
+    const promoStores = useMemo(() => {
+        const map = new Map();
+        for (const p of allProducts) {
+            for (const s of p.stores) {
+                const saved = Number(s.total_discount_saved ?? 0);
+                const cnt = Number(s.promo_count ?? (s.discount > 0 ? 1 : 0));
+                if (saved > 0 || cnt > 0) {
+                    const cur = map.get(s.merchant) || { merchant: s.merchant, count: 0, saved: 0 };
+                    cur.count += cnt;
+                    cur.saved += saved;
+                    map.set(s.merchant, cur);
+                }
+            }
+        }
+        return [...map.values()].sort((a, b) => b.saved - a.saved || b.count - a.count);
+    }, [allProducts]);
     const displayedProducts = filterMode === "multi"
         ? allProducts.filter((p) => p.stores.length > 1)
-        : allProducts;
+        : filterMode === "promo"
+            ? allProducts.filter((p) => p.stores.some((s) => (s.discount ?? 0) > 0 || (s.promo_count ?? 0) > 0))
+            : allProducts;
 
     return (
         <div style={glassCard}>
@@ -327,10 +346,10 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                 </button>
             </div>
 
-            {/* Filter Mode Tabs (Semua vs Bisa Hemat >1 Toko) */}
+            {/* Filter Mode Tabs (Semua vs Bisa Hemat >1 Toko vs Diskon) */}
             {allProducts.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         <button
                             onClick={() => setFilterMode("all")}
                             style={{
@@ -363,6 +382,24 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                         >
                             🔥 Beda Toko / Bisa Hemat ({multiStoreCount})
                         </button>
+                        {promoCount > 0 && (
+                            <button
+                                onClick={() => setFilterMode("promo")}
+                                style={{
+                                    padding: "5px 11px",
+                                    borderRadius: 99,
+                                    border: filterMode === "promo" ? "1px solid var(--color-primary)" : "1px solid var(--glass-border)",
+                                    background: filterMode === "promo" ? "var(--color-primary-soft)" : "var(--bg-surface-low)",
+                                    color: filterMode === "promo" ? "var(--color-primary)" : "var(--color-muted)",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                🏷️ Dapat Diskon ({promoCount})
+                            </button>
+                        )}
                     </div>
                     {result?.query && (
                         <button
@@ -372,6 +409,21 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                             ↺ Lihat Katalog Semua
                         </button>
                     )}
+                </div>
+            )}
+
+            {/* Banner Toko Paling Sering Kasih Diskon */}
+            {promoStores.length > 0 && (
+                <div style={{ padding: "10px 14px", borderRadius: 12, background: "rgba(131,155,122,.08)", border: "1px solid rgba(131,155,122,.24)", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 11, color: "var(--color-text)", lineHeight: 1.4 }}>
+                        <span style={{ fontWeight: 800, color: "var(--color-primary)" }}>🏷️ Toko Paling Sering Kasih Diskon: </span>
+                        {promoStores.map((ps, idx) => (
+                            <span key={ps.merchant}>
+                                {idx > 0 ? " · " : ""}
+                                <strong>{ps.merchant}</strong> ({ps.count} item promo, hemat <span className="mono" style={{ color: "var(--color-primary)", fontWeight: 700 }}>{fmtRp(ps.saved)}</span>)
+                            </span>
+                        ))}
+                    </div>
                 </div>
             )}
 
@@ -475,6 +527,7 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                     {p.stores.map((s, i) => {
                         const isHistoricalLow = s.observations > 1 && s.per_unit_price <= s.lowest_per_unit_price;
                         const isAboveHistoricalLow = s.observations > 1 && s.per_unit_price > s.lowest_per_unit_price;
+                        const hasDiscount = s.normal_price && s.discount && s.discount > 0;
                         return (
                             <div
                                 key={s.merchant}
@@ -489,14 +542,26 @@ const PriceComparePanel = ({ toast, quickItems = [], externalQuery, onExternalQu
                                 }}
                             >
                                 <div style={{ color: "var(--color-text)", minWidth: 0 }}>
-                                    <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                                         <span style={{ fontWeight: i === 0 ? 800 : 600 }}>
                                             {i === 0 && p.stores.length > 1 ? "🏆 " : ""}{s.merchant}
                                         </span>
                                         <span style={{ color: "var(--color-muted)" }}>
-                                            {" "}· {fmtRp(s.price)}{s.size ? ` (${s.size})` : ""} · {shortDate(s.last_date)}
+                                            ·{" "}
+                                            {hasDiscount && (
+                                                <span style={{ textDecoration: "line-through", opacity: 0.65, marginRight: 4 }}>
+                                                    {fmtRp(s.normal_price)}
+                                                </span>
+                                            )}
+                                            <strong style={{ color: hasDiscount ? "var(--color-primary)" : "inherit" }}>{fmtRp(s.price)}</strong>
+                                            {s.size ? ` (${s.size})` : ""} · {shortDate(s.last_date)}
                                             {s.observations > 1 ? ` · ${s.observations}x beli` : ""}
                                         </span>
+                                        {hasDiscount && (
+                                            <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 99, background: "rgba(131,155,122,.15)", color: "var(--color-primary)", fontWeight: 700, whiteSpace: "nowrap" }}>
+                                                🏷️ Diskon -{fmtRp(s.discount)}/pcs
+                                            </span>
+                                        )}
                                     </div>
                                     {isHistoricalLow && (
                                         <div style={{ fontSize: 10, color: "var(--color-primary)", fontWeight: 700, marginTop: 2 }}>

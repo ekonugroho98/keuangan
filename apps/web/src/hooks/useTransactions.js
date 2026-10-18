@@ -10,6 +10,11 @@ function flatten(tx) {
         amount: tx.amount,
         date: tx.date,
         note: tx.note,
+        qty: tx.qty ?? null,
+        unit_price: tx.unit_price ?? null,
+        discount: tx.discount ?? 0,
+        normal_unit_price: tx.normal_unit_price ?? null,
+        total_size_label: tx.total_size_label ?? null,
         category: tx.category?.name,
         icon: tx.category?.icon || categoryIcons[tx.category?.name] || "📦",
         beneficiary: tx.beneficiary?.name ?? null, // F-A, 10-fitur-opsional-keluarga.md §3 — null = bersama
@@ -79,6 +84,7 @@ export function useTransactions() {
                     items: items.map((i) => ({
                         amount: i.amount,
                         qty: i.qty && Number(i.qty) > 0 ? Number(i.qty) : undefined,
+                        discount: i.discount && Number(i.discount) > 0 ? Math.round(Number(i.discount)) : undefined,
                         category: i.category,
                         note: i.note,
                     })),

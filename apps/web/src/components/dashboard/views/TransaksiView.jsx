@@ -742,6 +742,15 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                                     untuk: {tx.beneficiary}
                                                 </span>
                                             )}
+                                            {tx.discount > 0 && (
+                                                <span style={{
+                                                    fontSize: 9, padding: "2px 8px", borderRadius: 9999,
+                                                    background: "rgba(131,155,122,.14)", color: "var(--color-primary)",
+                                                    fontWeight: 700, whiteSpace: "nowrap",
+                                                }}>
+                                                    🏷️ Diskon -{fmtRp(tx.discount)}
+                                                </span>
+                                            )}
                                         </div>
                                         <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0 }}>
                                             {fmtDate(tx.date)} · {tCat(tx.category)} ·{" "}
@@ -749,6 +758,8 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                                 ? <span style={{ color: "#4FC3F7", fontWeight: 600 }}>{tx.account_name} → {tx.to_account_name}</span>
                                                 : tx.account_name
                                             }
+                                            {tx.qty > 1 && tx.unit_price ? ` · ${tx.qty}x @${fmtRp(tx.unit_price)}` : ""}
+                                            {tx.discount > 0 ? ` · Harga asli ${fmtRp(tx.amount + tx.discount)}` : ""}
                                         </p>
                                     </div>
                                 </div>

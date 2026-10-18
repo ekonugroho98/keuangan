@@ -12453,6 +12453,8 @@ var TransactionSchema = external_exports.object({
   note: external_exports.string(),
   qty: external_exports.number().nullable().optional(),
   unit_price: external_exports.number().nullable().optional(),
+  discount: external_exports.number().int().nonnegative().nullable().optional(),
+  normal_unit_price: external_exports.number().nullable().optional(),
   size_value: external_exports.number().nullable().optional(),
   size_unit: external_exports.enum(["g", "ml", "pcs"]).nullable().optional(),
   total_size_label: external_exports.string().nullable().optional(),
@@ -12485,6 +12487,7 @@ var BatchItemSchema = external_exports.object({
   amount: external_exports.number().int().positive().optional(),
   amount_text: external_exports.string().optional(),
   qty: external_exports.number().positive().optional(),
+  discount: external_exports.number().int().nonnegative().optional(),
   category_id: UuidSchema.optional(),
   category: external_exports.string().optional(),
   note: external_exports.string().optional(),
@@ -12507,6 +12510,8 @@ var UpdateTransactionBodySchema = external_exports.object({
   category: external_exports.string().optional(),
   date: DateStringSchema.optional(),
   note: external_exports.string().max(500).optional(),
+  qty: external_exports.number().positive().optional(),
+  discount: external_exports.number().int().nonnegative().optional(),
   beneficiary_id: UuidSchema.nullable().optional(),
   beneficiary: external_exports.string().optional().openapi({ description: "null eksplisit pada beneficiary_id = kembali ke bersama." })
 }).openapi("UpdateTransactionBody");
@@ -12956,6 +12961,7 @@ var ReceiptItemSchema = external_exports.object({
   name: external_exports.string().min(1),
   qty: external_exports.number().positive().default(1),
   amount: external_exports.number().int().positive(),
+  discount: external_exports.number().int().nonnegative().optional().openapi({ description: "Total potongan diskon baris struk ini (Rp). amount tetap harga bersih yang dibayar setelah diskon." }),
   category_id: UuidSchema.optional(),
   category: external_exports.string().optional(),
   for: external_exports.string().optional().openapi({ description: "Alias beneficiary untuk item ini (F-A), diteruskan apa adanya." }),
@@ -12979,7 +12985,11 @@ var ComparePricesQuerySchema = external_exports.object({
 var StorePriceSchema = external_exports.object({
   merchant: external_exports.string(),
   last_date: external_exports.string(),
-  price: external_exports.number().openapi({ description: "Harga satu kemasan terakhir" }),
+  price: external_exports.number().openapi({ description: "Harga satu kemasan terakhir (setelah diskon)" }),
+  normal_price: external_exports.number().nullable().optional().openapi({ description: "Harga satu kemasan asli sebelum diskon (null bila tidak diskon)" }),
+  discount: external_exports.number().optional().openapi({ description: "Potongan diskon per kemasan pada transaksi terakhir (Rp, 0 bila tidak diskon)" }),
+  promo_count: external_exports.number().optional().openapi({ description: "Berapa kali toko ini memberi diskon pada riwayat produk ini" }),
+  total_discount_saved: external_exports.number().optional().openapi({ description: "Total rupiah diskon yang dihemat untuk produk ini di toko ini" }),
   size: external_exports.string().nullable(),
   per_unit_price: external_exports.number().openapi({ description: "Harga terakhir per satuan banding (compare_basis)" }),
   lowest_per_unit_price: external_exports.number(),
@@ -14369,19 +14379,32 @@ async function recordPrices(tx, householdId, merchant, date, items) {
   const m = merchant?.trim();
   const valid = items.filter((i) => i.transaction_id && i.amount > 0);
   if (!m || !valid.length) return 0;
-  const payload = valid.map((i) => ({ transaction_id: i.transaction_id, name: priceItemName(i.name), qty: i.qty ?? 1, amount: i.amount }));
+  const payload = valid.map((i) => ({
+    transaction_id: i.transaction_id,
+    name: priceItemName(i.name),
+    qty: i.qty ?? 1,
+    amount: i.amount,
+    discount: i.discount && i.discount > 0 ? Math.round(i.discount) : 0
+  }));
   const [row] = await tx`select record_product_prices(${householdId}, ${m}, ${date}, ${tx.json(payload)}) as n`;
   return row?.n ?? 0;
 }
 async function syncTransactionPrice(tx, householdId, txRow) {
-  const [prev] = await tx`select qty::text from product_prices where transaction_id = ${txRow.id}`;
+  const [prev] = await tx`select qty::text, discount::text from product_prices where transaction_id = ${txRow.id}`;
   await tx`delete from product_prices where transaction_id = ${txRow.id}`;
   if (txRow.type !== "expense" || !txRow.note || txRow.amount <= 0) return;
   const parsed = parseReceiptNote(txRow.note);
   if (!parsed.merchant || !parsed.name) return;
-  const prevQty = parsed.qty ?? (prev ? Number(prev.qty) : 1);
+  const effectiveQty = txRow.qty ?? parsed.qty ?? (prev ? Number(prev.qty) : 1);
+  const effectiveDiscount = txRow.discount !== void 0 ? txRow.discount : prev ? Number(prev.discount) : 0;
   await recordPrices(tx, householdId, parsed.merchant, txRow.date, [
-    { transaction_id: txRow.id, name: parsed.name, qty: prevQty > 0 ? prevQty : 1, amount: txRow.amount }
+    {
+      transaction_id: txRow.id,
+      name: parsed.name,
+      qty: effectiveQty > 0 ? effectiveQty : 1,
+      amount: txRow.amount,
+      discount: effectiveDiscount > 0 ? effectiveDiscount : 0
+    }
   ]);
 }
 function basisFor(unit) {
@@ -14418,12 +14441,18 @@ function summarizeObservations(rows) {
     const metric = (o) => Math.round((unit && o.price_per_unit != null ? Number(o.price_per_unit) : Number(o.unit_price)) * basis.factor);
     const stores = /* @__PURE__ */ new Map();
     for (const o of obs) {
+      const rawDisc = Math.max(0, Number(o.discount ?? 0));
+      const qtyVal = Math.max(1, Number(o.qty ?? 1));
+      const unitDisc = rawDisc > 0 ? Math.round(rawDisc / qtyVal) : 0;
+      const normalPrice = rawDisc > 0 ? Math.round(o.normal_unit_price != null ? Number(o.normal_unit_price) : Number(o.unit_price) + rawDisc / qtyVal) : null;
       const s = stores.get(o.merchant_key);
       if (!s) {
         stores.set(o.merchant_key, {
           merchant: o.merchant,
           last_date: o.date,
           price: Math.round(Number(o.unit_price)),
+          ...normalPrice !== null ? { normal_price: normalPrice, discount: unitDisc } : {},
+          ...rawDisc > 0 ? { promo_count: 1, total_discount_saved: Math.round(rawDisc) } : {},
           size: sizeLabel(o),
           per_unit_price: metric(o),
           lowest_per_unit_price: metric(o),
@@ -14432,6 +14461,10 @@ function summarizeObservations(rows) {
       } else {
         s.observations++;
         s.lowest_per_unit_price = Math.min(s.lowest_per_unit_price, metric(o));
+        if (rawDisc > 0) {
+          s.promo_count = (s.promo_count ?? 0) + 1;
+          s.total_discount_saved = (s.total_discount_saved ?? 0) + Math.round(rawDisc);
+        }
       }
     }
     const list = [...stores.values()].sort((a, b2) => a.per_unit_price - b2.per_unit_price);
@@ -14439,7 +14472,10 @@ function summarizeObservations(rows) {
     const max = Math.max(...list.map((s) => s.per_unit_price));
     const savings = list.length > 1 && max > 0 ? Math.round((max - list[0].per_unit_price) / max * 100) : null;
     const name = obs[0].product_name;
-    const parts2 = list.map((s) => `${s.merchant} ${fmtRp(s.per_unit_price)}/${basis.label.replace("per ", "")}${s.size ? ` (${s.size} ${fmtRp(s.price)})` : ""}, ${fmtDateId(s.last_date)}`);
+    const parts2 = list.map((s) => {
+      const promoInfo = s.normal_price && s.discount && s.discount > 0 ? ` [harga asli ${fmtRp(s.normal_price)}, diskon -${fmtRp(s.discount)}]` : "";
+      return `${s.merchant} ${fmtRp(s.per_unit_price)}/${basis.label.replace("per ", "")}${s.size ? ` (${s.size} ${fmtRp(s.price)}${promoInfo})` : promoInfo}, ${fmtDateId(s.last_date)}`;
+    });
     const summary = list.length > 1 ? `${name}: termurah di ${list[0].merchant}. ${parts2.join("; ")}.${savings ? ` Selisih ${savings}%.` : ""}` : `${name}: baru tercatat di ${parts2[0]}. Belum ada pembanding dari toko lain.`;
     out.push({ product_name: name, unit, compare_basis: basis.label, stores: list, cheapest, savings_pct: savings, summary });
   }
@@ -14449,6 +14485,7 @@ function summarizeObservations(rows) {
 }
 var OBS_SELECT = `
   select product_name, product_key, keyword, merchant, merchant_key, qty::float as qty, unit_price::float as unit_price,
+         discount::float as discount, normal_unit_price::float as normal_unit_price,
          size_value::float as size_value, size_unit, price_per_unit::float as price_per_unit, date::text as date
   from v_product_prices`;
 function sinceDate(days) {
@@ -14559,6 +14596,8 @@ function formatTotalSize(qty, sizeVal, sizeUnit) {
 function mapTx(r) {
   const qty = r.item_qty != null ? Number(r.item_qty) : null;
   const unitPrice = r.item_unit_price != null ? Math.round(Number(r.item_unit_price)) : null;
+  const discount = r.item_discount != null ? Math.round(Number(r.item_discount)) : null;
+  const normalUnitPrice = r.item_normal_unit_price != null ? Math.round(Number(r.item_normal_unit_price)) : unitPrice;
   const sizeValue = r.item_size_value != null ? Number(r.item_size_value) : null;
   const sizeUnit = r.item_size_unit ?? null;
   const totalSizeLabel = formatTotalSize(qty, sizeValue, sizeUnit);
@@ -14569,7 +14608,16 @@ function mapTx(r) {
     amount: Number(r.amount),
     date: r.date,
     note: r.note,
-    ...qty !== null ? { qty, unit_price: unitPrice, size_value: sizeValue, size_unit: sizeUnit, total_size_label: totalSizeLabel, canonical_name: canonicalName } : {},
+    ...qty !== null ? {
+      qty,
+      unit_price: unitPrice,
+      discount: discount ?? 0,
+      normal_unit_price: normalUnitPrice,
+      size_value: sizeValue,
+      size_unit: sizeUnit,
+      total_size_label: totalSizeLabel,
+      canonical_name: canonicalName
+    } : {},
     account: { id: r.account_id, name: r.account_name, owner: r.account_owner_member_id ? { member_id: r.account_owner_member_id, display_name: r.account_owner_display_name } : null },
     to_account: r.to_account_id ? { id: r.to_account_id, name: r.to_account_name, owner: r.to_account_owner_member_id ? { member_id: r.to_account_owner_member_id, display_name: r.to_account_owner_display_name } : null } : null,
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
@@ -14591,6 +14639,7 @@ var TX_SELECT = `
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
          t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
          pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
+         pp.discount::text as item_discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as item_normal_unit_price,
          pp.size_value::text as item_size_value, pp.size_unit as item_size_unit,
          coalesce(pa.canonical_name, pk.canonical_name) as item_canonical_name
   from transactions t
@@ -14790,7 +14839,13 @@ async function createTransactionBatch(actor, input, timezone) {
       if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount });
       if (parsed?.merchant) {
         const list = pricesByMerchant.get(parsed.merchant) ?? [];
-        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty ?? parsed.qty, amount: it.amount });
+        list.push({
+          transaction_id: txId,
+          name: parsed.name,
+          qty: input.items[i]?.qty ?? parsed.qty,
+          amount: it.amount,
+          discount: input.items[i]?.discount
+        });
         pricesByMerchant.set(parsed.merchant, list);
       }
     }
@@ -14820,13 +14875,15 @@ async function updateTransaction(actor, id, input) {
     }
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch)})`;
     let rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
-    if (patch.amount !== void 0 || patch.date !== void 0 || patch.note !== void 0 || patch.type !== void 0) {
+    if (patch.amount !== void 0 || patch.date !== void 0 || patch.note !== void 0 || patch.type !== void 0 || input.qty !== void 0 || input.discount !== void 0) {
       await syncTransactionPrice(tx, actor.householdId, {
         id: rows[0].id,
         type: rows[0].type,
         amount: Number(rows[0].amount),
         date: rows[0].date,
-        note: rows[0].note
+        note: rows[0].note,
+        qty: input.qty,
+        discount: input.discount
       });
       rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
     }
@@ -17046,7 +17103,7 @@ async function ingestReceipt(actor, input) {
     const priceItems = [];
     for (const [idx, item] of input.items.entries()) {
       const txId = takeMatch(idx, item.amount);
-      priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount });
+      priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount, discount: item.discount });
       if (titipan[idx]) titipanCreated.push({ txId, borrower: titipan[idx].borrower, name: item.name, amount: item.amount });
       if (input.shopping) {
         const [match2] = await tx`select find_shopping_match(${actor.householdId}, ${item.name}) as id`;
@@ -17137,6 +17194,8 @@ function buildInsights(input) {
   const { rows, period, today } = input;
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const count = rows.length;
+  const totalDiscount = rows.reduce((s, r) => s + Math.max(0, Number(r.discount ?? 0)), 0);
+  const discountedCount = rows.filter((r) => Number(r.discount ?? 0) > 0).length;
   const effectiveTo = today < period.to && today >= period.from ? today : period.to;
   const daysElapsed = Math.max(1, daysBetween(period.from, effectiveTo));
   const daysInPeriod = daysBetween(period.from, period.to);
@@ -17160,15 +17219,25 @@ function buildInsights(input) {
     items.set(k, g);
     if (place) {
       const pk = normText(place);
-      const p = places.get(pk) ?? { place, total: 0, count: 0 };
+      const p = places.get(pk) ?? { place, total: 0, count: 0, discount_total: 0, discount_count: 0 };
       p.total += r.amount;
       p.count++;
+      const disc = Math.max(0, Number(r.discount ?? 0));
+      if (disc > 0) {
+        p.discount_total += disc;
+        p.discount_count++;
+      }
       places.set(pk, p);
     }
   }
   const topItems = [...items.values()].sort((a, b2) => b2.total - a.total || b2.count - a.count).slice(0, 15).map((g) => ({ item: g.item, place: [...g.places][0] ?? null, label: g.places.size ? `${g.item} (${[...g.places][0]})` : g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), dates: g.dates.sort() }));
   const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.label, count: i.count, total: i.total }));
-  const topPlaces = [...places.values()].sort((a, b2) => b2.total - a.total).slice(0, 10);
+  const topPlaces = [...places.values()].sort((a, b2) => b2.total - a.total).slice(0, 10).map((p) => ({
+    place: p.place,
+    total: p.total,
+    count: p.count,
+    ...p.discount_total > 0 ? { discount_total: p.discount_total, discount_count: p.discount_count } : {}
+  }));
   const days = /* @__PURE__ */ new Map();
   for (const r of rows) {
     const d = days.get(r.date) ?? { date: r.date, total: 0, count: 0, items: [] };
@@ -17222,6 +17291,10 @@ function buildInsights(input) {
   const scope = input.filter.category ?? "Semua pengeluaran";
   parts2.push(`${scope} ${period.label}${ongoing ? ` (s.d. ${fmtDay(effectiveTo)})` : ""}: ${fmtRp(total)} dari ${count} transaksi, rata-rata ${fmtRp(perDay)}/hari.`);
   if (ongoing) parts2.push(`Laju ini \u2248 ${fmtRp(projected)} untuk satu periode penuh.`);
+  if (totalDiscount > 0) {
+    const topDiscPlace = [...places.values()].sort((a, b2) => b2.discount_total - a.discount_total)[0];
+    parts2.push(`Total hemat dari diskon: ${fmtRp(totalDiscount)} (${discountedCount} item${topDiscPlace && topDiscPlace.discount_total > 0 ? `, terbanyak di ${topDiscPlace.place} ${fmtRp(topDiscPlace.discount_total)}` : ""}).`);
+  }
   if (budget) parts2.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ""}${budget.cut_per_day_needed > 0 ? ` \u2014 supaya pas budget, rata-rata harian perlu turun \xB1${fmtRp(budget.cut_per_day_needed)}` : ""}.`);
   if (comparison && comparison.available && comparison.change_pct !== null) parts2.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? "naik" : "turun"} ${Math.abs(comparison.change_pct)}%.`);
   if (topDays[0] && topDays[0].count > 1) parts2.push(`Hari paling boros: ${topDays[0].weekday} ${fmtDay(topDays[0].date)} ${fmtRp(topDays[0].total)} (${topDays[0].count} transaksi).`);
@@ -17231,7 +17304,15 @@ function buildInsights(input) {
   return {
     period: { label: period.label, from: period.from, to: period.to, days_elapsed: daysElapsed, days_in_period: daysInPeriod, ongoing },
     filter: input.filter,
-    totals: { total, count, per_day: perDay, avg_per_transaction: avgTx, active_days: activeDays, projected_period_total: projected },
+    totals: {
+      total,
+      count,
+      per_day: perDay,
+      avg_per_transaction: avgTx,
+      active_days: activeDays,
+      projected_period_total: projected,
+      ...totalDiscount > 0 ? { total_discount_saved: totalDiscount, discounted_items_count: discountedCount } : {}
+    },
     budget,
     comparison,
     by_category: input.filter.category ? void 0 : byCategory,
@@ -17245,7 +17326,16 @@ function buildInsights(input) {
     by_weekday: byWeekday,
     week_split: weekSplit,
     largest,
-    transactions: count <= MAX_TX_LIST ? [...rows].sort((a, b2) => a.date < b2.date ? -1 : 1).map((r) => ({ date: r.date, amount: r.amount, note: r.note, category: r.category, account: r.account, beneficiary: r.beneficiary })) : void 0,
+    transactions: count <= MAX_TX_LIST ? [...rows].sort((a, b2) => a.date < b2.date ? -1 : 1).map((r) => ({
+      date: r.date,
+      amount: r.amount,
+      note: r.note,
+      category: r.category,
+      account: r.account,
+      beneficiary: r.beneficiary,
+      ...r.qty != null ? { qty: r.qty, unit_price: r.unit_price } : {},
+      ...r.discount && r.discount > 0 ? { discount: r.discount, normal_unit_price: r.normal_unit_price } : {}
+    })) : void 0,
     transactions_omitted: count > MAX_TX_LIST ? count : 0,
     text_id: parts2.join(" ")
   };
@@ -17283,7 +17373,9 @@ async function analyzeSpending(actor, input) {
       select t.id, t.date::text as date, t.amount::text as amount, coalesce(t.note, '') as note,
              c.name as category, c.is_system as category_system,
              a.name as account, am.display_name as account_owner,
-             coalesce(bm.display_name, b.name) as beneficiary, rm.display_name as recorded_by
+             coalesce(bm.display_name, b.name) as beneficiary, rm.display_name as recorded_by,
+             pp.qty::text as qty, pp.unit_price::text as unit_price,
+             pp.discount::text as discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as normal_unit_price
       from transactions t
       join categories c on c.id = t.category_id
       join accounts a on a.id = t.account_id
@@ -17291,10 +17383,18 @@ async function analyzeSpending(actor, input) {
       left join beneficiaries b on b.id = t.beneficiary_id
       left join household_members bm on bm.id = b.member_id
       join household_members rm on rm.id = t.recorded_by_member_id
+      left join product_prices pp on pp.transaction_id = t.id
       where ${where(period.from, period.to)}
       order by t.date, t.created_at
     `;
-    const rows = raw2.map((r) => ({ ...r, amount: Number(r.amount) }));
+    const rows = raw2.map((r) => ({
+      ...r,
+      amount: Number(r.amount),
+      qty: r.qty != null ? Number(r.qty) : null,
+      unit_price: r.unit_price != null ? Math.round(Number(r.unit_price)) : null,
+      discount: r.discount != null ? Math.round(Number(r.discount)) : null,
+      normal_unit_price: r.normal_unit_price != null ? Math.round(Number(r.normal_unit_price)) : null
+    }));
     let previous = null;
     if (input.compare !== false) {
       const effectiveTo = today < period.to && today >= period.from ? today : period.to;
@@ -17819,7 +17919,8 @@ var TOOLS = [
             properties: {
               name: str("Nama item persis seperti di struk atau diucapkan user"),
               qty: num("Jumlah unit, default 1"),
-              amount: num("Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)"),
+              amount: num("Harga bersih item ini dalam rupiah SETELAH dikurangi diskon item (bukan per-unit kalau qty>1, total baris item ini)"),
+              discount: num("Total potongan diskon baris item ini dalam rupiah (opsional, 0 kalau tidak diskon)"),
               category: str('Nama kategori dari list_categories, dipilih dari JENIS barang ini (bukan toko). Ragu \u2192 "Lainnya" atau kosongkan: API menebak dari nama item, dan nama tak dikenal dipetakan ke kategori household terdekat (tidak pernah error).'),
               for: str("F-A, opsional, HANYA kalau fitur aktif: penerima manfaat item ini"),
               titipan: str('Nama orang yang MENITIP, HANYA kalau user bilang item ini titipan/dibelikan untuk orang lain yang akan mengganti uangnya ("sabunnya titipan Bu Ani"). Item itu masuk kategori Piutang + otomatis dibuatkan catatan piutang atas nama orang itu (bukan pengeluaran keluarga). Jangan isi kalau tidak disebut.')
@@ -17844,7 +17945,15 @@ var TOOLS = [
         date: args.date,
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
-        items: items.map((i) => ({ name: i.name, qty: i.qty == null ? 1 : Number(i.qty), amount: Number(i.amount), category: i.category, for: optStr(i.for), titipan: optStr(i.titipan) })),
+        items: items.map((i) => ({
+          name: i.name,
+          qty: i.qty == null ? 1 : Number(i.qty),
+          amount: Number(i.amount),
+          discount: i.discount != null && Number(i.discount) > 0 ? Math.round(Number(i.discount)) : void 0,
+          category: i.category,
+          for: optStr(i.for),
+          titipan: optStr(i.titipan)
+        })),
         total: args.total == null ? void 0 : Number(args.total),
         shopping: args.shopping !== false,
         pantry: args.pantry !== false
@@ -18022,6 +18131,10 @@ ${cats || "  (tidak ada)"}`;
       const rows = data.map((t) => {
         const meta = [];
         if (t.qty != null && t.qty > 1) meta.push(`qty: ${t.qty}${t.unit_price ? ` @${fmtRp2(t.unit_price)}` : ""}`);
+        if (t.discount && t.discount > 0) {
+          const normalTotal = t.amount + t.discount;
+          meta.push(`harga asli: ${t.qty && t.qty > 1 && t.normal_unit_price ? `@${fmtRp2(t.normal_unit_price)} (total ${fmtRp2(normalTotal)})` : fmtRp2(normalTotal)}, diskon: -${fmtRp2(t.discount)}`);
+        }
         if (t.total_size_label) meta.push(`total ukuran: ${t.total_size_label}`);
         if (t.canonical_name) meta.push(`produk: ${t.canonical_name}`);
         const metaSuffix = meta.length ? ` (${meta.join(", ")})` : "";
@@ -18140,6 +18253,18 @@ ${list.map((i) => `  [${i.id}] ${i.name}: ${i.qty} ${i.unit}${i.min_qty != null 
       if (r.shopping) lines.push(`Belanja: ${r.shopping.marked_bought.length ? `dicoret ${r.shopping.marked_bought.map((s) => s.name).join(", ")}` : "tidak ada yang cocok"}${r.shopping.unmatched.length ? ` (tidak di daftar: ${r.shopping.unmatched.join(", ")})` : ""}.`);
       if (r.pantry) lines.push(`Stok: ${r.pantry.updated.length ? r.pantry.updated.map((p) => `${p.name} \u2192 ${p.qty_after}`).join(", ") : "tidak ada yang cocok"}${r.pantry.unmatched.length ? ` (tidak di stok: ${r.pantry.unmatched.join(", ")})` : ""}.`);
       return lines.join("\n");
+    }
+    case "compare_prices": {
+      const r = result;
+      if (!r.products?.length) return `Belum ada riwayat harga untuk "${r.query || "produk tersebut"}".`;
+      return r.products.map((p) => `  \u2022 ${p.summary}`).join("\n");
+    }
+    case "analyze_spending": {
+      const r = result;
+      const discPlaces = (r.top_places ?? []).filter((p) => p.discount_total && p.discount_total > 0);
+      const discLine = discPlaces.length ? `
+Toko pemberi diskon: ${discPlaces.map((p) => `${p.place} (hemat ${fmtRp2(p.discount_total)} dari ${p.discount_count} item)`).join(", ")}.` : "";
+      return `${r.text_id}${discLine}`;
     }
     default:
       return formatGenericWriteResult(result);
@@ -18407,18 +18532,19 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
   "date": "2026-04-06",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk 1", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" },
-    { "note": "Nama Produk 2", "qty": 2, "amount": 17000, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk 1", "qty": 1, "amount": 15000, "discount": 0, "category": "<nama kategori dari daftar>" },
+    { "note": "Nama Produk 2", "qty": 2, "amount": 40380, "discount": 6600, "category": "<nama kategori dari daftar>" }
   ]
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
 - note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus \u2014 dipakai untuk mengenali produk yang sama lain kali; mis. "GRANDCO MG REF 1LT" tulis persis begitu, JANGAN ubah "MG" yang berarti Minyak Goreng menjadi "Margarin")
 - qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (wajib baca kolom Qty/jumlah pcs dengan teliti, mis. "2 pcs" / "2 X 23.490" \u2192 qty: 2; default 1 hanya jika benar-benar 1 unit)
-- amount: harga bersih yang dibayar untuk baris item itu SETELAH dikurangi diskon item jika ada (mis. 2 \xD7 23.490 = 46.980, Diskon -6.600 \u2192 amount: 40380, qty: 2), angka bulat tanpa titik/koma
+- amount: harga bersih yang dibayar untuk baris item itu SETELAH dikurangi diskon item jika ada (mis. 2 \xD7 23.490 = 46.980, Diskon -6.600 \u2192 amount: 40380, discount: 6600, qty: 2), angka bulat tanpa titik/koma
+- discount: total potongan diskon untuk baris item itu dalam Rupiah (angka bulat positif, mis. "DISC : -6,600" \u2192 discount: 6600; tulis 0 jika tidak ada diskon pada item tersebut)
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
-- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item tersendiri (diskon per item langsung mengurangi amount item terkait)
+- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item tersendiri (diskon per item langsung dicatat di field discount & mengurangi amount item terkait)
 Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`;
 }
 function textPrompt(ocrText, categories) {
@@ -18432,10 +18558,10 @@ Kembalikan HANYA JSON (tanpa penjelasan lain):
   "date": "YYYY-MM-DD atau null",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk", "qty": 1, "amount": 15000, "discount": 0, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: note = nama item persis seperti di struk (jangan ubah singkatan "MG" [Minyak Goreng] menjadi Margarin); qty = jumlah unit/kemasan yang dibeli pada baris tersebut (wajib teliti membaca "2 pcs" / "2 X ..."); amount = harga total bersih per baris item setelah dikurangi diskon item (qty\xD7satuan - diskon_item); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item tersendiri.
+Aturan: note = nama item persis seperti di struk (jangan ubah singkatan "MG" [Minyak Goreng] menjadi Margarin); qty = jumlah unit/kemasan yang dibeli pada baris tersebut (wajib teliti membaca "2 pcs" / "2 X ..."); amount = harga total bersih per baris item setelah dikurangi diskon item (qty\xD7satuan - diskon_item); discount = total potongan diskon baris item tersebut (angka bulat positif, 0 jika tidak ada diskon); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item tersendiri.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:
@@ -19715,7 +19841,11 @@ var hermes_tools_default = [
               },
               amount: {
                 type: "number",
-                description: "Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)"
+                description: "Harga bersih item ini dalam rupiah SETELAH dikurangi diskon item (bukan per-unit kalau qty>1, total baris item ini)"
+              },
+              discount: {
+                type: "number",
+                description: "Total potongan diskon baris item ini dalam rupiah (opsional, 0 kalau tidak diskon)"
               },
               category: {
                 type: "string",

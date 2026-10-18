@@ -63,6 +63,8 @@ export interface TxRow {
   deleted_at: string | null
   item_qty?: string | null
   item_unit_price?: string | null
+  item_discount?: string | null
+  item_normal_unit_price?: string | null
   item_size_value?: string | null
   item_size_unit?: 'g' | 'ml' | 'pcs' | null
   item_canonical_name?: string | null
@@ -79,6 +81,8 @@ function formatTotalSize(qty: number | null, sizeVal: number | null, sizeUnit: s
 export function mapTx(r: TxRow) {
   const qty = r.item_qty != null ? Number(r.item_qty) : null
   const unitPrice = r.item_unit_price != null ? Math.round(Number(r.item_unit_price)) : null
+  const discount = r.item_discount != null ? Math.round(Number(r.item_discount)) : null
+  const normalUnitPrice = r.item_normal_unit_price != null ? Math.round(Number(r.item_normal_unit_price)) : unitPrice
   const sizeValue = r.item_size_value != null ? Number(r.item_size_value) : null
   const sizeUnit = r.item_size_unit ?? null
   const totalSizeLabel = formatTotalSize(qty, sizeValue, sizeUnit)
@@ -90,7 +94,18 @@ export function mapTx(r: TxRow) {
     amount: Number(r.amount),
     date: r.date,
     note: r.note,
-    ...(qty !== null ? { qty, unit_price: unitPrice, size_value: sizeValue, size_unit: sizeUnit, total_size_label: totalSizeLabel, canonical_name: canonicalName } : {}),
+    ...(qty !== null
+      ? {
+          qty,
+          unit_price: unitPrice,
+          discount: discount ?? 0,
+          normal_unit_price: normalUnitPrice,
+          size_value: sizeValue,
+          size_unit: sizeUnit,
+          total_size_label: totalSizeLabel,
+          canonical_name: canonicalName,
+        }
+      : {}),
     account: { id: r.account_id, name: r.account_name, owner: r.account_owner_member_id ? { member_id: r.account_owner_member_id, display_name: r.account_owner_display_name } : null },
     to_account: r.to_account_id ? { id: r.to_account_id, name: r.to_account_name, owner: r.to_account_owner_member_id ? { member_id: r.to_account_owner_member_id, display_name: r.to_account_owner_display_name } : null } : null,
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
@@ -113,6 +128,7 @@ export const TX_SELECT = `
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
          t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
          pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
+         pp.discount::text as item_discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as item_normal_unit_price,
          pp.size_value::text as item_size_value, pp.size_unit as item_size_unit,
          coalesce(pa.canonical_name, pk.canonical_name) as item_canonical_name
   from transactions t
@@ -326,7 +342,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   })
 }
 
-export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; qty?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
+export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; qty?: number; discount?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
   // Item berformat struk "[Toko] Nama item" (modal scan web) → riwayat harga per toko (prices.ts).
   // Kanonikalisasi di luar transaksi DB; biasanya sudah ter-cache sejak scan, jadi tanpa panggilan AI.
   const parsedNotes = input.items.map((i) => (i.note ? parseReceiptNote(i.note) : null))
@@ -386,7 +402,13 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
       if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount })
       if (parsed?.merchant) {
         const list = pricesByMerchant.get(parsed.merchant) ?? []
-        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty ?? parsed.qty, amount: it.amount })
+        list.push({
+          transaction_id: txId,
+          name: parsed.name,
+          qty: input.items[i]?.qty ?? parsed.qty,
+          amount: it.amount,
+          discount: input.items[i]?.discount,
+        })
         pricesByMerchant.set(parsed.merchant, list)
       }
     }
@@ -409,6 +431,8 @@ export interface UpdateTransactionInput {
   category?: string
   date?: string
   note?: string
+  qty?: number
+  discount?: number
   beneficiary_id?: string | null
   beneficiary?: string
 }
@@ -435,14 +459,16 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
     let rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
-    // Sinkronkan juga ke product_prices bila nominal/tanggal/note/type berubah
-    if (patch.amount !== undefined || patch.date !== undefined || patch.note !== undefined || patch.type !== undefined) {
+    // Sinkronkan juga ke product_prices bila nominal/tanggal/note/type/qty/discount berubah
+    if (patch.amount !== undefined || patch.date !== undefined || patch.note !== undefined || patch.type !== undefined || input.qty !== undefined || input.discount !== undefined) {
       await syncTransactionPrice(tx, actor.householdId, {
         id: rows[0]!.id,
         type: rows[0]!.type,
         amount: Number(rows[0]!.amount),
         date: rows[0]!.date,
         note: rows[0]!.note,
+        qty: input.qty,
+        discount: input.discount,
       })
       rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
     }

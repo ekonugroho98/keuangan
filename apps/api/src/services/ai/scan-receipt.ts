@@ -34,18 +34,19 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
   "date": "2026-04-06",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk 1", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" },
-    { "note": "Nama Produk 2", "qty": 2, "amount": 17000, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk 1", "qty": 1, "amount": 15000, "discount": 0, "category": "<nama kategori dari daftar>" },
+    { "note": "Nama Produk 2", "qty": 2, "amount": 40380, "discount": 6600, "category": "<nama kategori dari daftar>" }
   ]
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
 - note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus — dipakai untuk mengenali produk yang sama lain kali; mis. "GRANDCO MG REF 1LT" tulis persis begitu, JANGAN ubah "MG" yang berarti Minyak Goreng menjadi "Margarin")
 - qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (wajib baca kolom Qty/jumlah pcs dengan teliti, mis. "2 pcs" / "2 X 23.490" → qty: 2; default 1 hanya jika benar-benar 1 unit)
-- amount: harga bersih yang dibayar untuk baris item itu SETELAH dikurangi diskon item jika ada (mis. 2 × 23.490 = 46.980, Diskon -6.600 → amount: 40380, qty: 2), angka bulat tanpa titik/koma
+- amount: harga bersih yang dibayar untuk baris item itu SETELAH dikurangi diskon item jika ada (mis. 2 × 23.490 = 46.980, Diskon -6.600 → amount: 40380, discount: 6600, qty: 2), angka bulat tanpa titik/koma
+- discount: total potongan diskon untuk baris item itu dalam Rupiah (angka bulat positif, mis. "DISC : -6,600" → discount: 6600; tulis 0 jika tidak ada diskon pada item tersebut)
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
-- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item tersendiri (diskon per item langsung mengurangi amount item terkait)
+- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item tersendiri (diskon per item langsung dicatat di field discount & mengurangi amount item terkait)
 Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`
 }
 
@@ -60,10 +61,10 @@ Kembalikan HANYA JSON (tanpa penjelasan lain):
   "date": "YYYY-MM-DD atau null",
   "subtotal": 200000,
   "items": [
-    { "note": "Nama Produk", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" }
+    { "note": "Nama Produk", "qty": 1, "amount": 15000, "discount": 0, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: note = nama item persis seperti di struk (jangan ubah singkatan "MG" [Minyak Goreng] menjadi Margarin); qty = jumlah unit/kemasan yang dibeli pada baris tersebut (wajib teliti membaca "2 pcs" / "2 X ..."); amount = harga total bersih per baris item setelah dikurangi diskon item (qty×satuan - diskon_item); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item tersendiri.
+Aturan: note = nama item persis seperti di struk (jangan ubah singkatan "MG" [Minyak Goreng] menjadi Margarin); qty = jumlah unit/kemasan yang dibeli pada baris tersebut (wajib teliti membaca "2 pcs" / "2 X ..."); amount = harga total bersih per baris item setelah dikurangi diskon item (qty×satuan - diskon_item); discount = total potongan diskon baris item tersebut (angka bulat positif, 0 jika tidak ada diskon); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item tersendiri.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:

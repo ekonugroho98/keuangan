@@ -9,6 +9,8 @@ interface Tx {
   note: string
   qty?: number | null
   unit_price?: number | null
+  discount?: number | null
+  normal_unit_price?: number | null
   total_size_label?: string | null
   canonical_name?: string | null
   category?: { name: string }
@@ -42,6 +44,10 @@ export function formatToolResult(name: string, result: unknown): string {
         .map((t) => {
           const meta: string[] = []
           if (t.qty != null && t.qty > 1) meta.push(`qty: ${t.qty}${t.unit_price ? ` @${fmtRp(t.unit_price)}` : ''}`)
+          if (t.discount && t.discount > 0) {
+            const normalTotal = t.amount + t.discount
+            meta.push(`harga asli: ${t.qty && t.qty > 1 && t.normal_unit_price ? `@${fmtRp(t.normal_unit_price)} (total ${fmtRp(normalTotal)})` : fmtRp(normalTotal)}, diskon: -${fmtRp(t.discount)}`)
+          }
           if (t.total_size_label) meta.push(`total ukuran: ${t.total_size_label}`)
           if (t.canonical_name) meta.push(`produk: ${t.canonical_name}`)
           const metaSuffix = meta.length ? ` (${meta.join(', ')})` : ''
@@ -151,6 +157,19 @@ export function formatToolResult(name: string, result: unknown): string {
       if (r.shopping) lines.push(`Belanja: ${r.shopping.marked_bought.length ? `dicoret ${r.shopping.marked_bought.map((s) => s.name).join(', ')}` : 'tidak ada yang cocok'}${r.shopping.unmatched.length ? ` (tidak di daftar: ${r.shopping.unmatched.join(', ')})` : ''}.`)
       if (r.pantry) lines.push(`Stok: ${r.pantry.updated.length ? r.pantry.updated.map((p) => `${p.name} → ${p.qty_after}`).join(', ') : 'tidak ada yang cocok'}${r.pantry.unmatched.length ? ` (tidak di stok: ${r.pantry.unmatched.join(', ')})` : ''}.`)
       return lines.join('\n')
+    }
+    case 'compare_prices': {
+      const r = result as { query: string; products: Array<{ summary: string }> }
+      if (!r.products?.length) return `Belum ada riwayat harga untuk "${r.query || 'produk tersebut'}".`
+      return r.products.map((p) => `  • ${p.summary}`).join('\n')
+    }
+    case 'analyze_spending': {
+      const r = result as { text_id: string; top_places?: Array<{ place: string; total: number; count: number; discount_total?: number; discount_count?: number }> }
+      const discPlaces = (r.top_places ?? []).filter((p) => p.discount_total && p.discount_total > 0)
+      const discLine = discPlaces.length
+        ? `\nToko pemberi diskon: ${discPlaces.map((p) => `${p.place} (hemat ${fmtRp(p.discount_total)} dari ${p.discount_count} item)`).join(', ')}.`
+        : ''
+      return `${r.text_id}${discLine}`
     }
     default:
       return formatGenericWriteResult(result)

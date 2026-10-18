@@ -23,6 +23,10 @@ export interface InsightTx {
   account_owner: string | null
   beneficiary: string | null
   recorded_by: string
+  qty?: number | null
+  unit_price?: number | null
+  discount?: number | null
+  normal_unit_price?: number | null
 }
 
 export interface InsightsInput {
@@ -95,6 +99,8 @@ export function buildInsights(input: InsightsInput) {
   const { rows, period, today } = input
   const total = rows.reduce((s, r) => s + r.amount, 0)
   const count = rows.length
+  const totalDiscount = rows.reduce((s, r) => s + Math.max(0, Number(r.discount ?? 0)), 0)
+  const discountedCount = rows.filter((r) => Number(r.discount ?? 0) > 0).length
   // Hari berjalan: periode yang masih berlangsung dihitung sampai hari ini, bukan sampai akhir periode.
   const effectiveTo = today < period.to && today >= period.from ? today : period.to
   const daysElapsed = Math.max(1, daysBetween(period.from, effectiveTo))
@@ -111,7 +117,7 @@ export function buildInsights(input: InsightsInput) {
   // Kunci = item + tempat: "Bakso" (tanpa tempat) dan "Bakso (Bakso Mas Boy)" adalah dua baris berbeda supaya agent
   // tidak menyimpulkan "Bakso Mas Boy 2x". Item yang sama di banyak tempat terlihat dari `item` yang berulang.
   const items = new Map<string, { item: string; total: number; count: number; places: Set<string>; dates: string[] }>()
-  const places = new Map<string, { place: string; total: number; count: number }>()
+  const places = new Map<string, { place: string; total: number; count: number; discount_total: number; discount_count: number }>()
   for (const r of rows) {
     const { item, place } = splitItem(r.note)
     const k = `${normText(item)}|${place ? normText(place) : ''}`
@@ -123,9 +129,14 @@ export function buildInsights(input: InsightsInput) {
     items.set(k, g)
     if (place) {
       const pk = normText(place)
-      const p = places.get(pk) ?? { place, total: 0, count: 0 }
+      const p = places.get(pk) ?? { place, total: 0, count: 0, discount_total: 0, discount_count: 0 }
       p.total += r.amount
       p.count++
+      const disc = Math.max(0, Number(r.discount ?? 0))
+      if (disc > 0) {
+        p.discount_total += disc
+        p.discount_count++
+      }
       places.set(pk, p)
     }
   }
@@ -134,7 +145,15 @@ export function buildInsights(input: InsightsInput) {
     .slice(0, 15)
     .map((g) => ({ item: g.item, place: [...g.places][0] ?? null, label: g.places.size ? `${g.item} (${[...g.places][0]})` : g.item, total: g.total, count: g.count, avg: Math.round(g.total / g.count), dates: g.dates.sort() }))
   const repeated = topItems.filter((i) => i.count > 1).map((i) => ({ item: i.label, count: i.count, total: i.total }))
-  const topPlaces = [...places.values()].sort((a, b) => b.total - a.total).slice(0, 10)
+  const topPlaces = [...places.values()]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10)
+    .map((p) => ({
+      place: p.place,
+      total: p.total,
+      count: p.count,
+      ...(p.discount_total > 0 ? { discount_total: p.discount_total, discount_count: p.discount_count } : {}),
+    }))
 
   const days = new Map<string, { date: string; total: number; count: number; items: string[] }>()
   for (const r of rows) {
@@ -201,6 +220,10 @@ export function buildInsights(input: InsightsInput) {
   const scope = input.filter.category ?? 'Semua pengeluaran'
   parts.push(`${scope} ${period.label}${ongoing ? ` (s.d. ${fmtDay(effectiveTo)})` : ''}: ${fmtRp(total)} dari ${count} transaksi, rata-rata ${fmtRp(perDay)}/hari.`)
   if (ongoing) parts.push(`Laju ini ≈ ${fmtRp(projected)} untuk satu periode penuh.`)
+  if (totalDiscount > 0) {
+    const topDiscPlace = [...places.values()].sort((a, b) => b.discount_total - a.discount_total)[0]
+    parts.push(`Total hemat dari diskon: ${fmtRp(totalDiscount)} (${discountedCount} item${topDiscPlace && topDiscPlace.discount_total > 0 ? `, terbanyak di ${topDiscPlace.place} ${fmtRp(topDiscPlace.discount_total)}` : ''}).`)
+  }
   if (budget) parts.push(`Budget ${fmtRp(budget.amount)}: terpakai ${budget.pct}%, proyeksi ${budget.projected_pct}%${budget.daily_allowance_left !== null ? `, sisa jatah ${fmtRp(budget.daily_allowance_left)}/hari` : ''}${budget.cut_per_day_needed > 0 ? ` — supaya pas budget, rata-rata harian perlu turun ±${fmtRp(budget.cut_per_day_needed)}` : ''}.`)
   if (comparison && comparison.available && comparison.change_pct !== null) parts.push(`Dibanding periode sebelumnya (${fmtRp(comparison.total)}): ${comparison.change >= 0 ? 'naik' : 'turun'} ${Math.abs(comparison.change_pct)}%.`)
   if (topDays[0] && topDays[0].count > 1) parts.push(`Hari paling boros: ${topDays[0].weekday} ${fmtDay(topDays[0].date)} ${fmtRp(topDays[0].total)} (${topDays[0].count} transaksi).`)
@@ -211,7 +234,15 @@ export function buildInsights(input: InsightsInput) {
   return {
     period: { label: period.label, from: period.from, to: period.to, days_elapsed: daysElapsed, days_in_period: daysInPeriod, ongoing },
     filter: input.filter,
-    totals: { total, count, per_day: perDay, avg_per_transaction: avgTx, active_days: activeDays, projected_period_total: projected },
+    totals: {
+      total,
+      count,
+      per_day: perDay,
+      avg_per_transaction: avgTx,
+      active_days: activeDays,
+      projected_period_total: projected,
+      ...(totalDiscount > 0 ? { total_discount_saved: totalDiscount, discounted_items_count: discountedCount } : {}),
+    },
     budget,
     comparison,
     by_category: input.filter.category ? undefined : byCategory,
@@ -225,7 +256,20 @@ export function buildInsights(input: InsightsInput) {
     by_weekday: byWeekday,
     week_split: weekSplit,
     largest,
-    transactions: count <= MAX_TX_LIST ? [...rows].sort((a, b) => (a.date < b.date ? -1 : 1)).map((r) => ({ date: r.date, amount: r.amount, note: r.note, category: r.category, account: r.account, beneficiary: r.beneficiary })) : undefined,
+    transactions: count <= MAX_TX_LIST
+      ? [...rows]
+          .sort((a, b) => (a.date < b.date ? -1 : 1))
+          .map((r) => ({
+            date: r.date,
+            amount: r.amount,
+            note: r.note,
+            category: r.category,
+            account: r.account,
+            beneficiary: r.beneficiary,
+            ...(r.qty != null ? { qty: r.qty, unit_price: r.unit_price } : {}),
+            ...(r.discount && r.discount > 0 ? { discount: r.discount, normal_unit_price: r.normal_unit_price } : {}),
+          }))
+      : undefined,
     transactions_omitted: count > MAX_TX_LIST ? count : 0,
     text_id: parts.join(' '),
   }
@@ -273,11 +317,13 @@ export async function analyzeSpending(actor: Actor, input: AnalyzeSpendingInput)
       ${beneficiaryId ? tx`and t.beneficiary_id = ${beneficiaryId}` : tx``}
       ${q ? tx`and norm_text(t.note) like ${q}` : tx``}
     `
-    const raw = await tx<Array<Omit<InsightTx, 'amount'> & { amount: string }>>`
+    const raw = await tx<Array<Omit<InsightTx, 'amount' | 'qty' | 'unit_price' | 'discount' | 'normal_unit_price'> & { amount: string; qty: string | null; unit_price: string | null; discount: string | null; normal_unit_price: string | null }>>`
       select t.id, t.date::text as date, t.amount::text as amount, coalesce(t.note, '') as note,
              c.name as category, c.is_system as category_system,
              a.name as account, am.display_name as account_owner,
-             coalesce(bm.display_name, b.name) as beneficiary, rm.display_name as recorded_by
+             coalesce(bm.display_name, b.name) as beneficiary, rm.display_name as recorded_by,
+             pp.qty::text as qty, pp.unit_price::text as unit_price,
+             pp.discount::text as discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as normal_unit_price
       from transactions t
       join categories c on c.id = t.category_id
       join accounts a on a.id = t.account_id
@@ -285,10 +331,18 @@ export async function analyzeSpending(actor: Actor, input: AnalyzeSpendingInput)
       left join beneficiaries b on b.id = t.beneficiary_id
       left join household_members bm on bm.id = b.member_id
       join household_members rm on rm.id = t.recorded_by_member_id
+      left join product_prices pp on pp.transaction_id = t.id
       where ${where(period.from, period.to)}
       order by t.date, t.created_at
     `
-    const rows: InsightTx[] = raw.map((r) => ({ ...r, amount: Number(r.amount) }))
+    const rows: InsightTx[] = raw.map((r) => ({
+      ...r,
+      amount: Number(r.amount),
+      qty: r.qty != null ? Number(r.qty) : null,
+      unit_price: r.unit_price != null ? Math.round(Number(r.unit_price)) : null,
+      discount: r.discount != null ? Math.round(Number(r.discount)) : null,
+      normal_unit_price: r.normal_unit_price != null ? Math.round(Number(r.normal_unit_price)) : null,
+    }))
 
     // Pembanding: periode sebelumnya dengan panjang SAMA dengan hari berjalan (like-for-like),
     // mis. 1–12 Okt dibanding 1–12 Sep, bukan dibanding September penuh.

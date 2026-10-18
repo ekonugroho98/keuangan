@@ -37,12 +37,14 @@ function sanitizeScanResult(raw, scanCategories) {
           : parseInt(String(item.amount).replace(/\D/g, ""), 10);
       const qtyRaw = Number(item.qty);
       const qty = !Number.isNaN(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+      const discRaw = Number(item.discount);
+      const discount = !Number.isNaN(discRaw) && discRaw > 0 ? Math.round(discRaw) : 0;
       const note =
         typeof item.note === "string" ? item.note.trim() : String(item.note || "").trim();
       const category =
         matchCategory(item.category, scanCategories) || guessCategory(note, scanCategories);
       if (!note || isNaN(amount) || amount <= 0) return null;
-      return { note, qty, amount, category };
+      return { note, qty, amount, discount, category };
     })
     .filter(Boolean);
 

@@ -819,7 +819,11 @@
               },
               "amount": {
                 "type": "number",
-                "description": "Harga item ini dalam rupiah (bukan per-unit kalau qty>1, total item ini)"
+                "description": "Harga bersih item ini dalam rupiah SETELAH dikurangi diskon item (bukan per-unit kalau qty>1, total baris item ini)"
+              },
+              "discount": {
+                "type": "number",
+                "description": "Total potongan diskon baris item ini dalam rupiah (opsional, 0 kalau tidak diskon)"
               },
               "category": {
                 "type": "string",

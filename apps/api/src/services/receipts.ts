@@ -16,6 +16,7 @@ interface ReceiptItemInput {
   name: string
   qty: number
   amount: number
+  discount?: number
   category_id?: string
   category?: string
   for?: string
@@ -113,7 +114,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
 
     for (const [idx, item] of input.items.entries()) {
       const txId = takeMatch(idx, item.amount)
-      priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount })
+      priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount, discount: item.discount })
       if (titipan[idx]) titipanCreated.push({ txId, borrower: titipan[idx]!.borrower, name: item.name, amount: item.amount })
 
       if (input.shopping) {

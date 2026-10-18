@@ -90,6 +90,7 @@ export interface PriceItem {
   name: string
   qty?: number
   amount: number
+  discount?: number
 }
 
 /** Nama item untuk riwayat harga: buang penanda titipan ("Sabun titipan Ani", "Sabun (titipan Ani)" → "Sabun"). */
@@ -101,28 +102,41 @@ export async function recordPrices(tx: postgres.TransactionSql, householdId: str
   const m = merchant?.trim()
   const valid = items.filter((i) => i.transaction_id && i.amount > 0)
   if (!m || !valid.length) return 0
-  const payload = valid.map((i) => ({ transaction_id: i.transaction_id!, name: priceItemName(i.name), qty: i.qty ?? 1, amount: i.amount }))
+  const payload = valid.map((i) => ({
+    transaction_id: i.transaction_id!,
+    name: priceItemName(i.name),
+    qty: i.qty ?? 1,
+    amount: i.amount,
+    discount: i.discount && i.discount > 0 ? Math.round(i.discount) : 0,
+  }))
   const [row] = await tx<{ n: number }[]>`select record_product_prices(${householdId}, ${m}, ${date}, ${tx.json(payload as unknown as postgres.JSONValue)}) as n`
   return row?.n ?? 0
 }
 
 /**
  * Sinkronkan 1 baris transaksi tunggal (createTransaction / updateTransaction) ke product_prices.
- * Bila di-edit (nominal/tanggal/note berubah), baris lama dihapus lalu dicatat ulang dengan mempertahankan qty dari note ("x2") atau qty sebelumnya.
+ * Bila di-edit (nominal/tanggal/note/qty/discount berubah), baris lama dihapus lalu dicatat ulang dengan mempertahankan qty & discount sebelumnya bila tidak dikirim ulang.
  */
 export async function syncTransactionPrice(
   tx: postgres.TransactionSql,
   householdId: string,
-  txRow: { id: string; type: string; amount: number; date: string; note: string | null | undefined },
+  txRow: { id: string; type: string; amount: number; date: string; note: string | null | undefined; qty?: number; discount?: number },
 ): Promise<void> {
-  const [prev] = await tx<{ qty: string }[]>`select qty::text from product_prices where transaction_id = ${txRow.id}`
+  const [prev] = await tx<{ qty: string; discount: string }[]>`select qty::text, discount::text from product_prices where transaction_id = ${txRow.id}`
   await tx`delete from product_prices where transaction_id = ${txRow.id}`
   if (txRow.type !== 'expense' || !txRow.note || txRow.amount <= 0) return
   const parsed = parseReceiptNote(txRow.note)
   if (!parsed.merchant || !parsed.name) return
-  const prevQty = parsed.qty ?? (prev ? Number(prev.qty) : 1)
+  const effectiveQty = txRow.qty ?? parsed.qty ?? (prev ? Number(prev.qty) : 1)
+  const effectiveDiscount = txRow.discount !== undefined ? txRow.discount : prev ? Number(prev.discount) : 0
   await recordPrices(tx, householdId, parsed.merchant, txRow.date, [
-    { transaction_id: txRow.id, name: parsed.name, qty: prevQty > 0 ? prevQty : 1, amount: txRow.amount },
+    {
+      transaction_id: txRow.id,
+      name: parsed.name,
+      qty: effectiveQty > 0 ? effectiveQty : 1,
+      amount: txRow.amount,
+      discount: effectiveDiscount > 0 ? effectiveDiscount : 0,
+    },
   ])
 }
 
@@ -136,6 +150,8 @@ export interface PriceObservation {
   merchant_key: string
   qty: number
   unit_price: number
+  discount?: number
+  normal_unit_price?: number
   size_value: number | null
   size_unit: 'g' | 'ml' | 'pcs' | null
   price_per_unit: number | null
@@ -146,6 +162,10 @@ export interface StorePrice {
   merchant: string
   last_date: string
   price: number
+  normal_price?: number | null
+  discount?: number
+  promo_count?: number
+  total_discount_saved?: number
   size: string | null
   per_unit_price: number
   lowest_per_unit_price: number
@@ -204,12 +224,20 @@ export function summarizeObservations(rows: PriceObservation[]): ProductComparis
     const metric = (o: PriceObservation) => Math.round((unit && o.price_per_unit != null ? Number(o.price_per_unit) : Number(o.unit_price)) * basis.factor)
     const stores = new Map<string, StorePrice>()
     for (const o of obs) {
+      const rawDisc = Math.max(0, Number(o.discount ?? 0))
+      const qtyVal = Math.max(1, Number(o.qty ?? 1))
+      const unitDisc = rawDisc > 0 ? Math.round(rawDisc / qtyVal) : 0
+      const normalPrice = rawDisc > 0
+        ? Math.round(o.normal_unit_price != null ? Number(o.normal_unit_price) : Number(o.unit_price) + rawDisc / qtyVal)
+        : null
       const s = stores.get(o.merchant_key)
       if (!s) {
         stores.set(o.merchant_key, {
           merchant: o.merchant,
           last_date: o.date,
           price: Math.round(Number(o.unit_price)),
+          ...(normalPrice !== null ? { normal_price: normalPrice, discount: unitDisc } : {}),
+          ...(rawDisc > 0 ? { promo_count: 1, total_discount_saved: Math.round(rawDisc) } : {}),
           size: sizeLabel(o),
           per_unit_price: metric(o),
           lowest_per_unit_price: metric(o),
@@ -218,6 +246,10 @@ export function summarizeObservations(rows: PriceObservation[]): ProductComparis
       } else {
         s.observations++
         s.lowest_per_unit_price = Math.min(s.lowest_per_unit_price, metric(o))
+        if (rawDisc > 0) {
+          s.promo_count = (s.promo_count ?? 0) + 1
+          s.total_discount_saved = (s.total_discount_saved ?? 0) + Math.round(rawDisc)
+        }
       }
     }
     const list = [...stores.values()].sort((a, b) => a.per_unit_price - b.per_unit_price)
@@ -225,7 +257,10 @@ export function summarizeObservations(rows: PriceObservation[]): ProductComparis
     const max = Math.max(...list.map((s) => s.per_unit_price))
     const savings = list.length > 1 && max > 0 ? Math.round(((max - list[0]!.per_unit_price) / max) * 100) : null
     const name = obs[0]!.product_name
-    const parts = list.map((s) => `${s.merchant} ${fmtRp(s.per_unit_price)}/${basis.label.replace('per ', '')}${s.size ? ` (${s.size} ${fmtRp(s.price)})` : ''}, ${fmtDateId(s.last_date)}`)
+    const parts = list.map((s) => {
+      const promoInfo = s.normal_price && s.discount && s.discount > 0 ? ` [harga asli ${fmtRp(s.normal_price)}, diskon -${fmtRp(s.discount)}]` : ''
+      return `${s.merchant} ${fmtRp(s.per_unit_price)}/${basis.label.replace('per ', '')}${s.size ? ` (${s.size} ${fmtRp(s.price)}${promoInfo})` : promoInfo}, ${fmtDateId(s.last_date)}`
+    })
     const summary =
       list.length > 1
         ? `${name}: termurah di ${list[0]!.merchant}. ${parts.join('; ')}.${savings ? ` Selisih ${savings}%.` : ''}`
@@ -242,6 +277,7 @@ export function summarizeObservations(rows: PriceObservation[]): ProductComparis
 
 const OBS_SELECT = `
   select product_name, product_key, keyword, merchant, merchant_key, qty::float as qty, unit_price::float as unit_price,
+         discount::float as discount, normal_unit_price::float as normal_unit_price,
          size_value::float as size_value, size_unit, price_per_unit::float as price_per_unit, date::text as date
   from v_product_prices`
 
