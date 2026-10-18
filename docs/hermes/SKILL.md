@@ -109,20 +109,24 @@ POST /v1/transfers
 
 ### Analisa & insight pengeluaran
 `GET /v1/insights/spending?period=this_month` (atau `last_month`, `this_year`) → perbandingan
-pengeluaran per kategori dan tren.
+pengeluaran per kategori, tren, serta `totals.total_discount_saved` (total penghematan diskon) dan
+`top_places[].discount_total` (toko yang paling banyak kasih diskon).
 
 ### Sisa budget
 `GET /v1/budgets/status?month=YYYY-MM` (tambah `&scope=member&member=<nama>` untuk budget per orang)
 
 ### Cari transaksi
 `GET /v1/transactions?from=YYYY-MM-DD&to=YYYY-MM-DD` (filter opsional: `account`, `type`, `category`,
-`member`, `beneficiary`, `q`)
+`member`, `beneficiary`, `q`).
+Tiap transaksi belanja struk mengembalikan `qty`, `unit_price` (harga satuan bersih setelah diskon),
+`discount` (total potongan diskon baris tersebut), `normal_unit_price` (harga satuan normal sebelum
+diskon), `total_size_label` (mis. `"2 L"` kalau beli 2 kemasan 1 liter), dan `canonical_name`.
 
 ### Ubah atau hapus transaksi
-Kalau user salah catat nominal, kategori, akun, atau tanggal:
+Kalau user salah catat nominal, kategori, akun, tanggal, jumlah (`qty`), atau diskon (`discount`):
 - Cari ID transaksinya dulu lewat `GET /v1/transactions` (jika belum ada di konteks sesi).
 - Ubah: `PATCH /v1/transactions/{transaction_id}` dengan field yang ingin diperbaiki, misal
-  `{"amount_text":"54rb"}` atau `{"account":"BCA","note":"sayur pasar"}`.
+  `{"amount_text":"54rb"}`, `{"account":"BCA","note":"sayur pasar"}`, atau `{"qty":2,"discount":6600}`.
 - Hapus: `DELETE /v1/transactions/{transaction_id}`.
 
 ### Koreksi saldo
@@ -228,13 +232,17 @@ HANYA kalau `features.shopping_stock.enabled`:
   barang berharga dari **satu** transaksi):
   ```
   POST /v1/receipts/ingest
-  {"account":"Kas","merchant":"Alfamart","date":"YYYY-MM-DD","default_location":"shelf","items":[{"name":"Beras 5kg","qty":1,"unit":"sak","unit_price":72000},{"name":"Telur","qty":1,"unit":"kg","unit_price":28500}]}
+  {"account":"Kas","merchant":"Alfamart","date":"YYYY-MM-DD","default_location":"shelf","items":[{"name":"Minyak Goreng 1L","qty":2,"unit":"pcs","amount":40380,"discount":6600},{"name":"Telur","qty":1,"unit":"kg","unit_price":28500}]}
   ```
-  Satu panggilan ini sekaligus mencatat transaksi pengeluaran, mencoret item yang cocok di daftar
-  belanja, menambah stok pantry, dan menyimpan riwayat harga barang. Responsnya melaporkan per item
-  apa yang terjadi, termasuk `unmatched` untuk yang tidak cocok — **laporkan yang `unmatched`
-  dengan jujur**, jangan diam-diam diabaikan.
-- **Bandingkan harga barang antar toko**: `GET /v1/prices/compare?q=beras`.
+  - Isi `amount` dengan **total harga bersih yang dibayar** untuk baris itu (setelah dipotong diskon), dan isi `discount` dengan **nominal potongan diskon baris itu** (angka positif, default `0`).
+  - Satu panggilan ini sekaligus mencatat transaksi pengeluaran, mencoret item yang cocok di daftar
+    belanja, menambah stok pantry, dan menyimpan riwayat harga barang (lengkap dengan harga normal,
+    diskon, dan harga bersih). Responsnya melaporkan per item apa yang terjadi, termasuk `unmatched`
+    untuk yang tidak cocok — **laporkan yang `unmatched` dengan jujur**, jangan diam-diam diabaikan.
+- **Bandingkan harga barang antar toko**: `GET /v1/prices/compare?q=beras` — mengembalikan harga
+  bersih (`price`), harga normal sebelum diskon (`normal_price`), diskon satuan (`discount`),
+  berapa kali toko tersebut memberi promo (`promo_count`), dan total penghematan diskon
+  (`total_discount_saved`).
 
 > **Catatan foto struk**: membaca gambar hanya berfungsi pada model AI yang vision-capable. Model
 > gratis bawaan secara default **bukan** vision-capable — ganti model dulu lewat `/model` kalau fitur
