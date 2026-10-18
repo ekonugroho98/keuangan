@@ -63,8 +63,60 @@ function sanitizeScanResult(raw, scanCategories) {
     typeof raw.merchant === "string" && raw.merchant.trim()
       ? raw.merchant.trim()
       : "Struk";
+  const receipt_url =
+    typeof raw.receipt_url === "string" && raw.receipt_url.startsWith("http")
+      ? raw.receipt_url
+      : null;
 
-  return { merchant, date, subtotal, items: sanitized };
+  return { merchant, date, subtotal, receipt_url, items: sanitized };
+}
+
+/* ── Kompres foto struk di browser ke WebP (maxWidth 1080px, quality 0.78 -> ~60-90 KB) ── */
+async function compressReceiptImage(file, maxWidth = 1080, quality = 0.78) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const dataUrlOrig = reader.result;
+      const img = new Image();
+      img.onerror = () => {
+        // Fallback jika gagal decode di canvas
+        resolve({
+          base64: String(dataUrlOrig).split(",")[1],
+          mimeType: file.type || "image/jpeg",
+        });
+      };
+      img.onload = () => {
+        try {
+          const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          let outUrl = canvas.toDataURL("image/webp", quality);
+          let mimeType = "image/webp";
+          if (!outUrl.startsWith("data:image/webp")) {
+            outUrl = canvas.toDataURL("image/jpeg", quality);
+            mimeType = "image/jpeg";
+          }
+          resolve({
+            base64: outUrl.split(",")[1],
+            mimeType,
+          });
+        } catch {
+          resolve({
+            base64: String(dataUrlOrig).split(",")[1],
+            mimeType: file.type || "image/jpeg",
+          });
+        }
+      };
+      img.src = dataUrlOrig;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ── Guess kategori dari nama item → dipetakan ke nama kategori household yang ada.
@@ -466,6 +518,8 @@ const AddTransactionModal = ({
 
   const fileRef = useRef(null);
   const fileRefGallery = useRef(null);
+  const attachRef = useRef(null);
+  const [uploadingAttach, setUploadingAttach] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanMode, setScanMode] = useState("");
@@ -482,6 +536,28 @@ const AddTransactionModal = ({
     setScanMode("");
   };
 
+  const handleAttachReceipt = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setUploadingAttach(true);
+    try {
+      const { base64, mimeType } = await compressReceiptImage(file);
+      const uploaded = await unwrap(
+        await api.POST("/v1/receipts/upload", {
+          body: { image_base64: base64, mime_type: mimeType },
+        }),
+      );
+      if (uploaded?.receipt_url) {
+        setTxForm((p) => ({ ...p, receipt_url: uploaded.receipt_url }));
+      }
+    } catch (err) {
+      setScanError("❌ " + (err.message || "Gagal mengunggah foto struk"));
+    } finally {
+      setUploadingAttach(false);
+    }
+  };
+
   const handleScanFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -495,12 +571,7 @@ const AddTransactionModal = ({
     const hasAiConfigured = !aiConfig?.disabled && aiConfig?.apiKey;
 
     try {
-      const base64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result.split(",")[1]);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
+      const { base64, mimeType } = await compressReceiptImage(file);
 
       const applyResult = (result) => {
         if (result.error) {
@@ -524,13 +595,13 @@ const AddTransactionModal = ({
       if (hasAiConfigured) {
         try {
           setScanMode("ai");
-          result = await scanReceiptWithAI(base64, file.type, scanCategories);
+          result = await scanReceiptWithAI(base64, mimeType, scanCategories);
         } catch (err) {
           if (err.code !== "provider_no_vision") throw err;
           setScanMode("ocr");
           result = await scanReceiptWithOCR(
             base64,
-            file.type,
+            mimeType,
             (p) => setScanProgress(p),
             aiConfig,
             scanCategories,
@@ -540,11 +611,22 @@ const AddTransactionModal = ({
         setScanMode("ocr");
         result = await scanReceiptWithOCR(
           base64,
-          file.type,
+          mimeType,
           (p) => setScanProgress(p),
           aiConfig,
+          scanCategories,
         );
       }
+
+      if (result && !result.error && !result.receipt_url) {
+        const up = await unwrap(
+          await api.POST("/v1/receipts/upload", {
+            body: { image_base64: base64, mime_type: mimeType },
+          }),
+        ).catch(() => null);
+        if (up?.receipt_url) result.receipt_url = up.receipt_url;
+      }
+
       applyResult(result);
     } catch (err) {
       setScanError("❌ " + (err.message || "Gagal membaca struk"));
@@ -569,7 +651,7 @@ const AddTransactionModal = ({
       // Note kanonik "[Nama Toko] Nama item x2" (sama dengan ingest_receipt di backend) — toko di depan
       // supaya terbaca di daftar transaksi dan bisa diurai untuk perbandingan harga antar toko.
       const withMerchant = selected.map((i) => ({ ...i, note: formatReceiptNote(i.note, scanResults?.merchant, null, i.qty) }));
-      await onSubmitMultiple(withMerchant, scanAccount, scanResults?.date);
+      await onSubmitMultiple(withMerchant, scanAccount, scanResults?.date, scanResults?.receipt_url);
     }
     resetScan();
   };
@@ -2048,6 +2130,122 @@ const AddTransactionModal = ({
                   />
                 </div>
               )}
+
+              <div style={{ marginBottom: 16 }}>
+                <FieldLabel hint="Otomatis dikompres ke WebP hemat kuota">
+                  🧾 BUKTI STRUK / NOTA (OPSIONAL)
+                </FieldLabel>
+                <input
+                  ref={attachRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAttachReceipt}
+                  style={{ display: "none" }}
+                />
+                {txForm.receipt_url ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "10px 12px",
+                      borderRadius: 14,
+                      border: "1px solid rgba(131,155,122,.35)",
+                      background: "rgba(131,155,122,.08)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <img
+                        src={txForm.receipt_url}
+                        alt="Bukti Struk"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          border: "1px solid var(--color-border)",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)" }}>
+                          ✅ Foto Struk Tersimpan
+                        </div>
+                        <a
+                          href={txForm.receipt_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: "var(--color-muted)", textDecoration: "underline" }}
+                        >
+                          Buka ukuran penuh ↗
+                        </a>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => attachRef.current?.click()}
+                        disabled={uploadingAttach}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid var(--color-border)",
+                          background: "var(--bg-surface-low)",
+                          color: "var(--color-text)",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        Ganti
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTxForm((p) => ({ ...p, receipt_url: "" }))}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid rgba(255,113,108,.3)",
+                          background: "rgba(255,113,108,.1)",
+                          color: "var(--color-expense)",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => attachRef.current?.click()}
+                    disabled={uploadingAttach}
+                    style={{
+                      width: "100%",
+                      padding: "11px 14px",
+                      borderRadius: 14,
+                      border: "1px dashed var(--color-border)",
+                      background: "rgba(255,255,255,.02)",
+                      color: "var(--color-muted)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: uploadingAttach ? "wait" : "pointer",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    {uploadingAttach ? "⏳ Mengompres & mengunggah struk..." : "📷 Lampirkan Foto Struk / Bukti Transfer"}
+                  </button>
+                )}
+              </div>
 
               <div style={{ marginBottom: 16 }}>
                 <FieldLabel>📅 TANGGAL</FieldLabel>

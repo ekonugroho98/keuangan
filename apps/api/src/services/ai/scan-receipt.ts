@@ -3,6 +3,7 @@ import type { Actor } from '../../auth/actor'
 import { withActor } from '../../db/tx'
 import { classifyItems, loadExpenseCategories, type ExpenseCategory } from '../categorize'
 import { canonicalizeProducts } from '../prices'
+import { uploadReceiptImage } from '../storage'
 import { VISION_PROVIDERS, buildTextRequest, buildVisionRequest, callProviderJson, getAiConfig } from './provider'
 
 // Kategori pengeluaran milik household (bukan daftar hardcode) — ini yang ditawarkan ke AI dan
@@ -85,9 +86,15 @@ export async function scanReceipt(actor: Actor, input: { image_base64?: string; 
   const categories = await withActor(actor, (tx) => loadExpenseCategories(tx, actor.householdId))
 
   let raw: Record<string, unknown>
+  let uploadedReceiptUrl: string | null = null
   if (input.image_base64 && input.mime_type) {
     if (!VISION_PROVIDERS.includes(provider)) throw ApiError.fromCode('provider_no_vision')
-    raw = await callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider)
+    const [aiRaw, uploaded] = await Promise.all([
+      callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider),
+      uploadReceiptImage(actor.householdId, { image_base64: input.image_base64, mime_type: input.mime_type }).catch(() => null),
+    ])
+    raw = aiRaw
+    uploadedReceiptUrl = uploaded?.receipt_url ?? null
   } else {
     raw = await callProviderJson(buildTextRequest(provider, apiKey, textPrompt(input.ocr_text!, categories)), provider)
   }
@@ -101,5 +108,9 @@ export async function scanReceipt(actor: Actor, input: { image_base64?: string; 
     classifyItems(actor, items.map((it, i) => ({ name: names[i]!, aiCategory: it.category })), { webLookup: true }),
     canonicalizeProducts(actor, names),
   ])
-  return { ...raw, items: items.map((it, i) => ({ ...it, category: classified[i]!.category, category_source: classified[i]!.source })) }
+  return {
+    ...raw,
+    ...(uploadedReceiptUrl ? { receipt_url: uploadedReceiptUrl } : {}),
+    items: items.map((it, i) => ({ ...it, category: classified[i]!.category, category_source: classified[i]!.source })),
+  }
 }

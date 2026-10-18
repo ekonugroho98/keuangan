@@ -7,6 +7,7 @@ import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef, resolveEf
 import { classifyItems } from './categorize'
 import { formatReceiptNote } from '@karaya/shared/format'
 import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
+import { resolveReceiptUrl } from './storage'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { todayInTz } from './period'
 import { getHouseholdTimezone } from './households'
@@ -30,6 +31,9 @@ export interface IngestReceiptInput {
   merchant?: string
   recorded_by_id?: string
   recorded_by?: string
+  receipt_url?: string
+  receipt_image_base64?: string
+  receipt_mime_type?: string
   items: ReceiptItemInput[]
   total?: number
   ref_no?: string
@@ -61,7 +65,10 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   // catatan piutang otomatis; tidak ikut diklasifikasi (bukan pengeluaran keluarga) dan tidak dipelajari.
   const titipan = input.items.map((item) => detectTitipan(item.name, item.titipan))
   const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx])
-  const classifiedList = await classifyItems(actor, toClassify, { webLookup: true })
+  const [classifiedList, receiptUrl] = await Promise.all([
+    classifyItems(actor, toClassify, { webLookup: true }),
+    resolveReceiptUrl(actor.householdId, input),
+  ])
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]!]))
   // Perbandingan harga antar toko (prices.ts): seragamkan nama kasir → produk kanonik (satu panggilan AI
   // BYOK per struk, di-cache global) SEBELUM transaksi DB dibuka. Best-effort, tidak pernah gagal.
@@ -97,8 +104,11 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
       )
     `
     const ids = createdIdRows.map((r) => r.id)
-    if (recorderId !== actor.memberId && ids.length > 0) {
-      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids])
+    if ((recorderId !== actor.memberId || receiptUrl) && ids.length > 0) {
+      await tx.unsafe(
+        `update transactions set recorded_by_member_id = $1, receipt_url = coalesce($2, receipt_url) where id = any($3::uuid[])`,
+        [recorderId, receiptUrl ?? null, ids],
+      )
     }
 
     // Korelasi item asli -> baris transaksi yang baru dibuat lewat note+amount (bukan index posisi
@@ -158,6 +168,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     return {
       transactions: fullRows.map(mapTx),
       account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
+      ...(receiptUrl ? { receipt_url: receiptUrl } : {}),
       ...(piutang.length ? { piutang } : {}),
       prices_recorded: pricesRecorded,
       ...(input.shopping ? { shopping: { marked_bought: shoppingMarked, unmatched: shoppingUnmatched } } : {}),

@@ -30,6 +30,15 @@ const EnvSchema = z.object({
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_PER_DAY: z.coerce.number().int().positive().default(2000),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().int().positive().default(24),
+
+  // Penyimpanan bukti foto struk/nota (services/storage.ts):
+  // Default 'supabase' (gratis 1 GB, muat ~12.500 foto WebP ~80KB).
+  // Jika sudah skala besar (>10.000 struk), tinggal ubah STORAGE_PROVIDER ke 'r2' (Cloudflare R2 10 GB gratis + $0 egress)
+  // atau 'firebase' (Firebase Blaze 5 GB US region).
+  STORAGE_PROVIDER: z.enum(['supabase', 'r2', 'firebase']).default('supabase'),
+  R2_UPLOAD_WORKER_URL: z.string().url().optional(),
+  R2_UPLOAD_TOKEN: z.string().optional(),
+  FIREBASE_STORAGE_BUCKET: z.string().optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>

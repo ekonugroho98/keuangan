@@ -79,6 +79,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
     const [search,         setSearch]         = useState("");
     const [hoveredId,     setHoveredId]     = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [previewReceiptTx, setPreviewReceiptTx] = useState(null);
     const [page,          setPage]          = useState(1);
     const PAGE_SIZE = 50;
 
@@ -232,6 +233,78 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                 style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ff716c,#e04f4f)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                                 {t("tx.deleteConfirm") || "Ya, Hapus"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Receipt Image Lightbox Modal ── */}
+            {previewReceiptTx?.receipt_url && (
+                <div
+                    onClick={() => setPreviewReceiptTx(null)}
+                    style={{
+                        position: "fixed", inset: 0, zIndex: 9999,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: "rgba(0,0,0,.78)", backdropFilter: "blur(8px)",
+                        padding: 16,
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: "var(--bg-surface)", border: "1px solid var(--color-border)",
+                            borderRadius: 20, maxWidth: 520, width: "100%", maxHeight: "90vh",
+                            display: "flex", flexDirection: "column", overflow: "hidden",
+                            boxShadow: "0 24px 64px rgba(0,0,0,.6)", animation: "scaleIn .2s",
+                        }}
+                    >
+                        <div style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "14px 18px", borderBottom: "1px solid var(--color-border-soft)",
+                            gap: 10,
+                        }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    🧾 {previewReceiptTx.note}
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>
+                                    {fmtDate(previewReceiptTx.date)} · {fmtRp(previewReceiptTx.amount)} · {previewReceiptTx.account_name}
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                <a
+                                    href={previewReceiptTx.receipt_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        fontSize: 11, fontWeight: 700, color: "var(--color-primary)",
+                                        textDecoration: "none", padding: "6px 10px", borderRadius: 8,
+                                        background: "rgba(131,155,122,.12)", border: "1px solid rgba(131,155,122,.3)",
+                                    }}
+                                >
+                                    ↗ Buka Penuh
+                                </a>
+                                <button
+                                    onClick={() => setPreviewReceiptTx(null)}
+                                    style={{
+                                        width: 30, height: 30, borderRadius: 8,
+                                        border: "1px solid var(--color-border-soft)", background: "transparent",
+                                        color: "var(--color-muted)", cursor: "pointer", fontSize: 13,
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ overflowY: "auto", padding: 14, background: "rgba(0,0,0,.25)", textAlign: "center" }}>
+                            <img
+                                src={previewReceiptTx.receipt_url}
+                                alt={`Struk ${previewReceiptTx.note}`}
+                                style={{
+                                    maxWidth: "100%", height: "auto", borderRadius: 12,
+                                    border: "1px solid var(--color-border-soft)",
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
@@ -750,6 +823,22 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                                 }}>
                                                     🏷️ Diskon -{fmtRp(tx.discount)}
                                                 </span>
+                                            )}
+                                            {tx.receipt_url && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewReceiptTx(tx)}
+                                                    style={{
+                                                        fontSize: 9, padding: "2px 8px", borderRadius: 9999,
+                                                        background: "rgba(79,195,247,.12)", color: "#4FC3F7",
+                                                        border: "1px solid rgba(79,195,247,.25)",
+                                                        fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer",
+                                                        fontFamily: "inherit",
+                                                    }}
+                                                    title="Lihat foto bukti struk/nota"
+                                                >
+                                                    🧾 Lihat Struk
+                                                </button>
                                             )}
                                         </div>
                                         <p style={{ fontSize: 11, color: "var(--color-muted)", margin: 0 }}>

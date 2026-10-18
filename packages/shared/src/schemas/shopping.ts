@@ -121,6 +121,9 @@ export const IngestReceiptBodySchema = z
     merchant: z.string().optional(),
     recorded_by_id: UuidSchema.optional(),
     recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.' }),
+    receipt_url: z.string().url().max(1000).optional().openapi({ description: 'URL foto struk yang akan ditempelkan ke seluruh transaksi hasil ingest ini.' }),
+    receipt_image_base64: z.string().optional().openapi({ description: 'Opsional: base64 foto struk (WebP/JPEG/PNG) untuk langsung diunggah ke storage dan ditempelkan ke seluruh transaksi struk ini.' }),
+    receipt_mime_type: z.string().optional().openapi({ description: 'Tipe MIME foto struk (image/webp, image/jpeg, image/png).' }),
     items: z.array(ReceiptItemSchema).min(1).max(100),
     total: z.number().int().positive().optional().openapi({ description: 'Kalau dikirim, divalidasi sum(items.amount) === total.' }),
     ref_no: z.string().optional(),
@@ -128,6 +131,22 @@ export const IngestReceiptBodySchema = z
     pantry: z.boolean().default(true).openapi({ description: 'Tambah stok untuk item yang cocok di pantry.' }),
   })
   .openapi('IngestReceiptBody')
+
+export const UploadReceiptImageBodySchema = z
+  .object({
+    image_base64: z.string().min(16).openapi({ description: 'Base64 foto struk/nota (disarankan WebP max 1080px, <= 5 MB).' }),
+    mime_type: z.string().optional().openapi({ description: 'image/webp | image/jpeg | image/png (otomatis dideteksi dari magic bytes jika kosong).' }),
+  })
+  .openapi('UploadReceiptImageBody')
+
+export const UploadReceiptImageResponseSchema = z
+  .object({
+    receipt_url: z.string().url(),
+    provider: z.enum(['supabase', 'r2', 'firebase']),
+    size_bytes: z.number().int(),
+    mime_type: z.string(),
+  })
+  .openapi('UploadReceiptImageResponse')
 
 // ── Perbandingan harga antar toko (10-fitur-opsional-keluarga.md §6.8) ──────────────────────
 export const ComparePricesQuerySchema = z.object({

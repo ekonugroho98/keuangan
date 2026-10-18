@@ -31,7 +31,9 @@ export const ScanReceiptBodySchema = z
 
 export const ScanReceiptItemSchema = z.object({
   note: z.string(),
+  qty: z.number().optional(),
   amount: z.number(),
+  discount: z.number().optional(),
   category: z.string(),
 })
 
@@ -40,7 +42,9 @@ export const ScanReceiptResponseSchema = z
     merchant: z.string().optional(),
     date: z.string().nullable().optional(),
     subtotal: z.number().nullable().optional(),
+    receipt_url: z.string().url().nullable().optional(),
     items: z.array(ScanReceiptItemSchema).optional(),
     error: z.string().optional(),
   })
   .openapi('ScanReceiptResponse')
+

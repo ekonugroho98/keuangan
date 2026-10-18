@@ -21,6 +21,7 @@ function flatten(tx) {
         account_name: tx.account?.name,
         to_account_name: tx.to_account?.name,
         recorded_by: tx.recorded_by,
+        receipt_url: tx.receipt_url ?? null,
         source: tx.source,
         created_at: tx.created_at,
     };
@@ -64,23 +65,35 @@ export function useTransactions() {
         queryClient.invalidateQueries({ queryKey: ["prices"] });
     };
 
-    const addTx = async ({ type, amount, category, note, account, date, beneficiary }) => {
+    const addTx = async ({ type, amount, category, note, account, date, beneficiary, receipt_url }) => {
         const result = await unwrap(
             // beneficiary HANYA dikirim kalau terisi (F-A, feature opsional) — field yang tidak
             // pernah disentuh harus tidak ada di body sama sekali, bukan string kosong, supaya
             // household yang belum mengaktifkan fitur ini tidak pernah memicu gate 400 di backend.
-            await api.POST("/v1/transactions", { body: { type, amount, category, note, account, date, beneficiary: beneficiary || undefined } }),
+            await api.POST("/v1/transactions", {
+                body: {
+                    type,
+                    amount,
+                    category,
+                    note,
+                    account,
+                    date,
+                    beneficiary: beneficiary || undefined,
+                    receipt_url: receipt_url || undefined,
+                },
+            }),
         );
         invalidateMoney();
         return { transaction: flatten(result.transaction), account: result.account };
     };
 
-    const addMultipleTx = async (items, accountName, date) => {
+    const addMultipleTx = async (items, accountName, date, receiptUrl) => {
         const result = await unwrap(
             await api.POST("/v1/transactions/batch", {
                 body: {
                     account: accountName,
                     date,
+                    receipt_url: receiptUrl || undefined,
                     items: items.map((i) => ({
                         amount: i.amount,
                         qty: i.qty && Number(i.qty) > 0 ? Number(i.qty) : undefined,
@@ -95,7 +108,7 @@ export function useTransactions() {
         return { transactions: result.transactions.map(flatten), account: result.account };
     };
 
-    const editTx = async (id, { type, amount, category, note, account, date, beneficiary }) => {
+    const editTx = async (id, { type, amount, category, note, account, date, beneficiary, receipt_url }) => {
         const body = {};
         if (type !== undefined) body.type = type;
         if (amount !== undefined) body.amount = amount;
@@ -103,6 +116,7 @@ export function useTransactions() {
         if (note !== undefined) body.note = note;
         if (account !== undefined) body.account = account;
         if (date !== undefined) body.date = date;
+        if (receipt_url !== undefined) body.receipt_url = receipt_url || null;
         // `beneficiary` key HARUS tidak ada sama sekali di objek yang dioper kalau caller tidak
         // ikut mengirimnya (household belum aktifkan F-A) — beda dari string kosong ("" = user
         // sengaja pilih "Bersama" di form, yang justru WAJIB jadi beneficiary_id:null eksplisit

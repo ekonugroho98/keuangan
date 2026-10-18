@@ -8,6 +8,7 @@ import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords, refineAgentCategory } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { canonicalizeProducts, recordPrices, syncTransactionPrice, type PriceItem } from './prices'
+import { resolveReceiptUrl } from './storage'
 import { formatReceiptNote, parseReceiptNote } from '@karaya/shared/format'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
@@ -56,6 +57,7 @@ export interface TxRow {
   beneficiary_kind: string | null
   recorded_by_member_id: string
   recorded_by_display_name: string
+  receipt_url?: string | null
   source: string
   recurring_id: string | null
   created_at: string
@@ -111,6 +113,7 @@ export function mapTx(r: TxRow) {
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
     beneficiary: r.beneficiary_id ? { id: r.beneficiary_id, name: r.beneficiary_name!, kind: r.beneficiary_kind! } : null,
     recorded_by: { member_id: r.recorded_by_member_id, display_name: r.recorded_by_display_name },
+    receipt_url: r.receipt_url ?? null,
     source: r.source,
     recurring_id: r.recurring_id,
     created_at: r.created_at,
@@ -126,6 +129,7 @@ export const TX_SELECT = `
          t.category_id, c.name as category_name, c.icon as category_icon, c.color as category_color,
          t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
+         t.receipt_url,
          t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
          pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
          pp.discount::text as item_discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as item_normal_unit_price,
@@ -307,6 +311,9 @@ export interface CreateTransactionInput {
   beneficiary?: string
   recorded_by_id?: string
   recorded_by?: string
+  receipt_url?: string
+  receipt_image_base64?: string
+  receipt_mime_type?: string
 }
 
 export async function createTransaction(actor: Actor, input: CreateTransactionInput, timezone: string) {
@@ -315,6 +322,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name])
   }
+  const receiptUrl = await resolveReceiptUrl(actor.householdId, input)
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
@@ -331,8 +339,13 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
         ${amount}, ${txDate}, ${input.note ?? ''}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `
-    if (recorderId !== actor.memberId) {
-      await tx`update transactions set recorded_by_member_id = ${recorderId} where id = ${row!.id}`
+    if (recorderId !== actor.memberId || receiptUrl) {
+      await tx`
+        update transactions
+        set recorded_by_member_id = ${recorderId},
+            receipt_url = coalesce(${receiptUrl ?? null}, receipt_url)
+        where id = ${row!.id}
+      `
     }
     if (parsedNote?.merchant) {
       await syncTransactionPrice(tx, actor.householdId, {
@@ -349,12 +362,27 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   })
 }
 
-export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; recorded_by_id?: string; recorded_by?: string; items: Array<{ amount?: number; amount_text?: string; qty?: number; discount?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
+export async function createTransactionBatch(
+  actor: Actor,
+  input: {
+    account_id?: string
+    account?: string
+    date?: string
+    recorded_by_id?: string
+    recorded_by?: string
+    receipt_url?: string
+    receipt_image_base64?: string
+    receipt_mime_type?: string
+    items: Array<{ amount?: number; amount_text?: string; qty?: number; discount?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }>
+  },
+  timezone: string,
+) {
   // Item berformat struk "[Toko] Nama item" (modal scan web) → riwayat harga per toko (prices.ts).
   // Kanonikalisasi di luar transaksi DB; biasanya sudah ter-cache sejak scan, jadi tanpa panggilan AI.
   const parsedNotes = input.items.map((i) => (i.note ? parseReceiptNote(i.note) : null))
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p!.name)
   if (priceNames.length) await canonicalizeProducts(actor, priceNames)
+  const receiptUrl = await resolveReceiptUrl(actor.householdId, input)
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
@@ -396,8 +424,11 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
       select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems as unknown as postgres.JSONValue)}, ${txSource(actor)})
     `
     const ids = createdRows.map((r) => r.id)
-    if (recorderId !== actor.memberId && ids.length > 0) {
-      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids])
+    if ((recorderId !== actor.memberId || receiptUrl) && ids.length > 0) {
+      await tx.unsafe(
+        `update transactions set recorded_by_member_id = $1, receipt_url = coalesce($2, receipt_url) where id = any($3::uuid[])`,
+        [recorderId, receiptUrl ?? null, ids],
+      )
     }
     // Lewat web (JWT) user sudah meninjau kategori tiap item di modal scan sebelum menyimpan — itu
     // konfirmasi manusia, jadi dipelajari (category_keywords). Lewat API key kategori masih tebakan
@@ -449,6 +480,9 @@ export interface UpdateTransactionInput {
   beneficiary?: string
   recorded_by_id?: string
   recorded_by?: string
+  receipt_url?: string | null
+  receipt_image_base64?: string
+  receipt_mime_type?: string
 }
 
 export async function updateTransaction(actor: Actor, id: string, input: UpdateTransactionInput) {
@@ -456,6 +490,7 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name])
   }
+  const receiptUrl = await resolveReceiptUrl(actor.householdId, input)
   return withActor(actor, async (tx) => {
     const newRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const patch: Record<string, unknown> = {}
@@ -473,8 +508,12 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
     }
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
-    if (newRecorderId) {
+    if (newRecorderId && receiptUrl !== undefined) {
+      await tx`update transactions set recorded_by_member_id = ${newRecorderId}, receipt_url = ${receiptUrl} where id = ${id}`
+    } else if (newRecorderId) {
       await tx`update transactions set recorded_by_member_id = ${newRecorderId} where id = ${id}`
+    } else if (receiptUrl !== undefined) {
+      await tx`update transactions set receipt_url = ${receiptUrl} where id = ${id}`
     }
     let rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
     // Sinkronkan juga ke product_prices bila nominal/tanggal/note/type/qty/discount berubah

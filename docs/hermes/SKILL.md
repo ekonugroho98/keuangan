@@ -61,15 +61,16 @@ karaya koreksi-saldo "BCA" 3250000           # Koreksi saldo aktual (POST /v1/ac
 karaya kategori [--type expense|income|all]  # Daftar kategori valid (GET /v1/categories)
 karaya resolve --kind <account|category|member|debt|goal|piutang> --query "<teks>"
 
-# 2. Catat Keuangan (Pengeluaran, Pemasukan, Batch, Transfer, Struk, Cari, Ubah, Hapus, Pulihkan)
-karaya keluar --akun BCA --kategori "Bahan Makanan" --nominal 45rb --catatan "sayur" [--oleh Ibu] [--untuk Anak] [--toko "Pasar"]
-karaya masuk  --akun BCA --kategori Gaji --nominal 15jt --catatan "gaji bulanan" [--oleh Ayah]
-karaya batch  '{"account":"BRI","recorded_by":"Ibu","items":[{"amount_text":"20rb","category":"Bahan Makanan","note":"sayur"},{"amount_text":"15rb","note":"sabun","titipan":"Ayah"}]}'
+# 2. Catat Keuangan (Pengeluaran, Pemasukan, Batch, Transfer, Struk, Foto Bukti, Cari, Ubah, Hapus, Pulihkan)
+karaya keluar --akun BCA --kategori "Bahan Makanan" --nominal 45rb --catatan "sayur" [--oleh Ibu] [--untuk Anak] [--toko "Pasar"] [--foto /path/struk.jpg]
+karaya masuk  --akun BCA --kategori Gaji --nominal 15jt --catatan "gaji bulanan" [--oleh Ayah] [--foto /path/bukti.jpg]
+karaya batch  '{"account":"BRI","recorded_by":"Ibu","items":[{"amount_text":"20rb","category":"Bahan Makanan","note":"sayur"},{"amount_text":"15rb","note":"sabun","titipan":"Ayah"}]}' [--foto /path/struk.jpg]
 karaya transfer --dari BCA --ke GoPay --nominal 200rb --catatan "isi gopay" [--oleh Ayah]
-karaya struk '{"account":"BRI","merchant":"Alfamart","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600,"category":"Bahan Makanan"}]}'
+karaya struk '{"account":"BRI","merchant":"Alfamart","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600,"category":"Bahan Makanan"}]}' [--foto /path/struk.jpg]
+karaya upload-struk /path/struk.jpg          # Upload & kompres foto struk ke WebP -> return receipt_url (POST /v1/receipts/upload)
 karaya cari [--periode this_month] [--dari YYYY-MM-DD] [--sampai YYYY-MM-DD] [--akun BCA] [--kategori ...] [--member Ibu] [--untuk Anak] [--q indomaret] [--min 10000] [--max 500000]
 karaya detail <tx_id>                        # Detail 1 transaksi (GET /v1/transactions/{id})
-karaya ubah <tx_id> [--nominal 54rb] [--akun ...] [--kategori ...] [--catatan "sayur pasar"] [--oleh ...] [--untuk ...] [--qty 2] [--diskon 6600]
+karaya ubah <tx_id> [--nominal 54rb] [--akun ...] [--kategori ...] [--catatan "sayur pasar"] [--oleh ...] [--untuk ...] [--qty 2] [--diskon 6600] [--foto /path/struk.jpg]
 karaya hapus <tx_id>                         # Soft-delete transaksi (DELETE /v1/transactions/{id})
 karaya pulihkan <tx_id>                      # Pulihkan transaksi terhapus (POST /v1/transactions/{id}/restore)
 
@@ -294,8 +295,9 @@ HANYA kalau `features.shopping_stock.enabled` (gunakan CLI `karaya belanja ...` 
 - **Catat struk belanja sekaligus** (kalau user mengirim **foto struk** atau menyebut beberapa
   barang berharga dari **satu** transaksi):
   ```bash
-  karaya struk '{"account":"Kas","merchant":"Alfamart","date":"YYYY-MM-DD","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600},{"name":"Telur","qty":1,"amount":28500}]}'
+  karaya struk '{"account":"Kas","merchant":"Alfamart","date":"YYYY-MM-DD","recorded_by":"Ibu","items":[{"name":"Minyak Goreng 1L","qty":2,"amount":40380,"discount":6600},{"name":"Telur","qty":1,"amount":28500}]}' --foto /path/ke/foto.jpg
   ```
+  - **Penting (Bukti Struk)**: Setiap kali user mengirim file foto struk/nota dari Telegram/WhatsApp, **wajib sertakan `--foto /path/ke/foto.jpg`** pada perintah `karaya struk`, `karaya keluar`, `karaya masuk`, atau `karaya batch`. CLI `karaya` akan otomatis mengompres foto struk ke WebP hemat kuota (~60–90 KB) dan menyimpannya ke `receipt_url` agar bisa dilihat di Web/APK tombol **"🧾 Lihat Struk"**.
   - Isi `amount` dengan **total harga bersih yang dibayar** untuk baris itu (setelah dipotong diskon), dan isi `discount` dengan **nominal potongan diskon baris itu** (angka positif, default `0`).
   - Satu panggilan ini sekaligus mencatat transaksi pengeluaran, mencoret item yang cocok di daftar
     belanja, menambah stok pantry, dan menyimpan riwayat harga barang (lengkap dengan harga normal,
@@ -306,9 +308,9 @@ HANYA kalau `features.shopping_stock.enabled` (gunakan CLI `karaya belanja ...` 
   berapa kali toko tersebut memberi promo (`promo_count`), dan total penghematan diskon
   (`total_discount_saved`).
 
-> **Catatan foto struk (Vision AI + Fallback OCR `ocr-baca`)**:
+> **Catatan foto struk (Vision AI + Fallback OCR `ocr-baca` + Simpan Foto `--foto`)**:
 > 1. **Utamakan Vision AI bawaan** untuk membaca foto struk/nota secara langsung.
-> 2. **Fallback OCR Lokal**: Jika model AI yang sedang aktif tidak bisa membaca gambar (mis. model gratis text-only) atau terkena limit gambar (429), **JANGAN menolak dan JANGAN menulis script OCR sendiri** — jalankan perintah **`ocr-baca /path/ke/foto.jpg`** (atau `ocr-struk /path/ke/foto.jpg`) di terminal untuk mengekstrak teks struk, lalu catat hasilnya dengan `karaya struk '...'`.
+> 2. **Fallback OCR Lokal**: Jika model AI yang sedang aktif tidak bisa membaca gambar (mis. model gratis text-only) atau terkena limit gambar (429), **JANGAN menolak dan JANGAN menulis script OCR sendiri** — jalankan perintah **`ocr-baca /path/ke/foto.jpg`** (atau `ocr-struk /path/ke/foto.jpg`) di terminal untuk mengekstrak teks struk, lalu catat hasilnya dengan `karaya struk '...' --foto /path/ke/foto.jpg`.
 
 ## Aturan perilaku
 

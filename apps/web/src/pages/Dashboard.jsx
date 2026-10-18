@@ -351,13 +351,14 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         note: txForm.note || txForm.category,
         date: txForm.date || toLocalDateStr(),
         account: accountName,
+        ...(txForm.receipt_url ? { receipt_url: txForm.receipt_url } : {}),
         // Gate dengan beneficiaryEnabled (bukan selalu kirim txForm.beneficiary) — review 2026-10-07:
         // kalau user sempat pilih chip beneficiary lalu fiturnya dimatikan dari sesi lain SEBELUM
         // submit, txForm.beneficiary masih terisi walau pickernya sudah hilang dari layar; tanpa
         // gate ini nilai lama tetap terkirim dan ditolak backend (400) alih-alih diam-diam dibuang.
         ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),
       });
-      setTxForm({ type: "expense", amount: "", category: defaultExpenseCat, note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr(), beneficiary: "" });
+      setTxForm({ type: "expense", amount: "", category: defaultExpenseCat, note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr(), beneficiary: "", receipt_url: "" });
       setShowAddTx(false);
       showToast("Transaksi berhasil ditambahkan!");
     } catch (err) {
@@ -367,13 +368,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     }
   };
 
-  const addMultipleTx_ = async (items, accountName, date) => {
+  const addMultipleTx_ = async (items, accountName, date, receiptUrl) => {
     if (!items.length || isSavingTx) return;
     if (!accountName) { showToast("Pilih akun terlebih dahulu", "error"); return; }
 
     setIsSavingTx(true);
     try {
-      const result = await addMultipleTx(items, accountName, date || toLocalDateStr());
+      const result = await addMultipleTx(items, accountName, date || toLocalDateStr(), receiptUrl);
       setShowAddTx(false);
       showToast(`${result.transactions.length} transaksi berhasil disimpan!`);
     } catch (err) {
@@ -395,6 +396,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       toAccount: tx.to_account_name || "",
       date: tx.date || toLocalDateStr(),
       beneficiary: tx.beneficiary || "",
+      receipt_url: tx.receipt_url || "",
     });
     setShowEditTx(true);
   };
@@ -419,6 +421,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
           note: txForm.note || txForm.category,
           date: txForm.date || editingTx.date,
           account: txForm.account || editingTx.account_name,
+          receipt_url: txForm.receipt_url || null,
           // Hanya ikut kalau fitur aktif — lihat catatan panjang di editTx (useTransactions.js) soal
           // kenapa "" di sini beda arti dari key yang tidak ada sama sekali.
           ...(beneficiaryEnabled ? { beneficiary: txForm.beneficiary } : {}),

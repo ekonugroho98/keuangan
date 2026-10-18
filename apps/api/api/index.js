@@ -8415,7 +8415,15 @@ var EnvSchema = external_exports.object({
   API_KEY_PEPPER: external_exports.string().min(32, "API_KEY_PEPPER wajib sejak Fase 6, minimal 32 karakter acak."),
   RATE_LIMIT_PER_MINUTE: external_exports.coerce.number().int().positive().default(60),
   RATE_LIMIT_PER_DAY: external_exports.coerce.number().int().positive().default(2e3),
-  IDEMPOTENCY_TTL_HOURS: external_exports.coerce.number().int().positive().default(24)
+  IDEMPOTENCY_TTL_HOURS: external_exports.coerce.number().int().positive().default(24),
+  // Penyimpanan bukti foto struk/nota (services/storage.ts):
+  // Default 'supabase' (gratis 1 GB, muat ~12.500 foto WebP ~80KB).
+  // Jika sudah skala besar (>10.000 struk), tinggal ubah STORAGE_PROVIDER ke 'r2' (Cloudflare R2 10 GB gratis + $0 egress)
+  // atau 'firebase' (Firebase Blaze 5 GB US region).
+  STORAGE_PROVIDER: external_exports.enum(["supabase", "r2", "firebase"]).default("supabase"),
+  R2_UPLOAD_WORKER_URL: external_exports.string().url().optional(),
+  R2_UPLOAD_TOKEN: external_exports.string().optional(),
+  FIREBASE_STORAGE_BUCKET: external_exports.string().optional()
 });
 function loadEnv() {
   const result = EnvSchema.safeParse(process.env);
@@ -12464,6 +12472,7 @@ var TransactionSchema = external_exports.object({
   category: CategoryRefOutSchema,
   beneficiary: BeneficiaryRefOutSchema,
   recorded_by: external_exports.object({ member_id: UuidSchema, display_name: external_exports.string() }),
+  receipt_url: external_exports.string().url().nullable().optional(),
   source: TxSourceSchema,
   recurring_id: UuidSchema.nullable(),
   created_at: external_exports.string(),
@@ -12483,7 +12492,10 @@ var CreateTransactionBodySchema = external_exports.object({
   beneficiary_id: UuidSchema.optional(),
   beneficiary: external_exports.string().optional().openapi({ description: "F-A (10-fitur-opsional-keluarga.md \xA73), hanya berlaku kalau feature beneficiary aktif." }),
   recorded_by_id: UuidSchema.optional(),
-  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transaksi ini (mis. "Ibu", "Ayah"). Jika kosong pada panggilan API key, otomatis mengikuti pemilik akun pembayar (atau pemilik API key untuk akun bersama).' })
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transaksi ini (mis. "Ibu", "Ayah"). Jika kosong pada panggilan API key, otomatis mengikuti pemilik akun pembayar (atau pemilik API key untuk akun bersama).' }),
+  receipt_url: external_exports.string().url().max(1e3).optional().openapi({ description: "URL foto bukti struk/nota (mis. dari POST /v1/receipts/upload atau /v1/ai/scan-receipt)." }),
+  receipt_image_base64: external_exports.string().optional().openapi({ description: "Opsional: base64 foto struk/nota untuk langsung diunggah dan ditempelkan sebagai receipt_url." }),
+  receipt_mime_type: external_exports.string().optional().openapi({ description: "Tipe MIME foto (image/webp, image/jpeg, image/png)." })
 }).openapi("CreateTransactionBody");
 var BatchItemSchema = external_exports.object({
   amount: external_exports.number().int().positive().optional(),
@@ -12503,10 +12515,14 @@ var CreateTransactionBatchBodySchema = external_exports.object({
   date: DateStringSchema.optional(),
   recorded_by_id: UuidSchema.optional(),
   recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").' }),
+  receipt_url: external_exports.string().url().max(1e3).optional().openapi({ description: "URL foto struk yang berlaku untuk seluruh item pada batch ini." }),
+  receipt_image_base64: external_exports.string().optional().openapi({ description: "Opsional: base64 foto struk untuk langsung diunggah dan ditempelkan ke seluruh item batch ini." }),
+  receipt_mime_type: external_exports.string().optional(),
   items: external_exports.array(BatchItemSchema).min(1).max(100)
 }).openapi("CreateTransactionBatchBody");
 var UpdateTransactionBodySchema = external_exports.object({
   amount: external_exports.number().int().positive().max(1e11).optional(),
+  amount_text: external_exports.string().min(1).optional(),
   type: external_exports.enum(["income", "expense"]).optional(),
   account_id: UuidSchema.optional(),
   account: external_exports.string().optional(),
@@ -12519,7 +12535,10 @@ var UpdateTransactionBodySchema = external_exports.object({
   beneficiary_id: UuidSchema.nullable().optional(),
   beneficiary: external_exports.string().optional().openapi({ description: "null eksplisit pada beneficiary_id = kembali ke bersama." }),
   recorded_by_id: UuidSchema.optional(),
-  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Ubah atribut anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").' })
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Ubah atribut anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").' }),
+  receipt_url: external_exports.string().url().max(1e3).nullable().optional().openapi({ description: "URL bukti struk/nota (kirim null untuk menghapus lampiran struk)." }),
+  receipt_image_base64: external_exports.string().optional().openapi({ description: "Opsional: base64 foto bukti struk baru untuk langsung diunggah." }),
+  receipt_mime_type: external_exports.string().optional()
 }).openapi("UpdateTransactionBody");
 var CreateTransferBodySchema = external_exports.object({
   amount: external_exports.number().int().positive().max(1e11).optional(),
@@ -12776,13 +12795,16 @@ var ScanReceiptBodySchema = external_exports.object({
 }).openapi("ScanReceiptBody");
 var ScanReceiptItemSchema = external_exports.object({
   note: external_exports.string(),
+  qty: external_exports.number().optional(),
   amount: external_exports.number(),
+  discount: external_exports.number().optional(),
   category: external_exports.string()
 });
 var ScanReceiptResponseSchema = external_exports.object({
   merchant: external_exports.string().optional(),
   date: external_exports.string().nullable().optional(),
   subtotal: external_exports.number().nullable().optional(),
+  receipt_url: external_exports.string().url().nullable().optional(),
   items: external_exports.array(ScanReceiptItemSchema).optional(),
   error: external_exports.string().optional()
 }).openapi("ScanReceiptResponse");
@@ -12982,12 +13004,25 @@ var IngestReceiptBodySchema = external_exports.object({
   merchant: external_exports.string().optional(),
   recorded_by_id: UuidSchema.optional(),
   recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.' }),
+  receipt_url: external_exports.string().url().max(1e3).optional().openapi({ description: "URL foto struk yang akan ditempelkan ke seluruh transaksi hasil ingest ini." }),
+  receipt_image_base64: external_exports.string().optional().openapi({ description: "Opsional: base64 foto struk (WebP/JPEG/PNG) untuk langsung diunggah ke storage dan ditempelkan ke seluruh transaksi struk ini." }),
+  receipt_mime_type: external_exports.string().optional().openapi({ description: "Tipe MIME foto struk (image/webp, image/jpeg, image/png)." }),
   items: external_exports.array(ReceiptItemSchema).min(1).max(100),
   total: external_exports.number().int().positive().optional().openapi({ description: "Kalau dikirim, divalidasi sum(items.amount) === total." }),
   ref_no: external_exports.string().optional(),
   shopping: external_exports.boolean().default(true).openapi({ description: "Coret item yang cocok di daftar belanja." }),
   pantry: external_exports.boolean().default(true).openapi({ description: "Tambah stok untuk item yang cocok di pantry." })
 }).openapi("IngestReceiptBody");
+var UploadReceiptImageBodySchema = external_exports.object({
+  image_base64: external_exports.string().min(16).openapi({ description: "Base64 foto struk/nota (disarankan WebP max 1080px, <= 5 MB)." }),
+  mime_type: external_exports.string().optional().openapi({ description: "image/webp | image/jpeg | image/png (otomatis dideteksi dari magic bytes jika kosong)." })
+}).openapi("UploadReceiptImageBody");
+var UploadReceiptImageResponseSchema = external_exports.object({
+  receipt_url: external_exports.string().url(),
+  provider: external_exports.enum(["supabase", "r2", "firebase"]),
+  size_bytes: external_exports.number().int(),
+  mime_type: external_exports.string()
+}).openapi("UploadReceiptImageResponse");
 var ComparePricesQuerySchema = external_exports.object({
   q: external_exports.string().optional().openapi({ description: 'Nama produk, mis. "sabun lifebuoy", "minyak goreng". Kosongkan untuk katalog semua produk yang tercatat.' }),
   days: external_exports.coerce.number().int().min(1).max(730).default(180)
@@ -14618,6 +14653,123 @@ async function setProductAlias(actor, input) {
   });
 }
 
+// src/services/storage.ts
+import crypto6 from "node:crypto";
+var MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+function detectMimeAndExt(buf, hint) {
+  if (buf.length >= 12 && buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { mimeType: "image/webp", ext: "webp" };
+  }
+  if (buf.length >= 3 && buf[0] === 255 && buf[1] === 216 && buf[2] === 255) {
+    return { mimeType: "image/jpeg", ext: "jpg" };
+  }
+  if (buf.length >= 8 && buf[0] === 137 && buf[1] === 80 && buf[2] === 78 && buf[3] === 71) {
+    return { mimeType: "image/png", ext: "png" };
+  }
+  const normalized = (hint ?? "").toLowerCase().trim();
+  if (normalized === "image/webp") return { mimeType: "image/webp", ext: "webp" };
+  if (normalized === "image/png") return { mimeType: "image/png", ext: "png" };
+  return { mimeType: "image/jpeg", ext: "jpg" };
+}
+async function uploadReceiptImage(householdId, input) {
+  const rawBase64 = input.image_base64.replace(/^data:[^;]+;base64,/, "").trim();
+  const buf = Buffer.from(rawBase64, "base64");
+  if (buf.byteLength === 0) {
+    throw new ApiError("validation_error", "Data gambar struk kosong atau tidak valid.");
+  }
+  if (buf.byteLength > MAX_RECEIPT_BYTES) {
+    throw new ApiError("payload_too_large", "Ukuran gambar struk maksimal 5 MB.");
+  }
+  const { mimeType, ext } = detectMimeAndExt(buf, input.mime_type);
+  const yyyyMm = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
+  const objectPath = `${householdId}/${yyyyMm}/${crypto6.randomUUID()}.${ext}`;
+  const provider = env.STORAGE_PROVIDER;
+  if (provider === "r2") {
+    if (!env.R2_UPLOAD_WORKER_URL) {
+      throw new ApiError("internal_error", "R2_UPLOAD_WORKER_URL belum dikonfigurasi.");
+    }
+    const baseUrl = env.R2_UPLOAD_WORKER_URL.replace(/\/+$/, "");
+    const res2 = await fetch(`${baseUrl}/receipts/${objectPath}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": mimeType,
+        ...env.R2_UPLOAD_TOKEN ? { Authorization: `Bearer ${env.R2_UPLOAD_TOKEN}` } : {}
+      },
+      body: new Uint8Array(buf)
+    });
+    if (!res2.ok) {
+      const errText = await res2.text().catch(() => "");
+      throw new ApiError("internal_error", `Gagal mengunggah struk ke R2 (${res2.status}): ${errText.slice(0, 200)}`);
+    }
+    return {
+      receipt_url: `${baseUrl}/receipts/${objectPath}`,
+      provider: "r2",
+      size_bytes: buf.byteLength,
+      mime_type: mimeType
+    };
+  }
+  if (provider === "firebase") {
+    if (!env.FIREBASE_STORAGE_BUCKET) {
+      throw new ApiError("internal_error", "FIREBASE_STORAGE_BUCKET belum dikonfigurasi.");
+    }
+    const encodedName = encodeURIComponent(`receipts/${objectPath}`);
+    const uploadUrl2 = `https://firebasestorage.googleapis.com/v0/b/${env.FIREBASE_STORAGE_BUCKET}/o?uploadType=media&name=${encodedName}`;
+    const res2 = await fetch(uploadUrl2, {
+      method: "POST",
+      headers: { "Content-Type": mimeType },
+      body: new Uint8Array(buf)
+    });
+    if (!res2.ok) {
+      const errText = await res2.text().catch(() => "");
+      throw new ApiError("internal_error", `Gagal mengunggah struk ke Firebase (${res2.status}): ${errText.slice(0, 200)}`);
+    }
+    const meta = await res2.json();
+    const tokenParam = meta.downloadTokens ? `&token=${meta.downloadTokens.split(",")[0]}` : "";
+    return {
+      receipt_url: `https://firebasestorage.googleapis.com/v0/b/${env.FIREBASE_STORAGE_BUCKET}/o/${encodedName}?alt=media${tokenParam}`,
+      provider: "firebase",
+      size_bytes: buf.byteLength,
+      mime_type: mimeType
+    };
+  }
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new ApiError("internal_error", "SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY diperlukan untuk menyimpan foto struk.");
+  }
+  const supabaseBase = env.SUPABASE_URL.replace(/\/+$/, "");
+  const uploadUrl = `${supabaseBase}/storage/v1/object/receipts/${objectPath}`;
+  const res = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      "Content-Type": mimeType,
+      "x-upsert": "true",
+      "Cache-Control": "public, max-age=31536000, immutable"
+    },
+    body: new Uint8Array(buf)
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new ApiError("internal_error", `Gagal mengunggah struk ke Supabase Storage (${res.status}): ${errText.slice(0, 200)}`);
+  }
+  return {
+    receipt_url: `${supabaseBase}/storage/v1/object/public/receipts/${objectPath}`,
+    provider: "supabase",
+    size_bytes: buf.byteLength,
+    mime_type: mimeType
+  };
+}
+async function resolveReceiptUrl(householdId, input) {
+  if (input.receipt_image_base64) {
+    const uploaded = await uploadReceiptImage(householdId, {
+      image_base64: input.receipt_image_base64,
+      mime_type: input.receipt_mime_type
+    });
+    return uploaded.receipt_url;
+  }
+  return input.receipt_url;
+}
+
 // src/services/transactions.ts
 function touchesBeneficiary(ref) {
   return ref.beneficiary_id !== void 0 || ref.beneficiary !== void 0;
@@ -14673,6 +14825,7 @@ function mapTx(r) {
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
     beneficiary: r.beneficiary_id ? { id: r.beneficiary_id, name: r.beneficiary_name, kind: r.beneficiary_kind } : null,
     recorded_by: { member_id: r.recorded_by_member_id, display_name: r.recorded_by_display_name },
+    receipt_url: r.receipt_url ?? null,
     source: r.source,
     recurring_id: r.recurring_id,
     created_at: r.created_at,
@@ -14687,6 +14840,7 @@ var TX_SELECT = `
          t.category_id, c.name as category_name, c.icon as category_icon, c.color as category_color,
          t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
+         t.receipt_url,
          t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
          pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
          pp.discount::text as item_discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as item_normal_unit_price,
@@ -14822,6 +14976,7 @@ async function createTransaction(actor, input, timezone) {
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
+  const receiptUrl = await resolveReceiptUrl(actor.householdId, input);
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
@@ -14836,8 +14991,13 @@ async function createTransaction(actor, input, timezone) {
         ${amount}, ${txDate}, ${input.note ?? ""}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `;
-    if (recorderId !== actor.memberId) {
-      await tx`update transactions set recorded_by_member_id = ${recorderId} where id = ${row.id}`;
+    if (recorderId !== actor.memberId || receiptUrl) {
+      await tx`
+        update transactions
+        set recorded_by_member_id = ${recorderId},
+            receipt_url = coalesce(${receiptUrl ?? null}, receipt_url)
+        where id = ${row.id}
+      `;
     }
     if (parsedNote?.merchant) {
       await syncTransactionPrice(tx, actor.householdId, {
@@ -14857,6 +15017,7 @@ async function createTransactionBatch(actor, input, timezone) {
   const parsedNotes = input.items.map((i) => i.note ? parseReceiptNote(i.note) : null);
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p.name);
   if (priceNames.length) await canonicalizeProducts(actor, priceNames);
+  const receiptUrl = await resolveReceiptUrl(actor.householdId, input);
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
@@ -14885,8 +15046,11 @@ async function createTransactionBatch(actor, input, timezone) {
       select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems)}, ${txSource(actor)})
     `;
     const ids = createdRows.map((r) => r.id);
-    if (recorderId !== actor.memberId && ids.length > 0) {
-      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids]);
+    if ((recorderId !== actor.memberId || receiptUrl) && ids.length > 0) {
+      await tx.unsafe(
+        `update transactions set recorded_by_member_id = $1, receipt_url = coalesce($2, receipt_url) where id = any($3::uuid[])`,
+        [recorderId, receiptUrl ?? null, ids]
+      );
     }
     if (actor.credential === "jwt") await learnKeywords(tx, actor.householdId, items.filter((i) => !i.titipan).map((i) => ({ note: i.note, categoryId: i.category_id })));
     const remaining = [...createdRows];
@@ -14922,6 +15086,7 @@ async function updateTransaction(actor, id, input) {
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
+  const receiptUrl = await resolveReceiptUrl(actor.householdId, input);
   return withActor(actor, async (tx) => {
     const newRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const patch = {};
@@ -14935,8 +15100,12 @@ async function updateTransaction(actor, id, input) {
       patch.beneficiary_id = await resolveBeneficiaryRef(tx, actor, input) ?? null;
     }
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch)})`;
-    if (newRecorderId) {
+    if (newRecorderId && receiptUrl !== void 0) {
+      await tx`update transactions set recorded_by_member_id = ${newRecorderId}, receipt_url = ${receiptUrl} where id = ${id}`;
+    } else if (newRecorderId) {
       await tx`update transactions set recorded_by_member_id = ${newRecorderId} where id = ${id}`;
+    } else if (receiptUrl !== void 0) {
+      await tx`update transactions set receipt_url = ${receiptUrl} where id = ${id}`;
     }
     let rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
     if (patch.amount !== void 0 || patch.date !== void 0 || patch.note !== void 0 || patch.type !== void 0 || input.qty !== void 0 || input.discount !== void 0) {
@@ -17134,7 +17303,10 @@ async function ingestReceipt(actor, input) {
   const timezone = await getHouseholdTimezone(actor);
   const titipan = input.items.map((item) => detectTitipan(item.name, item.titipan));
   const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx]);
-  const classifiedList = await classifyItems(actor, toClassify, { webLookup: true });
+  const [classifiedList, receiptUrl] = await Promise.all([
+    classifyItems(actor, toClassify, { webLookup: true }),
+    resolveReceiptUrl(actor.householdId, input)
+  ]);
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]]));
   if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name));
   return withActor(actor, async (tx) => {
@@ -17160,8 +17332,11 @@ async function ingestReceipt(actor, input) {
       )
     `;
     const ids = createdIdRows.map((r) => r.id);
-    if (recorderId !== actor.memberId && ids.length > 0) {
-      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids]);
+    if ((recorderId !== actor.memberId || receiptUrl) && ids.length > 0) {
+      await tx.unsafe(
+        `update transactions set recorded_by_member_id = $1, receipt_url = coalesce($2, receipt_url) where id = any($3::uuid[])`,
+        [recorderId, receiptUrl ?? null, ids]
+      );
     }
     const remaining = [...createdIdRows];
     function takeMatch(idx, amount) {
@@ -17209,6 +17384,7 @@ async function ingestReceipt(actor, input) {
     return {
       transactions: fullRows.map(mapTx),
       account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
+      ...receiptUrl ? { receipt_url: receiptUrl } : {},
       ...piutang.length ? { piutang } : {},
       prices_recorded: pricesRecorded,
       ...input.shopping ? { shopping: { marked_bought: shoppingMarked, unmatched: shoppingUnmatched } } : {},
@@ -17675,7 +17851,8 @@ var TOOLS = [
         note: str('Keterangan singkat, mis. "belanja sayur"'),
         date: str('YYYY-MM-DD; default hari ini (WIB). "kemarin" \u2192 isi tanggal kemarin.', { format: "date" }),
         beneficiary: str('F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut \u2014 jangan menebak.'),
-        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.')
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
+        receipt_url: str("Opsional: URL foto bukti struk/nota (mis. hasil dari POST /v1/receipts/upload atau CLI karaya --foto).")
       },
       required: ["amount_text", "account", "category"]
     },
@@ -17684,7 +17861,7 @@ var TOOLS = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor);
-      return createTransaction(actor, { type: "expense", ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary), recorded_by: optStr(args.recorded_by) }, timezone);
+      return createTransaction(actor, { type: "expense", ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary), recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) }, timezone);
     }
   },
   {
@@ -17698,7 +17875,8 @@ var TOOLS = [
         category: str('Nama kategori atau UUID, mis. "Gaji", "Freelance"'),
         note: str("Keterangan singkat"),
         date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
-        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").')
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").'),
+        receipt_url: str("Opsional: URL foto bukti transfer/nota.")
       },
       required: ["amount_text", "account", "category"]
     },
@@ -17707,7 +17885,7 @@ var TOOLS = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor);
-      return createTransaction(actor, { type: "income", ...pickAmountAccountCategory(args), recorded_by: optStr(args.recorded_by) }, timezone);
+      return createTransaction(actor, { type: "income", ...pickAmountAccountCategory(args), recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) }, timezone);
     }
   },
   {
@@ -17719,6 +17897,7 @@ var TOOLS = [
         account: str("Nama akun atau UUID, berlaku untuk SEMUA item"),
         date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").'),
+        receipt_url: str("Opsional: URL foto struk yang berlaku untuk semua item di batch ini."),
         items: {
           type: "array",
           description: "Daftar item pengeluaran",
@@ -17744,7 +17923,7 @@ var TOOLS = [
       const timezone = await getHouseholdTimezone(actor);
       const raw2 = args.items ?? [];
       const items = raw2.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary), titipan: optStr(i.titipan) }));
-      return createTransactionBatch(actor, { account: args.account, date: args.date, recorded_by: optStr(args.recorded_by), items }, timezone);
+      return createTransactionBatch(actor, { account: args.account, date: args.date, recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url), items }, timezone);
     }
   },
   {
@@ -17996,6 +18175,7 @@ var TOOLS = [
         merchant: str("Nama toko, kalau disebut/terbaca"),
         ref_no: str("Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)"),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
+        receipt_url: str("Opsional: URL foto struk yang sudah diunggah (mis. via POST /v1/receipts/upload atau CLI karaya --foto) agar tertaut ke semua item struk ini."),
         items: {
           type: "array",
           description: "Daftar item di struk",
@@ -18031,6 +18211,7 @@ var TOOLS = [
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
         recorded_by: optStr(args.recorded_by),
+        receipt_url: optStr(args.receipt_url),
         items: items.map((i) => ({
           name: i.name,
           qty: i.qty == null ? 1 : Number(i.qty),
@@ -18659,9 +18840,15 @@ async function scanReceipt(actor, input) {
   const apiKey = config.apiKey;
   const categories = await withActor(actor, (tx) => loadExpenseCategories(tx, actor.householdId));
   let raw2;
+  let uploadedReceiptUrl = null;
   if (input.image_base64 && input.mime_type) {
     if (!VISION_PROVIDERS.includes(provider)) throw ApiError.fromCode("provider_no_vision");
-    raw2 = await callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider);
+    const [aiRaw, uploaded] = await Promise.all([
+      callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider),
+      uploadReceiptImage(actor.householdId, { image_base64: input.image_base64, mime_type: input.mime_type }).catch(() => null)
+    ]);
+    raw2 = aiRaw;
+    uploadedReceiptUrl = uploaded?.receipt_url ?? null;
   } else {
     raw2 = await callProviderJson(buildTextRequest(provider, apiKey, textPrompt(input.ocr_text, categories)), provider);
   }
@@ -18672,7 +18859,11 @@ async function scanReceipt(actor, input) {
     classifyItems(actor, items.map((it, i) => ({ name: names[i], aiCategory: it.category })), { webLookup: true }),
     canonicalizeProducts(actor, names)
   ]);
-  return { ...raw2, items: items.map((it, i) => ({ ...it, category: classified[i].category, category_source: classified[i].source })) };
+  return {
+    ...raw2,
+    ...uploadedReceiptUrl ? { receipt_url: uploadedReceiptUrl } : {},
+    items: items.map((it, i) => ({ ...it, category: classified[i].category, category_source: classified[i].source }))
+  };
 }
 
 // src/routes/ai.ts
@@ -20531,6 +20722,25 @@ pantryApp.openapi(
 
 // src/routes/receipts.ts
 var receiptsApp = new OpenAPIHono();
+receiptsApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/receipts/upload",
+    tags: ["receipts"],
+    summary: "Unggah foto struk/nota ke storage dan dapatkan receipt_url",
+    security: [{ bearerJwt: [] }],
+    request: { body: { content: { "application/json": { schema: UploadReceiptImageBodySchema } } } },
+    responses: {
+      201: { content: { "application/json": { schema: UploadReceiptImageResponseSchema } }, description: "Berhasil diunggah" }
+    }
+  }),
+  async (c) => {
+    const actor = c.get("actor");
+    assertScope(actor, "write");
+    const result = await uploadReceiptImage(actor.householdId, c.req.valid("json"));
+    return c.json(result, 201);
+  }
+);
 receiptsApp.openapi(
   createRoute({
     method: "post",

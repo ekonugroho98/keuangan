@@ -225,6 +225,7 @@ export const TOOLS: ToolDefinition[] = [
         date: str('YYYY-MM-DD; default hari ini (WIB). "kemarin" → isi tanggal kemarin.', { format: 'date' }),
         beneficiary: str('F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut — jangan menebak.'),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
+        receipt_url: str('Opsional: URL foto bukti struk/nota (mis. hasil dari POST /v1/receipts/upload atau CLI karaya --foto).'),
       },
       required: ['amount_text', 'account', 'category'],
     },
@@ -233,7 +234,7 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return transactionsSvc.createTransaction(actor, { type: 'expense', ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary), recorded_by: optStr(args.recorded_by) }, timezone)
+      return transactionsSvc.createTransaction(actor, { type: 'expense', ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary), recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) }, timezone)
     },
   },
   {
@@ -248,6 +249,7 @@ export const TOOLS: ToolDefinition[] = [
         note: str('Keterangan singkat'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").'),
+        receipt_url: str('Opsional: URL foto bukti transfer/nota.'),
       },
       required: ['amount_text', 'account', 'category'],
     },
@@ -256,7 +258,7 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return transactionsSvc.createTransaction(actor, { type: 'income', ...pickAmountAccountCategory(args), recorded_by: optStr(args.recorded_by) }, timezone)
+      return transactionsSvc.createTransaction(actor, { type: 'income', ...pickAmountAccountCategory(args), recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) }, timezone)
     },
   },
   {
@@ -268,6 +270,7 @@ export const TOOLS: ToolDefinition[] = [
         account: str('Nama akun atau UUID, berlaku untuk SEMUA item'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").'),
+        receipt_url: str('Opsional: URL foto struk yang berlaku untuk semua item di batch ini.'),
         items: {
           type: 'array',
           description: 'Daftar item pengeluaran',
@@ -291,7 +294,7 @@ export const TOOLS: ToolDefinition[] = [
       const timezone = await getHouseholdTimezone(actor)
       const raw = (args.items as Array<{ amount_text?: string; amount?: number; category?: string; note?: string; beneficiary?: unknown; titipan?: unknown }>) ?? []
       const items = raw.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary), titipan: optStr(i.titipan) }))
-      return transactionsSvc.createTransactionBatch(actor, { account: args.account as string, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by), items }, timezone)
+      return transactionsSvc.createTransactionBatch(actor, { account: args.account as string, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url), items }, timezone)
     },
   },
   {
@@ -547,6 +550,7 @@ export const TOOLS: ToolDefinition[] = [
         merchant: str('Nama toko, kalau disebut/terbaca'),
         ref_no: str('Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)'),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
+        receipt_url: str('Opsional: URL foto struk yang sudah diunggah (mis. via POST /v1/receipts/upload atau CLI karaya --foto) agar tertaut ke semua item struk ini.'),
         items: {
           type: 'array',
           description: 'Daftar item di struk',
@@ -584,6 +588,7 @@ export const TOOLS: ToolDefinition[] = [
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
         recorded_by: optStr(args.recorded_by),
+        receipt_url: optStr(args.receipt_url),
         items: items.map((i) => ({
           name: i.name,
           qty: i.qty == null ? 1 : Number(i.qty),
