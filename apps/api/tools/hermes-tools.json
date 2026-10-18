@@ -273,6 +273,10 @@
         "beneficiary": {
           "type": "string",
           "description": "F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. \"anak\", \"ortu\", nama anak). Kosongkan kalau tidak disebut — jangan menebak."
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. \"Ibu\", \"Ayah\"). Jika kosong, otomatis mengikuti pemilik akun pembayar."
         }
       },
       "required": [
@@ -317,6 +321,10 @@
           "type": "string",
           "description": "YYYY-MM-DD; default hari ini",
           "format": "date"
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. \"Ibu\", \"Ayah\")."
         }
       },
       "required": [
@@ -349,6 +357,10 @@
           "type": "string",
           "description": "YYYY-MM-DD; default hari ini",
           "format": "date"
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. \"Ibu\", \"Ayah\")."
         },
         "items": {
           "type": "array",
@@ -422,6 +434,10 @@
           "type": "string",
           "description": "YYYY-MM-DD; default hari ini",
           "format": "date"
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Opsional: nama/alias anggota keluarga yang mencatat transfer ini."
         }
       },
       "required": [
@@ -464,9 +480,21 @@
           "description": "Tanggal baru YYYY-MM-DD (opsional)",
           "format": "date"
         },
+        "qty": {
+          "type": "number",
+          "description": "Jumlah unit/pcs baru (opsional)"
+        },
+        "discount": {
+          "type": "number",
+          "description": "Total potongan diskon baru dalam rupiah (opsional)"
+        },
         "beneficiary": {
           "type": "string",
           "description": "F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata \"bersama\"/\"keluarga\" untuk mengosongkan (kembali jadi pengeluaran bersama)."
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. \"Ibu\", \"Ayah\")."
         }
       },
       "required": [
@@ -802,6 +830,10 @@
         "ref_no": {
           "type": "string",
           "description": "Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)"
+        },
+        "recorded_by": {
+          "type": "string",
+          "description": "Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. \"Ibu\", \"Ayah\"). Jika kosong, otomatis mengikuti pemilik akun pembayar."
         },
         "items": {
           "type": "array",

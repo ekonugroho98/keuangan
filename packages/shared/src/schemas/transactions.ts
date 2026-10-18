@@ -54,6 +54,8 @@ export const CreateTransactionBodySchema = z
     note: z.string().max(500).optional(),
     beneficiary_id: UuidSchema.optional(),
     beneficiary: z.string().optional().openapi({ description: 'F-A (10-fitur-opsional-keluarga.md §3), hanya berlaku kalau feature beneficiary aktif.' }),
+    recorded_by_id: UuidSchema.optional(),
+    recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transaksi ini (mis. "Ibu", "Ayah"). Jika kosong pada panggilan API key, otomatis mengikuti pemilik akun pembayar (atau pemilik API key untuk akun bersama).' }),
   })
   .openapi('CreateTransactionBody')
 
@@ -75,6 +77,8 @@ export const CreateTransactionBatchBodySchema = z
     account_id: UuidSchema.optional(),
     account: z.string().optional(),
     date: DateStringSchema.optional(),
+    recorded_by_id: UuidSchema.optional(),
+    recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").' }),
     items: z.array(BatchItemSchema).min(1).max(100),
   })
   .openapi('CreateTransactionBatchBody')
@@ -93,6 +97,8 @@ export const UpdateTransactionBodySchema = z
     discount: z.number().int().nonnegative().optional(),
     beneficiary_id: UuidSchema.nullable().optional(),
     beneficiary: z.string().optional().openapi({ description: 'null eksplisit pada beneficiary_id = kembali ke bersama.' }),
+    recorded_by_id: UuidSchema.optional(),
+    recorded_by: z.string().max(80).optional().openapi({ description: 'Ubah atribut anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").' }),
   })
   .openapi('UpdateTransactionBody')
 
@@ -106,6 +112,8 @@ export const CreateTransferBodySchema = z
     to_account: z.string().optional(),
     date: DateStringSchema.optional(),
     note: z.string().max(500).optional(),
+    recorded_by_id: UuidSchema.optional(),
+    recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transfer ini.' }),
   })
   .openapi('CreateTransferBody')
 

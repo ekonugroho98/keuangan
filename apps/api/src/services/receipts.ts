@@ -3,7 +3,7 @@ import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { requireFeature } from './features'
-import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef } from './resolver'
+import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef, resolveMemberRef, resolveEffectiveRecorder } from './resolver'
 import { classifyItems } from './categorize'
 import { formatReceiptNote } from '@karaya/shared/format'
 import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
@@ -28,6 +28,8 @@ export interface IngestReceiptInput {
   account?: string
   date?: string
   merchant?: string
+  recorded_by_id?: string
+  recorded_by?: string
   items: ReceiptItemInput[]
   total?: number
   ref_no?: string
@@ -65,7 +67,11 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   // BYOK per struk, di-cache global) SEBELUM transaksi DB dibuka. Best-effort, tidak pernah gagal.
   if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name))
   return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input)
+    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
+      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
+      : undefined
+    const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId)
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null
     // Note kanonik "[Toko] Nama item [ref: NOMOR]" (formatReceiptNote): toko di depan supaya terbaca
     // dan bisa diurai untuk perbandingan harga antar toko; `[ref: ...]` untuk F-C rekonsiliasi
@@ -92,6 +98,10 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
         ${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items as unknown as postgres.JSONValue)}, ${txSource(actor)}
       )
     `
+    const ids = createdIdRows.map((r) => r.id)
+    if (recorderId !== actor.memberId && ids.length > 0) {
+      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids])
+    }
 
     // Korelasi item asli -> baris transaksi yang baru dibuat lewat note+amount (bukan index posisi
     // array — jsonb_array_elements TIDAK dijamin Postgres mempertahankan urutan untuk
@@ -141,10 +151,9 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
       }
     }
 
-    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, created: titipanCreated }) : []
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, ownerMemberId: recorderId, created: titipanCreated }) : []
     const pricesRecorded = await recordPrices(tx, actor.householdId, input.merchant, date, priceItems)
 
-    const ids = createdIdRows.map((r) => r.id)
     const fullRows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
 

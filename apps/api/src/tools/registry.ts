@@ -224,6 +224,7 @@ export const TOOLS: ToolDefinition[] = [
         note: str('Keterangan singkat, mis. "belanja sayur"'),
         date: str('YYYY-MM-DD; default hari ini (WIB). "kemarin" → isi tanggal kemarin.', { format: 'date' }),
         beneficiary: str('F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut — jangan menebak.'),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
       },
       required: ['amount_text', 'account', 'category'],
     },
@@ -232,7 +233,7 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return transactionsSvc.createTransaction(actor, { type: 'expense', ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary) }, timezone)
+      return transactionsSvc.createTransaction(actor, { type: 'expense', ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary), recorded_by: optStr(args.recorded_by) }, timezone)
     },
   },
   {
@@ -246,6 +247,7 @@ export const TOOLS: ToolDefinition[] = [
         category: str('Nama kategori atau UUID, mis. "Gaji", "Freelance"'),
         note: str('Keterangan singkat'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").'),
       },
       required: ['amount_text', 'account', 'category'],
     },
@@ -254,7 +256,7 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return transactionsSvc.createTransaction(actor, { type: 'income', ...pickAmountAccountCategory(args) }, timezone)
+      return transactionsSvc.createTransaction(actor, { type: 'income', ...pickAmountAccountCategory(args), recorded_by: optStr(args.recorded_by) }, timezone)
     },
   },
   {
@@ -265,6 +267,7 @@ export const TOOLS: ToolDefinition[] = [
       properties: {
         account: str('Nama akun atau UUID, berlaku untuk SEMUA item'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").'),
         items: {
           type: 'array',
           description: 'Daftar item pengeluaran',
@@ -288,7 +291,7 @@ export const TOOLS: ToolDefinition[] = [
       const timezone = await getHouseholdTimezone(actor)
       const raw = (args.items as Array<{ amount_text?: string; amount?: number; category?: string; note?: string; beneficiary?: unknown; titipan?: unknown }>) ?? []
       const items = raw.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary), titipan: optStr(i.titipan) }))
-      return transactionsSvc.createTransactionBatch(actor, { account: args.account as string, date: args.date as string | undefined, items }, timezone)
+      return transactionsSvc.createTransactionBatch(actor, { account: args.account as string, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by), items }, timezone)
     },
   },
   {
@@ -302,6 +305,7 @@ export const TOOLS: ToolDefinition[] = [
         to_account: str('Nama akun atau UUID tujuan dana'),
         note: str('Keterangan singkat'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat transfer ini.'),
       },
       required: ['amount_text', 'from_account', 'to_account'],
     },
@@ -312,7 +316,7 @@ export const TOOLS: ToolDefinition[] = [
       const timezone = await getHouseholdTimezone(actor)
       return transfersSvc.createTransfer(
         actor,
-        { amount_text: args.amount_text as string, from_account: args.from_account as string, to_account: args.to_account as string, note: args.note as string | undefined, date: args.date as string | undefined },
+        { amount_text: args.amount_text as string, from_account: args.from_account as string, to_account: args.to_account as string, note: args.note as string | undefined, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by) },
         timezone,
       )
     },
@@ -328,7 +332,10 @@ export const TOOLS: ToolDefinition[] = [
         category: str('Kategori baru (opsional)'),
         note: str('Catatan baru (opsional)'),
         date: str('Tanggal baru YYYY-MM-DD (opsional)', { format: 'date' }),
+        qty: num('Jumlah unit/pcs baru (opsional)'),
+        discount: num('Total potongan diskon baru dalam rupiah (opsional)'),
         beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).'),
+        recorded_by: str('Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").'),
       },
       required: ['transaction_id'],
     },
@@ -341,7 +348,10 @@ export const TOOLS: ToolDefinition[] = [
         category: args.category as string | undefined,
         note: args.note as string | undefined,
         date: args.date as string | undefined,
+        qty: args.qty != null ? Number(args.qty) : undefined,
+        discount: args.discount != null ? Math.round(Number(args.discount)) : undefined,
         beneficiary: optStr(args.beneficiary),
+        recorded_by: optStr(args.recorded_by),
       }),
   },
   {
@@ -536,6 +546,7 @@ export const TOOLS: ToolDefinition[] = [
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
         merchant: str('Nama toko, kalau disebut/terbaca'),
         ref_no: str('Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)'),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
         items: {
           type: 'array',
           description: 'Daftar item di struk',
@@ -572,6 +583,7 @@ export const TOOLS: ToolDefinition[] = [
         date: args.date as string | undefined,
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
+        recorded_by: optStr(args.recorded_by),
         items: items.map((i) => ({
           name: i.name,
           qty: i.qty == null ? 1 : Number(i.qty),

@@ -33,13 +33,14 @@ export async function resolveAccountRef(
   actor: Actor,
   ref: { account_id?: string; account?: string },
   field = 'account',
+  pronounMemberId?: string,
 ): Promise<string> {
   if (ref.account_id) return ref.account_id
   if (!ref.account) throw ApiError.fromCode('validation_error', { message: `${field} wajib diisi.`, details: { field } })
   if (looksLikeUuid(ref.account)) return ref.account
 
   const [row] = await tx<[{ result: ResolveResult }]>`
-    select resolve_account(${actor.householdId}, ${actor.memberId}, ${ref.account}, false) as result
+    select resolve_account(${actor.householdId}, ${pronounMemberId ?? actor.memberId}, ${ref.account}, false) as result
   `
   const result = row!.result
   if (result.status === 'ok') return result.match!.id as string
@@ -86,6 +87,35 @@ export async function resolveMemberRef(
   if (result.status === 'ok') return result.match!.id as string
   if (result.status === 'ambiguous') throw ApiError.fromCode('ambiguous_member', { candidates: result.candidates })
   throw ApiError.fromCode('member_not_found', { candidates: result.candidates })
+}
+
+/**
+ * Resolusi atribusi pencatat (1 API Key per Household):
+ * 1. Kalau caller mengirim `recorded_by_id` atau `recorded_by` eksplisit (mis. "Ibu", "Ayah"),
+ *    resolve ke `household_members.id`.
+ * 2. Kalau tidak diisi dan request berasal dari `api_key`, otomatis ikut `owner_member_id` dari
+ *    akun yang dipakai membayar (`accountId`) jika akun itu milik salah satu member (mis. BRI Ibu -> Ibu).
+ * 3. Fallback ke `actor.memberId` (pemilik API key / user JWT).
+ */
+export async function resolveEffectiveRecorder(
+  tx: postgres.TransactionSql,
+  actor: Actor,
+  ref: { recorded_by_id?: string; recorded_by?: string },
+  accountId?: string,
+  preResolvedExplicitId?: string,
+): Promise<string> {
+  if (preResolvedExplicitId) return preResolvedExplicitId
+  if (ref.recorded_by_id || ref.recorded_by) {
+    const resolved = await resolveMemberRef(tx, actor, { member_id: ref.recorded_by_id, member: ref.recorded_by })
+    if (resolved) return resolved
+  }
+  if (actor.credential === 'api_key' && accountId) {
+    const [acc] = await tx<{ owner_member_id: string | null }[]>`
+      select owner_member_id from accounts where id = ${accountId} and household_id = ${actor.householdId}
+    `
+    if (acc?.owner_member_id) return acc.owner_member_id
+  }
+  return actor.memberId
 }
 
 /**

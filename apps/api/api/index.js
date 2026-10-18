@@ -12481,7 +12481,9 @@ var CreateTransactionBodySchema = external_exports.object({
   date: DateStringSchema.optional(),
   note: external_exports.string().max(500).optional(),
   beneficiary_id: UuidSchema.optional(),
-  beneficiary: external_exports.string().optional().openapi({ description: "F-A (10-fitur-opsional-keluarga.md \xA73), hanya berlaku kalau feature beneficiary aktif." })
+  beneficiary: external_exports.string().optional().openapi({ description: "F-A (10-fitur-opsional-keluarga.md \xA73), hanya berlaku kalau feature beneficiary aktif." }),
+  recorded_by_id: UuidSchema.optional(),
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transaksi ini (mis. "Ibu", "Ayah"). Jika kosong pada panggilan API key, otomatis mengikuti pemilik akun pembayar (atau pemilik API key untuk akun bersama).' })
 }).openapi("CreateTransactionBody");
 var BatchItemSchema = external_exports.object({
   amount: external_exports.number().int().positive().optional(),
@@ -12499,6 +12501,8 @@ var CreateTransactionBatchBodySchema = external_exports.object({
   account_id: UuidSchema.optional(),
   account: external_exports.string().optional(),
   date: DateStringSchema.optional(),
+  recorded_by_id: UuidSchema.optional(),
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").' }),
   items: external_exports.array(BatchItemSchema).min(1).max(100)
 }).openapi("CreateTransactionBatchBody");
 var UpdateTransactionBodySchema = external_exports.object({
@@ -12513,7 +12517,9 @@ var UpdateTransactionBodySchema = external_exports.object({
   qty: external_exports.number().positive().optional(),
   discount: external_exports.number().int().nonnegative().optional(),
   beneficiary_id: UuidSchema.nullable().optional(),
-  beneficiary: external_exports.string().optional().openapi({ description: "null eksplisit pada beneficiary_id = kembali ke bersama." })
+  beneficiary: external_exports.string().optional().openapi({ description: "null eksplisit pada beneficiary_id = kembali ke bersama." }),
+  recorded_by_id: UuidSchema.optional(),
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Ubah atribut anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").' })
 }).openapi("UpdateTransactionBody");
 var CreateTransferBodySchema = external_exports.object({
   amount: external_exports.number().int().positive().max(1e11).optional(),
@@ -12523,7 +12529,9 @@ var CreateTransferBodySchema = external_exports.object({
   to_account_id: UuidSchema.optional(),
   to_account: external_exports.string().optional(),
   date: DateStringSchema.optional(),
-  note: external_exports.string().max(500).optional()
+  note: external_exports.string().max(500).optional(),
+  recorded_by_id: UuidSchema.optional(),
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: "Nama/alias anggota keluarga yang mencatat transfer ini." })
 }).openapi("CreateTransferBody");
 var TransactionListQuerySchema = external_exports.object({
   period: external_exports.string().optional(),
@@ -12972,6 +12980,8 @@ var IngestReceiptBodySchema = external_exports.object({
   account: external_exports.string().optional(),
   date: DateStringSchema.optional(),
   merchant: external_exports.string().optional(),
+  recorded_by_id: UuidSchema.optional(),
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.' }),
   items: external_exports.array(ReceiptItemSchema).min(1).max(100),
   total: external_exports.number().int().positive().optional().openapi({ description: "Kalau dikirim, divalidasi sum(items.amount) === total." }),
   ref_no: external_exports.string().optional(),
@@ -13056,12 +13066,12 @@ var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function looksLikeUuid(s) {
   return UUID_RE.test(s);
 }
-async function resolveAccountRef(tx, actor, ref, field = "account") {
+async function resolveAccountRef(tx, actor, ref, field = "account", pronounMemberId) {
   if (ref.account_id) return ref.account_id;
   if (!ref.account) throw ApiError.fromCode("validation_error", { message: `${field} wajib diisi.`, details: { field } });
   if (looksLikeUuid(ref.account)) return ref.account;
   const [row] = await tx`
-    select resolve_account(${actor.householdId}, ${actor.memberId}, ${ref.account}, false) as result
+    select resolve_account(${actor.householdId}, ${pronounMemberId ?? actor.memberId}, ${ref.account}, false) as result
   `;
   const result = row.result;
   if (result.status === "ok") return result.match.id;
@@ -13095,6 +13105,20 @@ async function resolveMemberRef(tx, actor, ref) {
   if (result.status === "ok") return result.match.id;
   if (result.status === "ambiguous") throw ApiError.fromCode("ambiguous_member", { candidates: result.candidates });
   throw ApiError.fromCode("member_not_found", { candidates: result.candidates });
+}
+async function resolveEffectiveRecorder(tx, actor, ref, accountId, preResolvedExplicitId) {
+  if (preResolvedExplicitId) return preResolvedExplicitId;
+  if (ref.recorded_by_id || ref.recorded_by) {
+    const resolved = await resolveMemberRef(tx, actor, { member_id: ref.recorded_by_id, member: ref.recorded_by });
+    if (resolved) return resolved;
+  }
+  if (actor.credential === "api_key" && accountId) {
+    const [acc] = await tx`
+      select owner_member_id from accounts where id = ${accountId} and household_id = ${actor.householdId}
+    `;
+    if (acc?.owner_member_id) return acc.owner_member_id;
+  }
+  return actor.memberId;
 }
 async function resolveOwnerMemberId(tx, actor, owner) {
   if (!owner || owner === "me") return actor.memberId;
@@ -14288,6 +14312,7 @@ async function piutangCategoryId(tx, householdId) {
   return row.id;
 }
 async function createTitipanPiutang(tx, actor, input) {
+  const ownerId = input.ownerMemberId ?? actor.memberId;
   const groups = /* @__PURE__ */ new Map();
   for (const c of input.created) {
     const key = c.borrower.toLowerCase();
@@ -14304,7 +14329,7 @@ async function createTitipanPiutang(tx, actor, input) {
     const lendTxId = g.items.length === 1 ? g.items[0].txId ?? null : null;
     const [row] = await tx`
       insert into piutang (household_id, owner_member_id, borrower_name, total, from_account_id, notes, lend_transaction_id)
-      values (${actor.householdId}, ${actor.memberId}, ${g.borrower}, ${total}, ${input.accountId}, ${notes}, ${lendTxId})
+      values (${actor.householdId}, ${ownerId}, ${g.borrower}, ${total}, ${input.accountId}, ${notes}, ${lendTxId})
       returning id
     `;
     out.push({ id: row.id, borrower_name: g.borrower, total, items: names });
@@ -14773,7 +14798,9 @@ async function createTransaction(actor, input, timezone) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
   return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input);
+    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId);
     const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type);
     const categoryId = actor.credential === "api_key" && input.type === "expense" ? await refineAgentCategory(tx, actor.householdId, input.note, resolvedCategoryId) : resolvedCategoryId;
     const beneficiaryId = await resolveBeneficiaryRef(tx, actor, input) ?? null;
@@ -14784,6 +14811,9 @@ async function createTransaction(actor, input, timezone) {
         ${amount}, ${txDate}, ${input.note ?? ""}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `;
+    if (recorderId !== actor.memberId) {
+      await tx`update transactions set recorded_by_member_id = ${recorderId} where id = ${row.id}`;
+    }
     if (parsedNote?.merchant) {
       await syncTransactionPrice(tx, actor.householdId, {
         id: row.id,
@@ -14803,7 +14833,9 @@ async function createTransactionBatch(actor, input, timezone) {
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p.name);
   if (priceNames.length) await canonicalizeProducts(actor, priceNames);
   return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input);
+    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId);
     const piutangCatId = await piutangCategoryId(tx, actor.householdId);
     const items = await Promise.all(
       input.items.map(async (item, idx) => {
@@ -14827,6 +14859,10 @@ async function createTransactionBatch(actor, input, timezone) {
     const createdRows = await tx`
       select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems)}, ${txSource(actor)})
     `;
+    const ids = createdRows.map((r) => r.id);
+    if (recorderId !== actor.memberId && ids.length > 0) {
+      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids]);
+    }
     if (actor.credential === "jwt") await learnKeywords(tx, actor.householdId, items.filter((i) => !i.titipan).map((i) => ({ note: i.note, categoryId: i.category_id })));
     const remaining = [...createdRows];
     const titipanCreated = [];
@@ -14849,9 +14885,8 @@ async function createTransactionBatch(actor, input, timezone) {
         pricesByMerchant.set(parsed.merchant, list);
       }
     }
-    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, created: titipanCreated }) : [];
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, ownerMemberId: recorderId, created: titipanCreated }) : [];
     for (const [merchant, list] of pricesByMerchant) await recordPrices(tx, actor.householdId, merchant, date, list);
-    const ids = createdRows.map((r) => r.id);
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
     return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow.balance) }, ...piutang.length ? { piutang } : {} };
@@ -14863,10 +14898,11 @@ async function updateTransaction(actor, id, input) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
   return withActor(actor, async (tx) => {
+    const newRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
     const patch = {};
     if (input.amount !== void 0 || input.amount_text !== void 0) patch.amount = parseAmount(input);
     if (input.type !== void 0) patch.type = input.type;
-    if (input.account_id || input.account) patch.account_id = await resolveAccountRef(tx, actor, input);
+    if (input.account_id || input.account) patch.account_id = await resolveAccountRef(tx, actor, input, "account", newRecorderId);
     if (input.category_id || input.category) patch.category_id = await resolveCategoryRef(tx, actor, input);
     if (input.date !== void 0) patch.date = input.date;
     if (input.note !== void 0) patch.note = input.note;
@@ -14874,6 +14910,9 @@ async function updateTransaction(actor, id, input) {
       patch.beneficiary_id = await resolveBeneficiaryRef(tx, actor, input) ?? null;
     }
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch)})`;
+    if (newRecorderId) {
+      await tx`update transactions set recorded_by_member_id = ${newRecorderId} where id = ${id}`;
+    }
     let rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
     if (patch.amount !== void 0 || patch.date !== void 0 || patch.note !== void 0 || patch.type !== void 0 || input.qty !== void 0 || input.discount !== void 0) {
       await syncTransactionPrice(tx, actor.householdId, {
@@ -15042,11 +15081,16 @@ async function createTransfer(actor, input, timezone) {
     throw err;
   }
   return withActor(actor, async (tx) => {
-    const fromId = await resolveAccountRef(tx, actor, { account_id: input.from_account_id, account: input.from_account }, "from_account");
-    const toId = await resolveAccountRef(tx, actor, { account_id: input.to_account_id, account: input.to_account }, "to_account");
+    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const fromId = await resolveAccountRef(tx, actor, { account_id: input.from_account_id, account: input.from_account }, "from_account", explicitRecorderId);
+    const toId = await resolveAccountRef(tx, actor, { account_id: input.to_account_id, account: input.to_account }, "to_account", explicitRecorderId);
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, fromId, explicitRecorderId);
     const [txRow] = await tx`
       select id from post_transfer(${actor.householdId}, ${actor.memberId}, ${fromId}, ${toId}, ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? null}, ${txSource(actor)})
     `;
+    if (recorderId !== actor.memberId) {
+      await tx`update transactions set recorded_by_member_id = ${recorderId} where id = ${txRow.id}`;
+    }
     const [full] = await tx`
       select type, amount::text, date::text, note, created_at::text from transactions where id = ${txRow.id}
     `;
@@ -17069,7 +17113,9 @@ async function ingestReceipt(actor, input) {
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]]));
   if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name));
   return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input);
+    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId);
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null;
     const displayNames = input.items.map((item, idx) => titipanDisplayName(item.name, titipan[idx]));
     const noteFor = (idx) => formatReceiptNote(displayNames[idx], input.merchant, input.ref_no, input.items[idx]?.qty).slice(0, 500);
@@ -17088,6 +17134,10 @@ async function ingestReceipt(actor, input) {
         ${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(items)}, ${txSource(actor)}
       )
     `;
+    const ids = createdIdRows.map((r) => r.id);
+    if (recorderId !== actor.memberId && ids.length > 0) {
+      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids]);
+    }
     const remaining = [...createdIdRows];
     function takeMatch(idx, amount) {
       const expected = noteFor(idx);
@@ -17127,9 +17177,8 @@ async function ingestReceipt(actor, input) {
         }
       }
     }
-    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, created: titipanCreated }) : [];
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, ownerMemberId: recorderId, created: titipanCreated }) : [];
     const pricesRecorded = await recordPrices(tx, actor.householdId, input.merchant, date, priceItems);
-    const ids = createdIdRows.map((r) => r.id);
     const fullRows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
     return {
@@ -17600,7 +17649,8 @@ var TOOLS = [
         category: str("Nama kategori atau UUID"),
         note: str('Keterangan singkat, mis. "belanja sayur"'),
         date: str('YYYY-MM-DD; default hari ini (WIB). "kemarin" \u2192 isi tanggal kemarin.', { format: "date" }),
-        beneficiary: str('F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut \u2014 jangan menebak.')
+        beneficiary: str('F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut \u2014 jangan menebak.'),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.')
       },
       required: ["amount_text", "account", "category"]
     },
@@ -17609,7 +17659,7 @@ var TOOLS = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor);
-      return createTransaction(actor, { type: "expense", ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary) }, timezone);
+      return createTransaction(actor, { type: "expense", ...pickAmountAccountCategory(args), beneficiary: optStr(args.beneficiary), recorded_by: optStr(args.recorded_by) }, timezone);
     }
   },
   {
@@ -17622,7 +17672,8 @@ var TOOLS = [
         account: str("Nama akun atau UUID tujuan dana masuk"),
         category: str('Nama kategori atau UUID, mis. "Gaji", "Freelance"'),
         note: str("Keterangan singkat"),
-        date: str("YYYY-MM-DD; default hari ini", { format: "date" })
+        date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").')
       },
       required: ["amount_text", "account", "category"]
     },
@@ -17631,7 +17682,7 @@ var TOOLS = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor);
-      return createTransaction(actor, { type: "income", ...pickAmountAccountCategory(args) }, timezone);
+      return createTransaction(actor, { type: "income", ...pickAmountAccountCategory(args), recorded_by: optStr(args.recorded_by) }, timezone);
     }
   },
   {
@@ -17642,6 +17693,7 @@ var TOOLS = [
       properties: {
         account: str("Nama akun atau UUID, berlaku untuk SEMUA item"),
         date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").'),
         items: {
           type: "array",
           description: "Daftar item pengeluaran",
@@ -17667,7 +17719,7 @@ var TOOLS = [
       const timezone = await getHouseholdTimezone(actor);
       const raw2 = args.items ?? [];
       const items = raw2.map((i) => ({ ...i, beneficiary: optStr(i.beneficiary), titipan: optStr(i.titipan) }));
-      return createTransactionBatch(actor, { account: args.account, date: args.date, items }, timezone);
+      return createTransactionBatch(actor, { account: args.account, date: args.date, recorded_by: optStr(args.recorded_by), items }, timezone);
     }
   },
   {
@@ -17680,7 +17732,8 @@ var TOOLS = [
         from_account: str("Nama akun atau UUID sumber dana"),
         to_account: str("Nama akun atau UUID tujuan dana"),
         note: str("Keterangan singkat"),
-        date: str("YYYY-MM-DD; default hari ini", { format: "date" })
+        date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
+        recorded_by: str("Opsional: nama/alias anggota keluarga yang mencatat transfer ini.")
       },
       required: ["amount_text", "from_account", "to_account"]
     },
@@ -17691,7 +17744,7 @@ var TOOLS = [
       const timezone = await getHouseholdTimezone(actor);
       return createTransfer(
         actor,
-        { amount_text: args.amount_text, from_account: args.from_account, to_account: args.to_account, note: args.note, date: args.date },
+        { amount_text: args.amount_text, from_account: args.from_account, to_account: args.to_account, note: args.note, date: args.date, recorded_by: optStr(args.recorded_by) },
         timezone
       );
     }
@@ -17707,7 +17760,10 @@ var TOOLS = [
         category: str("Kategori baru (opsional)"),
         note: str("Catatan baru (opsional)"),
         date: str("Tanggal baru YYYY-MM-DD (opsional)", { format: "date" }),
-        beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).')
+        qty: num("Jumlah unit/pcs baru (opsional)"),
+        discount: num("Total potongan diskon baru dalam rupiah (opsional)"),
+        beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).'),
+        recorded_by: str('Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").')
       },
       required: ["transaction_id"]
     },
@@ -17719,7 +17775,10 @@ var TOOLS = [
       category: args.category,
       note: args.note,
       date: args.date,
-      beneficiary: optStr(args.beneficiary)
+      qty: args.qty != null ? Number(args.qty) : void 0,
+      discount: args.discount != null ? Math.round(Number(args.discount)) : void 0,
+      beneficiary: optStr(args.beneficiary),
+      recorded_by: optStr(args.recorded_by)
     })
   },
   {
@@ -17911,6 +17970,7 @@ var TOOLS = [
         date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
         merchant: str("Nama toko, kalau disebut/terbaca"),
         ref_no: str("Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)"),
+        recorded_by: str('Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'),
         items: {
           type: "array",
           description: "Daftar item di struk",
@@ -17945,6 +18005,7 @@ var TOOLS = [
         date: args.date,
         merchant: optStr(args.merchant),
         ref_no: optStr(args.ref_no),
+        recorded_by: optStr(args.recorded_by),
         items: items.map((i) => ({
           name: i.name,
           qty: i.qty == null ? 1 : Number(i.qty),
@@ -19295,6 +19356,10 @@ var hermes_tools_default = [
         beneficiary: {
           type: "string",
           description: 'F-A, HANYA kalau fitur aktif & user sebut eksplisit: nama penerima manfaat (mis. "anak", "ortu", nama anak). Kosongkan kalau tidak disebut \u2014 jangan menebak.'
+        },
+        recorded_by: {
+          type: "string",
+          description: 'Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'
         }
       },
       required: [
@@ -19339,6 +19404,10 @@ var hermes_tools_default = [
           type: "string",
           description: "YYYY-MM-DD; default hari ini",
           format: "date"
+        },
+        recorded_by: {
+          type: "string",
+          description: 'Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").'
         }
       },
       required: [
@@ -19371,6 +19440,10 @@ var hermes_tools_default = [
           type: "string",
           description: "YYYY-MM-DD; default hari ini",
           format: "date"
+        },
+        recorded_by: {
+          type: "string",
+          description: 'Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").'
         },
         items: {
           type: "array",
@@ -19444,6 +19517,10 @@ var hermes_tools_default = [
           type: "string",
           description: "YYYY-MM-DD; default hari ini",
           format: "date"
+        },
+        recorded_by: {
+          type: "string",
+          description: "Opsional: nama/alias anggota keluarga yang mencatat transfer ini."
         }
       },
       required: [
@@ -19486,9 +19563,21 @@ var hermes_tools_default = [
           description: "Tanggal baru YYYY-MM-DD (opsional)",
           format: "date"
         },
+        qty: {
+          type: "number",
+          description: "Jumlah unit/pcs baru (opsional)"
+        },
+        discount: {
+          type: "number",
+          description: "Total potongan diskon baru dalam rupiah (opsional)"
+        },
         beneficiary: {
           type: "string",
           description: 'F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).'
+        },
+        recorded_by: {
+          type: "string",
+          description: 'Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").'
         }
       },
       required: [
@@ -19824,6 +19913,10 @@ var hermes_tools_default = [
         ref_no: {
           type: "string",
           description: "Nomor referensi/RRN di struk, kalau ada (opsional, berguna untuk rekonsiliasi nanti)"
+        },
+        recorded_by: {
+          type: "string",
+          description: 'Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'
         },
         items: {
           type: "array",

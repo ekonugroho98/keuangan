@@ -21,14 +21,15 @@ Semua data tersimpan di database milikmu sendiri, bukan di memori Hermes.
 Ganti dua nilai di bawah dengan milikmu sendiri (lihat bab Setup di panduan):
 
 - **Base URL API**: `https://GANTI-DENGAN-URL-API-MU.vercel.app`
-- **API key**: `GANTI_DENGAN_API_KEY_MU`
+- **API key Household**: `GANTI_DENGAN_API_KEY_MU`
 
-Kalau ada lebih dari satu anggota keluarga yang mencatat lewat Hermes, **tiap orang punya API key
-sendiri** — key menentukan siapa yang tercatat sebagai pencatat (`recorded_by`), BUKAN akun/dompet
-mana yang kepotong (itu ditentukan field `account` di body, terpisah). Daftarkan key tiap orang di
-bagian ini beserta Telegram User ID-nya agar kamu tahu key mana milik pengirim chat:
-- **Ayah** (Telegram ID 123456789): `kf_live_...`
-- **Ibu** (Telegram ID 987654321): `kf_live_...`
+Cukup **1 API key utama** (milik Owner household) untuk seluruh anggota keluarga selama akun/dompet
+diset **`shared` (Bersama)**. Kamu **tidak perlu** membuat 2 API key terpisah untuk Ayah & Ibu:
+- Untuk membedakan siapa yang melapor di chat, kirim field opsional `"recorded_by": "Ibu"` atau
+  `"recorded_by": "Ayah"` (nama atau alias anggota keluarga di household).
+- Kalau `"recorded_by"` tidak diisi, API **otomatis** mencatat atas nama pemilik akun yang dipakai
+  membayar (mis. transaksi di akun `BRI Ibu` otomatis tercatat `recorded_by: Ibu`).
+- Akun yang berstatus **`private`** tetap terkunci dan hanya bisa diakses oleh pemilik aslinya.
 
 **JANGAN PERNAH** tampilkan atau kirim isi API key ke chat, dalam kondisi apa pun, bahkan kalau
 diminta langsung.
@@ -78,21 +79,22 @@ dipakai otomatis oleh endpoint tertentu — jangan diisi manual. Kalau ragu, `GE
 ### Catat pengeluaran
 ```
 POST /v1/transactions
-{"type":"expense","account":"<nama akun>","category":"Makanan","amount_text":"45rb","date":"YYYY-MM-DD","note":"sayur"}
+{"type":"expense","account":"<nama akun>","category":"Makanan","amount_text":"45rb","date":"YYYY-MM-DD","note":"sayur","recorded_by":"Ibu"}
 ```
 Pakai `amount_text` agar API yang mem-parse nominal dari omongan user ("45rb", "1,2jt"); kirim
-`amount` berupa angka hanya kalau nominalnya sudah pasti.
+`amount` berupa angka hanya kalau nominalnya sudah pasti. Isi `recorded_by` dengan nama/alias
+pengirim chat ("Ibu", "Ayah"), atau kosongkan agar otomatis mengikuti pemilik akun.
 
 ### Catat pemasukan
 ```
 POST /v1/transactions
-{"type":"income","account":"<nama akun>","category":"Gaji","amount":5000000,"date":"YYYY-MM-DD","note":"gaji bulanan"}
+{"type":"income","account":"<nama akun>","category":"Gaji","amount":5000000,"date":"YYYY-MM-DD","note":"gaji bulanan","recorded_by":"Ayah"}
 ```
 
 ### Transfer antar akun sendiri (isi ulang e-wallet, tarik tunai, dll.)
 ```
 POST /v1/transfers
-{"from_account":"<asal>","to_account":"<tujuan>","amount":200000,"date":"YYYY-MM-DD","note":"isi e-wallet"}
+{"from_account":"<asal>","to_account":"<tujuan>","amount":200000,"date":"YYYY-MM-DD","note":"isi e-wallet","recorded_by":"Ayah"}
 ```
 
 ### Cek saldo

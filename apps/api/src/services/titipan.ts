@@ -91,8 +91,9 @@ export interface PiutangSummary {
 export async function createTitipanPiutang(
   tx: postgres.TransactionSql,
   actor: Actor,
-  input: { accountId: string; merchant?: string | null; created: TitipanCreated[] },
+  input: { accountId: string; merchant?: string | null; ownerMemberId?: string; created: TitipanCreated[] },
 ): Promise<PiutangSummary[]> {
+  const ownerId = input.ownerMemberId ?? actor.memberId
   const groups = new Map<string, { borrower: string; items: TitipanCreated[] }>()
   for (const c of input.created) {
     const key = c.borrower.toLowerCase()
@@ -109,7 +110,7 @@ export async function createTitipanPiutang(
     const lendTxId = g.items.length === 1 ? (g.items[0]!.txId ?? null) : null
     const [row] = await tx<{ id: string }[]>`
       insert into piutang (household_id, owner_member_id, borrower_name, total, from_account_id, notes, lend_transaction_id)
-      values (${actor.householdId}, ${actor.memberId}, ${g.borrower}, ${total}, ${input.accountId}, ${notes}, ${lendTxId})
+      values (${actor.householdId}, ${ownerId}, ${g.borrower}, ${total}, ${input.accountId}, ${notes}, ${lendTxId})
       returning id
     `
     out.push({ id: row!.id, borrower_name: g.borrower, total, items: names })

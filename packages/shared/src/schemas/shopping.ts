@@ -119,6 +119,8 @@ export const IngestReceiptBodySchema = z
     account: z.string().optional(),
     date: DateStringSchema.optional(),
     merchant: z.string().optional(),
+    recorded_by_id: UuidSchema.optional(),
+    recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.' }),
     items: z.array(ReceiptItemSchema).min(1).max(100),
     total: z.number().int().positive().optional().openapi({ description: 'Kalau dikirim, divalidasi sum(items.amount) === total.' }),
     ref_no: z.string().optional(),

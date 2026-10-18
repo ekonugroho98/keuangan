@@ -3,7 +3,7 @@ import { ApiError } from '@karaya/shared/errors'
 import { parseAmountId, AmountParseError } from '@karaya/shared/format'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
-import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef } from './resolver'
+import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef, resolveEffectiveRecorder } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords, refineAgentCategory } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
@@ -305,6 +305,8 @@ export interface CreateTransactionInput {
   note?: string
   beneficiary_id?: string
   beneficiary?: string
+  recorded_by_id?: string
+  recorded_by?: string
 }
 
 export async function createTransaction(actor: Actor, input: CreateTransactionInput, timezone: string) {
@@ -314,7 +316,11 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
     await canonicalizeProducts(actor, [parsedNote.name])
   }
   return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input)
+    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
+      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
+      : undefined
+    const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId)
     const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type)
     const categoryId = actor.credential === 'api_key' && input.type === 'expense'
       ? await refineAgentCategory(tx, actor.householdId, input.note, resolvedCategoryId)
@@ -327,6 +333,9 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
         ${amount}, ${txDate}, ${input.note ?? ''}, ${txSource(actor)}, null, ${beneficiaryId}
       )
     `
+    if (recorderId !== actor.memberId) {
+      await tx`update transactions set recorded_by_member_id = ${recorderId} where id = ${row!.id}`
+    }
     if (parsedNote?.merchant) {
       await syncTransactionPrice(tx, actor.householdId, {
         id: row!.id,
@@ -342,14 +351,18 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   })
 }
 
-export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; items: Array<{ amount?: number; amount_text?: string; qty?: number; discount?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
+export async function createTransactionBatch(actor: Actor, input: { account_id?: string; account?: string; date?: string; recorded_by_id?: string; recorded_by?: string; items: Array<{ amount?: number; amount_text?: string; qty?: number; discount?: number; category_id?: string; category?: string; note?: string; beneficiary_id?: string; beneficiary?: string; titipan?: string }> }, timezone: string) {
   // Item berformat struk "[Toko] Nama item" (modal scan web) → riwayat harga per toko (prices.ts).
   // Kanonikalisasi di luar transaksi DB; biasanya sudah ter-cache sejak scan, jadi tanpa panggilan AI.
   const parsedNotes = input.items.map((i) => (i.note ? parseReceiptNote(i.note) : null))
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p!.name)
   if (priceNames.length) await canonicalizeProducts(actor, priceNames)
   return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input)
+    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
+      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
+      : undefined
+    const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
+    const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId)
     const piutangCatId = await piutangCategoryId(tx, actor.householdId)
     // Titipan (titipan.ts): field `titipan`, kata "titipan" di note, ATAU kategori dipilih "Piutang"
     // (dropdown modal web) → kategori Piutang + catatan piutang atas nama orangnya.
@@ -386,6 +399,10 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     const createdRows = await tx<{ id: string; note: string; amount: string }[]>`
       select id, note, amount::text from post_transactions_batch(${actor.householdId}, ${actor.memberId}, ${accountId}, ${date}, ${tx.json(dbItems as unknown as postgres.JSONValue)}, ${txSource(actor)})
     `
+    const ids = createdRows.map((r) => r.id)
+    if (recorderId !== actor.memberId && ids.length > 0) {
+      await tx.unsafe(`update transactions set recorded_by_member_id = $1 where id = any($2::uuid[])`, [recorderId, ids])
+    }
     // Lewat web (JWT) user sudah meninjau kategori tiap item di modal scan sebelum menyimpan — itu
     // konfirmasi manusia, jadi dipelajari (category_keywords). Lewat API key kategori masih tebakan
     // agent; belajar baru terjadi saat user mengoreksinya (updateTransaction). Titipan tidak dipelajari.
@@ -412,9 +429,8 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
         pricesByMerchant.set(parsed.merchant, list)
       }
     }
-    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, created: titipanCreated }) : []
+    const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, ownerMemberId: recorderId, created: titipanCreated }) : []
     for (const [merchant, list] of pricesByMerchant) await recordPrices(tx, actor.householdId, merchant, date, list)
-    const ids = createdRows.map((r) => r.id)
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
     return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow!.balance) }, ...(piutang.length ? { piutang } : {}) }
@@ -435,6 +451,8 @@ export interface UpdateTransactionInput {
   discount?: number
   beneficiary_id?: string | null
   beneficiary?: string
+  recorded_by_id?: string
+  recorded_by?: string
 }
 
 export async function updateTransaction(actor: Actor, id: string, input: UpdateTransactionInput) {
@@ -443,10 +461,13 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
     await canonicalizeProducts(actor, [parsedNote.name])
   }
   return withActor(actor, async (tx) => {
+    const newRecorderId = (input.recorded_by_id || input.recorded_by)
+      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
+      : undefined
     const patch: Record<string, unknown> = {}
     if (input.amount !== undefined || input.amount_text !== undefined) patch.amount = parseAmount(input)
     if (input.type !== undefined) patch.type = input.type
-    if (input.account_id || input.account) patch.account_id = await resolveAccountRef(tx, actor, input)
+    if (input.account_id || input.account) patch.account_id = await resolveAccountRef(tx, actor, input, 'account', newRecorderId)
     if (input.category_id || input.category) patch.category_id = await resolveCategoryRef(tx, actor, input)
     if (input.date !== undefined) patch.date = input.date
     if (input.note !== undefined) patch.note = input.note
@@ -458,6 +479,9 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
     }
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
+    if (newRecorderId) {
+      await tx`update transactions set recorded_by_member_id = ${newRecorderId} where id = ${id}`
+    }
     let rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
     // Sinkronkan juga ke product_prices bila nominal/tanggal/note/type/qty/discount berubah
     if (patch.amount !== undefined || patch.date !== undefined || patch.note !== undefined || patch.type !== undefined || input.qty !== undefined || input.discount !== undefined) {
