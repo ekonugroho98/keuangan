@@ -3,7 +3,7 @@ import { ApiError } from '@karaya/shared/errors'
 import { parseAmountId, AmountParseError } from '@karaya/shared/format'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
-import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef, resolveEffectiveRecorder } from './resolver'
+import { resolveAccountRef, resolveCategoryRef, resolveMemberRef, resolveBeneficiaryRef, resolveEffectiveRecorder, resolveExplicitRecorder } from './resolver'
 import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords, refineAgentCategory } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
@@ -316,9 +316,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
     await canonicalizeProducts(actor, [parsedNote.name])
   }
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
-      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
-      : undefined
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId)
     const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type)
@@ -358,9 +356,7 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p!.name)
   if (priceNames.length) await canonicalizeProducts(actor, priceNames)
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
-      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
-      : undefined
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId)
     const piutangCatId = await piutangCategoryId(tx, actor.householdId)
@@ -461,9 +457,7 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
     await canonicalizeProducts(actor, [parsedNote.name])
   }
   return withActor(actor, async (tx) => {
-    const newRecorderId = (input.recorded_by_id || input.recorded_by)
-      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
-      : undefined
+    const newRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const patch: Record<string, unknown> = {}
     if (input.amount !== undefined || input.amount_text !== undefined) patch.amount = parseAmount(input)
     if (input.type !== undefined) patch.type = input.type

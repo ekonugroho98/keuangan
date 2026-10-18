@@ -86,15 +86,57 @@ export async function resolveMemberRef(
   const result = row!.result
   if (result.status === 'ok') return result.match!.id as string
   if (result.status === 'ambiguous') throw ApiError.fromCode('ambiguous_member', { candidates: result.candidates })
+
+  const q = ref.member.trim()
+  if (q.length >= 2) {
+    const partialMembers = await tx<{ id: string }[]>`
+      select id from household_members
+      where household_id = ${actor.householdId} and deleted_at is null
+        and display_name ilike ${'%' + q + '%'}
+    `
+    if (partialMembers.length === 1) return partialMembers[0]!.id
+
+    const ownerAccounts = await tx<{ owner_member_id: string }[]>`
+      select distinct owner_member_id from accounts
+      where household_id = ${actor.householdId} and deleted_at is null
+        and owner_member_id is not null
+        and (name ilike ${'%' + q + '%'} or exists (select 1 from unnest(aliases) a where a ilike ${'%' + q + '%'}))
+    `
+    if (ownerAccounts.length === 1) return ownerAccounts[0]!.owner_member_id
+  }
+
   throw ApiError.fromCode('member_not_found', { candidates: result.candidates })
+}
+
+/**
+ * Resolusi `recorded_by` eksplisit secara aman (best-effort untuk skala produksi):
+ * Kalau tenant belum mengundang pasangan ke household (baru 1 member) tapi tetap mengirim
+ * `recorded_by: "Ibu"`, jangan gagalkan pencatatan transaksi dengan 404 — kembalikan `undefined`
+ * supaya fallback ke pemilik akun (`account.owner_member_id`) atau pemilik API key (`actor.memberId`).
+ */
+export async function resolveExplicitRecorder(
+  tx: postgres.TransactionSql,
+  actor: Actor,
+  ref: { recorded_by_id?: string; recorded_by?: string },
+): Promise<string | undefined> {
+  if (!ref.recorded_by_id && !ref.recorded_by) return undefined
+  try {
+    return await resolveMemberRef(tx, actor, { member_id: ref.recorded_by_id, member: ref.recorded_by })
+  } catch (err) {
+    if (err instanceof ApiError && (err.code === 'member_not_found' || err.code === 'ambiguous_member')) {
+      return undefined
+    }
+    throw err
+  }
 }
 
 /**
  * Resolusi atribusi pencatat (1 API Key per Household):
  * 1. Kalau caller mengirim `recorded_by_id` atau `recorded_by` eksplisit (mis. "Ibu", "Ayah"),
  *    resolve ke `household_members.id`.
- * 2. Kalau tidak diisi dan request berasal dari `api_key`, otomatis ikut `owner_member_id` dari
- *    akun yang dipakai membayar (`accountId`) jika akun itu milik salah satu member (mis. BRI Ibu -> Ibu).
+ * 2. Kalau tidak diisi (atau member belum terdaftar) dan request berasal dari `api_key`, otomatis
+ *    ikut `owner_member_id` dari akun yang dipakai membayar (`accountId`) jika akun itu milik salah
+ *    satu member (mis. BRI Ibu -> Ibu).
  * 3. Fallback ke `actor.memberId` (pemilik API key / user JWT).
  */
 export async function resolveEffectiveRecorder(
@@ -105,10 +147,8 @@ export async function resolveEffectiveRecorder(
   preResolvedExplicitId?: string,
 ): Promise<string> {
   if (preResolvedExplicitId) return preResolvedExplicitId
-  if (ref.recorded_by_id || ref.recorded_by) {
-    const resolved = await resolveMemberRef(tx, actor, { member_id: ref.recorded_by_id, member: ref.recorded_by })
-    if (resolved) return resolved
-  }
+  const explicit = await resolveExplicitRecorder(tx, actor, ref)
+  if (explicit) return explicit
   if (actor.credential === 'api_key' && accountId) {
     const [acc] = await tx<{ owner_member_id: string | null }[]>`
       select owner_member_id from accounts where id = ${accountId} and household_id = ${actor.householdId}

@@ -3,7 +3,7 @@ import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { requireFeature } from './features'
-import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef, resolveMemberRef, resolveEffectiveRecorder } from './resolver'
+import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef, resolveEffectiveRecorder, resolveExplicitRecorder } from './resolver'
 import { classifyItems } from './categorize'
 import { formatReceiptNote } from '@karaya/shared/format'
 import { canonicalizeProducts, recordPrices, type PriceItem } from './prices'
@@ -67,9 +67,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   // BYOK per struk, di-cache global) SEBELUM transaksi DB dibuka. Best-effort, tidak pernah gagal.
   if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name))
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
-      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
-      : undefined
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId)
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null

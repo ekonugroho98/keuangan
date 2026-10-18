@@ -13104,14 +13104,39 @@ async function resolveMemberRef(tx, actor, ref) {
   const result = row.result;
   if (result.status === "ok") return result.match.id;
   if (result.status === "ambiguous") throw ApiError.fromCode("ambiguous_member", { candidates: result.candidates });
+  const q = ref.member.trim();
+  if (q.length >= 2) {
+    const partialMembers = await tx`
+      select id from household_members
+      where household_id = ${actor.householdId} and deleted_at is null
+        and display_name ilike ${"%" + q + "%"}
+    `;
+    if (partialMembers.length === 1) return partialMembers[0].id;
+    const ownerAccounts = await tx`
+      select distinct owner_member_id from accounts
+      where household_id = ${actor.householdId} and deleted_at is null
+        and owner_member_id is not null
+        and (name ilike ${"%" + q + "%"} or exists (select 1 from unnest(aliases) a where a ilike ${"%" + q + "%"}))
+    `;
+    if (ownerAccounts.length === 1) return ownerAccounts[0].owner_member_id;
+  }
   throw ApiError.fromCode("member_not_found", { candidates: result.candidates });
+}
+async function resolveExplicitRecorder(tx, actor, ref) {
+  if (!ref.recorded_by_id && !ref.recorded_by) return void 0;
+  try {
+    return await resolveMemberRef(tx, actor, { member_id: ref.recorded_by_id, member: ref.recorded_by });
+  } catch (err) {
+    if (err instanceof ApiError && (err.code === "member_not_found" || err.code === "ambiguous_member")) {
+      return void 0;
+    }
+    throw err;
+  }
 }
 async function resolveEffectiveRecorder(tx, actor, ref, accountId, preResolvedExplicitId) {
   if (preResolvedExplicitId) return preResolvedExplicitId;
-  if (ref.recorded_by_id || ref.recorded_by) {
-    const resolved = await resolveMemberRef(tx, actor, { member_id: ref.recorded_by_id, member: ref.recorded_by });
-    if (resolved) return resolved;
-  }
+  const explicit = await resolveExplicitRecorder(tx, actor, ref);
+  if (explicit) return explicit;
   if (actor.credential === "api_key" && accountId) {
     const [acc] = await tx`
       select owner_member_id from accounts where id = ${accountId} and household_id = ${actor.householdId}
@@ -14798,7 +14823,7 @@ async function createTransaction(actor, input, timezone) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId);
     const resolvedCategoryId = await resolveCategoryRef(tx, actor, input, input.type);
@@ -14833,7 +14858,7 @@ async function createTransactionBatch(actor, input, timezone) {
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p.name);
   if (priceNames.length) await canonicalizeProducts(actor, priceNames);
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId);
     const piutangCatId = await piutangCategoryId(tx, actor.householdId);
@@ -14898,7 +14923,7 @@ async function updateTransaction(actor, id, input) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
   return withActor(actor, async (tx) => {
-    const newRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const newRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const patch = {};
     if (input.amount !== void 0 || input.amount_text !== void 0) patch.amount = parseAmount(input);
     if (input.type !== void 0) patch.type = input.type;
@@ -15081,7 +15106,7 @@ async function createTransfer(actor, input, timezone) {
     throw err;
   }
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const fromId = await resolveAccountRef(tx, actor, { account_id: input.from_account_id, account: input.from_account }, "from_account", explicitRecorderId);
     const toId = await resolveAccountRef(tx, actor, { account_id: input.to_account_id, account: input.to_account }, "to_account", explicitRecorderId);
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, fromId, explicitRecorderId);
@@ -17113,7 +17138,7 @@ async function ingestReceipt(actor, input) {
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]]));
   if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name));
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = input.recorded_by_id || input.recorded_by ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by }) : void 0;
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, accountId, explicitRecorderId);
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null;

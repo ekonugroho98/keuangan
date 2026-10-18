@@ -2,7 +2,7 @@ import { ApiError } from '@karaya/shared/errors'
 import { parseAmountId, AmountParseError } from '@karaya/shared/format'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
-import { resolveAccountRef, resolveMemberRef, resolveEffectiveRecorder } from './resolver'
+import { resolveAccountRef, resolveEffectiveRecorder, resolveExplicitRecorder } from './resolver'
 import { todayInTz } from './period'
 import { txSource } from './transactions'
 
@@ -29,9 +29,7 @@ export async function createTransfer(actor: Actor, input: CreateTransferInput, t
   }
 
   return withActor(actor, async (tx) => {
-    const explicitRecorderId = (input.recorded_by_id || input.recorded_by)
-      ? await resolveMemberRef(tx, actor, { member_id: input.recorded_by_id, member: input.recorded_by })
-      : undefined
+    const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const fromId = await resolveAccountRef(tx, actor, { account_id: input.from_account_id, account: input.from_account }, 'from_account', explicitRecorderId)
     const toId = await resolveAccountRef(tx, actor, { account_id: input.to_account_id, account: input.to_account }, 'to_account', explicitRecorderId)
     const recorderId = await resolveEffectiveRecorder(tx, actor, input, fromId, explicitRecorderId)
