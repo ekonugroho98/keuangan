@@ -40,12 +40,12 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
-- note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus — dipakai untuk mengenali produk yang sama lain kali)
-- qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (angka bulat/desimal, default 1 jika tidak tertulis)
-- amount: harga total untuk baris item itu (qty × harga satuan), angka bulat tanpa titik/koma
+- note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus — dipakai untuk mengenali produk yang sama lain kali; mis. "GRANDCO MG REF 1LT" tulis persis begitu, JANGAN ubah "MG" yang berarti Minyak Goreng menjadi "Margarin")
+- qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (wajib baca kolom Qty/jumlah pcs dengan teliti, mis. "2 pcs" / "2 X 23.490" → qty: 2; default 1 hanya jika benar-benar 1 unit)
+- amount: harga bersih yang dibayar untuk baris item itu SETELAH dikurangi diskon item jika ada (mis. 2 × 23.490 = 46.980, Diskon -6.600 → amount: 40380, qty: 2), angka bulat tanpa titik/koma
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
-- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
+- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item tersendiri (diskon per item langsung mengurangi amount item terkait)
 Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`
 }
 
@@ -63,7 +63,7 @@ Kembalikan HANYA JSON (tanpa penjelasan lain):
     { "note": "Nama Produk", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: note = nama item persis seperti di struk; qty = jumlah unit yang dibeli (default 1); amount = harga total per baris item (qty×satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
+Aturan: note = nama item persis seperti di struk (jangan ubah singkatan "MG" [Minyak Goreng] menjadi Margarin); qty = jumlah unit/kemasan yang dibeli pada baris tersebut (wajib teliti membaca "2 pcs" / "2 X ..."); amount = harga total bersih per baris item setelah dikurangi diskon item (qty×satuan - diskon_item); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item tersendiri.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:

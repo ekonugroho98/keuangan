@@ -8,7 +8,7 @@ import { resolvePeriod, todayInTz } from './period'
 import { learnKeywords, refineAgentCategory } from './categorize'
 import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayName, type TitipanCreated } from './titipan'
 import { canonicalizeProducts, recordPrices, syncTransactionPrice, type PriceItem } from './prices'
-import { parseReceiptNote } from '@karaya/shared/format'
+import { formatReceiptNote, parseReceiptNote } from '@karaya/shared/format'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -61,15 +61,36 @@ export interface TxRow {
   created_at: string
   updated_at: string
   deleted_at: string | null
+  item_qty?: string | null
+  item_unit_price?: string | null
+  item_size_value?: string | null
+  item_size_unit?: 'g' | 'ml' | 'pcs' | null
+  item_canonical_name?: string | null
+}
+
+function formatTotalSize(qty: number | null, sizeVal: number | null, sizeUnit: string | null): string | null {
+  if (!sizeVal || !sizeUnit || sizeVal <= 0) return null
+  const total = (qty && qty > 0 ? qty : 1) * sizeVal
+  if (sizeUnit === 'g' && total >= 1000) return `${+(total / 1000).toFixed(2)} kg`
+  if (sizeUnit === 'ml' && total >= 1000) return `${+(total / 1000).toFixed(2)} L`
+  return `${+total.toFixed(2)} ${sizeUnit}`
 }
 
 export function mapTx(r: TxRow) {
+  const qty = r.item_qty != null ? Number(r.item_qty) : null
+  const unitPrice = r.item_unit_price != null ? Math.round(Number(r.item_unit_price)) : null
+  const sizeValue = r.item_size_value != null ? Number(r.item_size_value) : null
+  const sizeUnit = r.item_size_unit ?? null
+  const totalSizeLabel = formatTotalSize(qty, sizeValue, sizeUnit)
+  const canonicalName = r.item_canonical_name ?? null
+
   return {
     id: r.id,
     type: r.type,
     amount: Number(r.amount),
     date: r.date,
     note: r.note,
+    ...(qty !== null ? { qty, unit_price: unitPrice, size_value: sizeValue, size_unit: sizeUnit, total_size_label: totalSizeLabel, canonical_name: canonicalName } : {}),
     account: { id: r.account_id, name: r.account_name, owner: r.account_owner_member_id ? { member_id: r.account_owner_member_id, display_name: r.account_owner_display_name } : null },
     to_account: r.to_account_id ? { id: r.to_account_id, name: r.to_account_name, owner: r.to_account_owner_member_id ? { member_id: r.to_account_owner_member_id, display_name: r.to_account_owner_display_name } : null } : null,
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
@@ -90,7 +111,10 @@ export const TX_SELECT = `
          t.category_id, c.name as category_name, c.icon as category_icon, c.color as category_color,
          t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
-         t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at
+         t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
+         pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
+         pp.size_value::text as item_size_value, pp.size_unit as item_size_unit,
+         coalesce(pa.canonical_name, pk.canonical_name) as item_canonical_name
   from transactions t
   join accounts a on a.id = t.account_id
   left join household_members am on am.id = a.owner_member_id
@@ -100,6 +124,9 @@ export const TX_SELECT = `
   left join beneficiaries b on b.id = t.beneficiary_id
   left join household_members bm on bm.id = b.member_id and bm.deleted_at is null
   join household_members rm on rm.id = t.recorded_by_member_id
+  left join product_prices pp on pp.transaction_id = t.id
+  left join product_aliases pa on pa.household_id = t.household_id and pa.keyword = pp.keyword
+  left join product_knowledge pk on pk.keyword = pp.keyword
 `
 
 export interface TransactionListQuery {
@@ -167,7 +194,12 @@ function buildTxFilter(
   } else if (resolved.beneficiaryId) {
     clauses.push(`t.beneficiary_id = ${push(resolved.beneficiaryId)}`)
   }
-  if (query.q) clauses.push(`t.note ilike ${push(`%${query.q}%`)}`)
+  if (query.q) {
+    const pq = push(`%${query.q}%`)
+    clauses.push(
+      `(t.note ilike ${pq} or exists (select 1 from product_prices ppq left join product_aliases paq on paq.household_id = t.household_id and paq.keyword = ppq.keyword left join product_knowledge pkq on pkq.keyword = ppq.keyword where ppq.transaction_id = t.id and coalesce(paq.canonical_name, pkq.canonical_name, ppq.base_name) ilike ${pq}))`,
+    )
+  }
   if (query.min_amount !== undefined) clauses.push(`t.amount >= ${push(query.min_amount)}`)
   if (query.max_amount !== undefined) clauses.push(`t.amount <= ${push(query.max_amount)}`)
   if (cur) {
@@ -306,14 +338,22 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
     // Titipan (titipan.ts): field `titipan`, kata "titipan" di note, ATAU kategori dipilih "Piutang"
     // (dropdown modal web) → kategori Piutang + catatan piutang atas nama orangnya.
     const items = await Promise.all(
-      input.items.map(async (item) => {
+      input.items.map(async (item, idx) => {
         const resolvedCat0 = await resolveCategoryRef(tx, actor, item, 'expense')
         const resolvedCat = actor.credential === 'api_key' ? await refineAgentCategory(tx, actor.householdId, item.note, resolvedCat0) : resolvedCat0
         const titipan = detectTitipan(item.note, item.titipan) ?? (resolvedCat === piutangCatId ? { borrower: 'Titipan' } : null)
+        const baseNote = titipan ? titipanDisplayName(item.note ?? '', titipan) : (item.note ?? '')
+        const parsed = parsedNotes[idx]
+        const withQtyNote =
+          item.qty && item.qty > 1 && baseNote
+            ? parsed?.merchant
+              ? formatReceiptNote(titipan ? titipanDisplayName(parsed.name, titipan) : parsed.name, parsed.merchant, parsed.refNo, item.qty)
+              : formatReceiptNote(baseNote, null, null, item.qty)
+            : baseNote
         return {
           amount: parseAmount(item),
           category_id: titipan ? piutangCatId : resolvedCat,
-          note: titipan ? titipanDisplayName(item.note ?? '', titipan).slice(0, 500) : (item.note ?? ''),
+          note: withQtyNote.slice(0, 500),
           beneficiary_id: (await resolveBeneficiaryRef(tx, actor, item)) ?? null,
           titipan,
         }
@@ -346,7 +386,7 @@ export async function createTransactionBatch(actor: Actor, input: { account_id?:
       if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount })
       if (parsed?.merchant) {
         const list = pricesByMerchant.get(parsed.merchant) ?? []
-        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty, amount: it.amount })
+        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty ?? parsed.qty, amount: it.amount })
         pricesByMerchant.set(parsed.merchant, list)
       }
     }

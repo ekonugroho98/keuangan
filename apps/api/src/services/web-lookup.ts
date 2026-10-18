@@ -52,7 +52,7 @@ function classifyPrompt(itemName: string, snippets: string[]): string {
   const evidence = snippets.length
     ? `Hasil pencarian web untuk nama itu:\n${snippets.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
     : 'Tidak ada hasil pencarian web — pakai pengetahuanmu sendiri tentang produk yang umum di minimarket/supermarket Indonesia.'
-  return `Kamu mengidentifikasi barang dari struk belanja Indonesia. Nama item sering disingkat kasir (mis. "LFBY BS 85G" = Lifebuoy sabun batang 85 g, "INDM GRG" = Indomie goreng).
+  return `Kamu mengidentifikasi barang dari struk belanja Indonesia. Nama item sering disingkat kasir (mis. "LFBY BS 85G" = Lifebuoy sabun batang 85 g, "INDM GRG" = Indomie goreng, "GRANDCO MG REF 1LT" / "BML MG 2L" = Minyak goreng refill, di mana "MG" = Minyak Goreng sedangkan "MGR" = Margarin).
 Nama item: "${itemName}"
 
 ${evidence}

@@ -564,9 +564,9 @@ const AddTransactionModal = ({
     }
     setScanError("");
     if (onSubmitMultiple) {
-      // Note kanonik "[Nama Toko] Nama item" (sama dengan ingest_receipt di backend) — toko di depan
+      // Note kanonik "[Nama Toko] Nama item x2" (sama dengan ingest_receipt di backend) — toko di depan
       // supaya terbaca di daftar transaksi dan bisa diurai untuk perbandingan harga antar toko.
-      const withMerchant = selected.map((i) => ({ ...i, note: formatReceiptNote(i.note, scanResults?.merchant) }));
+      const withMerchant = selected.map((i) => ({ ...i, note: formatReceiptNote(i.note, scanResults?.merchant, null, i.qty) }));
       await onSubmitMultiple(withMerchant, scanAccount, scanResults?.date);
     }
     resetScan();
@@ -1981,7 +1981,9 @@ const AddTransactionModal = ({
               {txForm.type === "expense" ? (() => {
                 const parsed = parseReceiptNote(txForm.note || "");
                 const curMerchant = parsed.merchant || "";
-                const curName = parsed.merchant ? parsed.name : (txForm.note || "");
+                const curName = parsed.merchant
+                  ? `${parsed.name}${parsed.qty && parsed.qty > 1 ? ` x${parsed.qty}` : ""}`
+                  : (txForm.note || "");
                 const setMerchantAndName = (m, n) => {
                   const cleanM = (m || "").trim();
                   const cleanN = n ?? "";

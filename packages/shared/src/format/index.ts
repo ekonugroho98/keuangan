@@ -65,22 +65,39 @@ export function parseAmountId(input: string | number): number {
 }
 
 // ── Note transaksi dari struk ───────────────────────────────────────────────────────────────
-// Format kanonik: "[Nama Toko] Nama item [ref: NOMOR]". Dipakai ingest_receipt (Hermes) dan modal
-// scan web supaya note konsisten, mudah dibaca ("[Indomaret] Indomie Goreng"), dan bisa diurai
-// balik: nama toko untuk perbandingan harga antar toko, `[ref: …]` untuk rekonsiliasi bank (F-C).
-export function formatReceiptNote(name: string, merchant?: string | null, refNo?: string | null): string {
+// Format kanonik: "[Nama Toko] Nama item x2 [ref: NOMOR]". Dipakai ingest_receipt (Hermes) dan modal
+// scan web supaya note konsisten, mudah dibaca ("[Indomaret] Indomie Goreng x2"), dan bisa diurai
+// balik: nama toko untuk perbandingan harga antar toko, `x2` untuk jumlah kemasan (qty),
+// dan `[ref: …]` untuk rekonsiliasi bank (F-C).
+export function formatReceiptNote(
+  name: string,
+  merchant?: string | null,
+  refNo?: string | null,
+  qty?: number | null,
+): string {
   const m = merchant?.trim()
   const r = refNo?.trim()
-  return `${m ? `[${m}] ` : ''}${name.trim()}${r ? ` [ref: ${r}]` : ''}`
+  let cleanName = name.trim()
+  const q = qty != null && Number.isFinite(Number(qty)) && Number(qty) > 1 ? Number(qty) : null
+  if (q && !/(?:^|\s)(?:x\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*x|\(\d+(?:[.,]\d+)?\s*x[^)]*\))(?:\s|$|\))/i.test(cleanName)) {
+    const titipanSuffix = cleanName.match(/(\s*\(titipan [^)]*\)\s*)$/i)
+    if (titipanSuffix && titipanSuffix.index != null) {
+      cleanName = `${cleanName.slice(0, titipanSuffix.index).trim()} x${q}${titipanSuffix[1]}`
+    } else {
+      cleanName = `${cleanName} x${q}`
+    }
+  }
+  return `${m ? `[${m}] ` : ''}${cleanName}${r ? ` [ref: ${r}]` : ''}`
 }
 
 export interface ParsedReceiptNote {
   merchant?: string
   name: string
   refNo?: string
+  qty?: number
 }
 
-/** Kebalikan formatReceiptNote. Juga mengerti format lama "Nama — Toko [ref: X]" (struk sebelum 2026-10-13). */
+/** Kebalikan formatReceiptNote. Juga mengerti format lama "Nama — Toko [ref: X]" (struk sebelum 2026-10-13) serta kelipatan "x2" / "(2x)". */
 export function parseReceiptNote(note: string): ParsedReceiptNote {
   let rest = note.trim()
   const out: ParsedReceiptNote = { name: rest }
@@ -98,6 +115,18 @@ export function parseReceiptNote(note: string): ParsedReceiptNote {
     if (legacy > 0) {
       out.merchant = rest.slice(legacy + 3).trim()
       rest = rest.slice(0, legacy).trim()
+    }
+  }
+  // Ekstrak kelipatan di akhir nama item ("GRANDCO MG REF 1LT x2", "Indomie 2x", "Minyak (2x @Rp20.190)")
+  const qtyMatch = rest.match(
+    /^(.*?)\s+(?:x\s*(\d+(?:[.,]\d+)?)|\((\d+(?:[.,]\d+)?)\s*x(?:\s*@[^)]*)?\)|(\d+(?:[.,]\d+)?)\s*x)(\s*\(titipan [^)]*\))?\s*$/i,
+  )
+  if (qtyMatch) {
+    const rawQ = (qtyMatch[2] || qtyMatch[3] || qtyMatch[4] || '').replace(',', '.')
+    const parsedQ = Number.parseFloat(rawQ)
+    if (Number.isFinite(parsedQ) && parsedQ > 1 && qtyMatch[1]?.trim()) {
+      out.qty = parsedQ
+      rest = `${qtyMatch[1].trim()}${qtyMatch[5] || ''}`
     }
   }
   out.name = rest

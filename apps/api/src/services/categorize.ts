@@ -39,7 +39,7 @@ const KEYWORD_RULES: Array<{ re: RegExp; group: ProductGroup }> = [
   { re: /bensin|bbm|pertamax|pertalite|parkir|\btol\b|ojek|grab|gojek|taxi|taksi|\bbus\b|kereta|transjakarta/i, group: 'transport' },
   { re: /buku|alat tulis|pensil|pulpen|sekolah|kursus|\bles\b|fotokopi|fotocopy/i, group: 'education' },
   { re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|pampers|pewangi|pembersih|sunlight|rinso|molto|so ?klin|daia|downy|vanish|biosol|wipol|bayclin|super ?pel|baygon|pepsodent|ciptadent|lifebuoy|\blux\b|dettol|sunsilk|pantene|rejoice|paseo|montis|monttis|\bpel\b|sapu|baju|celana|kaos|sandal|sepatu/i, group: 'household' },
-  { re: /\bmie\b|nasi|ayam|sapi|ikan|sayur|buah|kopi|\bteh\b|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/i, group: 'food' },
+  { re: /\bmie\b|nasi|ayam|sapi|ikan|sayur|buah|kopi|\bteh\b|susu|roti|snack|kerupuk|minyak|\bmyk\s*grg\b|\bmg\s+ref\b|grandco|bimoli|sunco|tropical|filma|sania|fortune|margarin|blue\s*band|forvita|palmia|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/i, group: 'food' },
 ]
 
 // Kategori khusus yang HANYA ada di sebagian household (dibuat user, bukan bawaan): dicek sebelum

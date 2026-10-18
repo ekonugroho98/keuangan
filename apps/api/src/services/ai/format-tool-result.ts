@@ -1,7 +1,19 @@
 const fmtRp = (n: unknown) => `Rp ${Number(n ?? 0).toLocaleString('id-ID')}`
 
 interface Acc { id: string; name: string; icon?: string; type: string; balance: number | null }
-interface Tx { id: string; type: string; amount: number; date: string; note: string; category?: { name: string }; account?: { name: string } }
+interface Tx {
+  id: string
+  type: string
+  amount: number
+  date: string
+  note: string
+  qty?: number | null
+  unit_price?: number | null
+  total_size_label?: string | null
+  canonical_name?: string | null
+  category?: { name: string }
+  account?: { name: string }
+}
 
 /**
  * Format hasil tool (object dari service layer, bukan HTTP) jadi teks Bahasa Indonesia untuk
@@ -27,7 +39,14 @@ export function formatToolResult(name: string, result: unknown): string {
       const { data } = result as { data: Tx[] }
       if (!data.length) return 'Tidak ada transaksi yang cocok dengan filter itu.'
       const rows = data
-        .map((t) => `${t.date} | ${t.type === 'income' ? 'Pemasukan' : t.type === 'transfer' ? 'Transfer' : 'Pengeluaran'} | ${fmtRp(t.amount)} | ${t.category?.name ?? '-'} | ${t.note || '-'} | ${t.account?.name ?? '-'}`)
+        .map((t) => {
+          const meta: string[] = []
+          if (t.qty != null && t.qty > 1) meta.push(`qty: ${t.qty}${t.unit_price ? ` @${fmtRp(t.unit_price)}` : ''}`)
+          if (t.total_size_label) meta.push(`total ukuran: ${t.total_size_label}`)
+          if (t.canonical_name) meta.push(`produk: ${t.canonical_name}`)
+          const metaSuffix = meta.length ? ` (${meta.join(', ')})` : ''
+          return `${t.date} | ${t.type === 'income' ? 'Pemasukan' : t.type === 'transfer' ? 'Transfer' : 'Pengeluaran'} | ${fmtRp(t.amount)}${metaSuffix} | ${t.category?.name ?? '-'} | ${t.note || '-'} | ${t.account?.name ?? '-'}`
+        })
         .join('\n')
       return `${data.length} transaksi ditemukan:\n${rows}`
     }

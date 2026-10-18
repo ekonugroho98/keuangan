@@ -26,10 +26,12 @@ function canonicalPrompt(names: string[], existing: string[]): string {
     ? `\nNama kanonik yang SUDAH ADA (pakai PERSIS salah satu ini kalau produknya sama, walau ukurannya beda):\n${existing.map((e) => `- ${e}`).join('\n')}\n`
     : ''
   return `Kamu menyeragamkan nama barang dari struk belanja Indonesia supaya barang yang sama dari toko berbeda bisa dibandingkan harganya.
-Nama kasir sering disingkat ("LFBY BS 85G" = Lifebuoy sabun batang, "INDM GRG" = Indomie goreng, "BML MG 2L" = Bimoli minyak goreng).
+Nama kasir sering disingkat:
+- "MG" / "MYK GRG" = Minyak Goreng (mis. "GRANDCO MG REF 1LT" = "grandco minyak goreng", "BML MG 2L" = "bimoli minyak goreng"). JANGAN ubah "MG" menjadi Margarin ("MGR" = Margarin).
+- "REF" / "PCH" = Refill / Pouch, "BTL" = Botol, "BS" = Bar Soap / Sabun Batang ("LFBY BS 85G" = "lifebuoy sabun batang"), "INDM GRG" = "indomie goreng", "GL PSR" = "gula pasir".
 ${known}
 Untuk TIAP nama di bawah, beri:
-- canonical: merek + jenis produk + varian, huruf kecil, TANPA ukuran/berat/isi/jumlah (mis. "lifebuoy sabun batang total 10", "indomie goreng original", "bimoli minyak goreng"). Barang generik tanpa merek: jenisnya saja ("telur ayam", "beras"). null kalau tidak bisa dipastikan.
+- canonical: merek + jenis produk + varian, huruf kecil, TANPA ukuran/berat/isi/jumlah/kemasan (mis. "lifebuoy sabun batang total 10", "indomie goreng original", "bimoli minyak goreng", "grandco minyak goreng"). Barang generik tanpa merek: jenisnya saja ("telur ayam", "beras"). null kalau tidak bisa dipastikan.
 - group: salah satu dari ${groups}.
 
 Nama:
@@ -106,7 +108,7 @@ export async function recordPrices(tx: postgres.TransactionSql, householdId: str
 
 /**
  * Sinkronkan 1 baris transaksi tunggal (createTransaction / updateTransaction) ke product_prices.
- * Bila di-edit (nominal/tanggal/note berubah), baris lama dihapus lalu dicatat ulang dengan mempertahankan qty sebelumnya.
+ * Bila di-edit (nominal/tanggal/note berubah), baris lama dihapus lalu dicatat ulang dengan mempertahankan qty dari note ("x2") atau qty sebelumnya.
  */
 export async function syncTransactionPrice(
   tx: postgres.TransactionSql,
@@ -118,7 +120,7 @@ export async function syncTransactionPrice(
   if (txRow.type !== 'expense' || !txRow.note || txRow.amount <= 0) return
   const parsed = parseReceiptNote(txRow.note)
   if (!parsed.merchant || !parsed.name) return
-  const prevQty = prev ? Number(prev.qty) : 1
+  const prevQty = parsed.qty ?? (prev ? Number(prev.qty) : 1)
   await recordPrices(tx, householdId, parsed.merchant, txRow.date, [
     { transaction_id: txRow.id, name: parsed.name, qty: prevQty > 0 ? prevQty : 1, amount: txRow.amount },
   ])

@@ -70,7 +70,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     // dan bisa diurai untuk perbandingan harga antar toko; `[ref: ...]` untuk F-C rekonsiliasi
     // (spec §5.4: ref_no di note = +40 skor). Dipotong ke 500 (check constraint transactions.note).
     const displayNames = input.items.map((item, idx) => titipanDisplayName(item.name, titipan[idx]!))
-    const noteFor = (idx: number) => formatReceiptNote(displayNames[idx]!, input.merchant, input.ref_no).slice(0, 500)
+    const noteFor = (idx: number) => formatReceiptNote(displayNames[idx]!, input.merchant, input.ref_no, input.items[idx]?.qty).slice(0, 500)
     const items = await Promise.all(
       input.items.map(async (item, idx) => ({
         amount: item.amount,

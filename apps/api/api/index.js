@@ -12451,6 +12451,12 @@ var TransactionSchema = external_exports.object({
   amount: external_exports.number().int(),
   date: DateStringSchema,
   note: external_exports.string(),
+  qty: external_exports.number().nullable().optional(),
+  unit_price: external_exports.number().nullable().optional(),
+  size_value: external_exports.number().nullable().optional(),
+  size_unit: external_exports.enum(["g", "ml", "pcs"]).nullable().optional(),
+  total_size_label: external_exports.string().nullable().optional(),
+  canonical_name: external_exports.string().nullable().optional(),
   account: TransactionAccountRefSchema,
   to_account: TransactionAccountRefSchema,
   category: CategoryRefOutSchema,
@@ -13703,10 +13709,20 @@ function parseAmountId(input) {
   if (plain === "") throw new AmountParseError(input);
   return Number.parseInt(plain, 10);
 }
-function formatReceiptNote(name, merchant, refNo) {
+function formatReceiptNote(name, merchant, refNo, qty) {
   const m = merchant?.trim();
   const r = refNo?.trim();
-  return `${m ? `[${m}] ` : ""}${name.trim()}${r ? ` [ref: ${r}]` : ""}`;
+  let cleanName = name.trim();
+  const q = qty != null && Number.isFinite(Number(qty)) && Number(qty) > 1 ? Number(qty) : null;
+  if (q && !/(?:^|\s)(?:x\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*x|\(\d+(?:[.,]\d+)?\s*x[^)]*\))(?:\s|$|\))/i.test(cleanName)) {
+    const titipanSuffix = cleanName.match(/(\s*\(titipan [^)]*\)\s*)$/i);
+    if (titipanSuffix && titipanSuffix.index != null) {
+      cleanName = `${cleanName.slice(0, titipanSuffix.index).trim()} x${q}${titipanSuffix[1]}`;
+    } else {
+      cleanName = `${cleanName} x${q}`;
+    }
+  }
+  return `${m ? `[${m}] ` : ""}${cleanName}${r ? ` [ref: ${r}]` : ""}`;
 }
 function parseReceiptNote(note) {
   let rest = note.trim();
@@ -13725,6 +13741,17 @@ function parseReceiptNote(note) {
     if (legacy > 0) {
       out.merchant = rest.slice(legacy + 3).trim();
       rest = rest.slice(0, legacy).trim();
+    }
+  }
+  const qtyMatch = rest.match(
+    /^(.*?)\s+(?:x\s*(\d+(?:[.,]\d+)?)|\((\d+(?:[.,]\d+)?)\s*x(?:\s*@[^)]*)?\)|(\d+(?:[.,]\d+)?)\s*x)(\s*\(titipan [^)]*\))?\s*$/i
+  );
+  if (qtyMatch) {
+    const rawQ = (qtyMatch[2] || qtyMatch[3] || qtyMatch[4] || "").replace(",", ".");
+    const parsedQ = Number.parseFloat(rawQ);
+    if (Number.isFinite(parsedQ) && parsedQ > 1 && qtyMatch[1]?.trim()) {
+      out.qty = parsedQ;
+      rest = `${qtyMatch[1].trim()}${qtyMatch[5] || ""}`;
     }
   }
   out.name = rest;
@@ -13982,7 +14009,7 @@ function classifyPrompt(itemName, snippets) {
   const groups = PRODUCT_GROUPS.map((g) => `- ${g}: ${GROUP_LABEL_ID[g]}`).join("\n");
   const evidence = snippets.length ? `Hasil pencarian web untuk nama itu:
 ${snippets.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "Tidak ada hasil pencarian web \u2014 pakai pengetahuanmu sendiri tentang produk yang umum di minimarket/supermarket Indonesia.";
-  return `Kamu mengidentifikasi barang dari struk belanja Indonesia. Nama item sering disingkat kasir (mis. "LFBY BS 85G" = Lifebuoy sabun batang 85 g, "INDM GRG" = Indomie goreng).
+  return `Kamu mengidentifikasi barang dari struk belanja Indonesia. Nama item sering disingkat kasir (mis. "LFBY BS 85G" = Lifebuoy sabun batang 85 g, "INDM GRG" = Indomie goreng, "GRANDCO MG REF 1LT" / "BML MG 2L" = Minyak goreng refill, di mana "MG" = Minyak Goreng sedangkan "MGR" = Margarin).
 Nama item: "${itemName}"
 
 ${evidence}
@@ -14021,7 +14048,7 @@ var KEYWORD_RULES = [
   { re: /bensin|bbm|pertamax|pertalite|parkir|\btol\b|ojek|grab|gojek|taxi|taksi|\bbus\b|kereta|transjakarta/i, group: "transport" },
   { re: /buku|alat tulis|pensil|pulpen|sekolah|kursus|\bles\b|fotokopi|fotocopy/i, group: "education" },
   { re: /deterjen|sabun|sampo|shampoo|pasta gigi|odol|sikat|tisu|tissue|pembalut|popok|diapers|pampers|pewangi|pembersih|sunlight|rinso|molto|so ?klin|daia|downy|vanish|biosol|wipol|bayclin|super ?pel|baygon|pepsodent|ciptadent|lifebuoy|\blux\b|dettol|sunsilk|pantene|rejoice|paseo|montis|monttis|\bpel\b|sapu|baju|celana|kaos|sandal|sepatu/i, group: "household" },
-  { re: /\bmie\b|nasi|ayam|sapi|ikan|sayur|buah|kopi|\bteh\b|susu|roti|snack|kerupuk|minyak|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/i, group: "food" }
+  { re: /\bmie\b|nasi|ayam|sapi|ikan|sayur|buah|kopi|\bteh\b|susu|roti|snack|kerupuk|minyak|\bmyk\s*grg\b|\bmg\s+ref\b|grandco|bimoli|sunco|tropical|filma|sania|fortune|margarin|blue\s*band|forvita|palmia|beras|gula|garam|tepung|saus|kecap|aqua|air mineral|minuman|makanan|bumbu|santan|telur|daging|bakso|soto|biskuit|coklat|cokelat|permen|yogurt|keju|sosis|nugget/i, group: "food" }
 ];
 var SPECIAL_RULES = [
   {
@@ -14285,10 +14312,12 @@ Nama kanonik yang SUDAH ADA (pakai PERSIS salah satu ini kalau produknya sama, w
 ${existing.map((e) => `- ${e}`).join("\n")}
 ` : "";
   return `Kamu menyeragamkan nama barang dari struk belanja Indonesia supaya barang yang sama dari toko berbeda bisa dibandingkan harganya.
-Nama kasir sering disingkat ("LFBY BS 85G" = Lifebuoy sabun batang, "INDM GRG" = Indomie goreng, "BML MG 2L" = Bimoli minyak goreng).
+Nama kasir sering disingkat:
+- "MG" / "MYK GRG" = Minyak Goreng (mis. "GRANDCO MG REF 1LT" = "grandco minyak goreng", "BML MG 2L" = "bimoli minyak goreng"). JANGAN ubah "MG" menjadi Margarin ("MGR" = Margarin).
+- "REF" / "PCH" = Refill / Pouch, "BTL" = Botol, "BS" = Bar Soap / Sabun Batang ("LFBY BS 85G" = "lifebuoy sabun batang"), "INDM GRG" = "indomie goreng", "GL PSR" = "gula pasir".
 ${known}
 Untuk TIAP nama di bawah, beri:
-- canonical: merek + jenis produk + varian, huruf kecil, TANPA ukuran/berat/isi/jumlah (mis. "lifebuoy sabun batang total 10", "indomie goreng original", "bimoli minyak goreng"). Barang generik tanpa merek: jenisnya saja ("telur ayam", "beras"). null kalau tidak bisa dipastikan.
+- canonical: merek + jenis produk + varian, huruf kecil, TANPA ukuran/berat/isi/jumlah/kemasan (mis. "lifebuoy sabun batang total 10", "indomie goreng original", "bimoli minyak goreng", "grandco minyak goreng"). Barang generik tanpa merek: jenisnya saja ("telur ayam", "beras"). null kalau tidak bisa dipastikan.
 - group: salah satu dari ${groups}.
 
 Nama:
@@ -14350,7 +14379,7 @@ async function syncTransactionPrice(tx, householdId, txRow) {
   if (txRow.type !== "expense" || !txRow.note || txRow.amount <= 0) return;
   const parsed = parseReceiptNote(txRow.note);
   if (!parsed.merchant || !parsed.name) return;
-  const prevQty = prev ? Number(prev.qty) : 1;
+  const prevQty = parsed.qty ?? (prev ? Number(prev.qty) : 1);
   await recordPrices(tx, householdId, parsed.merchant, txRow.date, [
     { transaction_id: txRow.id, name: parsed.name, qty: prevQty > 0 ? prevQty : 1, amount: txRow.amount }
   ]);
@@ -14520,13 +14549,27 @@ function parseAmount(input) {
     throw err;
   }
 }
+function formatTotalSize(qty, sizeVal, sizeUnit) {
+  if (!sizeVal || !sizeUnit || sizeVal <= 0) return null;
+  const total = (qty && qty > 0 ? qty : 1) * sizeVal;
+  if (sizeUnit === "g" && total >= 1e3) return `${+(total / 1e3).toFixed(2)} kg`;
+  if (sizeUnit === "ml" && total >= 1e3) return `${+(total / 1e3).toFixed(2)} L`;
+  return `${+total.toFixed(2)} ${sizeUnit}`;
+}
 function mapTx(r) {
+  const qty = r.item_qty != null ? Number(r.item_qty) : null;
+  const unitPrice = r.item_unit_price != null ? Math.round(Number(r.item_unit_price)) : null;
+  const sizeValue = r.item_size_value != null ? Number(r.item_size_value) : null;
+  const sizeUnit = r.item_size_unit ?? null;
+  const totalSizeLabel = formatTotalSize(qty, sizeValue, sizeUnit);
+  const canonicalName = r.item_canonical_name ?? null;
   return {
     id: r.id,
     type: r.type,
     amount: Number(r.amount),
     date: r.date,
     note: r.note,
+    ...qty !== null ? { qty, unit_price: unitPrice, size_value: sizeValue, size_unit: sizeUnit, total_size_label: totalSizeLabel, canonical_name: canonicalName } : {},
     account: { id: r.account_id, name: r.account_name, owner: r.account_owner_member_id ? { member_id: r.account_owner_member_id, display_name: r.account_owner_display_name } : null },
     to_account: r.to_account_id ? { id: r.to_account_id, name: r.to_account_name, owner: r.to_account_owner_member_id ? { member_id: r.to_account_owner_member_id, display_name: r.to_account_owner_display_name } : null } : null,
     category: { id: r.category_id, name: r.category_name, icon: r.category_icon, color: r.category_color },
@@ -14546,7 +14589,10 @@ var TX_SELECT = `
          t.category_id, c.name as category_name, c.icon as category_icon, c.color as category_color,
          t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
-         t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at
+         t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
+         pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
+         pp.size_value::text as item_size_value, pp.size_unit as item_size_unit,
+         coalesce(pa.canonical_name, pk.canonical_name) as item_canonical_name
   from transactions t
   join accounts a on a.id = t.account_id
   left join household_members am on am.id = a.owner_member_id
@@ -14556,6 +14602,9 @@ var TX_SELECT = `
   left join beneficiaries b on b.id = t.beneficiary_id
   left join household_members bm on bm.id = b.member_id and bm.deleted_at is null
   join household_members rm on rm.id = t.recorded_by_member_id
+  left join product_prices pp on pp.transaction_id = t.id
+  left join product_aliases pa on pa.household_id = t.household_id and pa.keyword = pp.keyword
+  left join product_knowledge pk on pk.keyword = pp.keyword
 `;
 function decodeCursor(cursor) {
   if (!cursor) return null;
@@ -14594,7 +14643,12 @@ function buildTxFilter(actor, query, resolved, cur) {
   } else if (resolved.beneficiaryId) {
     clauses.push(`t.beneficiary_id = ${push(resolved.beneficiaryId)}`);
   }
-  if (query.q) clauses.push(`t.note ilike ${push(`%${query.q}%`)}`);
+  if (query.q) {
+    const pq = push(`%${query.q}%`);
+    clauses.push(
+      `(t.note ilike ${pq} or exists (select 1 from product_prices ppq left join product_aliases paq on paq.household_id = t.household_id and paq.keyword = ppq.keyword left join product_knowledge pkq on pkq.keyword = ppq.keyword where ppq.transaction_id = t.id and coalesce(paq.canonical_name, pkq.canonical_name, ppq.base_name) ilike ${pq}))`
+    );
+  }
   if (query.min_amount !== void 0) clauses.push(`t.amount >= ${push(query.min_amount)}`);
   if (query.max_amount !== void 0) clauses.push(`t.amount <= ${push(query.max_amount)}`);
   if (cur) {
@@ -14703,14 +14757,17 @@ async function createTransactionBatch(actor, input, timezone) {
     const accountId = await resolveAccountRef(tx, actor, input);
     const piutangCatId = await piutangCategoryId(tx, actor.householdId);
     const items = await Promise.all(
-      input.items.map(async (item) => {
+      input.items.map(async (item, idx) => {
         const resolvedCat0 = await resolveCategoryRef(tx, actor, item, "expense");
         const resolvedCat = actor.credential === "api_key" ? await refineAgentCategory(tx, actor.householdId, item.note, resolvedCat0) : resolvedCat0;
         const titipan = detectTitipan(item.note, item.titipan) ?? (resolvedCat === piutangCatId ? { borrower: "Titipan" } : null);
+        const baseNote = titipan ? titipanDisplayName(item.note ?? "", titipan) : item.note ?? "";
+        const parsed = parsedNotes[idx];
+        const withQtyNote = item.qty && item.qty > 1 && baseNote ? parsed?.merchant ? formatReceiptNote(titipan ? titipanDisplayName(parsed.name, titipan) : parsed.name, parsed.merchant, parsed.refNo, item.qty) : formatReceiptNote(baseNote, null, null, item.qty) : baseNote;
         return {
           amount: parseAmount(item),
           category_id: titipan ? piutangCatId : resolvedCat,
-          note: titipan ? titipanDisplayName(item.note ?? "", titipan).slice(0, 500) : item.note ?? "",
+          note: withQtyNote.slice(0, 500),
           beneficiary_id: await resolveBeneficiaryRef(tx, actor, item) ?? null,
           titipan
         };
@@ -14733,7 +14790,7 @@ async function createTransactionBatch(actor, input, timezone) {
       if (it.titipan) titipanCreated.push({ txId, borrower: it.titipan.borrower, name: itemName, amount: it.amount });
       if (parsed?.merchant) {
         const list = pricesByMerchant.get(parsed.merchant) ?? [];
-        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty, amount: it.amount });
+        list.push({ transaction_id: txId, name: parsed.name, qty: input.items[i]?.qty ?? parsed.qty, amount: it.amount });
         pricesByMerchant.set(parsed.merchant, list);
       }
     }
@@ -16957,7 +17014,7 @@ async function ingestReceipt(actor, input) {
     const accountId = await resolveAccountRef(tx, actor, input);
     const piutangCatId = titipan.some(Boolean) ? await piutangCategoryId(tx, actor.householdId) : null;
     const displayNames = input.items.map((item, idx) => titipanDisplayName(item.name, titipan[idx]));
-    const noteFor = (idx) => formatReceiptNote(displayNames[idx], input.merchant, input.ref_no).slice(0, 500);
+    const noteFor = (idx) => formatReceiptNote(displayNames[idx], input.merchant, input.ref_no, input.items[idx]?.qty).slice(0, 500);
     const items = await Promise.all(
       input.items.map(async (item, idx) => ({
         amount: item.amount,
@@ -17961,7 +18018,14 @@ ${cats || "  (tidak ada)"}`;
     case "search_transactions": {
       const { data } = result;
       if (!data.length) return "Tidak ada transaksi yang cocok dengan filter itu.";
-      const rows = data.map((t) => `${t.date} | ${t.type === "income" ? "Pemasukan" : t.type === "transfer" ? "Transfer" : "Pengeluaran"} | ${fmtRp2(t.amount)} | ${t.category?.name ?? "-"} | ${t.note || "-"} | ${t.account?.name ?? "-"}`).join("\n");
+      const rows = data.map((t) => {
+        const meta = [];
+        if (t.qty != null && t.qty > 1) meta.push(`qty: ${t.qty}${t.unit_price ? ` @${fmtRp2(t.unit_price)}` : ""}`);
+        if (t.total_size_label) meta.push(`total ukuran: ${t.total_size_label}`);
+        if (t.canonical_name) meta.push(`produk: ${t.canonical_name}`);
+        const metaSuffix = meta.length ? ` (${meta.join(", ")})` : "";
+        return `${t.date} | ${t.type === "income" ? "Pemasukan" : t.type === "transfer" ? "Transfer" : "Pengeluaran"} | ${fmtRp2(t.amount)}${metaSuffix} | ${t.category?.name ?? "-"} | ${t.note || "-"} | ${t.account?.name ?? "-"}`;
+      }).join("\n");
       return `${data.length} transaksi ditemukan:
 ${rows}`;
     }
@@ -18348,12 +18412,12 @@ Kembalikan HANYA JSON (tanpa penjelasan lain) dengan format:
 }
 Aturan penting:
 - items: daftar SETIAP produk/item yang dibeli (bukan total/subtotal/pajak/kembalian)
-- note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus \u2014 dipakai untuk mengenali produk yang sama lain kali)
-- qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (angka bulat/desimal, default 1 jika tidak tertulis)
-- amount: harga total untuk baris item itu (qty \xD7 harga satuan), angka bulat tanpa titik/koma
+- note: nama produk persis seperti tertulis di struk (jangan diterjemahkan/diperhalus \u2014 dipakai untuk mengenali produk yang sama lain kali; mis. "GRANDCO MG REF 1LT" tulis persis begitu, JANGAN ubah "MG" yang berarti Minyak Goreng menjadi "Margarin")
+- qty: jumlah kemasan/unit item tersebut yang dibeli pada baris itu (wajib baca kolom Qty/jumlah pcs dengan teliti, mis. "2 pcs" / "2 X 23.490" \u2192 qty: 2; default 1 hanya jika benar-benar 1 unit)
+- amount: harga bersih yang dibayar untuk baris item itu SETELAH dikurangi diskon item jika ada (mis. 2 \xD7 23.490 = 46.980, Diskon -6.600 \u2192 amount: 40380, qty: 2), angka bulat tanpa titik/koma
 - subtotal: total yang harus dibayar dari struk (Subtotal/Total/Bayar), angka bulat tanpa titik/koma, null jika tidak ada
 - date: format YYYY-MM-DD dari struk, jika tidak ada tulis null
-- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item
+- Jangan masukkan baris Total, Subtotal, PPN, Diskon, Kembalian sebagai item tersendiri (diskon per item langsung mengurangi amount item terkait)
 Jika gambar bukan struk/nota, kembalikan: {"error": "bukan struk"}`;
 }
 function textPrompt(ocrText, categories) {
@@ -18370,7 +18434,7 @@ Kembalikan HANYA JSON (tanpa penjelasan lain):
     { "note": "Nama Produk", "qty": 1, "amount": 15000, "category": "<nama kategori dari daftar>" }
   ]
 }
-Aturan: note = nama item persis seperti di struk; qty = jumlah unit yang dibeli (default 1); amount = harga total per baris item (qty\xD7satuan); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item.
+Aturan: note = nama item persis seperti di struk (jangan ubah singkatan "MG" [Minyak Goreng] menjadi Margarin); qty = jumlah unit/kemasan yang dibeli pada baris tersebut (wajib teliti membaca "2 pcs" / "2 X ..."); amount = harga total bersih per baris item setelah dikurangi diskon item (qty\xD7satuan - diskon_item); jangan sertakan baris Total/Subtotal/Diskon/Kembalian sebagai item tersendiri.
 Jika bukan struk: {"error":"bukan struk"}
 
 TEKS OCR:
