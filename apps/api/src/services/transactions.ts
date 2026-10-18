@@ -434,7 +434,7 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
     }
 
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch as unknown as postgres.JSONValue)})`
-    const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
+    let rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
     // Sinkronkan juga ke product_prices bila nominal/tanggal/note/type berubah
     if (patch.amount !== undefined || patch.date !== undefined || patch.note !== undefined || patch.type !== undefined) {
       await syncTransactionPrice(tx, actor.householdId, {
@@ -444,6 +444,7 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
         date: rows[0]!.date,
         note: rows[0]!.note,
       })
+      rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
     }
     // Koreksi kategori eksplisit (web maupun Hermes) = sinyal terkuat untuk gudang kata kunci.
     if (typeof patch.category_id === 'string') await learnKeywords(tx, actor.householdId, [{ note: rows[0]!.note, categoryId: patch.category_id }])

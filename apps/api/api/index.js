@@ -14819,7 +14819,7 @@ async function updateTransaction(actor, id, input) {
       patch.beneficiary_id = await resolveBeneficiaryRef(tx, actor, input) ?? null;
     }
     await tx`select update_transaction(${actor.householdId}, ${actor.memberId}, ${id}, ${tx.json(patch)})`;
-    const rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
+    let rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
     if (patch.amount !== void 0 || patch.date !== void 0 || patch.note !== void 0 || patch.type !== void 0) {
       await syncTransactionPrice(tx, actor.householdId, {
         id: rows[0].id,
@@ -14828,6 +14828,7 @@ async function updateTransaction(actor, id, input) {
         date: rows[0].date,
         note: rows[0].note
       });
+      rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
     }
     if (typeof patch.category_id === "string") await learnKeywords(tx, actor.householdId, [{ note: rows[0].note, categoryId: patch.category_id }]);
     return mapTx(rows[0]);
