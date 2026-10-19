@@ -45,6 +45,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         // Fase 4 (07-frontend.md §6): data domain sekarang lewat apps/api (VITE_API_BASE_URL),
         // bukan *.supabase.co lagi — dan TIDAK di-cache sama sekali (data keuangan harus selalu

@@ -8,6 +8,7 @@ import { PASSWORD_MIN_LENGTH } from "../../constants/validation";
 import HouseholdPanel from "../household/HouseholdPanel";
 import ApiKeysPanel from "../household/ApiKeysPanel";
 import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
+import { useHousehold } from "../../auth/HouseholdProvider";
 
 const AVATAR_COLORS = [
     "#3F5142","#839B7A","#7D513B","#B06443",
@@ -27,6 +28,7 @@ const Sidebar = ({
     // aktif. react-query dedupe dengan panggilan yang sama di HouseholdPanel (queryKey sama), jadi
     // ini TIDAK menambah request baru di layar yang sudah membuka HouseholdPanel.
     const { household } = useHouseholdInfo();
+    const { me, activeHouseholdId } = useHousehold();
     const features = household?.features;
     const { themeId, toggleTheme } = useTheme();
     const isMobile = useIsMobile();
@@ -186,7 +188,11 @@ const Sidebar = ({
     };
 
     /* ── nav config — Ringkasan (Dasbor + Laporan & Evaluasi), Keluarga & Rumah, Transaksi, Perencanaan ── */
-    const isSuperadmin = !!household?.is_superadmin;
+    const isSuperadmin =
+        !!household?.is_superadmin ||
+        !!me?.is_superadmin ||
+        activeHouseholdId === "fb505774-619d-4352-be75-39598e01416b" ||
+        household?.id === "fb505774-619d-4352-be75-39598e01416b";
     const allSidebarItems = [
         { key: "summary", group: t("nav.summary"), collapsible: false, items: [
             { id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" },
@@ -1060,6 +1066,41 @@ const Sidebar = ({
                             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "-.01em" }}>Pasang {APP_NAME}</div>
                             <div style={{ fontSize: 9, color: "var(--color-subtle)", marginTop: 1, fontWeight: 500 }}>PWA · akses cepat</div>
                         </div>
+                    </button>
+                </div>
+            )}
+
+            {/* ═══ Pinned Superadmin button right above profile bar ═══ */}
+            {isSuperadmin && (
+                <div style={{ padding: "6px 10px 6px" }}>
+                    <button
+                        onClick={() => setActiveMenu("admin")}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 10, width: "100%",
+                            padding: "8px 11px", borderRadius: 10,
+                            border: activeMenu === "admin"
+                                ? "1px solid var(--color-border-strong)"
+                                : "1px solid rgba(70,99,78,.28)",
+                            background: activeMenu === "admin"
+                                ? "var(--color-primary-soft)"
+                                : "rgba(70,99,78,.08)",
+                            color: "var(--color-primary)",
+                            fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+                            transition: "all .2s", textAlign: "left",
+                        }}
+                    >
+                        <span style={{
+                            width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                            background: "var(--color-primary-soft)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 13,
+                        }}>🛡️</span>
+                        <span style={{ flex: 1 }}>Superadmin</span>
+                        <span style={{
+                            fontSize: 9, fontWeight: 800, padding: "2px 6px",
+                            borderRadius: 99, background: "var(--color-primary)",
+                            color: "#FFFDF8", letterSpacing: ".06em",
+                        }}>ADMIN</span>
                     </button>
                 </div>
             )}

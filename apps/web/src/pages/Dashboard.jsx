@@ -117,6 +117,13 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       ? "admin"
       : "dasbor",
   );
+  useEffect(() => {
+    const onHashChange = () => {
+      if (window.location.hash === "#admin") setActiveMenu("admin");
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
   const [initialCategoryFilter, setInitialCategoryFilter] = useState("");
   const [initialAccountFilter, setInitialAccountFilter] = useState("");
   const [showAddTx, setShowAddTx] = useState(false);
