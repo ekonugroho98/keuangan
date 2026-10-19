@@ -5,10 +5,12 @@ import {
   lazy,
   Suspense,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetchGoldPrices } from "../services/goldPrice";
 import { APP_AI_NAME } from "../config/app";
 import { api, unwrap } from "../api/client";
 import Sidebar from "../components/dashboard/Sidebar";
+import AiFloatingChat from "../components/dashboard/AiFloatingChat";
 import { exportTransactionsCSV, exportTransactionsExcel } from "../utils/exportData";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -201,9 +203,16 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const queryClient = useQueryClient();
+  const [showAiChat, setShowAiChat] = useState(false);
+
   // Android hardware Back button handler (tutup modal → tutup drawer → kembali ke Dasbor)
   useEffect(() => {
     window.__handleAndroidBack = () => {
+      if (showAiChat) {
+        setShowAiChat(false);
+        return "handled";
+      }
       if (showAddTx) {
         setShowAddTx(false);
         return "handled";
@@ -230,7 +239,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     return () => {
       delete window.__handleAndroidBack;
     };
-  }, [showAddTx, showEditTx, showAddAccount, isMobile, sidebarOpen, activeMenu]);
+  }, [showAiChat, showAddTx, showEditTx, showAddAccount, isMobile, sidebarOpen, activeMenu]);
 
   // ── AI GREETING ──────────────────────────────────────────
   const makeGreeting = useCallback(() => {
@@ -521,29 +530,35 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   };
 
   // ── AI CHAT (POST /v1/ai/chat — API key dibaca server-side, 05-api.md) ───
-  const handleAi = async () => {
-    if (!aiInput.trim() || aiTyping) return;
-    if (!aiConfig?.apiKey) {
+  const handleAi = async (overridePrompt) => {
+    const rawMsg = typeof overridePrompt === "string" ? overridePrompt : aiInput;
+    const userMsg = rawMsg.trim();
+    if (!userMsg || aiTyping) return;
+    if (!aiConfig?.apiKey || aiConfig?.disabled) {
       setAiChat((p) => [
         ...p,
-        { role: "error", text: "API key belum diatur. Buka Settings > AI Coach." },
+        { role: "error", text: "API key belum diatur atau AI dinonaktifkan. Buka Pengaturan > AI Coach." },
       ]);
       return;
     }
-    const userMsg = aiInput.trim();
     const updatedChat = [...aiChat, { role: "user", text: userMsg }];
     setAiChat(updatedChat);
-    setAiInput("");
+    if (typeof overridePrompt !== "string") setAiInput("");
     setAiTyping(true);
     try {
       const result = await unwrap(
         await api.POST("/v1/ai/chat", {
-          body: { messages: updatedChat.filter((m) => m.role === "user" || m.role === "ai") },
+          body: {
+            messages: updatedChat.filter((m) => m.role === "user" || m.role === "ai"),
+            allow_write: true,
+          },
         }),
       );
       setAiChat((p) =>
         p.filter((m) => m.role !== "thinking").concat({ role: "ai", text: result.reply }),
       );
+      // Segarkan data dasbor bila AI mengeksekusi tool tulis (catat transaksi, belanja, stok kulkas, dll.)
+      queryClient.invalidateQueries();
     } catch (err) {
       setAiChat((p) =>
         p.filter((m) => m.role !== "thinking").concat({ role: "error", text: err.message }),
@@ -994,6 +1009,23 @@ const Dashboard = ({ session, onLogout, showToast }) => {
           </Suspense>
         </div>
       </main>
+
+      <AiFloatingChat
+        open={showAiChat}
+        setOpen={setShowAiChat}
+        aiChat={aiChat}
+        aiTyping={aiTyping}
+        aiInput={aiInput}
+        setAiInput={setAiInput}
+        handleAi={handleAi}
+        onResetChat={() => setAiChat(makeGreeting())}
+        aiConfig={aiConfig}
+        onOpenAiSettings={() => {
+          setSidebarOpen(true);
+          setAiSettingsTrigger((p) => p + 1);
+        }}
+        activeMenu={activeMenu}
+      />
     </div>
   );
 };

@@ -501,12 +501,25 @@ const Sidebar = ({
                         </a>
                     </div>
                     <div style={{ position: "relative", marginBottom: 6 }}>
-                        <input type={aiKeyShow ? "text" : "password"} value={aiKey} onChange={e => setAiKey(e.target.value)} placeholder={currentProvider?.keyHint || "sk-..."} style={{ ...inputSt, paddingRight: 44 }} />
+                        <input
+                            type={aiKeyShow ? "text" : "password"}
+                            value={aiKey}
+                            onChange={e => {
+                                const val = e.target.value;
+                                setAiKey(val);
+                                if (val.trim().startsWith("sk-kb-") && aiProvider !== "gatekeeper") {
+                                    setAiProvider("gatekeeper");
+                                    setAiModel(DEFAULT_MODEL["gatekeeper"]);
+                                }
+                            }}
+                            placeholder={currentProvider?.keyHint || "sk-..."}
+                            style={{ ...inputSt, paddingRight: 44 }}
+                        />
                         <button onClick={() => setAiKeyShow(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--color-muted)" }}>
                             {aiKeyShow ? "🙈" : "👁️"}
                         </button>
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 16 }}>🔒 Disimpan terenkripsi di database, hanya kamu yang bisa akses.</div>
+                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 16 }}>🔒 Disimpan aman di database. Tombol Chat AI di pojok kanan bawah otomatis muncul saat AI aktif.</div>
 
                     {/* Toggle nonaktifkan AI */}
                     <div onClick={() => setAiDisabled(v => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, border: `1px solid ${aiDisabled ? "rgba(255,113,108,.25)" : "var(--color-border-soft)"}`, background: aiDisabled ? "rgba(255,113,108,.06)" : "transparent", cursor: "pointer", marginBottom: 14, userSelect: "none" }}>
@@ -515,7 +528,7 @@ const Sidebar = ({
                                 {aiDisabled ? "🚫 AI Dinonaktifkan" : "✅ AI Aktif"}
                             </div>
                             <div style={{ fontSize: 10, color: "var(--color-muted)", marginTop: 2 }}>
-                                {aiDisabled ? "Scan struk pakai OCR saja" : "Scan struk pakai AI vision"}
+                                {aiDisabled ? "Chat AI disembunyikan · scan struk pakai OCR" : "Chat AI kanan bawah & scan struk AI vision aktif"}
                             </div>
                         </div>
                         <div style={{ width: 36, height: 20, borderRadius: 10, background: aiDisabled ? "#ff716c" : "var(--color-primary)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
