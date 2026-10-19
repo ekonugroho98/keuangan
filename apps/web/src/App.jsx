@@ -359,9 +359,16 @@ export default function App() {
     };
 
     useEffect(() => {
+        const cleanAuthHash = () => {
+            if (window.location.hash && /(access_token=|error=|type=signup|type=recovery)/.test(window.location.hash)) {
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
+        };
+
         // Cek session yang sudah ada (misal user refresh halaman)
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
+            cleanAuthHash();
         });
 
         // Listen perubahan auth state (login, logout, token refresh, password recovery)
@@ -370,6 +377,7 @@ export default function App() {
             if (event === "PASSWORD_RECOVERY") {
                 setIsPasswordRecovery(true);
             }
+            cleanAuthHash();
         });
 
         return () => subscription.unsubscribe();

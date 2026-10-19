@@ -77,6 +77,7 @@ const LandingPage = ({ showToast }) => {
             email: signupForm.email,
             password: signupForm.password,
             options: {
+                emailRedirectTo: window.location.origin,
                 data: { full_name: signupForm.name }, // simpan nama di metadata
             },
         });

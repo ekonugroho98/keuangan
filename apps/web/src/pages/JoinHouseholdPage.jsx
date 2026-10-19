@@ -62,7 +62,10 @@ export default function JoinHouseholdPage({ code, session, showToast }) {
         const { error } = await supabase.auth.signUp({
             email: signupForm.email,
             password: signupForm.password,
-            options: { data: { full_name: signupForm.name } },
+            options: {
+                emailRedirectTo: window.location.href,
+                data: { full_name: signupForm.name },
+            },
         });
         setIsLoading(false);
         if (error) {
