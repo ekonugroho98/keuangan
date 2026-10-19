@@ -42,6 +42,11 @@ export function buildApp() {
   const allowedOrigins = Array.from(
     new Set([
       ...env.CORS_ORIGINS,
+      'https://kelola.keluargaberkembang.com',
+      'https://keuangan.keluargaberkembang.com',
+      'https://keluargaberkembang.com',
+      'https://www.keluargaberkembang.com',
+      'https://keuangan-eta.vercel.app',
       'https://localhost',
       'http://localhost',
       'capacitor://localhost',

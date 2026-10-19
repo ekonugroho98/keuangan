@@ -21673,6 +21673,11 @@ function buildApp() {
   const allowedOrigins = Array.from(
     /* @__PURE__ */ new Set([
       ...env.CORS_ORIGINS,
+      "https://kelola.keluargaberkembang.com",
+      "https://keuangan.keluargaberkembang.com",
+      "https://keluargaberkembang.com",
+      "https://www.keluargaberkembang.com",
+      "https://keuangan-eta.vercel.app",
       "https://localhost",
       "http://localhost",
       "capacitor://localhost",
