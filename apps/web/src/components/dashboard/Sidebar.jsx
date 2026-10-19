@@ -89,8 +89,8 @@ const Sidebar = ({
     const [editAppTagline, setEditAppTagline] = useState("");
 
     // AI Config state
-    const [aiProvider,  setAiProvider]  = useState(() => aiConfig?.provider || "groq");
-    const [aiModel,     setAiModel]     = useState(() => aiConfig?.model    || DEFAULT_MODEL["groq"]);
+    const [aiProvider,  setAiProvider]  = useState(() => aiConfig?.provider || "gatekeeper");
+    const [aiModel,     setAiModel]     = useState(() => aiConfig?.model    || DEFAULT_MODEL["gatekeeper"]);
     const [aiKey,       setAiKey]       = useState(() => aiConfig?.apiKey   || "");
     const [aiDisabled,  setAiDisabled]  = useState(() => aiConfig?.disabled || false);
     const [aiKeyShow,   setAiKeyShow]   = useState(false);
@@ -541,7 +541,7 @@ const Sidebar = ({
                     )}
 
                     <button onClick={handleSaveAi} disabled={aiSaving || (!aiKey.trim() && !aiDisabled)}
-                        style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: (!aiKey.trim() || aiSaving) ? "var(--color-border-soft)" : "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))", color: (!aiKey.trim() || aiSaving) ? "var(--color-muted)" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: (!aiKey.trim() || aiSaving) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: (!aiKey.trim() || aiSaving) ? 0.5 : 1 }}>
+                        style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: ((!aiKey.trim() && !aiDisabled) || aiSaving) ? "var(--color-border-soft)" : "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))", color: ((!aiKey.trim() && !aiDisabled) || aiSaving) ? "var(--color-muted)" : "var(--color-on-primary)", fontWeight: 700, fontSize: 13, cursor: ((!aiKey.trim() && !aiDisabled) || aiSaving) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: ((!aiKey.trim() && !aiDisabled) || aiSaving) ? 0.5 : 1 }}>
                         {aiSaving ? "Menyimpan..." : "Simpan"}
                     </button>
                     {aiKey.trim() && (
@@ -617,6 +617,17 @@ const Sidebar = ({
 
         /* Each tile: SVG icon + gradient tile background per category */
         const tiles = [
+            {
+                id: "ai",
+                label: "Asisten AI",
+                sub: aiConfig?.disabled ? "Dinonaktifkan" : aiStatus,
+                badge: aiActive && !aiConfig?.disabled,
+                grad: "linear-gradient(135deg, #3F5142, #2D3B30)",
+                tint: "rgba(63,81,66,.16)",
+                iconColor: "#FFFDF8",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4Z"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></svg>),
+                action: () => setProfileView("ai"),
+            },
             {
                 id: "household",
                 label: "Household",

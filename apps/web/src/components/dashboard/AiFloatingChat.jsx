@@ -64,7 +64,8 @@ export default function AiFloatingChat({
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const isAiEnabled = Boolean(aiConfig?.apiKey?.trim()) && !aiConfig?.disabled;
+  const hasKey = Boolean(aiConfig?.apiKey?.trim());
+  const isAiDisabled = Boolean(aiConfig?.disabled);
 
   useEffect(() => {
     if (open) {
@@ -73,15 +74,16 @@ export default function AiFloatingChat({
   }, [open, aiChat, aiTyping]);
 
   useEffect(() => {
-    if (open && !isMobile) {
+    if (open && hasKey && !isMobile) {
       setTimeout(() => inputRef.current?.focus(), 120);
     }
-  }, [open, isMobile]);
+  }, [open, hasKey, isMobile]);
 
-  // Hanya tampil bagi user yang sudah login & mengaktifkan fitur AI
-  if (!isAiEnabled) return null;
+  // Sembunyikan hanya jika user secara eksplisit menonaktifkan fitur AI di pengaturan
+  if (isAiDisabled) return null;
 
-  const isGatekeeper = aiConfig?.apiKey?.trim().startsWith("sk-kb-");
+  const isGatekeeper =
+    aiConfig?.provider === "gatekeeper" || aiConfig?.apiKey?.trim().startsWith("sk-kb-");
   const providerKey = isGatekeeper ? "gatekeeper" : aiConfig?.provider;
   const provider = AI_PROVIDERS[providerKey] || AI_PROVIDERS.gatekeeper;
   const modelLabel =
@@ -188,20 +190,22 @@ export default function AiFloatingChat({
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: "#6EE7B7",
+                      background: hasKey ? "#6EE7B7" : "#FBBF24",
                       display: "inline-block",
                       flexShrink: 0,
                     }}
                   />
                   <span>
-                    {provider?.label?.split(" ")[0] || "AI"} · {modelLabel} · ⚡ Bisa Catat
+                    {hasKey
+                      ? `${provider?.label?.split(" ")[0] || "AI"} · ${modelLabel} · ⚡ Bisa Catat`
+                      : "Belum aktif · Pasang Token / API Key"}
                   </span>
                 </div>
               </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-              {onResetChat && aiChat.length > 1 && (
+              {hasKey && onResetChat && aiChat.length > 1 && (
                 <button
                   type="button"
                   onClick={onResetChat}
@@ -276,18 +280,83 @@ export default function AiFloatingChat({
             </div>
           </div>
 
-          {/* Daftar Pesan */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "14px 14px 10px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              background: "var(--bg-app)",
-            }}
-          >
+          {!hasKey ? (
+            <div
+              style={{
+                flex: 1,
+                padding: "24px 20px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                gap: 14,
+                background: "var(--bg-app)",
+              }}
+            >
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 18,
+                  background: "var(--color-primary-soft)",
+                  border: "1px solid var(--color-border-strong)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 28,
+                }}
+              >
+                💎
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
+                  Aktifkan {APP_AI_NAME}
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--color-muted)", lineHeight: 1.6 }}>
+                  Tanya sisa jatah harian, cek stok kulkas, evaluasi anggaran, atau suruh AI langsung mencatat transaksi lewat chat.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenAiSettings?.();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep, #2D3B30))",
+                  color: "var(--color-on-primary, #fff)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  boxShadow: "0 6px 18px rgba(63,81,66,0.28)",
+                }}
+              >
+                ⚙️ Pasang Token / API Key AI
+              </button>
+              <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
+                Mendukung Token Resmi Keluarga Berkembang (<code>sk-kb-...</code>) maupun Groq / Gemini / OpenAI.
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Daftar Pesan */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  padding: "14px 14px 10px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  background: "var(--bg-app)",
+                }}
+              >
             {aiChat.map((m, i) => (
               <div
                 key={i}
@@ -471,6 +540,8 @@ export default function AiFloatingChat({
               ↑
             </button>
           </div>
+            </>
+          )}
         </div>
       )}
 
@@ -526,7 +597,7 @@ export default function AiFloatingChat({
           </svg>
         )}
 
-        {/* Indikator titik hijau aktif saat tertutup */}
+        {/* Indikator titik aktif saat tertutup */}
         {!open && (
           <span
             style={{
@@ -536,7 +607,7 @@ export default function AiFloatingChat({
               width: 12,
               height: 12,
               borderRadius: "50%",
-              background: "#34D399",
+              background: hasKey ? "#34D399" : "#FBBF24",
               border: "2px solid #fff",
             }}
           />

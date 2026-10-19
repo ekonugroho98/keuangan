@@ -41,7 +41,11 @@ meApp.openapi(
     const row = rows[0]
     if (!row) return c.json({ avatar_color: '#46634E', hidden_menus: [], app_name: 'Keluarga Berkembang', app_tagline: 'Berkembang Bersama dalam Kehangatan', language: 'id', theme: 'dark', active_household_id: null, ai_config: { has_api_key: false } })
     const { ai_config, ...rest } = row
-    return c.json({ ...rest, ai_config: { provider: ai_config?.provider, model: ai_config?.model, has_api_key: !!ai_config?.apiKey, disabled: ai_config?.disabled ?? false } })
+    const rawKey = (ai_config?.apiKey ?? (ai_config as Record<string, string | undefined>)?.api_key ?? '').trim()
+    const isGatekeeperKey = rawKey.startsWith('sk-kb-')
+    const resolvedProvider = isGatekeeperKey ? 'gatekeeper' : ai_config?.provider
+    const resolvedModel = isGatekeeperKey && (!ai_config?.model || !ai_config.model.startsWith('kb-')) ? 'kb-auto' : ai_config?.model
+    return c.json({ ...rest, ai_config: { provider: resolvedProvider, model: resolvedModel, has_api_key: rawKey.length > 0, disabled: ai_config?.disabled ?? false } })
   },
 )
 
