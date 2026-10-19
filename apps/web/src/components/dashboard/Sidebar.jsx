@@ -186,10 +186,14 @@ const Sidebar = ({
     };
 
     /* ── nav config — Ringkasan (Dasbor + Laporan & Evaluasi), Keluarga & Rumah, Transaksi, Perencanaan ── */
+    const isSuperadmin = !!household?.is_superadmin;
     const allSidebarItems = [
         { key: "summary", group: t("nav.summary"), collapsible: false, items: [
             { id: "dasbor",    label: t("nav.dashboard"),    icon: "📊" },
             { id: "laporan",   label: t("nav.reports"),      icon: "📑" },
+            ...(isSuperadmin ? [
+                { id: "admin", label: t("nav.admin") === "nav.admin" ? "Superadmin" : t("nav.admin"), icon: "🛡️" },
+            ] : []),
         ]},
         { key: "home", group: t("nav.home"), collapsible: true, highlight: true, items: [
             { id: "belanja",   label: t("nav.shopping"),     icon: "🛒" },

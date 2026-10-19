@@ -33,6 +33,7 @@ import { pantryApp } from './routes/pantry'
 import { receiptsApp } from './routes/receipts'
 import { pricesApp } from './routes/prices'
 import { insightsApp } from './routes/insights'
+import { adminApp } from './routes/admin'
 import { auditMiddleware } from './middleware/audit'
 
 export function buildApp() {
@@ -163,6 +164,7 @@ export function buildApp() {
   app.route('/', receiptsApp)
   app.route('/', pricesApp)
   app.route('/', insightsApp)
+  app.route('/', adminApp)
 
   return app
 }

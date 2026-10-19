@@ -48,6 +48,26 @@ const EnvSchema = z.object({
     .optional()
     .default('false')
     .transform((v) => v === 'true' || v === '1'),
+
+  // Daftar Superadmin (services/admin.ts):
+  // Default menyertakan household internal utama pemilik ('fb505774-619d-4352-be75-39598e01416b')
+  // serta user ID test lokal ('00000000-0000-0000-0000-0000000000e0') agar langsung bekerja tanpa wajib
+  // set env baru di Vercel, namun tetap bisa ditambah lewat SUPERADMIN_USER_IDS / SUPERADMIN_EMAILS.
+  SUPERADMIN_USER_IDS: z
+    .string()
+    .optional()
+    .default('00000000-0000-0000-0000-0000000000e0')
+    .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean)),
+  SUPERADMIN_EMAILS: z
+    .string()
+    .optional()
+    .default('')
+    .transform((s) => s.split(',').map((v) => v.trim().toLowerCase()).filter(Boolean)),
+  SUPERADMIN_HOUSEHOLD_IDS: z
+    .string()
+    .optional()
+    .default('fb505774-619d-4352-be75-39598e01416b')
+    .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean)),
 })
 
 export type Env = z.infer<typeof EnvSchema>

@@ -1,6 +1,7 @@
 # 11 — Spesifikasi & Handoff: Superadmin Dashboard (Karaya Finance / Keluarga Berkembang)
 
-> **Status**: Siap dikerjakan di sesi baru (Handoff dari sesi 2026-10-19 setelah penyelesaian Migrasi `0028` Receipt Storage, Migrasi `0029` Plan/Entitlements + Idempotency Cleanup, dan Bug Audit E2E `e738091`).
+> **Status**: **Selesai (2026-10-19)** — Migrasi `0030` (`admin_get_overview`, `admin_list_households`, `admin_update_household_plan`), endpoint `/v1/admin/*` + `requireSuperadmin`, lazy-loaded `AdminView.jsx`, dan E2E test suite (`test/integration/admin.test.ts`) sudah terpasang dan lulus penuh.
+
 
 ---
 

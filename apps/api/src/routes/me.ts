@@ -15,7 +15,10 @@ export const meApp = new OpenAPIHono()
 
 meApp.openapi(
   createRoute({ method: 'get', path: '/v1/me', tags: ['me'], summary: 'Info user & keanggotaan household', security: [{ bearerJwt: [] }], responses: OkAny }),
-  async (c) => c.json(await households.getMe(await requireUserId(c))),
+  async (c) => {
+    const userId = await requireUserId(c)
+    return c.json(await households.getMe(userId, c.get('userEmail')))
+  },
 )
 
 meApp.openapi(
@@ -121,10 +124,10 @@ householdApp.openapi(
   async (c) => {
     const actor = c.get('actor')
     const [me, household, members] = await Promise.all([
-      households.getMe(actor.userId),
+      households.getMe(actor.userId, actor.email),
       households.getCurrentHousehold(actor),
       households.listMembers(actor),
     ])
-    return c.json({ me, household, members })
+    return c.json({ me, household, members, is_superadmin: me.is_superadmin || household.is_superadmin })
   },
 )

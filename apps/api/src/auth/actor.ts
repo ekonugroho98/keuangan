@@ -4,6 +4,7 @@
  */
 export interface Actor {
   userId: string
+  email?: string
   householdId: string
   memberId: string
   role: 'owner' | 'member' | 'viewer'

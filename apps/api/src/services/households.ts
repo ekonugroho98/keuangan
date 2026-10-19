@@ -6,6 +6,8 @@ import type { Actor } from '../auth/actor'
 import { withActor, withUserClaims } from '../db/tx'
 import { parseHouseholdFeatures, invalidateFeaturesCache } from './features'
 import { computeHouseholdPlanStatus, invalidateEntitlementsCache, requireEntitlementInTx } from './entitlements'
+import { isSuperadminActor, isSuperadminIdentity } from './admin'
+
 
 interface HouseholdRow {
   id: string
@@ -68,7 +70,7 @@ export async function getHouseholdTimezone(actor: Actor): Promise<string> {
  * lewat psql). Kemungkinan sudah ada sejak household PATCH pertama kali dibuat (Fase 3/4), baru
  * ketahuan sekarang karena `settings` baru benar-benar diuji manual di Fase 5.
  */
-async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: string) {
+async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: string, isSuperadmin = false) {
   const [row] = await tx<HouseholdRow[]>`
     select h.id, h.name, h.timezone, h.default_account_visibility::text, h.owners_can_view_private_totals, h.features,
            h.plan_tier, h.plan_expires_at::text, h.entitlements,
@@ -86,15 +88,18 @@ async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: 
       entitlements: row.entitlements,
     }),
     member_count: Number(row.member_count),
+    is_superadmin: isSuperadmin,
   }
 }
 
 export async function getCurrentHousehold(actor: Actor) {
-  return withActor(actor, (tx) => selectCurrentHousehold(tx, actor.householdId))
+  const isSuperadmin = await isSuperadminActor(actor)
+  return withActor(actor, (tx) => selectCurrentHousehold(tx, actor.householdId, isSuperadmin))
 }
 
 export async function updateHousehold(actor: Actor, patch: { name?: string; timezone?: string; settings?: { default_account_visibility?: 'shared' | 'private'; owners_can_view_private_totals?: boolean }; features?: FeaturesPatch }) {
   if (actor.role !== 'owner') throw ApiError.fromCode('insufficient_scope')
+  const isSuperadmin = await isSuperadminActor(actor)
   return withActor(actor, async (tx) => {
     // Selalu baca+tulis `features` (bukan coalesce dengan jsonb null) — postgres.js men-DOBEL
     // encode JS string yang diikuti `::jsonb` di tagged template (bug nyata ditemukan saat
@@ -137,7 +142,7 @@ export async function updateHousehold(actor: Actor, patch: { name?: string; time
     tzCache.delete(actor.householdId)
     invalidateFeaturesCache(actor.householdId)
     invalidateEntitlementsCache(actor.householdId)
-    return selectCurrentHousehold(tx, actor.householdId)
+    return selectCurrentHousehold(tx, actor.householdId, isSuperadmin)
   })
 }
 
@@ -210,7 +215,7 @@ export async function leaveHousehold(actor: Actor, reassignToMemberId?: string) 
   })
 }
 
-export async function getMe(userId: string) {
+export async function getMe(userId: string, email?: string) {
   return withUserClaims(userId, async (tx) => {
     // h.deleted_at is null: household yang sudah di-merge (merge_household_into, Fase 5) tidak
     // boleh muncul sebagai membership aktif meski baris household_members lamanya masih ada.
@@ -223,7 +228,12 @@ export async function getMe(userId: string) {
     const [settings] = await tx<{ active_household_id: string | null }[]>`
       select active_household_id from user_settings where user_id = ${userId}
     `
-    return { memberships, active_household_id: settings?.active_household_id ?? null }
+    const isSuperadmin = isSuperadminIdentity({ userId, email, memberships })
+    return {
+      memberships,
+      active_household_id: settings?.active_household_id ?? null,
+      is_superadmin: isSuperadmin,
+    }
   })
 }
 

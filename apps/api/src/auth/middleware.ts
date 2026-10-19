@@ -12,6 +12,7 @@ declare module 'hono' {
   interface ContextVariableMap {
     actor: Actor
     userId: string
+    userEmail?: string
     requestId: string
   }
 }
@@ -29,7 +30,7 @@ interface MemberRow {
  * sama sekali -> not_household_member (endpoint onboarding POST /v1/households tidak lewat
  * middleware ini).
  */
-async function resolveMembership(userId: string, requestedHouseholdId?: string): Promise<MemberRow> {
+async function resolveMembership(userId: string, requestedHousehold?: string): Promise<MemberRow> {
   return withUserClaims(userId, async (tx) => {
     // join households dan saring h.deleted_at: merge_household_into (Fase 5) soft-delete baris
     // households sumber tapi TIDAK menghapus household_members lama milik user yang di-merge —
@@ -42,8 +43,8 @@ async function resolveMembership(userId: string, requestedHouseholdId?: string):
     `
     if (rows.length === 0) throw ApiError.fromCode('not_household_member')
 
-    if (requestedHouseholdId) {
-      const match = rows.find((r) => r.household_id === requestedHouseholdId)
+    if (requestedHousehold) {
+      const match = rows.find((r) => r.household_id === requestedHousehold)
       if (!match) throw ApiError.fromCode('not_household_member', { message: 'Kamu bukan anggota household yang diminta di X-Household-Id.' })
       return match
     }
@@ -117,11 +118,13 @@ export function requireAuth() {
     }
 
     const payload = await verifySupabaseJwt(token)
+    const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : undefined
     const requestedHousehold = c.req.header('X-Household-Id') ?? undefined
     const membership = await resolveMembership(payload.sub, requestedHousehold)
 
     const actor: Actor = {
       userId: payload.sub,
+      email,
       householdId: membership.household_id,
       memberId: membership.member_id,
       role: membership.role,
@@ -130,6 +133,7 @@ export function requireAuth() {
     }
     c.set('actor', actor)
     c.set('userId', payload.sub)
+    if (email) c.set('userEmail', email)
     await withIdempotency(c, actor, next)
   }
 }
@@ -167,5 +171,8 @@ export async function requireUserId(c: Context): Promise<string> {
   }
   const payload = await verifySupabaseJwt(token)
   c.set('userId', payload.sub)
+  if (typeof payload.email === 'string') {
+    c.set('userEmail', payload.email.trim().toLowerCase())
+  }
   return payload.sub
 }

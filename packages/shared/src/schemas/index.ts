@@ -13,3 +13,5 @@ export * from './household'
 export * from './api-keys'
 export * from './beneficiaries'
 export * from './shopping'
+export * from './admin'
+

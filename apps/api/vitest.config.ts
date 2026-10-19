@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config'
 process.env.API_PUBLIC_URL ??= 'http://localhost:8787'
 process.env.CORS_ORIGINS ??= 'http://localhost:5173'
 process.env.DATABASE_URL ??= 'postgres://karaya_api:localdevpassword@localhost:54329/postgres'
+process.env.TEST_ADMIN_DATABASE_URL ??= 'postgres://postgres:postgres@localhost:54329/postgres'
 process.env.SUPABASE_JWT_SECRET ??= 'local-test-secret-do-not-use-in-production-min32chars'
 process.env.API_KEY_PEPPER ??= 'local-test-pepper-do-not-use-in-production-min32'
 

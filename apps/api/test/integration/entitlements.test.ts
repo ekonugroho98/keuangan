@@ -142,11 +142,25 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
       const app = buildApp()
       const token = await mintJwt(EKO_USER_ID)
 
-      const hhRes = await app.request('/v1/households/current', {
+      const createHhRes = await app.request('/v1/households', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Keluarga Uji Entitlements',
+          timezone: 'Asia/Jakarta',
+          display_name: 'Eko Ent Test',
+        }),
+      })
+      expect(createHhRes.status).toBe(201)
+      const createdHh = await createHhRes.json()
+      const hhId = createdHh.household.id as string
+
+      const meRes = await app.request('/v1/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      const hh = await hhRes.json()
-      const hhId = hh.id as string
+      const meData = await meRes.json()
+      const primaryHhId = meData.memberships[0].household_id as string
+      await admin`update user_settings set active_household_id = ${primaryHhId} where user_id = ${EKO_USER_ID}`
 
       try {
         await admin`update households set plan_tier = 'free', entitlements = '{}'::jsonb where id = ${hhId}`
@@ -154,7 +168,7 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
         ;(env as { ENFORCE_PAID_FEATURES: boolean }).ENFORCE_PAID_FEATURES = true
 
         const blockedRes = await app.request('/v1/prices/compare?q=sabun', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}`, 'X-Household-Id': hhId },
         })
         expect(blockedRes.status).toBe(403)
         const blockedBody = await blockedRes.json()
@@ -164,7 +178,11 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
         // Upload inline receipt_image_base64 di POST /v1/transactions juga wajib ter-gate receipt_storage
         const inlineReceiptRes = await app.request('/v1/transactions', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Household-Id': hhId,
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             type: 'expense',
             account: 'BCA suami',
@@ -184,7 +202,11 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
         // Toggle fitur beneficiary di PATCH /v1/households/current juga wajib ter-gate beneficiary
         const patchFeatRes = await app.request('/v1/households/current', {
           method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Household-Id': hhId,
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             features: { beneficiary: { enabled: true } },
           }),
@@ -199,12 +221,12 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
         invalidateEntitlementsCache(hhId)
 
         const allowedRes = await app.request('/v1/prices/compare?q=sabun', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}`, 'X-Household-Id': hhId },
         })
         expect(allowedRes.status).toBe(200)
       } finally {
         ;(env as { ENFORCE_PAID_FEATURES: boolean }).ENFORCE_PAID_FEATURES = false
-        await admin`update households set plan_tier = 'lifetime', entitlements = '{}'::jsonb where id = ${hhId}`
+        await admin`delete from households where id = ${hhId}`
         invalidateEntitlementsCache(hhId)
       }
     })

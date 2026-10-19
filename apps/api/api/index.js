@@ -8430,7 +8430,14 @@ var EnvSchema = external_exports.object({
   // Saklar global penegakan fitur berbayar (services/entitlements.ts):
   // Default false = semua fitur terbuka (early-adopter / promo launch).
   // Ubah ke 'true' / '1' di env produksi saat mulai menegakkan pembatasan plan_tier = 'free'.
-  ENFORCE_PAID_FEATURES: external_exports.string().optional().default("false").transform((v) => v === "true" || v === "1")
+  ENFORCE_PAID_FEATURES: external_exports.string().optional().default("false").transform((v) => v === "true" || v === "1"),
+  // Daftar Superadmin (services/admin.ts):
+  // Default menyertakan household internal utama pemilik ('fb505774-619d-4352-be75-39598e01416b')
+  // serta user ID test lokal ('00000000-0000-0000-0000-0000000000e0') agar langsung bekerja tanpa wajib
+  // set env baru di Vercel, namun tetap bisa ditambah lewat SUPERADMIN_USER_IDS / SUPERADMIN_EMAILS.
+  SUPERADMIN_USER_IDS: external_exports.string().optional().default("00000000-0000-0000-0000-0000000000e0").transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean)),
+  SUPERADMIN_EMAILS: external_exports.string().optional().default("").transform((s) => s.split(",").map((v) => v.trim().toLowerCase()).filter(Boolean)),
+  SUPERADMIN_HOUSEHOLD_IDS: external_exports.string().optional().default("fb505774-619d-4352-be75-39598e01416b").transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean))
 });
 function loadEnv() {
   const result = EnvSchema.safeParse(process.env);
@@ -12995,6 +13002,31 @@ var ProductAliasBodySchema = external_exports.object({
   same_as: external_exports.string().min(2).openapi({ description: 'Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"' })
 }).openapi("ProductAliasBody");
 
+// ../../packages/shared/src/schemas/admin.ts
+var AdminEntitlementsOverridePatchSchema = external_exports.object({
+  api_access: external_exports.boolean().nullable().optional(),
+  receipt_storage: external_exports.boolean().nullable().optional(),
+  price_compare: external_exports.boolean().nullable().optional(),
+  multi_member: external_exports.boolean().nullable().optional(),
+  shopping_stock: external_exports.boolean().nullable().optional(),
+  beneficiary: external_exports.boolean().nullable().optional(),
+  excel_export: external_exports.boolean().nullable().optional()
+}).strict().openapi("AdminEntitlementsOverridePatch");
+var AdminListHouseholdsQuerySchema = external_exports.object({
+  q: external_exports.string().max(120).optional(),
+  plan_tier: external_exports.enum(["all", "free", "pro", "lifetime", "expired"]).optional().default("all"),
+  limit: external_exports.coerce.number().int().min(1).max(250).optional().default(100),
+  offset: external_exports.coerce.number().int().min(0).optional().default(0)
+}).openapi("AdminListHouseholdsQuery");
+var AdminUpdateHouseholdPlanBodySchema = external_exports.object({
+  plan_tier: PlanTierSchema.optional(),
+  plan_expires_at: external_exports.string().nullable().optional(),
+  entitlements_override: AdminEntitlementsOverridePatchSchema.optional()
+}).strict().openapi("AdminUpdateHouseholdPlanBody");
+var AdminCleanupIdempotencyBodySchema = external_exports.object({
+  older_than_days: external_exports.number().int().min(1).max(365).optional().default(7)
+}).strict().openapi("AdminCleanupIdempotencyBody");
+
 // src/services/entitlements.ts
 var FEATURE_LABELS = {
   api_access: "Integrasi Bot AI Telegram/WhatsApp (API Key)",
@@ -13090,7 +13122,7 @@ async function requireEntitlementInTx(tx, householdId, feature) {
 }
 
 // src/auth/middleware.ts
-async function resolveMembership(userId, requestedHouseholdId) {
+async function resolveMembership(userId, requestedHousehold) {
   return withUserClaims(userId, async (tx) => {
     const rows = await tx`
       select hm.household_id, hm.id as member_id, hm.role
@@ -13099,8 +13131,8 @@ async function resolveMembership(userId, requestedHouseholdId) {
       order by hm.joined_at asc
     `;
     if (rows.length === 0) throw ApiError.fromCode("not_household_member");
-    if (requestedHouseholdId) {
-      const match2 = rows.find((r) => r.household_id === requestedHouseholdId);
+    if (requestedHousehold) {
+      const match2 = rows.find((r) => r.household_id === requestedHousehold);
       if (!match2) throw ApiError.fromCode("not_household_member", { message: "Kamu bukan anggota household yang diminta di X-Household-Id." });
       return match2;
     }
@@ -13146,10 +13178,12 @@ function requireAuth() {
       return;
     }
     const payload = await verifySupabaseJwt(token);
+    const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : void 0;
     const requestedHousehold = c.req.header("X-Household-Id") ?? void 0;
     const membership = await resolveMembership(payload.sub, requestedHousehold);
     const actor = {
       userId: payload.sub,
+      email,
       householdId: membership.household_id,
       memberId: membership.member_id,
       role: membership.role,
@@ -13159,6 +13193,7 @@ function requireAuth() {
     };
     c.set("actor", actor);
     c.set("userId", payload.sub);
+    if (email) c.set("userEmail", email);
     await withIdempotency(c, actor, next);
   };
 }
@@ -13173,6 +13208,9 @@ async function requireUserId(c) {
   }
   const payload = await verifySupabaseJwt(token);
   c.set("userId", payload.sub);
+  if (typeof payload.email === "string") {
+    c.set("userEmail", payload.email.trim().toLowerCase());
+  }
   return payload.sub;
 }
 
@@ -13765,6 +13803,156 @@ categoriesApp.openapi(
   }
 );
 
+// src/services/admin.ts
+var superadminCache = /* @__PURE__ */ new Map();
+function isSuperadminIdentity(params) {
+  if (env.SUPERADMIN_USER_IDS.includes(params.userId)) return true;
+  if (params.email && env.SUPERADMIN_EMAILS.includes(params.email.trim().toLowerCase())) return true;
+  if (params.activeHouseholdId && params.activeRole === "owner" && env.SUPERADMIN_HOUSEHOLD_IDS.includes(params.activeHouseholdId)) {
+    return true;
+  }
+  if (params.memberships?.some(
+    (m) => m.role === "owner" && env.SUPERADMIN_HOUSEHOLD_IDS.includes(m.household_id)
+  )) {
+    return true;
+  }
+  return false;
+}
+async function isSuperadminActor(actor) {
+  if (actor.credential !== "jwt") return false;
+  if (isSuperadminIdentity({
+    userId: actor.userId,
+    email: actor.email,
+    activeHouseholdId: actor.householdId,
+    activeRole: actor.role
+  })) {
+    return true;
+  }
+  if (env.SUPERADMIN_HOUSEHOLD_IDS.length === 0) return false;
+  const cached = superadminCache.get(actor.userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.isSuperadmin;
+  const isOwnerOfSuperadminHh = await withUserClaims(actor.userId, async (tx) => {
+    const rows = await tx`
+      select hm.household_id, hm.role
+      from household_members hm
+      join households h on h.id = hm.household_id
+      where hm.user_id = ${actor.userId}
+        and hm.deleted_at is null
+        and h.deleted_at is null
+    `;
+    return rows.some((r) => r.role === "owner" && env.SUPERADMIN_HOUSEHOLD_IDS.includes(r.household_id));
+  });
+  superadminCache.set(actor.userId, { isSuperadmin: isOwnerOfSuperadminHh, expiresAt: Date.now() + 6e4 });
+  return isOwnerOfSuperadminHh;
+}
+async function requireSuperadmin(actor) {
+  requireJwtOnly(actor);
+  const allowed = await isSuperadminActor(actor);
+  if (!allowed) {
+    throw ApiError.fromCode("forbidden", {
+      message: "Hanya Superadmin yang dapat mengakses halaman ini."
+    });
+  }
+}
+async function getAdminOverview(actor) {
+  await requireSuperadmin(actor);
+  const dbOverview = await withActor(actor, async (tx) => {
+    const [row] = await tx`
+      select public.admin_get_overview() as overview
+    `;
+    return row.overview;
+  });
+  return {
+    ...dbOverview,
+    runtime: {
+      enforce_paid_features: env.ENFORCE_PAID_FEATURES,
+      storage_provider: env.STORAGE_PROVIDER,
+      rate_limit_per_minute: env.RATE_LIMIT_PER_MINUTE,
+      rate_limit_per_day: env.RATE_LIMIT_PER_DAY
+    }
+  };
+}
+async function listAdminHouseholds(actor, query) {
+  await requireSuperadmin(actor);
+  const raw2 = await withActor(actor, async (tx) => {
+    const [row] = await tx`
+      select public.admin_list_households(
+        ${query.q ?? null},
+        ${query.plan_tier ?? "all"},
+        ${query.limit ?? 100},
+        ${query.offset ?? 0}
+      ) as result
+    `;
+    return row.result;
+  });
+  const items = (raw2.items ?? []).map((item) => ({
+    ...item,
+    features: parseHouseholdFeatures(item.features),
+    plan: computeHouseholdPlanStatus({
+      plan_tier: item.plan_tier,
+      plan_expires_at: item.plan_expires_at,
+      entitlements: item.entitlements_override
+    })
+  }));
+  return {
+    total: Number(raw2.total ?? items.length),
+    items
+  };
+}
+async function updateAdminHouseholdPlan(actor, householdId, body) {
+  await requireSuperadmin(actor);
+  let normalizedExpiresAt = null;
+  let clearExpiresAt = false;
+  if (body.plan_expires_at === null || body.plan_expires_at === "") {
+    clearExpiresAt = true;
+  } else if (typeof body.plan_expires_at === "string") {
+    const parsedMs = Date.parse(body.plan_expires_at);
+    if (!Number.isFinite(parsedMs)) {
+      throw ApiError.fromCode("validation_error", {
+        message: "Format tanggal kedaluwarsa (plan_expires_at) tidak valid.",
+        details: { field: "plan_expires_at" }
+      });
+    }
+    normalizedExpiresAt = new Date(parsedMs).toISOString();
+  }
+  const updated = await withActor(actor, async (tx) => {
+    const entitlementsParam = body.entitlements_override !== void 0 ? tx.json(body.entitlements_override) : null;
+    const [row] = await tx`
+      select public.admin_update_household_plan(
+        ${householdId},
+        ${body.plan_tier ?? null},
+        ${normalizedExpiresAt},
+        ${clearExpiresAt},
+        ${entitlementsParam}
+      ) as result
+    `;
+    return row.result;
+  });
+  invalidateEntitlementsCache(householdId);
+  return {
+    ...updated,
+    plan: computeHouseholdPlanStatus({
+      plan_tier: updated.plan_tier,
+      plan_expires_at: updated.plan_expires_at,
+      entitlements: updated.entitlements_override
+    })
+  };
+}
+async function cleanupExpiredIdempotency(actor, olderThanDays = 7) {
+  await requireSuperadmin(actor);
+  const days = Math.max(1, Math.min(365, Math.floor(olderThanDays)));
+  const deletedCount = await withActor(actor, async (tx) => {
+    const [row] = await tx`
+      select public.cleanup_expired_idempotency_keys((${days} || ' days')::interval) as deleted
+    `;
+    return Number(row?.deleted ?? 0);
+  });
+  return {
+    deleted_count: deletedCount,
+    older_than_days: days
+  };
+}
+
 // src/services/households.ts
 function mergeFeatures(current, patch) {
   if (!patch) return current;
@@ -13791,7 +13979,7 @@ async function getHouseholdTimezone(actor) {
     return tz;
   });
 }
-async function selectCurrentHousehold(tx, householdId) {
+async function selectCurrentHousehold(tx, householdId, isSuperadmin = false) {
   const [row] = await tx`
     select h.id, h.name, h.timezone, h.default_account_visibility::text, h.owners_can_view_private_totals, h.features,
            h.plan_tier, h.plan_expires_at::text, h.entitlements,
@@ -13810,14 +13998,17 @@ async function selectCurrentHousehold(tx, householdId) {
       plan_expires_at: row.plan_expires_at,
       entitlements: row.entitlements
     }),
-    member_count: Number(row.member_count)
+    member_count: Number(row.member_count),
+    is_superadmin: isSuperadmin
   };
 }
 async function getCurrentHousehold(actor) {
-  return withActor(actor, (tx) => selectCurrentHousehold(tx, actor.householdId));
+  const isSuperadmin = await isSuperadminActor(actor);
+  return withActor(actor, (tx) => selectCurrentHousehold(tx, actor.householdId, isSuperadmin));
 }
 async function updateHousehold(actor, patch) {
   if (actor.role !== "owner") throw ApiError.fromCode("insufficient_scope");
+  const isSuperadmin = await isSuperadminActor(actor);
   return withActor(actor, async (tx) => {
     const [current] = await tx`select features from households where id = ${actor.householdId} for update`;
     const currentFeatures = parseHouseholdFeatures(current?.features);
@@ -13846,7 +14037,7 @@ async function updateHousehold(actor, patch) {
     tzCache.delete(actor.householdId);
     invalidateFeaturesCache(actor.householdId);
     invalidateEntitlementsCache(actor.householdId);
-    return selectCurrentHousehold(tx, actor.householdId);
+    return selectCurrentHousehold(tx, actor.householdId, isSuperadmin);
   });
 }
 async function listMembers(actor) {
@@ -13899,7 +14090,7 @@ async function leaveHousehold(actor, reassignToMemberId) {
     return { success: true };
   });
 }
-async function getMe(userId) {
+async function getMe(userId, email) {
   return withUserClaims(userId, async (tx) => {
     const memberships = await tx`
       select hm.household_id, h.name as household_name, hm.id as member_id, hm.role
@@ -13910,7 +14101,12 @@ async function getMe(userId) {
     const [settings] = await tx`
       select active_household_id from user_settings where user_id = ${userId}
     `;
-    return { memberships, active_household_id: settings?.active_household_id ?? null };
+    const isSuperadmin = isSuperadminIdentity({ userId, email, memberships });
+    return {
+      memberships,
+      active_household_id: settings?.active_household_id ?? null,
+      is_superadmin: isSuperadmin
+    };
   });
 }
 async function createHousehold(userId, input) {
@@ -16736,7 +16932,10 @@ var OkAny = { 200: { content: { "application/json": { schema: external_exports.a
 var meApp = new OpenAPIHono();
 meApp.openapi(
   createRoute({ method: "get", path: "/v1/me", tags: ["me"], summary: "Info user & keanggotaan household", security: [{ bearerJwt: [] }], responses: OkAny }),
-  async (c) => c.json(await getMe(await requireUserId(c)))
+  async (c) => {
+    const userId = await requireUserId(c);
+    return c.json(await getMe(userId, c.get("userEmail")));
+  }
 );
 meApp.openapi(
   createRoute({
@@ -16839,11 +17038,11 @@ householdApp.openapi(
   async (c) => {
     const actor = c.get("actor");
     const [me, household, members] = await Promise.all([
-      getMe(actor.userId),
+      getMe(actor.userId, actor.email),
       getCurrentHousehold(actor),
       listMembers(actor)
     ]);
-    return c.json({ me, household, members });
+    return c.json({ me, household, members, is_superadmin: me.is_superadmin || household.is_superadmin });
   }
 );
 
@@ -21047,6 +21246,80 @@ insightsApp.openapi(
   }
 );
 
+// src/routes/admin.ts
+var OkAny2 = {
+  200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+};
+var adminApp = new OpenAPIHono();
+adminApp.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/admin/overview",
+    tags: ["admin"],
+    summary: "Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk & DB)",
+    security: [{ bearerJwt: [] }],
+    responses: OkAny2
+  }),
+  async (c) => c.json(await getAdminOverview(c.get("actor")))
+);
+adminApp.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/admin/households",
+    tags: ["admin"],
+    summary: "Daftar seluruh household beserta anggota, paket, dan statistik pemakaian (Superadmin)",
+    security: [{ bearerJwt: [] }],
+    request: { query: AdminListHouseholdsQuerySchema },
+    responses: OkAny2
+  }),
+  async (c) => c.json(await listAdminHouseholds(c.get("actor"), c.req.valid("query")))
+);
+adminApp.openapi(
+  createRoute({
+    method: "patch",
+    path: "/v1/admin/households/{id}/plan",
+    tags: ["admin"],
+    summary: "Ubah plan_tier, plan_expires_at, dan override entitlements household (Superadmin)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      params: external_exports.object({ id: UuidSchema }),
+      body: { content: { "application/json": { schema: AdminUpdateHouseholdPlanBodySchema } } }
+    },
+    responses: OkAny2
+  }),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(await updateAdminHouseholdPlan(c.get("actor"), id, c.req.valid("json")));
+  }
+);
+adminApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/admin/maintenance/cleanup-idempotency",
+    tags: ["admin"],
+    summary: "Bersihkan kunci idempotency yang sudah kedaluwarsa (Superadmin)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        required: false,
+        content: { "application/json": { schema: AdminCleanupIdempotencyBodySchema } }
+      }
+    },
+    responses: OkAny2
+  }),
+  async (c) => {
+    let olderThanDays = 7;
+    try {
+      const body = await c.req.json();
+      if (body && typeof body.older_than_days === "number") {
+        olderThanDays = body.older_than_days;
+      }
+    } catch {
+    }
+    return c.json(await cleanupExpiredIdempotency(c.get("actor"), olderThanDays));
+  }
+);
+
 // src/middleware/audit.ts
 var REDACT_KEYS = /* @__PURE__ */ new Set(["api_key", "secret", "password", "new_password", "authorization", "api_key_pepper"]);
 function redact(value) {
@@ -21202,6 +21475,7 @@ function buildApp() {
   app2.route("/", receiptsApp);
   app2.route("/", pricesApp);
   app2.route("/", insightsApp);
+  app2.route("/", adminApp);
   return app2;
 }
 

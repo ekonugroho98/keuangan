@@ -70,6 +70,9 @@ const BelanjaView = lazy(
 const PantryView = lazy(
   () => import("../components/dashboard/views/PantryView"),
 );
+const AdminView = lazy(
+  () => import("../components/dashboard/views/AdminView"),
+);
 const AddTransactionModal = lazy(
   () => import("../components/dashboard/AddTransactionModal"),
 );
@@ -97,6 +100,7 @@ const NAV_LABELS = {
   prediksi: "nav.prediksi",
   belanja: "nav.shopping",
   pantry: "nav.pantry",
+  admin: "nav.admin",
 };
 
 const Dashboard = ({ session, onLogout, showToast }) => {
@@ -108,7 +112,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   );
 
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
-  const [activeMenu, setActiveMenu] = useState("dasbor");
+  const [activeMenu, setActiveMenu] = useState(() =>
+    window.location.pathname === "/admin" || window.location.hash === "#admin"
+      ? "admin"
+      : "dasbor",
+  );
   const [initialCategoryFilter, setInitialCategoryFilter] = useState("");
   const [initialAccountFilter, setInitialAccountFilter] = useState("");
   const [showAddTx, setShowAddTx] = useState(false);
@@ -975,6 +983,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             )}
             {activeMenu === "belanja" && <BelanjaView showToast={showToast} setActiveMenu={setActiveMenu} />}
             {activeMenu === "pantry" && <PantryView showToast={showToast} setActiveMenu={setActiveMenu} />}
+            {activeMenu === "admin" && <AdminView showToast={showToast} />}
           </Suspense>
         </div>
       </main>

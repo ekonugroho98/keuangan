@@ -3508,6 +3508,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/receipts/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unggah foto struk/nota ke storage dan dapatkan receipt_url */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UploadReceiptImageBody"];
+                };
+            };
+            responses: {
+                /** @description Berhasil diunggah */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UploadReceiptImageResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/receipts/ingest": {
         parameters: {
             query?: never;
@@ -3567,8 +3607,8 @@ export interface paths {
         /** Bandingkan harga produk antar toko (per satuan) */
         get: {
             parameters: {
-                query: {
-                    q: string;
+                query?: {
+                    q?: string;
                     days?: number;
                 };
                 header?: never;
@@ -3629,6 +3669,210 @@ export interface paths {
                             keyword: string;
                             canonical_name: string;
                         };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/insights/spending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analisa pengeluaran (angka matang untuk agent) */
+        get: {
+            parameters: {
+                query?: {
+                    period?: string;
+                    from?: string;
+                    to?: string;
+                    category?: string;
+                    account?: string;
+                    beneficiary?: string;
+                    q?: string;
+                    compare?: "true" | "false";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk & DB) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daftar seluruh household beserta anggota, paket, dan statistik pemakaian (Superadmin) */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    plan_tier?: "all" | "free" | "pro" | "lifetime" | "expired";
+                    limit?: number;
+                    offset?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/households/{id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Ubah plan_tier, plan_expires_at, dan override entitlements household (Superadmin) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminUpdateHouseholdPlanBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/maintenance/cleanup-idempotency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bersihkan kunci idempotency yang sudah kedaluwarsa (Superadmin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminCleanupIdempotencyBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
                     };
                 };
             };
@@ -3835,6 +4079,22 @@ export interface components {
             beneficiary_id?: string;
             /** @description F-A (10-fitur-opsional-keluarga.md §3), hanya berlaku kalau feature beneficiary aktif. */
             beneficiary?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            recorded_by_id?: string;
+            /** @description Nama/alias anggota keluarga yang mencatat transaksi ini (mis. "Ibu", "Ayah"). Jika kosong pada panggilan API key, otomatis mengikuti pemilik akun pembayar (atau pemilik API key untuk akun bersama). */
+            recorded_by?: string;
+            /**
+             * Format: uri
+             * @description URL foto bukti struk/nota (mis. dari POST /v1/receipts/upload atau /v1/ai/scan-receipt).
+             */
+            receipt_url?: string;
+            /** @description Opsional: base64 foto struk/nota untuk langsung diunggah dan ditempelkan sebagai receipt_url. */
+            receipt_image_base64?: string;
+            /** @description Tipe MIME foto (image/webp, image/jpeg, image/png). */
+            receipt_mime_type?: string;
         };
         CreateTransactionBatchBody: {
             /**
@@ -3845,9 +4105,26 @@ export interface components {
             account?: string;
             /** @example 2026-10-04 */
             date?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            recorded_by_id?: string;
+            /** @description Nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah"). */
+            recorded_by?: string;
+            /**
+             * Format: uri
+             * @description URL foto struk yang berlaku untuk seluruh item pada batch ini.
+             */
+            receipt_url?: string;
+            /** @description Opsional: base64 foto struk untuk langsung diunggah dan ditempelkan ke seluruh item batch ini. */
+            receipt_image_base64?: string;
+            receipt_mime_type?: string;
             items: {
                 amount?: number;
                 amount_text?: string;
+                qty?: number;
+                discount?: number;
                 /**
                  * Format: uuid
                  * @example 11111111-1111-1111-1111-111111111111
@@ -3867,6 +4144,7 @@ export interface components {
         };
         UpdateTransactionBody: {
             amount?: number;
+            amount_text?: string;
             /** @enum {string} */
             type?: "income" | "expense";
             /**
@@ -3884,6 +4162,8 @@ export interface components {
             /** @example 2026-10-04 */
             date?: string;
             note?: string;
+            qty?: number;
+            discount?: number;
             /**
              * Format: uuid
              * @example 11111111-1111-1111-1111-111111111111
@@ -3891,6 +4171,21 @@ export interface components {
             beneficiary_id?: string | null;
             /** @description null eksplisit pada beneficiary_id = kembali ke bersama. */
             beneficiary?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            recorded_by_id?: string;
+            /** @description Ubah atribut anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah"). */
+            recorded_by?: string;
+            /**
+             * Format: uri
+             * @description URL bukti struk/nota (kirim null untuk menghapus lampiran struk).
+             */
+            receipt_url?: string | null;
+            /** @description Opsional: base64 foto bukti struk baru untuk langsung diunggah. */
+            receipt_image_base64?: string;
+            receipt_mime_type?: string;
         };
         CreateTransferBody: {
             amount?: number;
@@ -3910,6 +4205,21 @@ export interface components {
             /** @example 2026-10-04 */
             date?: string;
             note?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            recorded_by_id?: string;
+            /** @description Nama/alias anggota keluarga yang mencatat transfer ini. */
+            recorded_by?: string;
+            /**
+             * Format: uri
+             * @description URL foto bukti transfer (opsional).
+             */
+            receipt_url?: string;
+            /** @description Opsional: base64 foto bukti transfer untuk langsung diunggah. */
+            receipt_image_base64?: string;
+            receipt_mime_type?: string;
         };
         CreateBudgetBody: {
             /**
@@ -4219,9 +4529,13 @@ export interface components {
             merchant?: string;
             date?: string | null;
             subtotal?: number | null;
+            /** Format: uri */
+            receipt_url?: string | null;
             items?: {
                 note: string;
+                qty?: number;
                 amount: number;
+                discount?: number;
                 category: string;
             }[];
             error?: string;
@@ -4398,6 +4712,20 @@ export interface components {
             /** @default  */
             note: string;
         };
+        UploadReceiptImageResponse: {
+            /** Format: uri */
+            receipt_url: string;
+            /** @enum {string} */
+            provider: "supabase" | "r2" | "firebase";
+            size_bytes: number;
+            mime_type: string;
+        };
+        UploadReceiptImageBody: {
+            /** @description Base64 foto struk/nota (disarankan WebP max 1080px, <= 5 MB). */
+            image_base64: string;
+            /** @description image/webp | image/jpeg | image/png (otomatis dideteksi dari magic bytes jika kosong). */
+            mime_type?: string;
+        };
         IngestReceiptBody: {
             /**
              * Format: uuid
@@ -4408,11 +4736,29 @@ export interface components {
             /** @example 2026-10-04 */
             date?: string;
             merchant?: string;
+            /**
+             * Format: uuid
+             * @example 11111111-1111-1111-1111-111111111111
+             */
+            recorded_by_id?: string;
+            /** @description Nama/alias anggota keluarga yang mencatat struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar. */
+            recorded_by?: string;
+            /**
+             * Format: uri
+             * @description URL foto struk yang akan ditempelkan ke seluruh transaksi hasil ingest ini.
+             */
+            receipt_url?: string;
+            /** @description Opsional: base64 foto struk (WebP/JPEG/PNG) untuk langsung diunggah ke storage dan ditempelkan ke seluruh transaksi struk ini. */
+            receipt_image_base64?: string;
+            /** @description Tipe MIME foto struk (image/webp, image/jpeg, image/png). */
+            receipt_mime_type?: string;
             items: {
                 name: string;
                 /** @default 1 */
                 qty: number;
                 amount: number;
+                /** @description Total potongan diskon baris struk ini (Rp). amount tetap harga bersih yang dibayar setelah diskon. */
+                discount?: number;
                 /**
                  * Format: uuid
                  * @example 11111111-1111-1111-1111-111111111111
@@ -4448,8 +4794,16 @@ export interface components {
             stores: {
                 merchant: string;
                 last_date: string;
-                /** @description Harga satu kemasan terakhir */
+                /** @description Harga satu kemasan terakhir (setelah diskon) */
                 price: number;
+                /** @description Harga satu kemasan asli sebelum diskon (null bila tidak diskon) */
+                normal_price?: number | null;
+                /** @description Potongan diskon per kemasan pada transaksi terakhir (Rp, 0 bila tidak diskon) */
+                discount?: number;
+                /** @description Berapa kali toko ini memberi diskon pada riwayat produk ini */
+                promo_count?: number;
+                /** @description Total rupiah diskon yang dihemat untuk produk ini di toko ini */
+                total_discount_saved?: number;
                 size: string | null;
                 /** @description Harga terakhir per satuan banding (compare_basis) */
                 per_unit_price: number;
@@ -4475,6 +4829,25 @@ export interface components {
             item: string;
             /** @description Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR" */
             same_as: string;
+        };
+        AdminEntitlementsOverridePatch: {
+            api_access?: boolean | null;
+            receipt_storage?: boolean | null;
+            price_compare?: boolean | null;
+            multi_member?: boolean | null;
+            shopping_stock?: boolean | null;
+            beneficiary?: boolean | null;
+            excel_export?: boolean | null;
+        };
+        AdminUpdateHouseholdPlanBody: {
+            /** @enum {string} */
+            plan_tier?: "free" | "pro" | "lifetime";
+            plan_expires_at?: string | null;
+            entitlements_override?: components["schemas"]["AdminEntitlementsOverridePatch"];
+        };
+        AdminCleanupIdempotencyBody: {
+            /** @default 7 */
+            older_than_days: number;
         };
     };
     responses: never;
