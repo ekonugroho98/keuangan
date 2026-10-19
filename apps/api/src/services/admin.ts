@@ -1,7 +1,10 @@
 import type postgres from 'postgres'
 import { ApiError } from '@karaya/shared/errors'
 import type {
+  AdminCreateVouchersBody,
+  AdminHouseholdTokensBody,
   AdminListHouseholdsQuery,
+  AdminProvisionWalletBody,
   AdminUpdateHouseholdPlanBody,
   HouseholdPlanStatus,
   PaidFeatureKey,
@@ -90,6 +93,133 @@ export async function requireSuperadmin(actor: Actor): Promise<void> {
   }
 }
 
+// ── Token Gatekeeper Server-to-Server HTTP Client (Separate DB on VPS) ──────────────────────
+
+export interface GatekeeperWalletItem {
+  owner_id: string
+  display_name: string
+  token_balance: number
+  lifetime_tokens_used: number
+  lifetime_requests: number
+  rpm_limit: number
+  is_suspended: number | boolean
+  keys_count?: number
+  active_keys_count: number
+  aliases: string[]
+  key_prefixes: string[]
+  created_at?: string
+  updated_at: string
+}
+
+export interface GatekeeperSummaryStats {
+  total_wallets: number
+  active_wallets: number
+  suspended_wallets: number
+  total_balance_tokens: number
+  total_used_tokens: number
+  total_requests: number
+  active_keys: number
+  unclaimed_vouchers: number
+}
+
+export interface GatekeeperOverviewBlock {
+  configured: boolean
+  online: boolean
+  base_url: string
+  error: string | null
+  summary: GatekeeperSummaryStats | null
+  wallets: GatekeeperWalletItem[]
+  vouchers: Array<Record<string, unknown>>
+}
+
+async function callGatekeeperApi<T>(
+  path: string,
+  options: { method?: 'GET' | 'POST'; body?: unknown; timeoutMs?: number } = {},
+): Promise<T> {
+  const token = env.GATEKEEPER_ADMIN_TOKEN.trim()
+  if (!token) {
+    throw ApiError.fromCode('validation_error', {
+      message: 'GATEKEEPER_ADMIN_TOKEN belum diset di environment server.',
+    })
+  }
+  const url = `${env.GATEKEEPER_BASE_URL}${path}`
+  const res = await fetch(url, {
+    method: options.method ?? 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Admin-Token': token,
+    },
+    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+    signal: AbortSignal.timeout(options.timeoutMs ?? 4500),
+  })
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string }
+  if (!res.ok) {
+    throw ApiError.fromCode('upstream_ai_error', {
+      message: data?.error || `Token Gatekeeper merespons HTTP ${res.status}`,
+    })
+  }
+  return data
+}
+
+async function fetchGatekeeperOverviewSafe(): Promise<GatekeeperOverviewBlock> {
+  const configured = env.GATEKEEPER_ADMIN_TOKEN.trim().length > 0
+  if (!configured) {
+    return {
+      configured: false,
+      online: false,
+      base_url: env.GATEKEEPER_BASE_URL,
+      error: null,
+      summary: null,
+      wallets: [],
+      vouchers: [],
+    }
+  }
+  try {
+    const data = await callGatekeeperApi<{
+      summary: GatekeeperSummaryStats
+      wallets: GatekeeperWalletItem[]
+      vouchers: Array<Record<string, unknown>>
+    }>('/gatekeeper/api/overview', { method: 'GET', timeoutMs: 3000 })
+    return {
+      configured: true,
+      online: true,
+      base_url: env.GATEKEEPER_BASE_URL,
+      error: null,
+      summary: data.summary ?? null,
+      wallets: data.wallets ?? [],
+      vouchers: data.vouchers ?? [],
+    }
+  } catch (err) {
+    return {
+      configured: true,
+      online: false,
+      base_url: env.GATEKEEPER_BASE_URL,
+      error: err instanceof Error ? err.message : 'Tidak dapat menghubungi Token Gatekeeper',
+      summary: null,
+      wallets: [],
+      vouchers: [],
+    }
+  }
+}
+
+async function lookupGatekeeperWalletsSafe(
+  items: Array<{ key: string; candidates: string[] }>,
+): Promise<Record<string, GatekeeperWalletItem | null>> {
+  if (!env.GATEKEEPER_ADMIN_TOKEN.trim() || items.length === 0) return {}
+  try {
+    const data = await callGatekeeperApi<{
+      results: Record<string, GatekeeperWalletItem | null>
+    }>('/gatekeeper/api/wallets/lookup', {
+      method: 'POST',
+      body: { items },
+      timeoutMs: 3000,
+    })
+    return data.results ?? {}
+  } catch {
+    return {}
+  }
+}
+
 export interface AdminOverviewOut {
   households: {
     total: number
@@ -143,16 +273,20 @@ export interface AdminOverviewOut {
     rate_limit_per_minute: number
     rate_limit_per_day: number
   }
+  token_gatekeeper: GatekeeperOverviewBlock
 }
 
 export async function getAdminOverview(actor: Actor): Promise<AdminOverviewOut> {
   await requireSuperadmin(actor)
-  const dbOverview = await withActor(actor, async (tx) => {
-    const [row] = await tx<[{ overview: Omit<AdminOverviewOut, 'runtime'> }]>`
-      select public.admin_get_overview() as overview
-    `
-    return row!.overview
-  })
+  const [dbOverview, tokenGatekeeper] = await Promise.all([
+    withActor(actor, async (tx) => {
+      const [row] = await tx<[{ overview: Omit<AdminOverviewOut, 'runtime' | 'token_gatekeeper'> }]>`
+        select public.admin_get_overview() as overview
+      `
+      return row!.overview
+    }),
+    fetchGatekeeperOverviewSafe(),
+  ])
 
   return {
     ...dbOverview,
@@ -162,6 +296,7 @@ export async function getAdminOverview(actor: Actor): Promise<AdminOverviewOut> 
       rate_limit_per_minute: env.RATE_LIMIT_PER_MINUTE,
       rate_limit_per_day: env.RATE_LIMIT_PER_DAY,
     },
+    token_gatekeeper: tokenGatekeeper,
   }
 }
 
@@ -173,6 +308,17 @@ export interface AdminHouseholdMemberItem {
   role: 'owner' | 'member' | 'viewer'
   color: string
   joined_at: string
+  has_ai_key?: boolean
+  ai_provider?: string | null
+}
+
+export interface AdminHouseholdAiConfigSummary {
+  configured_members: number
+  total_members: number
+  provider: string | null
+  model: string | null
+  is_gatekeeper: boolean
+  key_prefix: string | null
 }
 
 export interface AdminHouseholdItem {
@@ -187,6 +333,8 @@ export interface AdminHouseholdItem {
   created_at: string
   updated_at: string
   members: AdminHouseholdMemberItem[]
+  ai_config_summary: AdminHouseholdAiConfigSummary
+  token_wallet: GatekeeperWalletItem | null
   stats: {
     tx_total: number
     tx_web: number
@@ -212,7 +360,12 @@ export async function listAdminHouseholds(
         {
           result: {
             total: number
-            items: Array<Omit<AdminHouseholdItem, 'plan' | 'features'> & { features: unknown }>
+            items: Array<
+              Omit<AdminHouseholdItem, 'plan' | 'features' | 'token_wallet'> & {
+                features: unknown
+                ai_config_summary?: AdminHouseholdAiConfigSummary
+              }
+            >
           }
         },
       ]
@@ -227,7 +380,21 @@ export async function listAdminHouseholds(
     return row!.result
   })
 
-  const items: AdminHouseholdItem[] = (raw.items ?? []).map((item) => ({
+  const rawItems = raw.items ?? []
+  const lookupItems = rawItems.map((item) => {
+    const memberEmails = (item.members ?? [])
+      .map((m) => m.email?.trim().toLowerCase())
+      .filter((e): e is string => Boolean(e))
+    const memberUserIds = (item.members ?? []).map((m) => `user:${m.user_id}`)
+    return {
+      key: item.id,
+      candidates: [`hh:${item.id}`, item.id, ...memberEmails, ...memberUserIds],
+    }
+  })
+
+  const walletsByHhId = await lookupGatekeeperWalletsSafe(lookupItems)
+
+  const items: AdminHouseholdItem[] = rawItems.map((item) => ({
     ...item,
     features: parseHouseholdFeatures(item.features),
     plan: computeHouseholdPlanStatus({
@@ -235,6 +402,15 @@ export async function listAdminHouseholds(
       plan_expires_at: item.plan_expires_at,
       entitlements: item.entitlements_override,
     }),
+    ai_config_summary: item.ai_config_summary ?? {
+      configured_members: 0,
+      total_members: item.members?.length ?? 0,
+      provider: null,
+      model: null,
+      is_gatekeeper: false,
+      key_prefix: null,
+    },
+    token_wallet: walletsByHhId[item.id] ?? null,
   }))
 
   return {
@@ -323,5 +499,150 @@ export async function cleanupExpiredIdempotency(actor: Actor, olderThanDays = 7)
   return {
     deleted_count: deletedCount,
     older_than_days: days,
+  }
+}
+
+export async function provisionHouseholdTokens(
+  actor: Actor,
+  householdId: string,
+  body: AdminHouseholdTokensBody,
+) {
+  await requireSuperadmin(actor)
+
+  const ctx = await withActor(actor, async (tx) => {
+    const [row] = await tx<
+      [
+        {
+          result: {
+            id: string
+            name: string
+            plan_tier: string
+            member_count: number
+            member_emails: string[]
+            existing_gatekeeper_key: string | null
+          }
+        },
+      ]
+    >`
+      select public.admin_get_household_ai_context(${householdId}) as result
+    `
+    return row!.result
+  })
+
+  const aliases = [`hh:${householdId}`, householdId, ...(ctx.member_emails ?? [])]
+  const needFreshKey = Boolean(
+    body.force_new_key || (body.auto_inject_key && !ctx.existing_gatekeeper_key),
+  )
+
+  const gkRes = await callGatekeeperApi<{
+    ok: boolean
+    wallet: GatekeeperWalletItem
+    created_api_key: string | null
+  }>('/gatekeeper/api/wallets/provision', {
+    method: 'POST',
+    body: {
+      owner_id: `hh:${householdId}`,
+      display_name: ctx.name,
+      aliases,
+      delta_tokens: body.delta_tokens ?? 0,
+      set_balance: body.set_balance ?? null,
+      create_key_if_missing: true,
+      force_new_key: needFreshKey,
+      key_name: `Keluarga ${ctx.name}`,
+      reference_id: `karaya_admin:${actor.userId.slice(0, 8)}`,
+    },
+    timeoutMs: 6000,
+  })
+
+  const keyToInject = gkRes.created_api_key || ctx.existing_gatekeeper_key || null
+  let injected: {
+    household_id: string
+    updated_members: number
+    provider: string
+    model: string
+    key_prefix: string
+  } | null = null
+
+  if (body.auto_inject_key && keyToInject) {
+    injected = await withActor(actor, async (tx) => {
+      const [row] = await tx<
+        [
+          {
+            result: {
+              household_id: string
+              updated_members: number
+              provider: string
+              model: string
+              key_prefix: string
+            }
+          },
+        ]
+      >`
+        select public.admin_set_household_ai_key(
+          ${householdId},
+          ${keyToInject},
+          ${'gatekeeper'},
+          ${body.model ?? 'kb-auto'}
+        ) as result
+      `
+      return row!.result
+    })
+  }
+
+  return {
+    household_id: householdId,
+    wallet: gkRes.wallet,
+    created_api_key: gkRes.created_api_key,
+    injected,
+  }
+}
+
+export async function provisionStandaloneWallet(actor: Actor, body: AdminProvisionWalletBody) {
+  await requireSuperadmin(actor)
+
+  const gkRes = await callGatekeeperApi<{
+    ok: boolean
+    wallet: GatekeeperWalletItem
+    created_api_key: string | null
+  }>('/gatekeeper/api/wallets/provision', {
+    method: 'POST',
+    body: {
+      owner_id: body.owner_id.trim(),
+      display_name: body.display_name?.trim() || body.owner_id.trim(),
+      aliases: body.aliases ?? [],
+      delta_tokens: body.delta_tokens ?? 0,
+      set_balance: body.set_balance ?? null,
+      create_key_if_missing: body.create_key_if_missing ?? true,
+      force_new_key: body.force_new_key ?? false,
+      key_name: body.key_name ?? 'Karaya Key',
+      reference_id: `karaya_admin:${actor.userId.slice(0, 8)}`,
+    },
+    timeoutMs: 6000,
+  })
+
+  return {
+    wallet: gkRes.wallet,
+    created_api_key: gkRes.created_api_key,
+  }
+}
+
+export async function createGatekeeperVouchers(actor: Actor, body: AdminCreateVouchersBody) {
+  await requireSuperadmin(actor)
+
+  const gkRes = await callGatekeeperApi<{
+    ok: boolean
+    vouchers: Array<Record<string, unknown>>
+  }>('/gatekeeper/api/vouchers', {
+    method: 'POST',
+    body: {
+      token_amount: body.tokens,
+      count: body.count ?? 1,
+      batch_note: body.notes ?? '',
+    },
+    timeoutMs: 6000,
+  })
+
+  return {
+    vouchers: gkRes.vouchers ?? [],
   }
 }

@@ -1,7 +1,10 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import {
   AdminCleanupIdempotencyBodySchema,
+  AdminCreateVouchersBodySchema,
+  AdminHouseholdTokensBodySchema,
   AdminListHouseholdsQuerySchema,
+  AdminProvisionWalletBodySchema,
   AdminUpdateHouseholdPlanBodySchema,
   UuidSchema,
 } from '@karaya/shared/schemas'
@@ -18,7 +21,7 @@ adminApp.openapi(
     method: 'get',
     path: '/v1/admin/overview',
     tags: ['admin'],
-    summary: 'Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk & DB)',
+    summary: 'Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk, DB & Token Gatekeeper)',
     security: [{ bearerJwt: [] }],
     responses: OkAny,
   }),
@@ -30,7 +33,7 @@ adminApp.openapi(
     method: 'get',
     path: '/v1/admin/households',
     tags: ['admin'],
-    summary: 'Daftar seluruh household beserta anggota, paket, dan statistik pemakaian (Superadmin)',
+    summary: 'Daftar seluruh household beserta anggota, paket, dompet token AI, dan statistik pemakaian (Superadmin)',
     security: [{ bearerJwt: [] }],
     request: { query: AdminListHouseholdsQuerySchema },
     responses: OkAny,
@@ -55,6 +58,55 @@ adminApp.openapi(
     const { id } = c.req.valid('param')
     return c.json(await admin.updateAdminHouseholdPlan(c.get('actor'), id, c.req.valid('json')))
   },
+)
+
+adminApp.openapi(
+  createRoute({
+    method: 'post',
+    path: '/v1/admin/households/{id}/tokens',
+    tags: ['admin'],
+    summary: 'Top-up / atur kuota Token Gatekeeper household & auto-inject API key sk-kb-* ke semua anggota (Superadmin)',
+    security: [{ bearerJwt: [] }],
+    request: {
+      params: z.object({ id: UuidSchema }),
+      body: { content: { 'application/json': { schema: AdminHouseholdTokensBodySchema } } },
+    },
+    responses: OkAny,
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param')
+    return c.json(await admin.provisionHouseholdTokens(c.get('actor'), id, c.req.valid('json')))
+  },
+)
+
+adminApp.openapi(
+  createRoute({
+    method: 'post',
+    path: '/v1/admin/tokens/wallets/provision',
+    tags: ['admin'],
+    summary: 'Buat / top-up dompet Token Gatekeeper universal lintas produk (tg:, email:, ws:, hh:) (Superadmin)',
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: { content: { 'application/json': { schema: AdminProvisionWalletBodySchema } } },
+    },
+    responses: OkAny,
+  }),
+  async (c) => c.json(await admin.provisionStandaloneWallet(c.get('actor'), c.req.valid('json'))),
+)
+
+adminApp.openapi(
+  createRoute({
+    method: 'post',
+    path: '/v1/admin/tokens/vouchers',
+    tags: ['admin'],
+    summary: 'Generate kode voucher Token Gatekeeper (Superadmin)',
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: { content: { 'application/json': { schema: AdminCreateVouchersBodySchema } } },
+    },
+    responses: OkAny,
+  }),
+  async (c) => c.json(await admin.createGatekeeperVouchers(c.get('actor'), c.req.valid('json'))),
 )
 
 adminApp.openapi(

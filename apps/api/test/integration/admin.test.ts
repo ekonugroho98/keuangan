@@ -289,5 +289,175 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
       expect(body.deleted_count).toBeGreaterThanOrEqual(1)
       expect(body.older_than_days).toBe(7)
     })
+
+    it('POST /v1/admin/households/{id}/tokens melakukan top-up ke Gatekeeper dan auto-inject kunci sk-kb-* ke anggota household', async () => {
+      const { env } = await import('../../src/env')
+      const app = buildApp()
+      const superToken = await mintJwt(EKO_USER_ID)
+
+      // Buat household uji terisolasi
+      const createHhRes = await app.request('/v1/households', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${superToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Keluarga Uji Gatekeeper',
+          timezone: 'Asia/Jakarta',
+          display_name: 'Eko GK',
+        }),
+      })
+      expect(createHhRes.status).toBe(201)
+      const createdHh = await createHhRes.json()
+      const hhId = createdHh.household.id as string
+
+      // Kembalikan active_household_id ke household pertama
+      const meRes = await app.request('/v1/me', {
+        headers: { Authorization: `Bearer ${superToken}` },
+      })
+      const meData = await meRes.json()
+      const primaryHhId = meData.memberships[0].household_id as string
+      const [prevSettings] = await admin<{ ai_config: unknown }[]>`
+        select ai_config from user_settings where user_id = ${EKO_USER_ID}
+      `
+      await admin`update user_settings set active_household_id = ${primaryHhId} where user_id = ${EKO_USER_ID}`
+
+      const origFetch = globalThis.fetch
+      const origGkToken = env.GATEKEEPER_ADMIN_TOKEN
+      ;(env as { GATEKEEPER_ADMIN_TOKEN: string }).GATEKEEPER_ADMIN_TOKEN = 'test-gk-admin-secret'
+
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+        if (url.includes('/gatekeeper/api/wallets/provision')) {
+          const reqBody = JSON.parse(String(init?.body ?? '{}'))
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              wallet: {
+                owner_id: reqBody.owner_id,
+                display_name: reqBody.display_name || reqBody.owner_id,
+                token_balance: 750000,
+                lifetime_tokens_used: 12000,
+                lifetime_requests: 15,
+                rpm_limit: 20,
+                is_suspended: 0,
+                active_keys_count: 1,
+                aliases: reqBody.aliases ?? [reqBody.owner_id],
+                key_prefixes: ['sk-kb-test...9999'],
+                updated_at: new Date().toISOString(),
+              },
+              created_api_key: 'sk-kb-testkey1234567890abcdef9999',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        if (url.includes('/gatekeeper/api/wallets/lookup')) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              results: {
+                [hhId]: {
+                  owner_id: `hh:${hhId}`,
+                  display_name: 'Keluarga Uji Gatekeeper',
+                  token_balance: 750000,
+                  lifetime_tokens_used: 12000,
+                  lifetime_requests: 15,
+                  rpm_limit: 20,
+                  is_suspended: 0,
+                  active_keys_count: 1,
+                  aliases: [`hh:${hhId}`, 'eko@example.test'],
+                  key_prefixes: ['sk-kb-test...9999'],
+                  updated_at: new Date().toISOString(),
+                },
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        if (url.includes('/gatekeeper/api/vouchers')) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              vouchers: [{ code: 'KB-1M-TEST01', token_amount: 1000000, is_claimed: 0 }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return origFetch(input, init)
+      }) as typeof fetch
+
+      try {
+        // 1. Provision & auto-inject token ke household
+        const provRes = await app.request(`/v1/admin/households/${hhId}/tokens`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${superToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            delta_tokens: 750000,
+            auto_inject_key: true,
+            force_new_key: false,
+            model: 'kb-auto',
+          }),
+        })
+        expect(provRes.status).toBe(200)
+        const provData = await provRes.json()
+        expect(provData.wallet.token_balance).toBe(750000)
+        expect(provData.created_api_key).toBe('sk-kb-testkey1234567890abcdef9999')
+        expect(provData.injected.updated_members).toBe(1)
+        expect(provData.injected.provider).toBe('gatekeeper')
+
+        // 2. Pastikan GET /v1/admin/households mengembalikan token_wallet & ai_config_summary.is_gatekeeper = true
+        const listRes = await app.request(`/v1/admin/households?q=${hhId}`, {
+          headers: { Authorization: `Bearer ${superToken}` },
+        })
+        expect(listRes.status).toBe(200)
+        const listData = await listRes.json()
+        const item = listData.items.find((x: { id: string }) => x.id === hhId)
+        expect(item).toBeTruthy()
+        expect(item.token_wallet.token_balance).toBe(750000)
+        expect(item.ai_config_summary.is_gatekeeper).toBe(true)
+        expect(item.ai_config_summary.configured_members).toBe(1)
+
+        // 3. Provision standalone wallet lintas produk (mis. tg:998877)
+        const standaloneRes = await app.request('/v1/admin/tokens/wallets/provision', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${superToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            owner_id: 'tg:998877',
+            display_name: 'Telegram Bot User',
+            aliases: ['user@telegram.test'],
+            delta_tokens: 500000,
+          }),
+        })
+        expect(standaloneRes.status).toBe(200)
+        const standaloneData = await standaloneRes.json()
+        expect(standaloneData.wallet.owner_id).toBe('tg:998877')
+
+        // 4. Generate voucher Gatekeeper
+        const voucherRes = await app.request('/v1/admin/tokens/vouchers', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${superToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokens: 1000000,
+            count: 1,
+            prefix: 'KB',
+            notes: 'Unit test voucher',
+          }),
+        })
+        expect(voucherRes.status).toBe(200)
+        const voucherData = await voucherRes.json()
+        expect(voucherData.vouchers[0].code).toBe('KB-1M-TEST01')
+      } finally {
+        globalThis.fetch = origFetch
+        ;(env as { GATEKEEPER_ADMIN_TOKEN: string }).GATEKEEPER_ADMIN_TOKEN = origGkToken
+        if (prevSettings) {
+          await admin`
+            update user_settings
+            set ai_config = ${admin.json((prevSettings.ai_config ?? {}) as postgres.JSONValue)},
+                active_household_id = ${primaryHhId}
+            where user_id = ${EKO_USER_ID}
+          `
+        }
+        await admin`delete from households where id = ${hhId}`
+      }
+    })
   },
 )
+

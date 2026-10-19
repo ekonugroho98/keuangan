@@ -1,6 +1,7 @@
 import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../../auth/actor'
 import { withActor, withUserClaims } from '../../db/tx'
+import { env } from '../../env'
 import { getSummary } from '../summary'
 import { listAccounts } from '../accounts'
 import { listDebts } from '../debts'
@@ -31,8 +32,12 @@ async function getAiConfig(actor: Actor): Promise<AiConfig> {
     const [row] = await tx<{ ai_config: AiConfig }[]>`select ai_config from user_settings where user_id = ${actor.userId}`
     return row?.ai_config ?? {}
   })
-  if (!config.apiKey || config.disabled) throw ApiError.fromCode('ai_not_configured')
-  return config
+  const trimmedKey = config.apiKey?.trim()
+  if (!trimmedKey || config.disabled) throw ApiError.fromCode('ai_not_configured')
+  const isGatekeeperKey = trimmedKey.startsWith('sk-kb-')
+  const provider = isGatekeeperKey ? 'gatekeeper' : config.provider
+  const model = config.model || (provider === 'gatekeeper' ? 'kb-auto' : 'gpt-4o-mini')
+  return { ...config, apiKey: trimmedKey, provider, model }
 }
 
 async function getUserName(actor: Actor): Promise<string> {
@@ -44,6 +49,7 @@ async function getUserName(actor: Actor): Promise<string> {
 
 // ── Provider base URLs ──────────────────────────────────────────────────────
 const PROVIDER_BASE: Record<string, string> = {
+  gatekeeper: `${env.GATEKEEPER_BASE_URL}/v1`,
   openai: 'https://api.openai.com/v1',
   groq: 'https://api.groq.com/openai/v1',
   mistral: 'https://api.mistral.ai/v1',

@@ -3731,7 +3731,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk & DB) */
+        /** Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk, DB & Token Gatekeeper) */
         get: {
             parameters: {
                 query?: never;
@@ -3767,7 +3767,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Daftar seluruh household beserta anggota, paket, dan statistik pemakaian (Superadmin) */
+        /** Daftar seluruh household beserta anggota, paket, dompet token AI, dan statistik pemakaian (Superadmin) */
         get: {
             parameters: {
                 query?: {
@@ -3841,6 +3841,128 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/admin/households/{id}/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Top-up / atur kuota Token Gatekeeper household & auto-inject API key sk-kb-* ke semua anggota (Superadmin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminHouseholdTokensBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/tokens/wallets/provision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Buat / top-up dompet Token Gatekeeper universal lintas produk (tg:, email:, ws:, hh:) (Superadmin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminProvisionWalletBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/tokens/vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate kode voucher Token Gatekeeper (Superadmin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminCreateVouchersBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/admin/maintenance/cleanup-idempotency": {
@@ -4844,6 +4966,41 @@ export interface components {
             plan_tier?: "free" | "pro" | "lifetime";
             plan_expires_at?: string | null;
             entitlements_override?: components["schemas"]["AdminEntitlementsOverridePatch"];
+        };
+        AdminHouseholdTokensBody: {
+            /** @default 0 */
+            delta_tokens: number;
+            set_balance?: number | null;
+            /** @default true */
+            auto_inject_key: boolean;
+            /** @default false */
+            force_new_key: boolean;
+            /** @default kb-auto */
+            model: string;
+        };
+        AdminProvisionWalletBody: {
+            owner_id: string;
+            display_name?: string;
+            /** @default [] */
+            aliases: string[];
+            /** @default 0 */
+            delta_tokens: number;
+            set_balance?: number | null;
+            /** @default true */
+            create_key_if_missing: boolean;
+            /** @default false */
+            force_new_key: boolean;
+            /** @default Karaya Key */
+            key_name: string;
+        };
+        AdminCreateVouchersBody: {
+            tokens: number;
+            /** @default 1 */
+            count: number;
+            /** @default KB */
+            prefix: string;
+            /** @default  */
+            notes: string;
         };
         AdminCleanupIdempotencyBody: {
             /** @default 7 */

@@ -68,6 +68,16 @@ const EnvSchema = z.object({
     .optional()
     .default('fb505774-619d-4352-be75-39598e01416b')
     .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean)),
+
+  // Token Gatekeeper (separate DB on VPS, pulled/pushed via HTTP API by Superadmin Dashboard
+  // and used as AI provider for `sk-kb-*` keys):
+  GATEKEEPER_BASE_URL: z
+    .string()
+    .url()
+    .optional()
+    .default('https://9router.cortex-ai.my.id')
+    .transform((u) => u.replace(/\/+$/, '')),
+  GATEKEEPER_ADMIN_TOKEN: z.string().optional().default(''),
 })
 
 export type Env = z.infer<typeof EnvSchema>

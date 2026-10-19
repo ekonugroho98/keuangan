@@ -8437,7 +8437,11 @@ var EnvSchema = external_exports.object({
   // set env baru di Vercel, namun tetap bisa ditambah lewat SUPERADMIN_USER_IDS / SUPERADMIN_EMAILS.
   SUPERADMIN_USER_IDS: external_exports.string().optional().default("00000000-0000-0000-0000-0000000000e0").transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean)),
   SUPERADMIN_EMAILS: external_exports.string().optional().default("").transform((s) => s.split(",").map((v) => v.trim().toLowerCase()).filter(Boolean)),
-  SUPERADMIN_HOUSEHOLD_IDS: external_exports.string().optional().default("fb505774-619d-4352-be75-39598e01416b").transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean))
+  SUPERADMIN_HOUSEHOLD_IDS: external_exports.string().optional().default("fb505774-619d-4352-be75-39598e01416b").transform((s) => s.split(",").map((v) => v.trim()).filter(Boolean)),
+  // Token Gatekeeper (separate DB on VPS, pulled/pushed via HTTP API by Superadmin Dashboard
+  // and used as AI provider for `sk-kb-*` keys):
+  GATEKEEPER_BASE_URL: external_exports.string().url().optional().default("https://9router.cortex-ai.my.id").transform((u) => u.replace(/\/+$/, "")),
+  GATEKEEPER_ADMIN_TOKEN: external_exports.string().optional().default("")
 });
 function loadEnv() {
   const result = EnvSchema.safeParse(process.env);
@@ -13026,6 +13030,29 @@ var AdminUpdateHouseholdPlanBodySchema = external_exports.object({
 var AdminCleanupIdempotencyBodySchema = external_exports.object({
   older_than_days: external_exports.number().int().min(1).max(365).optional().default(7)
 }).strict().openapi("AdminCleanupIdempotencyBody");
+var AdminHouseholdTokensBodySchema = external_exports.object({
+  delta_tokens: external_exports.number().int().min(-1e8).max(1e8).optional().default(0),
+  set_balance: external_exports.number().int().min(0).max(1e8).nullable().optional(),
+  auto_inject_key: external_exports.boolean().optional().default(true),
+  force_new_key: external_exports.boolean().optional().default(false),
+  model: external_exports.string().min(1).max(60).optional().default("kb-auto")
+}).strict().openapi("AdminHouseholdTokensBody");
+var AdminProvisionWalletBodySchema = external_exports.object({
+  owner_id: external_exports.string().min(1).max(120),
+  display_name: external_exports.string().max(120).optional(),
+  aliases: external_exports.array(external_exports.string().min(1).max(120)).max(30).optional().default([]),
+  delta_tokens: external_exports.number().int().min(-1e8).max(1e8).optional().default(0),
+  set_balance: external_exports.number().int().min(0).max(1e8).nullable().optional(),
+  create_key_if_missing: external_exports.boolean().optional().default(true),
+  force_new_key: external_exports.boolean().optional().default(false),
+  key_name: external_exports.string().max(80).optional().default("Karaya Key")
+}).strict().openapi("AdminProvisionWalletBody");
+var AdminCreateVouchersBodySchema = external_exports.object({
+  tokens: external_exports.number().int().min(1e3).max(1e8),
+  count: external_exports.number().int().min(1).max(50).optional().default(1),
+  prefix: external_exports.string().min(1).max(20).optional().default("KB"),
+  notes: external_exports.string().max(120).optional().default("")
+}).strict().openapi("AdminCreateVouchersBody");
 
 // src/services/entitlements.ts
 var FEATURE_LABELS = {
@@ -13854,14 +13881,91 @@ async function requireSuperadmin(actor) {
     });
   }
 }
+async function callGatekeeperApi(path, options = {}) {
+  const token = env.GATEKEEPER_ADMIN_TOKEN.trim();
+  if (!token) {
+    throw ApiError.fromCode("validation_error", {
+      message: "GATEKEEPER_ADMIN_TOKEN belum diset di environment server."
+    });
+  }
+  const url = `${env.GATEKEEPER_BASE_URL}${path}`;
+  const res = await fetch(url, {
+    method: options.method ?? "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Token": token
+    },
+    ...options.body !== void 0 ? { body: JSON.stringify(options.body) } : {},
+    signal: AbortSignal.timeout(options.timeoutMs ?? 4500)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw ApiError.fromCode("upstream_ai_error", {
+      message: data?.error || `Token Gatekeeper merespons HTTP ${res.status}`
+    });
+  }
+  return data;
+}
+async function fetchGatekeeperOverviewSafe() {
+  const configured = env.GATEKEEPER_ADMIN_TOKEN.trim().length > 0;
+  if (!configured) {
+    return {
+      configured: false,
+      online: false,
+      base_url: env.GATEKEEPER_BASE_URL,
+      error: null,
+      summary: null,
+      wallets: [],
+      vouchers: []
+    };
+  }
+  try {
+    const data = await callGatekeeperApi("/gatekeeper/api/overview", { method: "GET", timeoutMs: 3e3 });
+    return {
+      configured: true,
+      online: true,
+      base_url: env.GATEKEEPER_BASE_URL,
+      error: null,
+      summary: data.summary ?? null,
+      wallets: data.wallets ?? [],
+      vouchers: data.vouchers ?? []
+    };
+  } catch (err) {
+    return {
+      configured: true,
+      online: false,
+      base_url: env.GATEKEEPER_BASE_URL,
+      error: err instanceof Error ? err.message : "Tidak dapat menghubungi Token Gatekeeper",
+      summary: null,
+      wallets: [],
+      vouchers: []
+    };
+  }
+}
+async function lookupGatekeeperWalletsSafe(items) {
+  if (!env.GATEKEEPER_ADMIN_TOKEN.trim() || items.length === 0) return {};
+  try {
+    const data = await callGatekeeperApi("/gatekeeper/api/wallets/lookup", {
+      method: "POST",
+      body: { items },
+      timeoutMs: 3e3
+    });
+    return data.results ?? {};
+  } catch {
+    return {};
+  }
+}
 async function getAdminOverview(actor) {
   await requireSuperadmin(actor);
-  const dbOverview = await withActor(actor, async (tx) => {
-    const [row] = await tx`
-      select public.admin_get_overview() as overview
-    `;
-    return row.overview;
-  });
+  const [dbOverview, tokenGatekeeper] = await Promise.all([
+    withActor(actor, async (tx) => {
+      const [row] = await tx`
+        select public.admin_get_overview() as overview
+      `;
+      return row.overview;
+    }),
+    fetchGatekeeperOverviewSafe()
+  ]);
   return {
     ...dbOverview,
     runtime: {
@@ -13869,7 +13973,8 @@ async function getAdminOverview(actor) {
       storage_provider: env.STORAGE_PROVIDER,
       rate_limit_per_minute: env.RATE_LIMIT_PER_MINUTE,
       rate_limit_per_day: env.RATE_LIMIT_PER_DAY
-    }
+    },
+    token_gatekeeper: tokenGatekeeper
   };
 }
 async function listAdminHouseholds(actor, query) {
@@ -13885,14 +13990,33 @@ async function listAdminHouseholds(actor, query) {
     `;
     return row.result;
   });
-  const items = (raw2.items ?? []).map((item) => ({
+  const rawItems = raw2.items ?? [];
+  const lookupItems = rawItems.map((item) => {
+    const memberEmails = (item.members ?? []).map((m) => m.email?.trim().toLowerCase()).filter((e) => Boolean(e));
+    const memberUserIds = (item.members ?? []).map((m) => `user:${m.user_id}`);
+    return {
+      key: item.id,
+      candidates: [`hh:${item.id}`, item.id, ...memberEmails, ...memberUserIds]
+    };
+  });
+  const walletsByHhId = await lookupGatekeeperWalletsSafe(lookupItems);
+  const items = rawItems.map((item) => ({
     ...item,
     features: parseHouseholdFeatures(item.features),
     plan: computeHouseholdPlanStatus({
       plan_tier: item.plan_tier,
       plan_expires_at: item.plan_expires_at,
       entitlements: item.entitlements_override
-    })
+    }),
+    ai_config_summary: item.ai_config_summary ?? {
+      configured_members: 0,
+      total_members: item.members?.length ?? 0,
+      provider: null,
+      model: null,
+      is_gatekeeper: false,
+      key_prefix: null
+    },
+    token_wallet: walletsByHhId[item.id] ?? null
   }));
   return {
     total: Number(raw2.total ?? items.length),
@@ -13950,6 +14074,92 @@ async function cleanupExpiredIdempotency(actor, olderThanDays = 7) {
   return {
     deleted_count: deletedCount,
     older_than_days: days
+  };
+}
+async function provisionHouseholdTokens(actor, householdId, body) {
+  await requireSuperadmin(actor);
+  const ctx = await withActor(actor, async (tx) => {
+    const [row] = await tx`
+      select public.admin_get_household_ai_context(${householdId}) as result
+    `;
+    return row.result;
+  });
+  const aliases = [`hh:${householdId}`, householdId, ...ctx.member_emails ?? []];
+  const needFreshKey = Boolean(
+    body.force_new_key || body.auto_inject_key && !ctx.existing_gatekeeper_key
+  );
+  const gkRes = await callGatekeeperApi("/gatekeeper/api/wallets/provision", {
+    method: "POST",
+    body: {
+      owner_id: `hh:${householdId}`,
+      display_name: ctx.name,
+      aliases,
+      delta_tokens: body.delta_tokens ?? 0,
+      set_balance: body.set_balance ?? null,
+      create_key_if_missing: true,
+      force_new_key: needFreshKey,
+      key_name: `Keluarga ${ctx.name}`,
+      reference_id: `karaya_admin:${actor.userId.slice(0, 8)}`
+    },
+    timeoutMs: 6e3
+  });
+  const keyToInject = gkRes.created_api_key || ctx.existing_gatekeeper_key || null;
+  let injected = null;
+  if (body.auto_inject_key && keyToInject) {
+    injected = await withActor(actor, async (tx) => {
+      const [row] = await tx`
+        select public.admin_set_household_ai_key(
+          ${householdId},
+          ${keyToInject},
+          ${"gatekeeper"},
+          ${body.model ?? "kb-auto"}
+        ) as result
+      `;
+      return row.result;
+    });
+  }
+  return {
+    household_id: householdId,
+    wallet: gkRes.wallet,
+    created_api_key: gkRes.created_api_key,
+    injected
+  };
+}
+async function provisionStandaloneWallet(actor, body) {
+  await requireSuperadmin(actor);
+  const gkRes = await callGatekeeperApi("/gatekeeper/api/wallets/provision", {
+    method: "POST",
+    body: {
+      owner_id: body.owner_id.trim(),
+      display_name: body.display_name?.trim() || body.owner_id.trim(),
+      aliases: body.aliases ?? [],
+      delta_tokens: body.delta_tokens ?? 0,
+      set_balance: body.set_balance ?? null,
+      create_key_if_missing: body.create_key_if_missing ?? true,
+      force_new_key: body.force_new_key ?? false,
+      key_name: body.key_name ?? "Karaya Key",
+      reference_id: `karaya_admin:${actor.userId.slice(0, 8)}`
+    },
+    timeoutMs: 6e3
+  });
+  return {
+    wallet: gkRes.wallet,
+    created_api_key: gkRes.created_api_key
+  };
+}
+async function createGatekeeperVouchers(actor, body) {
+  await requireSuperadmin(actor);
+  const gkRes = await callGatekeeperApi("/gatekeeper/api/vouchers", {
+    method: "POST",
+    body: {
+      token_amount: body.tokens,
+      count: body.count ?? 1,
+      batch_note: body.notes ?? ""
+    },
+    timeoutMs: 6e3
+  });
+  return {
+    vouchers: gkRes.vouchers ?? []
   };
 }
 
@@ -14323,21 +14533,37 @@ async function tryGetAiConfig(actor) {
     const [row] = await tx`select ai_config from user_settings where user_id = ${actor.userId}`;
     return row?.ai_config ?? {};
   });
-  if (!config.apiKey || !config.provider || config.disabled) return null;
-  return config;
+  const trimmedKey = config.apiKey?.trim();
+  if (!trimmedKey || config.disabled) return null;
+  const isGatekeeperKey = trimmedKey.startsWith("sk-kb-");
+  const provider = isGatekeeperKey ? "gatekeeper" : config.provider;
+  if (!provider) return null;
+  return {
+    ...config,
+    apiKey: trimmedKey,
+    provider,
+    model: config.model || (provider === "gatekeeper" ? "kb-auto" : void 0)
+  };
 }
 async function getAiConfig(actor) {
   const config = await tryGetAiConfig(actor);
   if (!config) throw ApiError.fromCode("ai_not_configured");
   return config;
 }
-var VISION_PROVIDERS = ["groq", "openai", "anthropic", "google"];
+var VISION_PROVIDERS = ["gatekeeper", "groq", "openai", "anthropic", "google"];
 var MAX_OUTPUT_TOKENS = 2048;
 var ANTHROPIC_MODEL = "claude-haiku-5-5";
 var GEMINI_MODEL = "gemini-3.6-flash";
 var GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 function buildVisionRequest(provider, apiKey, base64, mimeType, prompt) {
   const msgs = [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } }] }];
+  if (provider === "gatekeeper" || apiKey.startsWith("sk-kb-")) {
+    return {
+      url: `${env.GATEKEEPER_BASE_URL}/v1/chat/completions`,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: { model: "kb-vision", max_tokens: MAX_OUTPUT_TOKENS, messages: msgs }
+    };
+  }
   if (provider === "groq") {
     return { url: "https://api.groq.com/openai/v1/chat/completions", headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }, body: { model: "meta-llama/llama-4-scout-17b-16e-instruct", max_tokens: MAX_OUTPUT_TOKENS, messages: msgs } };
   }
@@ -14362,6 +14588,13 @@ function buildVisionRequest(provider, apiKey, base64, mimeType, prompt) {
 }
 function buildTextRequest(provider, apiKey, prompt, maxTokens = MAX_OUTPUT_TOKENS) {
   const msgs = [{ role: "user", content: prompt }];
+  if (provider === "gatekeeper" || apiKey.startsWith("sk-kb-")) {
+    return {
+      url: `${env.GATEKEEPER_BASE_URL}/v1/chat/completions`,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: { model: "kb-auto", max_tokens: maxTokens, messages: msgs }
+    };
+  }
   if (provider === "groq" || provider === "openai") {
     return {
       url: provider === "groq" ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions",
@@ -18959,8 +19192,12 @@ async function getAiConfig2(actor) {
     const [row] = await tx`select ai_config from user_settings where user_id = ${actor.userId}`;
     return row?.ai_config ?? {};
   });
-  if (!config.apiKey || config.disabled) throw ApiError.fromCode("ai_not_configured");
-  return config;
+  const trimmedKey = config.apiKey?.trim();
+  if (!trimmedKey || config.disabled) throw ApiError.fromCode("ai_not_configured");
+  const isGatekeeperKey = trimmedKey.startsWith("sk-kb-");
+  const provider = isGatekeeperKey ? "gatekeeper" : config.provider;
+  const model = config.model || (provider === "gatekeeper" ? "kb-auto" : "gpt-4o-mini");
+  return { ...config, apiKey: trimmedKey, provider, model };
 }
 async function getUserName(actor) {
   return withActor(actor, async (tx) => {
@@ -18969,6 +19206,7 @@ async function getUserName(actor) {
   });
 }
 var PROVIDER_BASE = {
+  gatekeeper: `${env.GATEKEEPER_BASE_URL}/v1`,
   openai: "https://api.openai.com/v1",
   groq: "https://api.groq.com/openai/v1",
   mistral: "https://api.mistral.ai/v1",
@@ -21256,7 +21494,7 @@ adminApp.openapi(
     method: "get",
     path: "/v1/admin/overview",
     tags: ["admin"],
-    summary: "Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk & DB)",
+    summary: "Ringkasan metrik Superadmin (pertumbuhan user, paket, transaksi, kuota struk, DB & Token Gatekeeper)",
     security: [{ bearerJwt: [] }],
     responses: OkAny2
   }),
@@ -21267,7 +21505,7 @@ adminApp.openapi(
     method: "get",
     path: "/v1/admin/households",
     tags: ["admin"],
-    summary: "Daftar seluruh household beserta anggota, paket, dan statistik pemakaian (Superadmin)",
+    summary: "Daftar seluruh household beserta anggota, paket, dompet token AI, dan statistik pemakaian (Superadmin)",
     security: [{ bearerJwt: [] }],
     request: { query: AdminListHouseholdsQuerySchema },
     responses: OkAny2
@@ -21291,6 +21529,52 @@ adminApp.openapi(
     const { id } = c.req.valid("param");
     return c.json(await updateAdminHouseholdPlan(c.get("actor"), id, c.req.valid("json")));
   }
+);
+adminApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/admin/households/{id}/tokens",
+    tags: ["admin"],
+    summary: "Top-up / atur kuota Token Gatekeeper household & auto-inject API key sk-kb-* ke semua anggota (Superadmin)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      params: external_exports.object({ id: UuidSchema }),
+      body: { content: { "application/json": { schema: AdminHouseholdTokensBodySchema } } }
+    },
+    responses: OkAny2
+  }),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(await provisionHouseholdTokens(c.get("actor"), id, c.req.valid("json")));
+  }
+);
+adminApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/admin/tokens/wallets/provision",
+    tags: ["admin"],
+    summary: "Buat / top-up dompet Token Gatekeeper universal lintas produk (tg:, email:, ws:, hh:) (Superadmin)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: { content: { "application/json": { schema: AdminProvisionWalletBodySchema } } }
+    },
+    responses: OkAny2
+  }),
+  async (c) => c.json(await provisionStandaloneWallet(c.get("actor"), c.req.valid("json")))
+);
+adminApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/admin/tokens/vouchers",
+    tags: ["admin"],
+    summary: "Generate kode voucher Token Gatekeeper (Superadmin)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: { content: { "application/json": { schema: AdminCreateVouchersBodySchema } } }
+    },
+    responses: OkAny2
+  }),
+  async (c) => c.json(await createGatekeeperVouchers(c.get("actor"), c.req.valid("json")))
 );
 adminApp.openapi(
   createRoute({

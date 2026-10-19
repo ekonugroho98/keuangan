@@ -46,3 +46,44 @@ export const AdminCleanupIdempotencyBodySchema = z
   .openapi('AdminCleanupIdempotencyBody')
 
 export type AdminCleanupIdempotencyBody = z.infer<typeof AdminCleanupIdempotencyBodySchema>
+
+export const AdminHouseholdTokensBodySchema = z
+  .object({
+    delta_tokens: z.number().int().min(-100_000_000).max(100_000_000).optional().default(0),
+    set_balance: z.number().int().min(0).max(100_000_000).nullable().optional(),
+    auto_inject_key: z.boolean().optional().default(true),
+    force_new_key: z.boolean().optional().default(false),
+    model: z.string().min(1).max(60).optional().default('kb-auto'),
+  })
+  .strict()
+  .openapi('AdminHouseholdTokensBody')
+
+export type AdminHouseholdTokensBody = z.infer<typeof AdminHouseholdTokensBodySchema>
+
+export const AdminProvisionWalletBodySchema = z
+  .object({
+    owner_id: z.string().min(1).max(120),
+    display_name: z.string().max(120).optional(),
+    aliases: z.array(z.string().min(1).max(120)).max(30).optional().default([]),
+    delta_tokens: z.number().int().min(-100_000_000).max(100_000_000).optional().default(0),
+    set_balance: z.number().int().min(0).max(100_000_000).nullable().optional(),
+    create_key_if_missing: z.boolean().optional().default(true),
+    force_new_key: z.boolean().optional().default(false),
+    key_name: z.string().max(80).optional().default('Karaya Key'),
+  })
+  .strict()
+  .openapi('AdminProvisionWalletBody')
+
+export type AdminProvisionWalletBody = z.infer<typeof AdminProvisionWalletBodySchema>
+
+export const AdminCreateVouchersBodySchema = z
+  .object({
+    tokens: z.number().int().min(1000).max(100_000_000),
+    count: z.number().int().min(1).max(50).optional().default(1),
+    prefix: z.string().min(1).max(20).optional().default('KB'),
+    notes: z.string().max(120).optional().default(''),
+  })
+  .strict()
+  .openapi('AdminCreateVouchersBody')
+
+export type AdminCreateVouchersBody = z.infer<typeof AdminCreateVouchersBodySchema>

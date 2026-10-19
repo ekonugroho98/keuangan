@@ -93,6 +93,21 @@ function formatRelativeTime(iso) {
   return formatDateShort(iso);
 }
 
+function formatCompactTokens(num) {
+  const n = Number(num || 0);
+  if (!Number.isFinite(n)) return "0";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    const val = (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 2);
+    return `${val} Jt`;
+  }
+  if (abs >= 1_000) {
+    const val = (n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1);
+    return `${val}rb`;
+  }
+  return n.toLocaleString("id-ID");
+}
+
 function toInputDateValue(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -113,12 +128,33 @@ export default function AdminView({ showToast }) {
   const [tierFilter, setTierFilter] = useState("all");
   const [cleaningIdem, setCleaningIdem] = useState(false);
 
-  // Modal state untuk Kelola Paket & Fitur
+  // Modal state untuk Kelola Paket, Fitur & Kuota Token AI per Household
   const [editingHh, setEditingHh] = useState(null);
   const [modalTier, setModalTier] = useState("pro");
   const [modalExpiresDate, setModalExpiresDate] = useState("");
   const [modalOverrides, setModalOverrides] = useState({});
   const [savingPlan, setSavingPlan] = useState(false);
+
+  // State Token Gatekeeper di dalam Modal Household
+  const [modalTokenDelta, setModalTokenDelta] = useState(0);
+  const [modalAutoInjectKey, setModalAutoInjectKey] = useState(true);
+  const [modalForceNewKey, setModalForceNewKey] = useState(false);
+  const [savingHhTokens, setSavingHhTokens] = useState(false);
+  const [lastProvisionedKey, setLastProvisionedKey] = useState(null);
+
+  // State Panel Dompet Lintas Produk & Voucher (Standalone Gatekeeper)
+  const [gkTab, setGkTab] = useState("wallets"); // "wallets" | "vouchers"
+  const [standaloneOwnerId, setStandaloneOwnerId] = useState("");
+  const [standaloneDisplayName, setStandaloneDisplayName] = useState("");
+  const [standaloneAliases, setStandaloneAliases] = useState("");
+  const [standaloneDeltaTokens, setStandaloneDeltaTokens] = useState(500000);
+  const [savingStandalone, setSavingStandalone] = useState(false);
+  const [standaloneCreatedKey, setStandaloneCreatedKey] = useState(null);
+
+  const [voucherTokens, setVoucherTokens] = useState(1000000);
+  const [voucherCount, setVoucherCount] = useState(1);
+  const [voucherNote, setVoucherNote] = useState("");
+  const [creatingVouchers, setCreatingVouchers] = useState(false);
 
   const overviewQuery = useQuery({
     queryKey: ["admin-overview"],
@@ -147,6 +183,7 @@ export default function AdminView({ showToast }) {
   const overview = overviewQuery.data;
   const householdsData = householdsQuery.data;
   const households = householdsData?.items ?? [];
+  const gkOverview = overview?.token_gatekeeper;
 
   const receiptQuotaStats = useMemo(() => {
     const usedKb = overview?.storage_and_db?.estimated_receipt_kb ?? 0;
@@ -160,7 +197,7 @@ export default function AdminView({ showToast }) {
   const handleRefreshAll = () => {
     overviewQuery.refetch();
     householdsQuery.refetch();
-    showToast?.("🔄 Data Superadmin diperbarui");
+    showToast?.("🔄 Data Superadmin & Token Gatekeeper diperbarui");
   };
 
   const handleCleanupIdempotency = async () => {
@@ -195,6 +232,71 @@ export default function AdminView({ showToast }) {
       }
     }
     setModalOverrides(nextOverrides);
+    setModalTokenDelta(0);
+    setModalAutoInjectKey(true);
+    setModalForceNewKey(false);
+    setLastProvisionedKey(null);
+  };
+
+  const handleProvisionHouseholdTokens = async () => {
+    if (!editingHh || savingHhTokens) return;
+    setSavingHhTokens(true);
+    try {
+      const res = await unwrap(
+        await api.POST("/v1/admin/households/{id}/tokens", {
+          params: { path: { id: editingHh.id } },
+          body: {
+            delta_tokens: Number(modalTokenDelta) || 0,
+            auto_inject_key: modalAutoInjectKey,
+            force_new_key: modalForceNewKey,
+            model: "kb-auto",
+          },
+        }),
+      );
+
+      if (res.created_api_key) {
+        setLastProvisionedKey(res.created_api_key);
+      }
+      setModalTokenDelta(0);
+      setModalForceNewKey(false);
+      setEditingHh((prev) =>
+        prev
+          ? {
+              ...prev,
+              token_wallet: res.wallet || prev.token_wallet,
+              ai_config_summary: res.injected
+                ? {
+                    ...prev.ai_config_summary,
+                    configured_members: res.injected.updated_members,
+                    provider: res.injected.provider,
+                    model: res.injected.model,
+                    is_gatekeeper: true,
+                    key_prefix: res.injected.key_prefix,
+                  }
+                : prev.ai_config_summary,
+            }
+          : prev,
+      );
+
+      const injectedMsg = res.injected
+        ? ` & Key dipasang ke ${res.injected.updated_members} anggota`
+        : "";
+      showToast?.(
+        `💎 Saldo token "${editingHh.name}": ${Number(
+          res.wallet?.token_balance ?? 0,
+        ).toLocaleString("id-ID")} token${injectedMsg}!`,
+      );
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-households"] }),
+        queryClient.invalidateQueries({ queryKey: ["me-settings"] }),
+      ]);
+    } catch (err) {
+      showToast?.(`❌ Gagal memproses token household: ${err.message}`);
+    } finally {
+      setSavingHhTokens(false);
+    }
   };
 
   const handleSavePlan = async () => {
@@ -217,17 +319,103 @@ export default function AdminView({ showToast }) {
         }),
       );
 
+      if (Number(modalTokenDelta) !== 0 || modalForceNewKey) {
+        await unwrap(
+          await api.POST("/v1/admin/households/{id}/tokens", {
+            params: { path: { id: editingHh.id } },
+            body: {
+              delta_tokens: Number(modalTokenDelta) || 0,
+              auto_inject_key: modalAutoInjectKey,
+              force_new_key: modalForceNewKey,
+              model: "kb-auto",
+            },
+          }),
+        );
+      }
+
       showToast?.(`✅ Paket & fitur "${editingHh.name}" berhasil diperbarui!`);
       setEditingHh(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-overview"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-households"] }),
         queryClient.invalidateQueries({ queryKey: ["household-current"] }),
+        queryClient.invalidateQueries({ queryKey: ["me-settings"] }),
       ]);
     } catch (err) {
       showToast?.(`❌ Gagal menyimpan paket: ${err.message}`);
     } finally {
       setSavingPlan(false);
+    }
+  };
+
+  const handleProvisionStandaloneWallet = async (e) => {
+    e?.preventDefault();
+    if (!standaloneOwnerId.trim() || savingStandalone) return;
+    setSavingStandalone(true);
+    setStandaloneCreatedKey(null);
+    try {
+      const aliasesList = standaloneAliases
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await unwrap(
+        await api.POST("/v1/admin/tokens/wallets/provision", {
+          body: {
+            owner_id: standaloneOwnerId.trim(),
+            display_name: standaloneDisplayName.trim() || standaloneOwnerId.trim(),
+            aliases: aliasesList,
+            delta_tokens: Number(standaloneDeltaTokens) || 0,
+            create_key_if_missing: true,
+            force_new_key: false,
+            key_name: standaloneDisplayName.trim() || standaloneOwnerId.trim(),
+          },
+        }),
+      );
+      if (res.created_api_key) {
+        setStandaloneCreatedKey(res.created_api_key);
+      }
+      showToast?.(
+        `💎 Dompet "${res.wallet?.owner_id}" siap! Saldo: ${Number(
+          res.wallet?.token_balance ?? 0,
+        ).toLocaleString("id-ID")} token`,
+      );
+      setStandaloneOwnerId("");
+      setStandaloneDisplayName("");
+      setStandaloneAliases("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-households"] }),
+      ]);
+    } catch (err) {
+      showToast?.(`❌ Gagal membuat/top-up dompet: ${err.message}`);
+    } finally {
+      setSavingStandalone(false);
+    }
+  };
+
+  const handleCreateVouchers = async (e) => {
+    e?.preventDefault();
+    if (creatingVouchers) return;
+    setCreatingVouchers(true);
+    try {
+      const res = await unwrap(
+        await api.POST("/v1/admin/tokens/vouchers", {
+          body: {
+            tokens: Number(voucherTokens) || 1000000,
+            count: Number(voucherCount) || 1,
+            prefix: "KB",
+            notes: voucherNote.trim(),
+          },
+        }),
+      );
+      const codes = (res.vouchers || []).map((v) => v.code).filter(Boolean);
+      showToast?.(`🎟️ ${codes.length} voucher berhasil dibuat: ${codes.join(", ")}`);
+      setVoucherNote("");
+      await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+    } catch (err) {
+      showToast?.(`❌ Gagal membuat voucher: ${err.message}`);
+    } finally {
+      setCreatingVouchers(false);
     }
   };
 
@@ -285,6 +473,23 @@ export default function AdminView({ showToast }) {
                   : "🎉 Mode Early-Adopter (Semua Fitur Terbuka)"}
               </span>
             )}
+            {gkOverview && (
+              <span
+                className={`chip ${
+                  gkOverview.online
+                    ? "chip-mint"
+                    : gkOverview.configured
+                    ? "chip-red"
+                    : "chip-ghost"
+                }`}
+              >
+                {gkOverview.online
+                  ? `💎 Gatekeeper Online (${gkOverview.summary?.total_wallets ?? 0} dompet)`
+                  : gkOverview.configured
+                  ? "🔴 Gatekeeper Offline"
+                  : "⚪ Gatekeeper Token Belum Diset"}
+              </span>
+            )}
             {overview?.runtime?.storage_provider && (
               <span className="chip chip-ghost">
                 ☁️ Storage: {overview.runtime.storage_provider.toUpperCase()}
@@ -300,7 +505,8 @@ export default function AdminView({ showToast }) {
             }}
           >
             Pantau pertumbuhan keluarga terdaftar, status langganan (`plan_tier` & add-on{" "}
-            `entitlements`), pemakaian kuota struk 1 GB, dan kesehatan database dalam satu layar.
+            `entitlements`), kuota Token AI (`sk-kb-*` lintas produk via API terpisah), dan
+            kesehatan database dalam satu layar.
           </p>
         </div>
 
@@ -321,31 +527,31 @@ export default function AdminView({ showToast }) {
         </button>
       </div>
 
-      {/* ═══ 4 KPI BENTO CARDS ═══ */}
+      {/* ═══ 5 KPI BENTO CARDS ═══ */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
-          gap: 14,
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(5, 1fr)",
+          gap: 12,
         }}
       >
         {/* KPI 1: Keluarga & Pengguna */}
-        <div className="bento" style={{ padding: 18 }}>
+        <div className="bento" style={{ padding: 16 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            👨‍👩‍👧 KELUARGA & PENGGUNA
+            👨‍👩‍👧 KELUARGA & USER
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <div className="mono" style={{ fontSize: 30, fontWeight: 800 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div className="mono" style={{ fontSize: 28, fontWeight: 800 }}>
               {overview?.households?.total ?? "—"}
             </div>
-            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>keluarga aktif</span>
+            <span style={{ fontSize: 11.5, color: "var(--color-muted)" }}>keluarga</span>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 10 }}>
             <span className="chip chip-mint">
-              +{overview?.households?.new_7d ?? 0} (7 hari)
+              +{overview?.households?.new_7d ?? 0} (7h)
             </span>
             <span className="chip chip-ghost">
-              +{overview?.households?.new_30d ?? 0} (30 hari)
+              +{overview?.households?.new_30d ?? 0} (30h)
             </span>
           </div>
           <div
@@ -353,7 +559,7 @@ export default function AdminView({ showToast }) {
               marginTop: 12,
               paddingTop: 10,
               borderTop: "1px solid var(--color-border-soft)",
-              fontSize: 12,
+              fontSize: 11.5,
               color: "var(--color-muted)",
               display: "flex",
               flexDirection: "column",
@@ -361,14 +567,14 @@ export default function AdminView({ showToast }) {
             }}
           >
             <div>
-              👤 Total anggota:{" "}
+              👤 Anggota:{" "}
               <strong style={{ color: "var(--color-text)" }}>
                 {overview?.members?.total_active ?? 0}
               </strong>{" "}
-              ({overview?.members?.unique_users ?? 0} akun unik)
+              ({overview?.members?.unique_users ?? 0} unik)
             </div>
             <div>
-              💑 Multi-member (pasangan):{" "}
+              💑 Pasangan:{" "}
               <strong style={{ color: "var(--color-text)" }}>
                 {overview?.households?.multi_member_count ?? 0} keluarga
               </strong>
@@ -377,19 +583,17 @@ export default function AdminView({ showToast }) {
         </div>
 
         {/* KPI 2: Monetisasi & Paket */}
-        <div className="bento" style={{ padding: 18 }}>
+        <div className="bento" style={{ padding: 16 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            💎 DISTRIBUSI PAKET (PLAN TIER)
+            👑 PAKET (PLAN TIER)
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <div className="mono" style={{ fontSize: 30, fontWeight: 800 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div className="mono" style={{ fontSize: 28, fontWeight: 800 }}>
               {(overview?.plans?.lifetime_total ?? 0) + (overview?.plans?.pro_active ?? 0)}
             </div>
-            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
-              keluarga Pro / Lifetime
-            </span>
+            <span style={{ fontSize: 11.5, color: "var(--color-muted)" }}>Pro / Lifetime</span>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 10 }}>
             <span
               className="chip"
               style={{
@@ -398,7 +602,7 @@ export default function AdminView({ showToast }) {
                 border: `1px solid ${TIER_BADGE.lifetime.border}`,
               }}
             >
-              👑 Lifetime: {overview?.plans?.lifetime_total ?? 0}
+              👑 {overview?.plans?.lifetime_total ?? 0}
             </span>
             <span className="chip chip-mint">
               ✨ Pro: {overview?.plans?.pro_active ?? 0}
@@ -412,7 +616,7 @@ export default function AdminView({ showToast }) {
               marginTop: 12,
               paddingTop: 10,
               borderTop: "1px solid var(--color-border-soft)",
-              fontSize: 12,
+              fontSize: 11.5,
               color: "var(--color-muted)",
               display: "flex",
               flexDirection: "column",
@@ -420,31 +624,17 @@ export default function AdminView({ showToast }) {
             }}
           >
             <div>
-              ⏰ Akan kedaluwarsa ≤7h:{" "}
-              <strong
-                style={{
-                  color:
-                    (overview?.plans?.pro_expiring_7d ?? 0) > 0
-                      ? "#D49D3F"
-                      : "var(--color-text)",
-                }}
-              >
+              ⏰ Exp ≤7h:{" "}
+              <strong style={{ color: "var(--color-text)" }}>
                 {overview?.plans?.pro_expiring_7d ?? 0}
               </strong>{" "}
               · Expired:{" "}
-              <strong
-                style={{
-                  color:
-                    (overview?.plans?.pro_expired ?? 0) > 0
-                      ? "var(--color-expense)"
-                      : "var(--color-text)",
-                }}
-              >
+              <strong style={{ color: "var(--color-text)" }}>
                 {overview?.plans?.pro_expired ?? 0}
               </strong>
             </div>
             <div>
-              🧩 Punya add-on satuan:{" "}
+              🧩 Add-on:{" "}
               <strong style={{ color: "var(--color-text)" }}>
                 {overview?.plans?.custom_entitlements_count ?? 0} keluarga
               </strong>
@@ -452,26 +642,28 @@ export default function AdminView({ showToast }) {
           </div>
         </div>
 
-        {/* KPI 3: Aktivitas & Retensi Transaksi */}
-        <div className="bento" style={{ padding: 18 }}>
+        {/* KPI 3: Token Gatekeeper AI */}
+        <div className="bento" style={{ padding: 16 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            📈 AKTIVITAS & RETENSI
+            💎 TOKEN AI (GATEKEEPER)
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <div className="mono" style={{ fontSize: 30, fontWeight: 800 }}>
-              {overview?.transactions?.total ?? "—"}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div
+              className="mono"
+              style={{ fontSize: 26, fontWeight: 800, color: "var(--color-primary)" }}
+            >
+              {gkOverview?.online
+                ? formatCompactTokens(gkOverview.summary?.total_balance_tokens ?? 0)
+                : "—"}
             </div>
-            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>total transaksi</span>
+            <span style={{ fontSize: 11.5, color: "var(--color-muted)" }}>sisa token</span>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 10 }}>
             <span className="chip chip-mint">
-              Hari ini: +{overview?.transactions?.today ?? 0}
+              Pakai: {formatCompactTokens(gkOverview?.summary?.total_used_tokens ?? 0)}
             </span>
             <span className="chip chip-ghost">
-              7 hari: +{overview?.transactions?.last_7d ?? 0}
-            </span>
-            <span className="chip chip-ghost">
-              Aktif 7d: {overview?.households?.active_7d ?? 0} klg
+              {gkOverview?.summary?.total_requests ?? 0} req
             </span>
           </div>
           <div
@@ -479,7 +671,7 @@ export default function AdminView({ showToast }) {
               marginTop: 12,
               paddingTop: 10,
               borderTop: "1px solid var(--color-border-soft)",
-              fontSize: 12,
+              fontSize: 11.5,
               color: "var(--color-muted)",
               display: "flex",
               flexDirection: "column",
@@ -487,47 +679,92 @@ export default function AdminView({ showToast }) {
             }}
           >
             <div>
-              🌐 Web/APK:{" "}
+              👛 Dompet aktif:{" "}
               <strong style={{ color: "var(--color-text)" }}>
-                {overview?.transactions?.by_source?.web ?? 0}
+                {gkOverview?.summary?.active_wallets ?? 0}
               </strong>{" "}
-              · 🤖 Bot/CLI:{" "}
-              <strong style={{ color: "var(--color-primary)" }}>
-                {overview?.transactions?.by_source?.api_key ?? 0}
+              · Key:{" "}
+              <strong style={{ color: "var(--color-text)" }}>
+                {gkOverview?.summary?.active_keys ?? 0}
               </strong>
             </div>
             <div>
-              🔄 Rutin:{" "}
+              🎟️ Voucher siap klaim:{" "}
               <strong style={{ color: "var(--color-text)" }}>
-                {overview?.transactions?.by_source?.recurring ?? 0}
-              </strong>{" "}
-              · 30 hari terakhir:{" "}
-              <strong style={{ color: "var(--color-text)" }}>
-                {overview?.transactions?.last_30d ?? 0}
+                {gkOverview?.summary?.unclaimed_vouchers ?? 0} kode
               </strong>
             </div>
           </div>
         </div>
 
-        {/* KPI 4: Kuota Struk Cloud & DB */}
-        <div className="bento" style={{ padding: 18 }}>
+        {/* KPI 4: Aktivitas & Retensi Transaksi */}
+        <div className="bento" style={{ padding: 16 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            🧾 KUOTA STRUK & BARIS DB
+            📈 AKTIVITAS TRANSAKSI
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <div className="mono" style={{ fontSize: 26, fontWeight: 800 }}>
+            <div className="mono" style={{ fontSize: 28, fontWeight: 800 }}>
+              {overview?.transactions?.total ?? "—"}
+            </div>
+            <span style={{ fontSize: 11.5, color: "var(--color-muted)" }}>transaksi</span>
+          </div>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 10 }}>
+            <span className="chip chip-mint">
+              Hari ini: +{overview?.transactions?.today ?? 0}
+            </span>
+            <span className="chip chip-ghost">
+              7h: +{overview?.transactions?.last_7d ?? 0}
+            </span>
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: "1px solid var(--color-border-soft)",
+              fontSize: 11.5,
+              color: "var(--color-muted)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <div>
+              🌐 Web:{" "}
+              <strong style={{ color: "var(--color-text)" }}>
+                {overview?.transactions?.by_source?.web ?? 0}
+              </strong>{" "}
+              · 🤖 Bot:{" "}
+              <strong style={{ color: "var(--color-primary)" }}>
+                {overview?.transactions?.by_source?.api_key ?? 0}
+              </strong>
+            </div>
+            <div>
+              🔥 Keluarga aktif 7h:{" "}
+              <strong style={{ color: "var(--color-text)" }}>
+                {overview?.households?.active_7d ?? 0} klg
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 5: Kuota Struk Cloud & DB */}
+        <div className="bento" style={{ padding: 16 }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
+            🧾 STRUK & BARIS DB
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div className="mono" style={{ fontSize: 25, fontWeight: 800 }}>
               {overview?.storage_and_db?.receipt_count ?? 0}
             </div>
-            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
-              foto struk (~{receiptQuotaStats.usedMb} MB / {receiptQuotaStats.limitMb} MB)
+            <span style={{ fontSize: 11, color: "var(--color-muted)" }}>
+              struk (~{receiptQuotaStats.usedMb}/{receiptQuotaStats.limitMb}MB)
             </span>
           </div>
 
-          {/* Progress Bar Kuota 1 GB */}
           <div
             style={{
               width: "100%",
-              height: 7,
+              height: 6,
               borderRadius: 99,
               background: "var(--color-border-soft)",
               overflow: "hidden",
@@ -549,12 +786,12 @@ export default function AdminView({ showToast }) {
 
           <div
             style={{
-              marginTop: 10,
-              fontSize: 11.5,
+              marginTop: 9,
+              fontSize: 11,
               color: "var(--color-muted)",
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: "3px 8px",
+              gap: "2px 6px",
             }}
           >
             <div>
@@ -569,32 +806,20 @@ export default function AdminView({ showToast }) {
                 {overview?.storage_and_db?.table_rows?.product_knowledge ?? 0}
               </strong>
             </div>
-            <div>
-              API Key:{" "}
-              <strong style={{ color: "var(--color-text)" }}>
-                {overview?.storage_and_db?.table_rows?.api_keys_active ?? 0}
-              </strong>
-            </div>
-            <div>
-              Idem Keys:{" "}
-              <strong style={{ color: "var(--color-text)" }}>
-                {overview?.storage_and_db?.table_rows?.idempotency_keys ?? 0}
-              </strong>
-            </div>
           </div>
 
           <button
             onClick={handleCleanupIdempotency}
             disabled={cleaningIdem}
             style={{
-              marginTop: 10,
+              marginTop: 8,
               width: "100%",
-              padding: "7px 10px",
-              borderRadius: 9,
+              padding: "6px 8px",
+              borderRadius: 8,
               border: "1px solid var(--color-border)",
               background: "var(--bg-surface-low)",
               color: "var(--color-text)",
-              fontSize: 11.5,
+              fontSize: 11,
               fontWeight: 700,
               cursor: cleaningIdem ? "not-allowed" : "pointer",
               fontFamily: "inherit",
@@ -602,7 +827,7 @@ export default function AdminView({ showToast }) {
           >
             {cleaningIdem
               ? "Membersihkan..."
-              : `🧹 Bersihkan Idempotency (${overview?.storage_and_db?.table_rows?.expired_idempotency_keys ?? 0} exp)`}
+              : `🧹 Cleanup Idem (${overview?.storage_and_db?.table_rows?.expired_idempotency_keys ?? 0})`}
           </button>
         </div>
       </div>
@@ -624,8 +849,8 @@ export default function AdminView({ showToast }) {
               Daftar Keluarga Terdaftar ({householdsData?.total ?? households.length})
             </h3>
             <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "3px 0 0" }}>
-              Klik <strong>Kelola Paket & Fitur</strong> untuk mengubah tier (`free` / `pro` /{" "}
-              `lifetime`), masa aktif, atau membuka add-on fitur satuan.
+              Klik <strong>Kelola Paket & Token AI</strong> untuk mengubah tier, masa aktif,
+              top-up kuota Token AI, atau auto-pasang key <code>sk-kb-*</code> ke semua anggota.
             </p>
           </div>
 
@@ -708,6 +933,8 @@ export default function AdminView({ showToast }) {
                 hh.plan_tier === "pro" &&
                 hh.plan?.effective_tier === "free" &&
                 hh.plan_expires_at;
+              const wallet = hh.token_wallet;
+              const aiCfg = hh.ai_config_summary;
 
               return (
                 <div
@@ -759,6 +986,31 @@ export default function AdminView({ showToast }) {
                           s.d. {formatDateShort(hh.plan_expires_at)}
                         </span>
                       )}
+
+                      {/* Badge Status AI Keluarga */}
+                      {aiCfg?.is_gatekeeper ? (
+                        <span
+                          className="chip chip-mint"
+                          style={{ padding: "2px 9px", fontSize: 10.5 }}
+                          title={`Key ${aiCfg.key_prefix || "sk-kb-*"} aktif di ${aiCfg.configured_members}/${aiCfg.total_members} anggota`}
+                        >
+                          💎 AI Gatekeeper ({aiCfg.configured_members}/{aiCfg.total_members})
+                        </span>
+                      ) : aiCfg?.configured_members > 0 ? (
+                        <span
+                          className="chip chip-ghost"
+                          style={{ padding: "2px 9px", fontSize: 10.5 }}
+                        >
+                          ⚡ BYOK {(aiCfg.provider || "AI").toUpperCase()} ({aiCfg.configured_members}/{aiCfg.total_members})
+                        </span>
+                      ) : (
+                        <span
+                          className="chip chip-ghost"
+                          style={{ padding: "2px 8px", fontSize: 10, opacity: 0.75 }}
+                        >
+                          ⚪ AI Belum Diset
+                        </span>
+                      )}
                     </div>
 
                     <div
@@ -784,6 +1036,11 @@ export default function AdminView({ showToast }) {
                       </span>
                       <span>📅 Daftar: {formatDateShort(hh.created_at)}</span>
                       <span>⏱️ Aktif: {formatRelativeTime(hh.stats?.last_tx_at)}</span>
+                      {wallet && (
+                        <span className="mono" style={{ color: "var(--color-primary)" }}>
+                          👛 Wallet: {wallet.owner_id}
+                        </span>
+                      )}
                     </div>
 
                     {/* Daftar Anggota */}
@@ -826,6 +1083,14 @@ export default function AdminView({ showToast }) {
                               · {m.email}
                             </span>
                           )}
+                          {m.has_ai_key && (
+                            <span
+                              title={`AI aktif (${m.ai_provider || "configured"})`}
+                              style={{ fontSize: 10 }}
+                            >
+                              {m.ai_provider === "gatekeeper" ? "💎" : "⚡"}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -846,17 +1111,45 @@ export default function AdminView({ showToast }) {
                     )}
                   </div>
 
-                  {/* Kolom Tengah: Statistik Pemakaian */}
+                  {/* Kolom Tengah: Statistik Pemakaian + Sisa Token AI */}
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(4, minmax(68px, 1fr))",
+                      gridTemplateColumns: isMobile
+                        ? "repeat(3, minmax(70px, 1fr))"
+                        : "repeat(5, minmax(72px, 1fr))",
                       gap: 8,
                       padding: isMobile ? "10px 0 0" : "0 12px",
                       borderTop: isMobile ? "1px solid var(--color-border-soft)" : "none",
                       borderLeft: isMobile ? "none" : "1px solid var(--color-border-soft)",
                     }}
                   >
+                    <div>
+                      <div style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 700 }}>
+                        SISA TOKEN AI
+                      </div>
+                      <div
+                        className="mono"
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 800,
+                          marginTop: 2,
+                          color: wallet
+                            ? wallet.token_balance > 0
+                              ? "var(--color-primary)"
+                              : "var(--color-expense)"
+                            : "var(--color-muted)",
+                        }}
+                      >
+                        {wallet ? formatCompactTokens(wallet.token_balance) : "—"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--color-muted)" }}>
+                        {wallet
+                          ? `Pakai: ${formatCompactTokens(wallet.lifetime_tokens_used)}`
+                          : "Belum ada"}
+                      </div>
+                    </div>
+
                     <div>
                       <div style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 700 }}>
                         TOTAL TX
@@ -895,7 +1188,7 @@ export default function AdminView({ showToast }) {
 
                     <div>
                       <div style={{ fontSize: 10, color: "var(--color-subtle)", fontWeight: 700 }}>
-                        API KEY
+                        API KEY BOT
                       </div>
                       <div className="mono" style={{ fontSize: 15, fontWeight: 800, marginTop: 2 }}>
                         {hh.stats?.active_api_keys ?? 0}
@@ -926,7 +1219,7 @@ export default function AdminView({ showToast }) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      ⚙️ Kelola Paket & Fitur
+                      ⚙️ Kelola Paket & Token AI
                     </button>
                   </div>
                 </div>
@@ -936,10 +1229,439 @@ export default function AdminView({ showToast }) {
         )}
       </div>
 
-      {/* ═══ MODAL KELOLA PAKET & FITUR (PER HOUSEHOLD) ═══ */}
+      {/* ═══ DOMPET TOKEN LINTAS PRODUK & GENERATOR VOUCHER (GATEKEEPER) ═══ */}
+      <div className="bento" style={{ padding: isMobile ? 14 : 20 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ fontSize: 17, margin: 0 }}>
+                💎 Token Gatekeeper — Dompet Lintas Produk & Voucher
+              </h3>
+              <span className="chip chip-ghost" style={{ fontSize: 10.5 }}>
+                DB Terpisah via API ({gkOverview?.base_url || "9router.cortex-ai.my.id"})
+              </span>
+            </div>
+            <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "3px 0 0" }}>
+              Kelola dompet token AI bukan hanya untuk <code>hh:&lt;uuid&gt;</code>, tapi juga user{" "}
+              <code>tg:&lt;id&gt;</code>, <code>email:&lt;user&gt;</code>, atau{" "}
+              <code>ws:&lt;slot&gt;</code> beserta kode voucher top-up.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              {
+                id: "wallets",
+                label: `👛 Semua Dompet (${gkOverview?.wallets?.length ?? 0})`,
+              },
+              {
+                id: "vouchers",
+                label: `🎟️ Voucher Token (${gkOverview?.vouchers?.length ?? 0})`,
+              },
+            ].map((t) => {
+              const active = gkTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setGkTab(t.id)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    border: `1px solid ${
+                      active ? "var(--color-primary)" : "var(--color-border-soft)"
+                    }`,
+                    background: active ? "var(--color-primary-soft)" : "transparent",
+                    color: active ? "var(--color-primary)" : "var(--color-muted)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {gkTab === "wallets" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Form Provision Dompet Lintas Produk */}
+            <form
+              onSubmit={handleProvisionStandaloneWallet}
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                background: "var(--bg-surface-low)",
+                border: "1px solid var(--color-border-soft)",
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1.2fr 1fr 1.2fr 0.9fr auto",
+                gap: 10,
+                alignItems: "end",
+              }}
+            >
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  OWNER ID (BEBAS LINTAS PRODUK)
+                </label>
+                <input
+                  type="text"
+                  value={standaloneOwnerId}
+                  onChange={(e) => setStandaloneOwnerId(e.target.value)}
+                  placeholder="mis. tg:628123 / email:user@x.com / ws:002"
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  NAMA TAMPILAN
+                </label>
+                <input
+                  type="text"
+                  value={standaloneDisplayName}
+                  onChange={(e) => setStandaloneDisplayName(e.target.value)}
+                  placeholder="mis. Bot Telegram Budi"
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  ALIAS TAMBAHAN (PISAH KOMA)
+                </label>
+                <input
+                  type="text"
+                  value={standaloneAliases}
+                  onChange={(e) => setStandaloneAliases(e.target.value)}
+                  placeholder="budi@gmail.com, tg:998877"
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  TAMBAH TOKEN (+/-)
+                </label>
+                <input
+                  type="number"
+                  step="50000"
+                  value={standaloneDeltaTokens}
+                  onChange={(e) => setStandaloneDeltaTokens(Number(e.target.value))}
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingStandalone || !standaloneOwnerId.trim()}
+                className="btn-primary"
+                style={{ padding: "9px 16px", fontSize: 12.5, whiteSpace: "nowrap" }}
+              >
+                {savingStandalone ? "Memproses..." : "➕ Buat / Top-Up"}
+              </button>
+            </form>
+
+            {standaloneCreatedKey && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "var(--color-primary-soft)",
+                  border: "1px solid var(--color-border-strong)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ fontSize: 12 }}>
+                  🔑 <strong>API Key Baru Dibuat:</strong>{" "}
+                  <code className="mono">{standaloneCreatedKey}</code>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(standaloneCreatedKey);
+                    showToast?.("📋 API Key sk-kb-* disalin ke clipboard!");
+                  }}
+                  className="btn-ghost"
+                  style={{ padding: "5px 12px", fontSize: 11.5 }}
+                >
+                  📋 Salin Key
+                </button>
+              </div>
+            )}
+
+            {/* Daftar Dompet di Gatekeeper */}
+            {(gkOverview?.wallets || []).length === 0 ? (
+              <div style={{ padding: 18, textAlign: "center", color: "var(--color-muted)", fontSize: 12.5 }}>
+                {gkOverview?.online
+                  ? "Belum ada dompet token terdaftar di Gatekeeper."
+                  : "Token Gatekeeper belum terhubung (pastikan GATEKEEPER_ADMIN_TOKEN aktif)."}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)",
+                  gap: 10,
+                }}
+              >
+                {(gkOverview?.wallets || []).map((w) => (
+                  <div
+                    key={w.owner_id}
+                    style={{
+                      padding: 12,
+                      borderRadius: 11,
+                      background: "var(--bg-surface-low)",
+                      border: "1px solid var(--color-border-soft)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: 13.5 }}>{w.display_name || w.owner_id}</strong>
+                        <span className="mono chip chip-ghost" style={{ fontSize: 10, padding: "2px 7px" }}>
+                          {w.owner_id}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10.5,
+                          color: "var(--color-muted)",
+                          marginTop: 4,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        🔗 Alias: {(w.aliases || []).slice(0, 4).join(", ")}
+                        {(w.aliases || []).length > 4 ? ` +${w.aliases.length - 4}` : ""}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div
+                        className="mono"
+                        style={{ fontSize: 15, fontWeight: 800, color: "var(--color-primary)" }}
+                      >
+                        {formatCompactTokens(w.token_balance)}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: "var(--color-muted)" }}>
+                        Pakai: {formatCompactTokens(w.lifetime_tokens_used)} ({w.lifetime_requests} req)
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Form Buat Voucher */}
+            <form
+              onSubmit={handleCreateVouchers}
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                background: "var(--bg-surface-low)",
+                border: "1px solid var(--color-border-soft)",
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 0.7fr 1.4fr auto",
+                gap: 10,
+                alignItems: "end",
+              }}
+            >
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  NOMINAL TOKEN PER VOUCHER
+                </label>
+                <select
+                  value={voucherTokens}
+                  onChange={(e) => setVoucherTokens(Number(e.target.value))}
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                >
+                  <option value={250000}>250.000 Token (Starter)</option>
+                  <option value={500000}>500.000 Token (Keluarga Hemat)</option>
+                  <option value={1000000}>1.000.000 Token (1 Juta - Standar)</option>
+                  <option value={2500000}>2.500.000 Token (2,5 Juta - Pro)</option>
+                  <option value={5000000}>5.000.000 Token (5 Juta - Sultan)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  JUMLAH KODE
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={voucherCount}
+                  onChange={(e) => setVoucherCount(Number(e.target.value))}
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-muted)" }}>
+                  CATATAN BATCH (OPSIONAL)
+                </label>
+                <input
+                  type="text"
+                  value={voucherNote}
+                  onChange={(e) => setVoucherNote(e.target.value)}
+                  placeholder="mis. Pembeli Lynk.id Batch Oktober"
+                  style={{
+                    width: "100%",
+                    marginTop: 4,
+                    padding: "8px 11px",
+                    borderRadius: 9,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 12.5,
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={creatingVouchers}
+                className="btn-primary"
+                style={{ padding: "9px 16px", fontSize: 12.5, whiteSpace: "nowrap" }}
+              >
+                {creatingVouchers ? "Membuat..." : "🎟️ Generate Voucher"}
+              </button>
+            </form>
+
+            {/* Daftar Voucher */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                gap: 8,
+              }}
+            >
+              {(gkOverview?.vouchers || []).slice(0, 18).map((v) => (
+                <div
+                  key={v.code}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    background: "var(--bg-surface-low)",
+                    border: "1px solid var(--color-border-soft)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <div>
+                    <div
+                      className="mono"
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 800,
+                        color: v.is_claimed ? "var(--color-muted)" : "var(--color-primary)",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(v.code);
+                        showToast?.(`📋 Kode voucher disalin: ${v.code}`);
+                      }}
+                    >
+                      {v.code}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "var(--color-muted)" }}>
+                      {formatCompactTokens(v.token_amount ?? v.tokens ?? 0)} token ·{" "}
+                      {v.is_claimed ? `Diklaim (${v.claimed_by})` : "Belum diklaim"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(v.code);
+                      showToast?.(`📋 Kode voucher disalin: ${v.code}`);
+                    }}
+                    className="btn-ghost"
+                    style={{ padding: "4px 9px", fontSize: 11 }}
+                  >
+                    📋
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ MODAL KELOLA PAKET, FITUR & TOKEN AI (PER HOUSEHOLD) ═══ */}
       {editingHh && (
         <div
-          onClick={() => !savingPlan && setEditingHh(null)}
+          onClick={() => !savingPlan && !savingHhTokens && setEditingHh(null)}
           style={{
             position: "fixed",
             inset: 0,
@@ -957,7 +1679,7 @@ export default function AdminView({ showToast }) {
             className="bento"
             style={{
               width: "100%",
-              maxWidth: 620,
+              maxWidth: 650,
               maxHeight: "90vh",
               overflowY: "auto",
               padding: isMobile ? 18 : 24,
@@ -974,7 +1696,7 @@ export default function AdminView({ showToast }) {
               }}
             >
               <div>
-                <div className="eyebrow">KELOLA PAKET & ENTITLEMENT KELUARGA</div>
+                <div className="eyebrow">KELOLA PAKET, ENTITLEMENT & TOKEN AI KELUARGA</div>
                 <h3 style={{ fontSize: 19, margin: "4px 0 0" }}>{editingHh.name}</h3>
               </div>
               <button
@@ -1101,10 +1823,186 @@ export default function AdminView({ showToast }) {
               </div>
             )}
 
-            {/* 3. Override Add-on Satuan per Fitur */}
+            {/* 3. Kuota Token AI Keluarga & Auto-Inject Key (Zero-Setup) */}
+            <div
+              style={{
+                marginBottom: 18,
+                padding: 14,
+                borderRadius: 12,
+                background: "var(--bg-surface-low)",
+                border: "1px solid var(--color-border-strong)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: "var(--color-primary)" }}>
+                  💎 KUOTA TOKEN AI KELUARGA & ZERO-SETUP KEY (SK-KB-*)
+                </div>
+                <div className="mono" style={{ fontSize: 12.5, fontWeight: 800 }}>
+                  Saldo:{" "}
+                  <span style={{ color: "var(--color-primary)" }}>
+                    {Number(editingHh.token_wallet?.token_balance ?? 0).toLocaleString("id-ID")}
+                  </span>{" "}
+                  token · Terpakai:{" "}
+                  {Number(editingHh.token_wallet?.lifetime_tokens_used ?? 0).toLocaleString("id-ID")}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11.5, color: "var(--color-muted)", marginBottom: 10 }}>
+                Dompet otomatis ditautkan ke <code>hh:{editingHh.id.slice(0, 8)}…</code> dan seluruh
+                email anggota keluarga ini. Saat <strong>Auto-pasang API Key</strong> dicentang,
+                suami & istri langsung bisa pakai Scan Struk & Chat AI tanpa perlu setting API Key!
+              </div>
+
+              {/* Tombol Preset Top-Up */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                {[
+                  { label: "0 (Hanya Sync Key)", val: 0 },
+                  { label: "+100rb Token", val: 100000 },
+                  { label: "+500rb Token", val: 500000 },
+                  { label: "+1 Juta Token", val: 1000000 },
+                  { label: "+5 Juta Token", val: 5000000 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => setModalTokenDelta(preset.val)}
+                    style={{
+                      padding: "6px 11px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      background:
+                        Number(modalTokenDelta) === preset.val
+                          ? "var(--color-primary-soft)"
+                          : "var(--bg-surface)",
+                      color:
+                        Number(modalTokenDelta) === preset.val
+                          ? "var(--color-primary)"
+                          : "var(--color-text)",
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: isMobile ? "column" : "row",
+                  alignItems: isMobile ? "stretch" : "center",
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="number"
+                    step="50000"
+                    value={modalTokenDelta}
+                    onChange={(e) => setModalTokenDelta(Number(e.target.value))}
+                    placeholder="Nominal tambah/kurang token (mis. 500000)"
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: 9,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--bg-surface)",
+                      color: "var(--color-text)",
+                      fontSize: 13,
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleProvisionHouseholdTokens}
+                  disabled={savingHhTokens}
+                  className="btn-primary"
+                  style={{ padding: "9px 16px", fontSize: 12.5, whiteSpace: "nowrap" }}
+                >
+                  {savingHhTokens
+                    ? "Memproses..."
+                    : Number(modalTokenDelta) !== 0
+                    ? `💎 Top-Up ${
+                        modalTokenDelta > 0 ? `+${formatCompactTokens(modalTokenDelta)}` : formatCompactTokens(modalTokenDelta)
+                      } & Pasang Key`
+                    : "⚡ Sinkronkan Dompet & Pasang Key AI"}
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={modalAutoInjectKey}
+                    onChange={(e) => setModalAutoInjectKey(e.target.checked)}
+                  />
+                  <span>
+                    <strong>Auto-pasang API Key <code>sk-kb-*</code></strong> ke seluruh anggota
+                    keluarga ini ({editingHh.members?.length ?? 0} orang)
+                  </span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={modalForceNewKey}
+                    onChange={(e) => setModalForceNewKey(e.target.checked)}
+                  />
+                  <span style={{ color: "var(--color-muted)" }}>
+                    Generate kunci <code>sk-kb-*</code> baru (rotasi/tambah kunci baru di Gatekeeper)
+                  </span>
+                </label>
+              </div>
+
+              {lastProvisionedKey && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: "9px 12px",
+                    borderRadius: 9,
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--color-border-strong)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span className="mono" style={{ fontSize: 11.5 }}>
+                    🔑 {lastProvisionedKey}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(lastProvisionedKey);
+                      showToast?.("📋 API Key sk-kb-* disalin!");
+                    }}
+                    className="btn-ghost"
+                    style={{ padding: "4px 10px", fontSize: 11 }}
+                  >
+                    📋 Salin
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Override Add-on Satuan per Fitur */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--color-muted)", marginBottom: 4 }}>
-                3. OVERRIDE FITUR SATUAN / ADD-ON (ENTITLEMENTS JSONB)
+                4. OVERRIDE FITUR SATUAN / ADD-ON (ENTITLEMENTS JSONB)
               </div>
               <div style={{ fontSize: 11.5, color: "var(--color-subtle)", marginBottom: 10 }}>
                 Pilih <strong>Ikut Paket</strong> untuk mengikuti status tier di atas, atau{" "}
@@ -1187,16 +2085,16 @@ export default function AdminView({ showToast }) {
               <button
                 type="button"
                 onClick={() => setEditingHh(null)}
-                disabled={savingPlan}
+                disabled={savingPlan || savingHhTokens}
                 className="btn-ghost"
                 style={{ padding: "10px 18px" }}
               >
-                Batal
+                Tutup
               </button>
               <button
                 type="button"
                 onClick={handleSavePlan}
-                disabled={savingPlan}
+                disabled={savingPlan || savingHhTokens}
                 className="btn-primary"
                 style={{ padding: "10px 22px", fontSize: 13.5 }}
               >

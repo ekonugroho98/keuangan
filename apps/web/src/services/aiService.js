@@ -4,6 +4,18 @@
 // This file only exports provider/model definitions for the Settings UI.
 
 export const AI_PROVIDERS = {
+  gatekeeper: {
+    label: "Keluarga Berkembang Token (Gatekeeper)", icon: "\u{1F48E}", badge: "RESMI",
+    models: [
+      { id: "kb-auto",    label: "KB Auto (Smart Failover)", note: "Rekomendasi" },
+      { id: "kb-fast",    label: "KB Fast",                  note: "Cepat & hemat" },
+      { id: "kb-vision",  label: "KB Vision (Scan Struk)",   note: "Multimodal" },
+      { id: "kb-premium", label: "KB Premium (Reasoning)",   note: "Analisa mendalam" },
+    ],
+    docsUrl: "https://9router.cortex-ai.my.id/gatekeeper", docsLabel: "Token Gatekeeper",
+    keyHint: "sk-kb-...", supportsTools: true,
+    baseUrl: "https://9router.cortex-ai.my.id/v1",
+  },
   openai: {
     label: "OpenAI", icon: "\u{1F916}", badge: "",
     models: [
@@ -92,15 +104,16 @@ export const AI_PROVIDERS = {
   },
 };
 
-export const PROVIDER_ORDER = ["groq", "deepseek", "openai", "anthropic", "google", "mistral", "xai", "kimi"];
+export const PROVIDER_ORDER = ["gatekeeper", "groq", "deepseek", "openai", "anthropic", "google", "mistral", "xai", "kimi"];
 
 export const DEFAULT_MODEL = {
-  openai:    "gpt-4o-mini",
-  anthropic: "claude-sonnet-4-5",
-  google:    "gemini-1.5-flash",
-  groq:      "llama-3.3-70b-versatile",
-  mistral:   "mistral-small-latest",
-  xai:       "grok-3-fast",
-  deepseek:  "deepseek-chat",
-  kimi:      "moonshot-v1-32k",
+  gatekeeper: "kb-auto",
+  openai:     "gpt-4o-mini",
+  anthropic:  "claude-sonnet-4-5",
+  google:     "gemini-1.5-flash",
+  groq:       "llama-3.3-70b-versatile",
+  mistral:    "mistral-small-latest",
+  xai:        "grok-3-fast",
+  deepseek:   "deepseek-chat",
+  kimi:       "moonshot-v1-32k",
 };

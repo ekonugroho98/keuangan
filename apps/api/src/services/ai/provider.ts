@@ -1,9 +1,10 @@
 import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../../auth/actor'
 import { withUserClaims } from '../../db/tx'
+import { env } from '../../env'
 
 /**
- * Akses provider AI BYOK (API key milik user di user_settings.ai_config) — dipakai scan-receipt.ts
+ * Akses provider AI BYOK / Token Gatekeeper (API key di user_settings.ai_config) — dipakai scan-receipt.ts
  * (vision/teks) dan web-lookup.ts (identifikasi produk). Satu tempat untuk URL/model per provider.
  */
 export interface AiConfig {
@@ -18,8 +19,17 @@ export async function tryGetAiConfig(actor: Actor): Promise<AiConfig | null> {
     const [row] = await tx<{ ai_config: AiConfig }[]>`select ai_config from user_settings where user_id = ${actor.userId}`
     return row?.ai_config ?? {}
   })
-  if (!config.apiKey || !config.provider || config.disabled) return null
-  return config
+  const trimmedKey = config.apiKey?.trim()
+  if (!trimmedKey || config.disabled) return null
+  const isGatekeeperKey = trimmedKey.startsWith('sk-kb-')
+  const provider = isGatekeeperKey ? 'gatekeeper' : config.provider
+  if (!provider) return null
+  return {
+    ...config,
+    apiKey: trimmedKey,
+    provider,
+    model: config.model || (provider === 'gatekeeper' ? 'kb-auto' : undefined),
+  }
 }
 
 export async function getAiConfig(actor: Actor): Promise<AiConfig> {
@@ -29,7 +39,7 @@ export async function getAiConfig(actor: Actor): Promise<AiConfig> {
 }
 
 // Provider yang mendukung vision (baca gambar) di endpoint chat/completions-nya.
-export const VISION_PROVIDERS = ['groq', 'openai', 'anthropic', 'google']
+export const VISION_PROVIDERS = ['gatekeeper', 'groq', 'openai', 'anthropic', 'google']
 
 // Struk panjang (30+ item) bisa melewati 1000 token keluaran dan JSON-nya terpotong di tengah.
 export const MAX_OUTPUT_TOKENS = 2048
@@ -42,6 +52,13 @@ export interface ProviderRequest { url: string; headers: Record<string, string>;
 
 export function buildVisionRequest(provider: string, apiKey: string, base64: string, mimeType: string, prompt: string): ProviderRequest {
   const msgs = [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }] }]
+  if (provider === 'gatekeeper' || apiKey.startsWith('sk-kb-')) {
+    return {
+      url: `${env.GATEKEEPER_BASE_URL}/v1/chat/completions`,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: { model: 'kb-vision', max_tokens: MAX_OUTPUT_TOKENS, messages: msgs },
+    }
+  }
   if (provider === 'groq') {
     return { url: 'https://api.groq.com/openai/v1/chat/completions', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: { model: 'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens: MAX_OUTPUT_TOKENS, messages: msgs } }
   }
@@ -67,6 +84,13 @@ export function buildVisionRequest(provider: string, apiKey: string, base64: str
 
 export function buildTextRequest(provider: string, apiKey: string, prompt: string, maxTokens = MAX_OUTPUT_TOKENS): ProviderRequest {
   const msgs = [{ role: 'user', content: prompt }]
+  if (provider === 'gatekeeper' || apiKey.startsWith('sk-kb-')) {
+    return {
+      url: `${env.GATEKEEPER_BASE_URL}/v1/chat/completions`,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: { model: 'kb-auto', max_tokens: maxTokens, messages: msgs },
+    }
+  }
   if (provider === 'groq' || provider === 'openai') {
     return {
       url: provider === 'groq' ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions',
