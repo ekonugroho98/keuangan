@@ -125,6 +125,9 @@ export const CreateTransferBodySchema = z
     note: z.string().max(500).optional(),
     recorded_by_id: UuidSchema.optional(),
     recorded_by: z.string().max(80).optional().openapi({ description: 'Nama/alias anggota keluarga yang mencatat transfer ini.' }),
+    receipt_url: z.string().url().max(1000).optional().openapi({ description: 'URL foto bukti transfer (opsional).' }),
+    receipt_image_base64: z.string().optional().openapi({ description: 'Opsional: base64 foto bukti transfer untuk langsung diunggah.' }),
+    receipt_mime_type: z.string().optional(),
   })
   .openapi('CreateTransferBody')
 

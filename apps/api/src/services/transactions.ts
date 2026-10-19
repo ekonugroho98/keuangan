@@ -322,7 +322,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name])
   }
-  const receiptUrl = await resolveReceiptUrl(actor.householdId, input)
+  const receiptUrl = await resolveReceiptUrl(actor, input)
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
@@ -382,7 +382,7 @@ export async function createTransactionBatch(
   const parsedNotes = input.items.map((i) => (i.note ? parseReceiptNote(i.note) : null))
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p!.name)
   if (priceNames.length) await canonicalizeProducts(actor, priceNames)
-  const receiptUrl = await resolveReceiptUrl(actor.householdId, input)
+  const receiptUrl = await resolveReceiptUrl(actor, input)
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const accountId = await resolveAccountRef(tx, actor, input, 'account', explicitRecorderId)
@@ -490,7 +490,7 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name])
   }
-  const receiptUrl = await resolveReceiptUrl(actor.householdId, input)
+  const receiptUrl = await resolveReceiptUrl(actor, input)
   return withActor(actor, async (tx) => {
     const newRecorderId = await resolveExplicitRecorder(tx, actor, input)
     const patch: Record<string, unknown> = {}

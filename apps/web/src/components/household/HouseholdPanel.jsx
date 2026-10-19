@@ -288,6 +288,7 @@ export default function HouseholdPanel({ onBack, showToast }) {
             {tab === "fitur" && (
                 <FeaturesTab
                     features={household?.features}
+                    plan={household?.plan}
                     isOwner={isOwner}
                     busy={featureBusy}
                     onPatch={patchFeature}
@@ -396,9 +397,11 @@ const BENEFICIARY_KINDS = [
  * mengikuti pola HouseholdPanel/ApiKeysPanel yang sudah ada (i18n 6 bahasa untuk UI household/fitur
  * baru dicatat sebagai utang teknis di PROGRESS.md, bukan konvensi baru yang disengaja di sini).
  */
-function FeaturesTab({ features, isOwner, busy, onPatch, toast }) {
+function FeaturesTab({ features, plan, isOwner, busy, onPatch, toast }) {
     const ben = features?.beneficiary ?? { enabled: false };
-    const { beneficiaries, addBeneficiary, deleteBeneficiary } = useBeneficiaries(!!ben.enabled);
+    const { beneficiaries, addBeneficiary, deleteBeneficiary } = useBeneficiaries(
+        !!ben.enabled && plan?.entitlements?.beneficiary !== false,
+    );
     const [newBenName, setNewBenName] = useState("");
     const [newBenKind, setNewBenKind] = useState("child");
     const [benBusy, setBenBusy] = useState(false);

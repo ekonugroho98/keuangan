@@ -5,7 +5,7 @@ import type { z } from '@hono/zod-openapi'
 import type { Actor } from '../auth/actor'
 import { withActor, withUserClaims } from '../db/tx'
 import { parseHouseholdFeatures, invalidateFeaturesCache } from './features'
-import { computeHouseholdPlanStatus, invalidateEntitlementsCache } from './entitlements'
+import { computeHouseholdPlanStatus, invalidateEntitlementsCache, requireEntitlementInTx } from './entitlements'
 
 interface HouseholdRow {
   id: string
@@ -109,6 +109,12 @@ export async function updateHousehold(actor: Actor, patch: { name?: string; time
     const [current] = await tx<{ features: unknown }[]>`select features from households where id = ${actor.householdId} for update`
     const currentFeatures = parseHouseholdFeatures(current?.features)
     const nextFeatures = patch.features ? mergeFeatures(currentFeatures, patch.features) : null
+    if (patch.features?.beneficiary?.enabled === true) {
+      await requireEntitlementInTx(tx, actor.householdId, 'beneficiary')
+    }
+    if (patch.features?.shopping_stock?.enabled === true) {
+      await requireEntitlementInTx(tx, actor.householdId, 'shopping_stock')
+    }
     const justEnabledBeneficiary = !!nextFeatures && !currentFeatures.beneficiary.enabled && nextFeatures.beneficiary.enabled
 
     await tx`

@@ -67,7 +67,7 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
   const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx])
   const [classifiedList, receiptUrl] = await Promise.all([
     classifyItems(actor, toClassify, { webLookup: true }),
-    resolveReceiptUrl(actor.householdId, input),
+    resolveReceiptUrl(actor, input),
   ])
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]!]))
   // Perbandingan harga antar toko (prices.ts): seragamkan nama kasir → produk kanonik (satu panggilan AI

@@ -309,6 +309,7 @@ export const TOOLS: ToolDefinition[] = [
         note: str('Keterangan singkat'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
         recorded_by: str('Opsional: nama/alias anggota keluarga yang mencatat transfer ini.'),
+        receipt_url: str('Opsional: URL foto bukti transfer.'),
       },
       required: ['amount_text', 'from_account', 'to_account'],
     },
@@ -319,7 +320,7 @@ export const TOOLS: ToolDefinition[] = [
       const timezone = await getHouseholdTimezone(actor)
       return transfersSvc.createTransfer(
         actor,
-        { amount_text: args.amount_text as string, from_account: args.from_account as string, to_account: args.to_account as string, note: args.note as string | undefined, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by) },
+        { amount_text: args.amount_text as string, from_account: args.from_account as string, to_account: args.to_account as string, note: args.note as string | undefined, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) },
         timezone,
       )
     },
@@ -339,6 +340,7 @@ export const TOOLS: ToolDefinition[] = [
         discount: num('Total potongan diskon baru dalam rupiah (opsional)'),
         beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).'),
         recorded_by: str('Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").'),
+        receipt_url: str('Opsional: URL foto bukti struk/nota baru (atau "none"/"hapus" untuk menghapus lampiran struk).'),
       },
       required: ['transaction_id'],
     },
@@ -355,6 +357,7 @@ export const TOOLS: ToolDefinition[] = [
         discount: args.discount != null ? Math.round(Number(args.discount)) : undefined,
         beneficiary: optStr(args.beneficiary),
         recorded_by: optStr(args.recorded_by),
+        receipt_url: args.receipt_url === null || args.receipt_url === 'none' || args.receipt_url === 'hapus' ? null : optStr(args.receipt_url),
       }),
   },
   {

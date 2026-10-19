@@ -12450,7 +12450,10 @@ var CreateTransferBodySchema = external_exports.object({
   date: DateStringSchema.optional(),
   note: external_exports.string().max(500).optional(),
   recorded_by_id: UuidSchema.optional(),
-  recorded_by: external_exports.string().max(80).optional().openapi({ description: "Nama/alias anggota keluarga yang mencatat transfer ini." })
+  recorded_by: external_exports.string().max(80).optional().openapi({ description: "Nama/alias anggota keluarga yang mencatat transfer ini." }),
+  receipt_url: external_exports.string().url().max(1e3).optional().openapi({ description: "URL foto bukti transfer (opsional)." }),
+  receipt_image_base64: external_exports.string().optional().openapi({ description: "Opsional: base64 foto bukti transfer untuk langsung diunggah." }),
+  receipt_mime_type: external_exports.string().optional()
 }).openapi("CreateTransferBody");
 var TransactionListQuerySchema = external_exports.object({
   period: external_exports.string().optional(),
@@ -13819,6 +13822,12 @@ async function updateHousehold(actor, patch) {
     const [current] = await tx`select features from households where id = ${actor.householdId} for update`;
     const currentFeatures = parseHouseholdFeatures(current?.features);
     const nextFeatures = patch.features ? mergeFeatures(currentFeatures, patch.features) : null;
+    if (patch.features?.beneficiary?.enabled === true) {
+      await requireEntitlementInTx(tx, actor.householdId, "beneficiary");
+    }
+    if (patch.features?.shopping_stock?.enabled === true) {
+      await requireEntitlementInTx(tx, actor.householdId, "shopping_stock");
+    }
     const justEnabledBeneficiary = !!nextFeatures && !currentFeatures.beneficiary.enabled && nextFeatures.beneficiary.enabled;
     await tx`
       update households set
@@ -14913,9 +14922,10 @@ async function uploadReceiptImage(householdId, input) {
     mime_type: mimeType
   };
 }
-async function resolveReceiptUrl(householdId, input) {
+async function resolveReceiptUrl(actor, input) {
   if (input.receipt_image_base64) {
-    const uploaded = await uploadReceiptImage(householdId, {
+    await requireEntitlement(actor, "receipt_storage");
+    const uploaded = await uploadReceiptImage(actor.householdId, {
       image_base64: input.receipt_image_base64,
       mime_type: input.receipt_mime_type
     });
@@ -15130,7 +15140,7 @@ async function createTransaction(actor, input, timezone) {
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
-  const receiptUrl = await resolveReceiptUrl(actor.householdId, input);
+  const receiptUrl = await resolveReceiptUrl(actor, input);
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
@@ -15171,7 +15181,7 @@ async function createTransactionBatch(actor, input, timezone) {
   const parsedNotes = input.items.map((i) => i.note ? parseReceiptNote(i.note) : null);
   const priceNames = parsedNotes.filter((p) => p?.merchant).map((p) => p.name);
   if (priceNames.length) await canonicalizeProducts(actor, priceNames);
-  const receiptUrl = await resolveReceiptUrl(actor.householdId, input);
+  const receiptUrl = await resolveReceiptUrl(actor, input);
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const accountId = await resolveAccountRef(tx, actor, input, "account", explicitRecorderId);
@@ -15240,7 +15250,7 @@ async function updateTransaction(actor, id, input) {
   if (parsedNote?.merchant && parsedNote.name) {
     await canonicalizeProducts(actor, [parsedNote.name]);
   }
-  const receiptUrl = await resolveReceiptUrl(actor.householdId, input);
+  const receiptUrl = await resolveReceiptUrl(actor, input);
   return withActor(actor, async (tx) => {
     const newRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const patch = {};
@@ -15428,6 +15438,7 @@ async function createTransfer(actor, input, timezone) {
     if (err instanceof AmountParseError) throw ApiError.fromCode("invalid_amount_text");
     throw err;
   }
+  const receiptUrl = await resolveReceiptUrl(actor, input);
   return withActor(actor, async (tx) => {
     const explicitRecorderId = await resolveExplicitRecorder(tx, actor, input);
     const fromId = await resolveAccountRef(tx, actor, { account_id: input.from_account_id, account: input.from_account }, "from_account", explicitRecorderId);
@@ -15436,11 +15447,20 @@ async function createTransfer(actor, input, timezone) {
     const [txRow] = await tx`
       select id from post_transfer(${actor.householdId}, ${actor.memberId}, ${fromId}, ${toId}, ${amount}, ${input.date ?? todayInTz(timezone)}, ${input.note ?? null}, ${txSource(actor)})
     `;
-    if (recorderId !== actor.memberId) {
-      await tx`update transactions set recorded_by_member_id = ${recorderId} where id = ${txRow.id}`;
+    if (recorderId !== actor.memberId || receiptUrl) {
+      await tx`
+        update transactions
+        set recorded_by_member_id = ${recorderId},
+            receipt_url = coalesce(${receiptUrl ?? null}, receipt_url)
+        where id = ${txRow.id}
+      `;
     }
     const [full] = await tx`
-      select type, amount::text, date::text, note, created_at::text from transactions where id = ${txRow.id}
+      select t.type, t.amount::text, t.date::text, t.note, t.receipt_url,
+             t.recorded_by_member_id, m.display_name as recorded_by_name, t.created_at::text
+      from transactions t
+      join household_members m on m.id = t.recorded_by_member_id
+      where t.id = ${txRow.id}
     `;
     const [fromAcc] = await tx`
       select a.name, v.balance::text from accounts a join v_account_balances v on v.account_id = a.id where a.id = ${fromId}
@@ -15449,7 +15469,19 @@ async function createTransfer(actor, input, timezone) {
       select a.name, v.balance::text from accounts a join v_account_balances v on v.account_id = a.id where a.id = ${toId}
     `;
     return {
-      transaction: { id: txRow.id, type: full.type, amount: Number(full.amount), date: full.date, note: full.note, created_at: full.created_at },
+      transaction: {
+        id: txRow.id,
+        type: full.type,
+        amount: Number(full.amount),
+        date: full.date,
+        note: full.note,
+        receipt_url: full.receipt_url ?? null,
+        recorded_by: {
+          member_id: full.recorded_by_member_id,
+          display_name: full.recorded_by_name
+        },
+        created_at: full.created_at
+      },
       from_account: { id: fromId, name: fromAcc.name, balance: fromAcc.balance !== null ? Number(fromAcc.balance) : null },
       to_account: { id: toId, name: toAcc.name, balance: toAcc.balance !== null ? Number(toAcc.balance) : null }
     };
@@ -17459,7 +17491,7 @@ async function ingestReceipt(actor, input) {
   const toClassify = input.items.map((item, idx) => ({ idx, name: item.name, aiCategory: item.category })).filter((x) => !titipan[x.idx]);
   const [classifiedList, receiptUrl] = await Promise.all([
     classifyItems(actor, toClassify, { webLookup: true }),
-    resolveReceiptUrl(actor.householdId, input)
+    resolveReceiptUrl(actor, input)
   ]);
   const classified = new Map(toClassify.map((x, i) => [x.idx, classifiedList[i]]));
   if (input.merchant) await canonicalizeProducts(actor, input.items.map((i) => i.name));
@@ -18091,7 +18123,8 @@ var TOOLS = [
         to_account: str("Nama akun atau UUID tujuan dana"),
         note: str("Keterangan singkat"),
         date: str("YYYY-MM-DD; default hari ini", { format: "date" }),
-        recorded_by: str("Opsional: nama/alias anggota keluarga yang mencatat transfer ini.")
+        recorded_by: str("Opsional: nama/alias anggota keluarga yang mencatat transfer ini."),
+        receipt_url: str("Opsional: URL foto bukti transfer.")
       },
       required: ["amount_text", "from_account", "to_account"]
     },
@@ -18102,7 +18135,7 @@ var TOOLS = [
       const timezone = await getHouseholdTimezone(actor);
       return createTransfer(
         actor,
-        { amount_text: args.amount_text, from_account: args.from_account, to_account: args.to_account, note: args.note, date: args.date, recorded_by: optStr(args.recorded_by) },
+        { amount_text: args.amount_text, from_account: args.from_account, to_account: args.to_account, note: args.note, date: args.date, recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) },
         timezone
       );
     }
@@ -18121,7 +18154,8 @@ var TOOLS = [
         qty: num("Jumlah unit/pcs baru (opsional)"),
         discount: num("Total potongan diskon baru dalam rupiah (opsional)"),
         beneficiary: str('F-A, opsional, HANYA kalau fitur aktif: nama penerima baru, atau kata "bersama"/"keluarga" untuk mengosongkan (kembali jadi pengeluaran bersama).'),
-        recorded_by: str('Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").')
+        recorded_by: str('Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").'),
+        receipt_url: str('Opsional: URL foto bukti struk/nota baru (atau "none"/"hapus" untuk menghapus lampiran struk).')
       },
       required: ["transaction_id"]
     },
@@ -18136,7 +18170,8 @@ var TOOLS = [
       qty: args.qty != null ? Number(args.qty) : void 0,
       discount: args.discount != null ? Math.round(Number(args.discount)) : void 0,
       beneficiary: optStr(args.beneficiary),
-      recorded_by: optStr(args.recorded_by)
+      recorded_by: optStr(args.recorded_by),
+      receipt_url: args.receipt_url === null || args.receipt_url === "none" || args.receipt_url === "hapus" ? null : optStr(args.receipt_url)
     })
   },
   {
@@ -18997,9 +19032,10 @@ async function scanReceipt(actor, input) {
   let uploadedReceiptUrl = null;
   if (input.image_base64 && input.mime_type) {
     if (!VISION_PROVIDERS.includes(provider)) throw ApiError.fromCode("provider_no_vision");
+    const plan = await getHouseholdPlanStatus(actor);
     const [aiRaw, uploaded] = await Promise.all([
       callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider),
-      uploadReceiptImage(actor.householdId, { image_base64: input.image_base64, mime_type: input.mime_type }).catch(() => null)
+      plan.entitlements.receipt_storage ? uploadReceiptImage(actor.householdId, { image_base64: input.image_base64, mime_type: input.mime_type }).catch(() => null) : Promise.resolve(null)
     ]);
     raw2 = aiRaw;
     uploadedReceiptUrl = uploaded?.receipt_url ?? null;
@@ -19909,6 +19945,10 @@ var hermes_tools_default = [
         recorded_by: {
           type: "string",
           description: "Opsional: nama/alias anggota keluarga yang mencatat transfer ini."
+        },
+        receipt_url: {
+          type: "string",
+          description: "Opsional: URL foto bukti transfer."
         }
       },
       required: [
@@ -19966,6 +20006,10 @@ var hermes_tools_default = [
         recorded_by: {
           type: "string",
           description: 'Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. "Ibu", "Ayah").'
+        },
+        receipt_url: {
+          type: "string",
+          description: 'Opsional: URL foto bukti struk/nota baru (atau "none"/"hapus" untuk menghapus lampiran struk).'
         }
       },
       required: [

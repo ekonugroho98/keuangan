@@ -316,6 +316,7 @@ export function exportTransactionsCSV(transactions = [], opts = {}) {
         "Dicatat Oleh",
         "Peruntukan",
         "Catatan",
+        "Bukti Struk",
     ];
     const rows = transactions.map((tx) => [
         tx.date || "",
@@ -327,6 +328,7 @@ export function exportTransactionsCSV(transactions = [], opts = {}) {
         tx.recorded_by?.display_name || "",
         tx.beneficiary || (tx.type === "expense" ? "Bersama" : ""),
         tx.note || "",
+        tx.receipt_url || "",
     ]);
 
     const csv = [headers, ...rows]
@@ -395,6 +397,7 @@ export function exportTransactionsExcel(transactions = [], opts = {}) {
             { v: "Dicatat Oleh", s: 2 },
             { v: "Peruntukan", s: 2 },
             { v: "Catatan", s: 2 },
+            { v: "Bukti Struk", s: 2 },
         ],
         ...transactions.map((tx) => [
             { v: tx.date || "", s: 3 },
@@ -406,13 +409,14 @@ export function exportTransactionsExcel(transactions = [], opts = {}) {
             { v: tx.recorded_by?.display_name || "-", s: 3 },
             { v: tx.beneficiary || (tx.type === "expense" ? "Bersama" : "-"), s: 3 },
             { v: tx.note || "", s: 3 },
+            { v: tx.receipt_url || "-", s: 3 },
         ]),
     ];
 
     const sheets = [
         {
             name: "Daftar Transaksi",
-            widths: [14, 15, 22, 18, 18, 18, 16, 16, 38],
+            widths: [14, 15, 22, 18, 18, 18, 16, 16, 38, 42],
             rows: txRows,
         },
     ];

@@ -2,6 +2,7 @@ import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../../auth/actor'
 import { withActor } from '../../db/tx'
 import { classifyItems, loadExpenseCategories, type ExpenseCategory } from '../categorize'
+import { getHouseholdPlanStatus } from '../entitlements'
 import { canonicalizeProducts } from '../prices'
 import { uploadReceiptImage } from '../storage'
 import { VISION_PROVIDERS, buildTextRequest, buildVisionRequest, callProviderJson, getAiConfig } from './provider'
@@ -89,9 +90,12 @@ export async function scanReceipt(actor: Actor, input: { image_base64?: string; 
   let uploadedReceiptUrl: string | null = null
   if (input.image_base64 && input.mime_type) {
     if (!VISION_PROVIDERS.includes(provider)) throw ApiError.fromCode('provider_no_vision')
+    const plan = await getHouseholdPlanStatus(actor)
     const [aiRaw, uploaded] = await Promise.all([
       callProviderJson(buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, visionPrompt(categories)), provider),
-      uploadReceiptImage(actor.householdId, { image_base64: input.image_base64, mime_type: input.mime_type }).catch(() => null),
+      plan.entitlements.receipt_storage
+        ? uploadReceiptImage(actor.householdId, { image_base64: input.image_base64, mime_type: input.mime_type }).catch(() => null)
+        : Promise.resolve(null),
     ])
     raw = aiRaw
     uploadedReceiptUrl = uploaded?.receipt_url ?? null

@@ -450,6 +450,10 @@
         "recorded_by": {
           "type": "string",
           "description": "Opsional: nama/alias anggota keluarga yang mencatat transfer ini."
+        },
+        "receipt_url": {
+          "type": "string",
+          "description": "Opsional: URL foto bukti transfer."
         }
       },
       "required": [
@@ -507,6 +511,10 @@
         "recorded_by": {
           "type": "string",
           "description": "Opsional: ubah nama/alias anggota keluarga pencatat transaksi ini (mis. \"Ibu\", \"Ayah\")."
+        },
+        "receipt_url": {
+          "type": "string",
+          "description": "Opsional: URL foto bukti struk/nota baru (atau \"none\"/\"hapus\" untuk menghapus lampiran struk)."
         }
       },
       "required": [

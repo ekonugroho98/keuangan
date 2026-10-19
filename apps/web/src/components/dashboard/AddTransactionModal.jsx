@@ -536,10 +536,18 @@ const AddTransactionModal = ({
     setScanMode("");
   };
 
+  useEffect(() => {
+    if (!open) {
+      setScanError("");
+      setUploadingAttach(false);
+    }
+  }, [open]);
+
   const handleAttachReceipt = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+    setScanError("");
     setUploadingAttach(true);
     try {
       const { base64, mimeType } = await compressReceiptImage(file);
@@ -2132,122 +2140,6 @@ const AddTransactionModal = ({
               )}
 
               <div style={{ marginBottom: 16 }}>
-                <FieldLabel hint="Otomatis dikompres ke WebP hemat kuota">
-                  🧾 BUKTI STRUK / NOTA (OPSIONAL)
-                </FieldLabel>
-                <input
-                  ref={attachRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAttachReceipt}
-                  style={{ display: "none" }}
-                />
-                {txForm.receipt_url ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      padding: "10px 12px",
-                      borderRadius: 14,
-                      border: "1px solid rgba(131,155,122,.35)",
-                      background: "rgba(131,155,122,.08)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <img
-                        src={txForm.receipt_url}
-                        alt="Bukti Struk"
-                        style={{
-                          width: 44,
-                          height: 44,
-                          objectFit: "cover",
-                          borderRadius: 8,
-                          border: "1px solid var(--color-border)",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)" }}>
-                          ✅ Foto Struk Tersimpan
-                        </div>
-                        <a
-                          href={txForm.receipt_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: 11, color: "var(--color-muted)", textDecoration: "underline" }}
-                        >
-                          Buka ukuran penuh ↗
-                        </a>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <button
-                        type="button"
-                        onClick={() => attachRef.current?.click()}
-                        disabled={uploadingAttach}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          border: "1px solid var(--color-border)",
-                          background: "var(--bg-surface-low)",
-                          color: "var(--color-text)",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Ganti
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTxForm((p) => ({ ...p, receipt_url: "" }))}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          border: "1px solid rgba(255,113,108,.3)",
-                          background: "rgba(255,113,108,.1)",
-                          color: "var(--color-expense)",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => attachRef.current?.click()}
-                    disabled={uploadingAttach}
-                    style={{
-                      width: "100%",
-                      padding: "11px 14px",
-                      borderRadius: 14,
-                      border: "1px dashed var(--color-border)",
-                      background: "rgba(255,255,255,.02)",
-                      color: "var(--color-muted)",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: uploadingAttach ? "wait" : "pointer",
-                      fontFamily: "inherit",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                    }}
-                  >
-                    {uploadingAttach ? "⏳ Mengompres & mengunggah struk..." : "📷 Lampirkan Foto Struk / Bukti Transfer"}
-                  </button>
-                )}
-              </div>
-
-              <div style={{ marginBottom: 16 }}>
                 <FieldLabel>📅 TANGGAL</FieldLabel>
                 <DatePicker
                   value={txForm.date}
@@ -2255,6 +2147,141 @@ const AddTransactionModal = ({
                 />
               </div>
             </>
+          )}
+
+          {!scanResults && (
+            <div style={{ marginBottom: 16 }}>
+              <FieldLabel hint="Otomatis dikompres ke WebP hemat kuota">
+                🧾 BUKTI STRUK / NOTA (OPSIONAL)
+              </FieldLabel>
+              <input
+                ref={attachRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAttachReceipt}
+                style={{ display: "none" }}
+              />
+              {txForm.receipt_url ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    border: "1px solid rgba(131,155,122,.35)",
+                    background: "rgba(131,155,122,.08)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <img
+                      src={txForm.receipt_url}
+                      alt="Bukti Struk"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-border)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)" }}>
+                        ✅ Foto Struk Tersimpan
+                      </div>
+                      <a
+                        href={txForm.receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 11, color: "var(--color-muted)", textDecoration: "underline" }}
+                      >
+                        Buka ukuran penuh ↗
+                      </a>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => attachRef.current?.click()}
+                      disabled={uploadingAttach}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--bg-surface-low)",
+                        color: "var(--color-text)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Ganti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTxForm((p) => ({ ...p, receipt_url: "" }))}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        border: "1px solid rgba(255,113,108,.3)",
+                        background: "rgba(255,113,108,.1)",
+                        color: "var(--color-expense)",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => attachRef.current?.click()}
+                  disabled={uploadingAttach}
+                  style={{
+                    width: "100%",
+                    padding: "11px 14px",
+                    borderRadius: 14,
+                    border: "1px dashed var(--color-border)",
+                    background: "rgba(255,255,255,.02)",
+                    color: "var(--color-muted)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: uploadingAttach ? "wait" : "pointer",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                >
+                  {uploadingAttach ? "⏳ Mengompres & mengunggah struk..." : "📷 Lampirkan Foto Struk / Bukti Transfer"}
+                </button>
+              )}
+              {scanError && (editMode || isTransfer) && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "10px 14px",
+                    background:
+                      "color-mix(in srgb, var(--color-expense) 8%, transparent)",
+                    border:
+                      "1px solid color-mix(in srgb, var(--color-expense) 25%, transparent)",
+                    borderRadius: 12,
+                    fontSize: 12,
+                    color: "var(--color-expense)",
+                  }}
+                >
+                  {scanError}
+                </div>
+              )}
+            </div>
           )}
 
           {!scanResults && (

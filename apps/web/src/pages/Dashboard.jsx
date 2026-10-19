@@ -143,13 +143,19 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const defaultExpenseCat =
     allCategoriesFromApi.find((c) => !c.is_system && c.type !== "income")?.name || "Bahan Makanan";
 
-  // Auto-select akun & kategori pertama saat modal dibuka agar tidak pernah kosong/invalid
+  // Reset form & auto-select akun + kategori pertama saat modal tambah dibuka (cegah state bocor dari openEditTx)
   const openAddTxModal = () => {
-    setTxForm((p) => ({
-      ...p,
-      account: p.account || accounts[0]?.name || "",
-      category: p.category || defaultExpenseCat,
-    }));
+    setTxForm({
+      type: "expense",
+      amount: "",
+      category: defaultExpenseCat,
+      note: "",
+      account: accounts[0]?.name || "",
+      toAccount: "",
+      date: toLocalDateStr(),
+      beneficiary: "",
+      receipt_url: "",
+    });
     setShowAddTx(true);
   };
   const { investments, addInvestment, editInvestment, deleteInvestment } = useInvestments();
@@ -160,8 +166,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const { recurrings, addRecurring, editRecurring, deleteRecurring, runDueRecurrings } = useRecurrings();
   const { splitBills, addSplitBill, deleteSplitBill, toggleMemberPaid } = useSplitBills();
   const { userSettings, aiConfig, saveSettings, saveAiConfig } = useSettings();
-  const { household } = useHouseholdInfo(); // F-0/F-A: gate field "Untuk" dari features.beneficiary.enabled
-  const beneficiaryEnabled = !!household?.features?.beneficiary?.enabled;
+  const { household } = useHouseholdInfo(); // F-0/F-A: gate field "Untuk" dari features.beneficiary.enabled + plan
+  const beneficiaryEnabled =
+    !!household?.features?.beneficiary?.enabled &&
+    household?.plan?.entitlements?.beneficiary !== false;
 
   const loading = accountsLoading || transactionsLoading;
 
@@ -412,6 +420,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         await editTxApi(editingTx.id, {
           note: txForm.note ?? "",
           date: txForm.date || editingTx.date,
+          receipt_url: txForm.receipt_url || null,
         });
       } else {
         await editTxApi(editingTx.id, {
@@ -460,8 +469,9 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         to_account: txForm.toAccount,
         date: txForm.date || toLocalDateStr(),
         note: txForm.note || `Transfer ${txForm.account} → ${txForm.toAccount}`,
+        ...(txForm.receipt_url ? { receipt_url: txForm.receipt_url } : {}),
       });
-      setTxForm({ type: "expense", amount: "", category: defaultExpenseCat, note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr() });
+      setTxForm({ type: "expense", amount: "", category: defaultExpenseCat, note: "", account: accounts[0]?.name ?? "", toAccount: "", date: toLocalDateStr(), beneficiary: "", receipt_url: "" });
       setShowAddTx(false);
       showToast(`Transfer Rp ${amount.toLocaleString("id-ID")} berhasil!`);
     } catch (err) {

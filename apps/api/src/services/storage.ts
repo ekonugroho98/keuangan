@@ -1,6 +1,8 @@
 import crypto from 'node:crypto'
 import { ApiError } from '@karaya/shared/errors'
+import type { Actor } from '../auth/actor'
 import { env } from '../env'
+import { requireEntitlement } from './entitlements'
 
 export type StorageProviderName = 'supabase' | 'r2' | 'firebase'
 
@@ -142,7 +144,7 @@ export async function uploadReceiptImage(
 }
 
 export async function resolveReceiptUrl(
-  householdId: string,
+  actor: Actor,
   input: {
     receipt_url?: string | null
     receipt_image_base64?: string
@@ -150,7 +152,8 @@ export async function resolveReceiptUrl(
   },
 ): Promise<string | null | undefined> {
   if (input.receipt_image_base64) {
-    const uploaded = await uploadReceiptImage(householdId, {
+    await requireEntitlement(actor, 'receipt_storage')
+    const uploaded = await uploadReceiptImage(actor.householdId, {
       image_base64: input.receipt_image_base64,
       mime_type: input.receipt_mime_type,
     })

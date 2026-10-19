@@ -161,6 +161,39 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
         expect(blockedBody.error.code).toBe('plan_upgrade_required')
         expect(blockedBody.error.details.feature).toBe('price_compare')
 
+        // Upload inline receipt_image_base64 di POST /v1/transactions juga wajib ter-gate receipt_storage
+        const inlineReceiptRes = await app.request('/v1/transactions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'expense',
+            account: 'BCA suami',
+            category: 'Makanan',
+            amount: 100,
+            date: '2026-10-19',
+            note: 'Bypass Test',
+            receipt_image_base64: 'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
+            receipt_mime_type: 'image/webp',
+          }),
+        })
+        expect(inlineReceiptRes.status).toBe(403)
+        const inlineReceiptBody = await inlineReceiptRes.json()
+        expect(inlineReceiptBody.error.code).toBe('plan_upgrade_required')
+        expect(inlineReceiptBody.error.details.feature).toBe('receipt_storage')
+
+        // Toggle fitur beneficiary di PATCH /v1/households/current juga wajib ter-gate beneficiary
+        const patchFeatRes = await app.request('/v1/households/current', {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            features: { beneficiary: { enabled: true } },
+          }),
+        })
+        expect(patchFeatRes.status).toBe(403)
+        const patchFeatBody = await patchFeatRes.json()
+        expect(patchFeatBody.error.code).toBe('plan_upgrade_required')
+        expect(patchFeatBody.error.details.feature).toBe('beneficiary')
+
         // Aktifkan add-on price_compare di JSONB entitlements walau tier tetap free
         await admin`update households set entitlements = '{"price_compare": true}'::jsonb where id = ${hhId}`
         invalidateEntitlementsCache(hhId)
@@ -174,6 +207,44 @@ describe.skipIf(!dbReachable || process.env.CI === 'true')(
         await admin`update households set plan_tier = 'lifetime', entitlements = '{}'::jsonb where id = ${hhId}`
         invalidateEntitlementsCache(hhId)
       }
+    })
+
+    it('POST /v1/transfers menyimpan recorded_by + receipt_url dan PATCH dapat mengubah receipt_url transfer', async () => {
+      const app = buildApp()
+      const token = await mintJwt(EKO_USER_ID)
+
+      const tfRes = await app.request('/v1/transfers', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_account: 'BCA suami',
+          to_account: 'BCA istri',
+          amount: 100,
+          date: '2026-10-19',
+          note: 'Test Bukti Transfer E2E',
+          recorded_by: 'Rina',
+          receipt_url: 'https://twcrflhvxzatpfrjmqzi.supabase.co/storage/v1/object/public/receipts/tf-e2e.webp',
+        }),
+      })
+      expect(tfRes.status).toBe(201)
+      const tfCreated = await tfRes.json()
+      createdTxIds.push(tfCreated.transaction.id)
+      expect(tfCreated.transaction.recorded_by.display_name).toBe('Rina')
+      expect(tfCreated.transaction.receipt_url).toBe(
+        'https://twcrflhvxzatpfrjmqzi.supabase.co/storage/v1/object/public/receipts/tf-e2e.webp',
+      )
+
+      const patchRes = await app.request(`/v1/transactions/${tfCreated.transaction.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          note: 'Test Bukti Transfer E2E Updated',
+          receipt_url: null,
+        }),
+      })
+      expect(patchRes.status).toBe(200)
+      const patched = await patchRes.json()
+      expect(patched.receipt_url).toBeNull()
     })
   },
 )
