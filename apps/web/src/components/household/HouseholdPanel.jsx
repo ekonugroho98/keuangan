@@ -180,6 +180,29 @@ export default function HouseholdPanel({ onBack, showToast }) {
             ) : (
                 <div style={{ ...rowCard, cursor: isOwner ? "pointer" : "default" }} onClick={() => { if (isOwner) { setNameDraft(household?.name || ""); setEditingName(true); } }}>
                     <span style={{ flex: 1, fontSize: 13, color: "var(--color-text)" }}>{household?.name || "..."}</span>
+                    {household?.plan && (
+                        <span style={{
+                            fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 999,
+                            background: household.plan.effective_tier === "lifetime"
+                                ? "rgba(250,204,21,.15)"
+                                : household.plan.effective_tier === "pro"
+                                    ? "rgba(131,155,122,.18)"
+                                    : "rgba(148,163,184,.12)",
+                            color: household.plan.effective_tier === "lifetime"
+                                ? "#facc15"
+                                : household.plan.effective_tier === "pro"
+                                    ? "var(--color-primary)"
+                                    : "var(--color-muted)",
+                            border: "1px solid currentColor",
+                            textTransform: "uppercase", letterSpacing: 0.6,
+                        }}>
+                            {household.plan.effective_tier === "lifetime"
+                                ? "👑 Lifetime"
+                                : household.plan.effective_tier === "pro"
+                                    ? "✨ Pro"
+                                    : "Starter"}
+                        </span>
+                    )}
                     {isOwner && <span style={{ fontSize: 11, color: "var(--color-muted)" }}>✏️</span>}
                 </div>
             )}
@@ -190,6 +213,7 @@ export default function HouseholdPanel({ onBack, showToast }) {
                     <button style={{ ...smallBtn(), flex: 1, background: tab === "invite" ? "var(--color-primary-soft)" : "var(--color-border-soft)" }} onClick={() => setTab("invite")}>Undangan</button>
                 )}
                 <button style={{ ...smallBtn(), flex: 1, background: tab === "fitur" ? "var(--color-primary-soft)" : "var(--color-border-soft)" }} onClick={() => setTab("fitur")}>Fitur opsional</button>
+                <button style={{ ...smallBtn(), flex: 1, background: tab === "plan" ? "var(--color-primary-soft)" : "var(--color-border-soft)" }} onClick={() => setTab("plan")}>👑 Paket</button>
             </div>
 
             {tab === "members" && (
@@ -270,6 +294,73 @@ export default function HouseholdPanel({ onBack, showToast }) {
                     toast={toast}
                 />
             )}
+
+            {tab === "plan" && (
+                <PlanTab plan={household?.plan} />
+            )}
+        </div>
+    );
+}
+
+const PLAN_ENTITLEMENT_ITEMS = [
+    { key: "api_access", icon: "🤖", label: "Integrasi Bot AI Telegram & WhatsApp", desc: "1 Household API Key untuk catat keuangan & struk via chat" },
+    { key: "receipt_storage", icon: "🧾", label: "Cloud Storage Bukti Struk (WebP)", desc: "Simpan & lihat foto struk belanja langsung di daftar transaksi" },
+    { key: "price_compare", icon: "⚖️", label: "Banding Harga & Diskon Antar Toko", desc: "Lacak harga termurah, harga asli sebelum diskon, & toko yang sering promo" },
+    { key: "multi_member", icon: "💑", label: "Kolaborasi Pasangan & Akun Privat", desc: "Gabungkan pembukuan suami-istri dengan dukungan dompet Shared & 🔒 Privat" },
+    { key: "shopping_stock", icon: "🛒", label: "Daftar Belanja & Stok Kulkas/Dapur", desc: "Otomatis coret daftar belanja & tambah stok rumah dari struk" },
+    { key: "beneficiary", icon: "👶", label: "Atribusi Untuk Siapa (Beneficiary)", desc: "Pisahkan laporan pengeluaran untuk Anak, Orang Tua, atau Aset" },
+    { key: "excel_export", icon: "📊", label: "Export Laporan Profesional (.xlsx 4-Sheet)", desc: "Unduh laporan keuangan bulanan rapi 4 tab siap cetak/audit" },
+];
+
+function PlanTab({ plan }) {
+    if (!plan) return <div style={{ fontSize: 12, color: "var(--color-muted)", textAlign: "center", padding: 10 }}>Memuat info paket...</div>;
+    const tierLabel = plan.effective_tier === "lifetime"
+        ? "👑 Lifetime Founder"
+        : plan.effective_tier === "pro"
+            ? "✨ Keluarga Berkembang Pro"
+            : "🌱 Starter (Gratis)";
+    return (
+        <div style={{ marginTop: 10 }}>
+            <div style={{
+                ...featureCard,
+                background: "linear-gradient(135deg, rgba(131,155,122,.14), rgba(79,195,247,.06))",
+                border: "1px solid rgba(131,155,122,.35)",
+            }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "var(--color-primary)", letterSpacing: 1, textTransform: "uppercase" }}>
+                    PAKET HOUSEHOLD AKTIF
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", marginTop: 4 }}>
+                    {tierLabel}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 4, lineHeight: 1.45 }}>
+                    {plan.effective_tier === "lifetime"
+                        ? "Seluruh fitur pintar, kolaborasi keluarga, dan penyimpanan bukti struk aktif permanen tanpa batas waktu."
+                        : plan.expires_at
+                            ? `Aktif hingga ${new Date(plan.expires_at).toLocaleDateString("id-ID")}.`
+                            : "Seluruh fitur keluarga & integrasi AI aktif untuk household ini."}
+                </div>
+            </div>
+
+            <div style={sectionLabel}>Hak Akses Fitur (Entitlements)</div>
+            {PLAN_ENTITLEMENT_ITEMS.map((item) => {
+                const unlocked = plan.entitlements?.[item.key] !== false;
+                return (
+                    <div key={item.key} style={{ ...rowCard, alignItems: "flex-start", padding: "10px 12px" }}>
+                        <span style={{ fontSize: 16, lineHeight: 1.2 }}>{item.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text)" }}>{item.label}</div>
+                            <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>{item.desc}</div>
+                        </div>
+                        <span style={{
+                            fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 999, flexShrink: 0,
+                            background: unlocked ? "rgba(131,155,122,.16)" : "rgba(255,113,108,.12)",
+                            color: unlocked ? "var(--color-primary)" : "#ff716c",
+                        }}>
+                            {unlocked ? "✓ Aktif" : "🔒 Pro"}
+                        </span>
+                    </div>
+                );
+            })}
         </div>
     );
 }

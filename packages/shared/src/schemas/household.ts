@@ -109,3 +109,58 @@ export const UpdateHouseholdBodySchema = z
 export const RemoveMemberQuerySchema = z.object({
   reassign_to_member_id: z.union([UuidSchema, z.literal('joint')]).optional(),
 })
+
+// ── Fondasi Paket Berbayar (Plan Tier & Entitlements) per Household ──────────────────────────
+export const PlanTierSchema = z.enum(['free', 'pro', 'lifetime'])
+export type PlanTier = z.infer<typeof PlanTierSchema>
+
+export const PAID_FEATURE_KEYS = [
+  'api_access',
+  'receipt_storage',
+  'price_compare',
+  'multi_member',
+  'shopping_stock',
+  'beneficiary',
+  'excel_export',
+] as const
+
+export const PaidFeatureKeySchema = z.enum(PAID_FEATURE_KEYS)
+export type PaidFeatureKey = z.infer<typeof PaidFeatureKeySchema>
+
+export const HouseholdEntitlementsOverrideSchema = z.object({
+  api_access: z.boolean().optional(),
+  receipt_storage: z.boolean().optional(),
+  price_compare: z.boolean().optional(),
+  multi_member: z.boolean().optional(),
+  shopping_stock: z.boolean().optional(),
+  beneficiary: z.boolean().optional(),
+  excel_export: z.boolean().optional(),
+})
+
+export const HouseholdEntitlementsSchema = z
+  .object({
+    api_access: z.boolean().default(true),
+    receipt_storage: z.boolean().default(true),
+    price_compare: z.boolean().default(true),
+    multi_member: z.boolean().default(true),
+    shopping_stock: z.boolean().default(true),
+    beneficiary: z.boolean().default(true),
+    excel_export: z.boolean().default(true),
+  })
+  .openapi('HouseholdEntitlements')
+
+export type HouseholdEntitlements = z.infer<typeof HouseholdEntitlementsSchema>
+
+export const HouseholdPlanStatusSchema = z
+  .object({
+    tier: PlanTierSchema,
+    effective_tier: PlanTierSchema,
+    expires_at: z.string().nullable(),
+    is_active: z.boolean(),
+    enforce_paid_features: z.boolean(),
+    entitlements: HouseholdEntitlementsSchema,
+  })
+  .openapi('HouseholdPlanStatus')
+
+export type HouseholdPlanStatus = z.infer<typeof HouseholdPlanStatusSchema>
+

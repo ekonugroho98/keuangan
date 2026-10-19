@@ -8118,6 +8118,7 @@ var ERROR_CODES = [
   "scope_exceeds_role",
   "invitation_email_mismatch",
   "feature_disabled",
+  "plan_upgrade_required",
   "not_found",
   "account_not_found",
   "category_not_found",
@@ -8201,6 +8202,7 @@ var ERROR_HTTP_STATUS = {
   scope_exceeds_role: 403,
   invitation_email_mismatch: 403,
   feature_disabled: 403,
+  plan_upgrade_required: 403,
   not_found: 404,
   account_not_found: 404,
   category_not_found: 404,
@@ -8284,6 +8286,7 @@ var ERROR_MESSAGES = {
   scope_exceeds_role: "Scope API key melebihi peranmu di household.",
   invitation_email_mismatch: "Email akunmu tidak cocok dengan undangan ini.",
   feature_disabled: "Fitur ini belum diaktifkan untuk household ini.",
+  plan_upgrade_required: "Fitur ini memerlukan paket Keluarga Berkembang Pro.",
   not_found: "Data tidak ditemukan.",
   account_not_found: "Akun tidak ditemukan.",
   category_not_found: "Kategori tidak ditemukan.",
@@ -8423,7 +8426,11 @@ var EnvSchema = external_exports.object({
   STORAGE_PROVIDER: external_exports.enum(["supabase", "r2", "firebase"]).default("supabase"),
   R2_UPLOAD_WORKER_URL: external_exports.string().url().optional(),
   R2_UPLOAD_TOKEN: external_exports.string().optional(),
-  FIREBASE_STORAGE_BUCKET: external_exports.string().optional()
+  FIREBASE_STORAGE_BUCKET: external_exports.string().optional(),
+  // Saklar global penegakan fitur berbayar (services/entitlements.ts):
+  // Default false = semua fitur terbuka (early-adopter / promo launch).
+  // Ubah ke 'true' / '1' di env produksi saat mulai menegakkan pembatasan plan_tier = 'free'.
+  ENFORCE_PAID_FEATURES: external_exports.string().optional().default("false").transform((v) => v === "true" || v === "1")
 });
 function loadEnv() {
   const result = EnvSchema.safeParse(process.env);
@@ -12188,6 +12195,10 @@ async function withIdempotency(c, actor, next) {
     update idempotency_keys set status = 'completed', response_status = ${status}, response_body = ${sql2.json(stored ?? null)}
     where credential_type = ${credentialType} and credential_id = ${credentialId} and key = ${key}
   `;
+  if (Math.random() < 0.02) {
+    sql2`select cleanup_expired_idempotency_keys()`.catch(() => {
+    });
+  }
 }
 
 // src/middleware/rate-limit.ts
@@ -12205,117 +12216,6 @@ async function checkRateLimit(c, actor) {
     throw ApiError.fromCode("rate_limited");
   }
 }
-
-// src/auth/middleware.ts
-async function resolveMembership(userId, requestedHouseholdId) {
-  return withUserClaims(userId, async (tx) => {
-    const rows = await tx`
-      select hm.household_id, hm.id as member_id, hm.role
-      from household_members hm join households h on h.id = hm.household_id
-      where hm.user_id = ${userId} and hm.deleted_at is null and h.deleted_at is null
-      order by hm.joined_at asc
-    `;
-    if (rows.length === 0) throw ApiError.fromCode("not_household_member");
-    if (requestedHouseholdId) {
-      const match2 = rows.find((r) => r.household_id === requestedHouseholdId);
-      if (!match2) throw ApiError.fromCode("not_household_member", { message: "Kamu bukan anggota household yang diminta di X-Household-Id." });
-      return match2;
-    }
-    const settingsRows = await tx`
-      select active_household_id from user_settings where user_id = ${userId}
-    `;
-    const active = settingsRows[0]?.active_household_id;
-    if (active) {
-      const match2 = rows.find((r) => r.household_id === active);
-      if (match2) return match2;
-    }
-    return rows[0];
-  });
-}
-var SCOPE_RANK2 = { read: 1, write: 2, admin: 3 };
-function defaultScopeForMethod(method) {
-  return method === "GET" ? "read" : "write";
-}
-function assertScope(actor, min) {
-  if (SCOPE_RANK2[actor.scope] < SCOPE_RANK2[min]) {
-    throw ApiError.fromCode("insufficient_scope");
-  }
-}
-function requireJwtOnly(actor) {
-  if (actor.credential !== "jwt") throw ApiError.fromCode("jwt_required");
-}
-function requireAuth() {
-  return async (c, next) => {
-    const authHeader = c.req.header("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      throw ApiError.fromCode("unauthorized");
-    }
-    const token = authHeader.slice("Bearer ".length).trim();
-    if (token.startsWith("kf_live_")) {
-      const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-      const actor2 = await resolveApiKeyActor(token, ip);
-      assertScope(actor2, defaultScopeForMethod(c.req.method));
-      await checkRateLimit(c, actor2);
-      c.set("actor", actor2);
-      c.set("userId", actor2.userId);
-      await withIdempotency(c, actor2, next);
-      return;
-    }
-    const payload = await verifySupabaseJwt(token);
-    const requestedHousehold = c.req.header("X-Household-Id") ?? void 0;
-    const membership = await resolveMembership(payload.sub, requestedHousehold);
-    const actor = {
-      userId: payload.sub,
-      householdId: membership.household_id,
-      memberId: membership.member_id,
-      role: membership.role,
-      credential: "jwt",
-      scope: "admin"
-      // JWT = pengguna manusia lewat web; scope efektif dari role, dicek di service layer.
-    };
-    c.set("actor", actor);
-    c.set("userId", payload.sub);
-    await withIdempotency(c, actor, next);
-  };
-}
-async function requireUserId(c) {
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw ApiError.fromCode("unauthorized");
-  }
-  const token = authHeader.slice("Bearer ".length).trim();
-  if (token.startsWith("kf_live_")) {
-    throw ApiError.fromCode("jwt_required");
-  }
-  const payload = await verifySupabaseJwt(token);
-  c.set("userId", payload.sub);
-  return payload.sub;
-}
-
-// src/routes/health.ts
-var HealthResponse = external_exports.object({
-  status: external_exports.literal("ok"),
-  version: external_exports.string(),
-  db: external_exports.enum(["ok", "not_configured", "error"])
-}).openapi("HealthResponse");
-var healthRoute = createRoute({
-  method: "get",
-  path: "/v1/health",
-  summary: "Status layanan",
-  description: "Tidak butuh autentikasi. db: ok kalau koneksi ke Postgres (role karaya_api) berhasil.",
-  tags: ["system"],
-  responses: {
-    200: {
-      content: { "application/json": { schema: HealthResponse } },
-      description: "Layanan hidup"
-    }
-  }
-});
-var healthApp = new OpenAPIHono();
-healthApp.openapi(healthRoute, async (c) => {
-  const db = await checkDbHealth();
-  return c.json({ status: "ok", version: "0.1.0", db }, 200);
-});
 
 // ../../packages/shared/src/schemas/common.ts
 var UuidSchema = external_exports.string().uuid().openapi({ example: "11111111-1111-1111-1111-111111111111" });
@@ -12873,6 +12773,43 @@ var UpdateHouseholdBodySchema = external_exports.object({
 var RemoveMemberQuerySchema = external_exports.object({
   reassign_to_member_id: external_exports.union([UuidSchema, external_exports.literal("joint")]).optional()
 });
+var PlanTierSchema = external_exports.enum(["free", "pro", "lifetime"]);
+var PAID_FEATURE_KEYS = [
+  "api_access",
+  "receipt_storage",
+  "price_compare",
+  "multi_member",
+  "shopping_stock",
+  "beneficiary",
+  "excel_export"
+];
+var PaidFeatureKeySchema = external_exports.enum(PAID_FEATURE_KEYS);
+var HouseholdEntitlementsOverrideSchema = external_exports.object({
+  api_access: external_exports.boolean().optional(),
+  receipt_storage: external_exports.boolean().optional(),
+  price_compare: external_exports.boolean().optional(),
+  multi_member: external_exports.boolean().optional(),
+  shopping_stock: external_exports.boolean().optional(),
+  beneficiary: external_exports.boolean().optional(),
+  excel_export: external_exports.boolean().optional()
+});
+var HouseholdEntitlementsSchema = external_exports.object({
+  api_access: external_exports.boolean().default(true),
+  receipt_storage: external_exports.boolean().default(true),
+  price_compare: external_exports.boolean().default(true),
+  multi_member: external_exports.boolean().default(true),
+  shopping_stock: external_exports.boolean().default(true),
+  beneficiary: external_exports.boolean().default(true),
+  excel_export: external_exports.boolean().default(true)
+}).openapi("HouseholdEntitlements");
+var HouseholdPlanStatusSchema = external_exports.object({
+  tier: PlanTierSchema,
+  effective_tier: PlanTierSchema,
+  expires_at: external_exports.string().nullable(),
+  is_active: external_exports.boolean(),
+  enforce_paid_features: external_exports.boolean(),
+  entitlements: HouseholdEntitlementsSchema
+}).openapi("HouseholdPlanStatus");
 
 // ../../packages/shared/src/schemas/api-keys.ts
 var ApiKeyScopeSchema = external_exports.enum(["read", "write", "admin"]);
@@ -13055,6 +12992,212 @@ var ProductAliasBodySchema = external_exports.object({
   same_as: external_exports.string().min(2).openapi({ description: 'Nama produk atau nama item struk lain yang sama barangnya, mis. "LIFEBUOY SABUN 85GR"' })
 }).openapi("ProductAliasBody");
 
+// src/services/entitlements.ts
+var FEATURE_LABELS = {
+  api_access: "Integrasi Bot AI Telegram/WhatsApp (API Key)",
+  receipt_storage: "Penyimpanan Cloud Bukti Struk (WebP)",
+  price_compare: "Banding Harga & Promo Antar Toko",
+  multi_member: "Kolaborasi Pasangan & Akun Shared/Privat",
+  shopping_stock: "Daftar Belanja & Stok Kulkas/Dapur",
+  beneficiary: 'Penerima Manfaat ("Untuk Siapa")',
+  excel_export: "Export Laporan Profesional Excel (.xlsx 4-Sheet)"
+};
+var entitlementsCache = /* @__PURE__ */ new Map();
+function invalidateEntitlementsCache(householdId) {
+  entitlementsCache.delete(householdId);
+}
+function computeHouseholdPlanStatus(raw2, enforcePaidFeatures = env.ENFORCE_PAID_FEATURES) {
+  const tierParsed = PlanTierSchema.safeParse(raw2.plan_tier);
+  const tier = tierParsed.success ? tierParsed.data : "pro";
+  const expiresAt = typeof raw2.plan_expires_at === "string" && raw2.plan_expires_at.trim() ? raw2.plan_expires_at : raw2.plan_expires_at instanceof Date ? raw2.plan_expires_at.toISOString() : null;
+  const isExpired = tier === "pro" && expiresAt !== null && Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) <= Date.now();
+  const effectiveTier = tier === "lifetime" ? "lifetime" : tier === "pro" && !isExpired ? "pro" : "free";
+  const isActive = effectiveTier === "lifetime" || effectiveTier === "pro";
+  const overridesParsed = HouseholdEntitlementsOverrideSchema.safeParse(raw2.entitlements ?? {});
+  const overrides = overridesParsed.success ? overridesParsed.data : {};
+  const entitlements = {};
+  for (const key of PAID_FEATURE_KEYS) {
+    if (!enforcePaidFeatures) {
+      entitlements[key] = true;
+    } else if (typeof overrides[key] === "boolean") {
+      entitlements[key] = overrides[key];
+    } else {
+      entitlements[key] = isActive;
+    }
+  }
+  return {
+    tier,
+    effective_tier: effectiveTier,
+    expires_at: expiresAt,
+    is_active: isActive,
+    enforce_paid_features: enforcePaidFeatures,
+    entitlements
+  };
+}
+async function getHouseholdPlanStatusInTx(tx, householdId) {
+  const [row] = await tx`
+    select plan_tier, plan_expires_at::text, entitlements
+    from households
+    where id = ${householdId}
+  `;
+  return computeHouseholdPlanStatus(row ?? {});
+}
+async function getHouseholdPlanStatus(actor) {
+  const cached = entitlementsCache.get(actor.householdId);
+  if (cached && cached.expiresAt > Date.now()) return cached.status;
+  return withActor(actor, async (tx) => {
+    const status = await getHouseholdPlanStatusInTx(tx, actor.householdId);
+    entitlementsCache.set(actor.householdId, { status, expiresAt: Date.now() + 3e4 });
+    return status;
+  });
+}
+async function requireEntitlement(actor, feature) {
+  if (!env.ENFORCE_PAID_FEATURES) return;
+  const status = await getHouseholdPlanStatus(actor);
+  if (!status.entitlements[feature]) {
+    const label = FEATURE_LABELS[feature] ?? feature;
+    throw ApiError.fromCode("plan_upgrade_required", {
+      message: `Fitur "${label}" memerlukan paket Keluarga Berkembang Pro.`,
+      hint: "Upgrade paket keluarga ke Pro atau aktifkan add-on fitur ini.",
+      details: {
+        feature,
+        tier: status.tier,
+        effective_tier: status.effective_tier,
+        expires_at: status.expires_at
+      }
+    });
+  }
+}
+async function requireEntitlementInTx(tx, householdId, feature) {
+  if (!env.ENFORCE_PAID_FEATURES) return;
+  const status = await getHouseholdPlanStatusInTx(tx, householdId);
+  if (!status.entitlements[feature]) {
+    const label = FEATURE_LABELS[feature] ?? feature;
+    throw ApiError.fromCode("plan_upgrade_required", {
+      message: `Fitur "${label}" memerlukan paket Keluarga Berkembang Pro.`,
+      hint: "Upgrade paket keluarga ke Pro atau aktifkan add-on fitur ini.",
+      details: {
+        feature,
+        tier: status.tier,
+        effective_tier: status.effective_tier,
+        expires_at: status.expires_at
+      }
+    });
+  }
+}
+
+// src/auth/middleware.ts
+async function resolveMembership(userId, requestedHouseholdId) {
+  return withUserClaims(userId, async (tx) => {
+    const rows = await tx`
+      select hm.household_id, hm.id as member_id, hm.role
+      from household_members hm join households h on h.id = hm.household_id
+      where hm.user_id = ${userId} and hm.deleted_at is null and h.deleted_at is null
+      order by hm.joined_at asc
+    `;
+    if (rows.length === 0) throw ApiError.fromCode("not_household_member");
+    if (requestedHouseholdId) {
+      const match2 = rows.find((r) => r.household_id === requestedHouseholdId);
+      if (!match2) throw ApiError.fromCode("not_household_member", { message: "Kamu bukan anggota household yang diminta di X-Household-Id." });
+      return match2;
+    }
+    const settingsRows = await tx`
+      select active_household_id from user_settings where user_id = ${userId}
+    `;
+    const active = settingsRows[0]?.active_household_id;
+    if (active) {
+      const match2 = rows.find((r) => r.household_id === active);
+      if (match2) return match2;
+    }
+    return rows[0];
+  });
+}
+var SCOPE_RANK2 = { read: 1, write: 2, admin: 3 };
+function defaultScopeForMethod(method) {
+  return method === "GET" ? "read" : "write";
+}
+function assertScope(actor, min) {
+  if (SCOPE_RANK2[actor.scope] < SCOPE_RANK2[min]) {
+    throw ApiError.fromCode("insufficient_scope");
+  }
+}
+function requireJwtOnly(actor) {
+  if (actor.credential !== "jwt") throw ApiError.fromCode("jwt_required");
+}
+function requireAuth() {
+  return async (c, next) => {
+    const authHeader = c.req.header("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw ApiError.fromCode("unauthorized");
+    }
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (token.startsWith("kf_live_")) {
+      const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+      const actor2 = await resolveApiKeyActor(token, ip);
+      await requireEntitlement(actor2, "api_access");
+      assertScope(actor2, defaultScopeForMethod(c.req.method));
+      await checkRateLimit(c, actor2);
+      c.set("actor", actor2);
+      c.set("userId", actor2.userId);
+      await withIdempotency(c, actor2, next);
+      return;
+    }
+    const payload = await verifySupabaseJwt(token);
+    const requestedHousehold = c.req.header("X-Household-Id") ?? void 0;
+    const membership = await resolveMembership(payload.sub, requestedHousehold);
+    const actor = {
+      userId: payload.sub,
+      householdId: membership.household_id,
+      memberId: membership.member_id,
+      role: membership.role,
+      credential: "jwt",
+      scope: "admin"
+      // JWT = pengguna manusia lewat web; scope efektif dari role, dicek di service layer.
+    };
+    c.set("actor", actor);
+    c.set("userId", payload.sub);
+    await withIdempotency(c, actor, next);
+  };
+}
+async function requireUserId(c) {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw ApiError.fromCode("unauthorized");
+  }
+  const token = authHeader.slice("Bearer ".length).trim();
+  if (token.startsWith("kf_live_")) {
+    throw ApiError.fromCode("jwt_required");
+  }
+  const payload = await verifySupabaseJwt(token);
+  c.set("userId", payload.sub);
+  return payload.sub;
+}
+
+// src/routes/health.ts
+var HealthResponse = external_exports.object({
+  status: external_exports.literal("ok"),
+  version: external_exports.string(),
+  db: external_exports.enum(["ok", "not_configured", "error"])
+}).openapi("HealthResponse");
+var healthRoute = createRoute({
+  method: "get",
+  path: "/v1/health",
+  summary: "Status layanan",
+  description: "Tidak butuh autentikasi. db: ok kalau koneksi ke Postgres (role karaya_api) berhasil.",
+  tags: ["system"],
+  responses: {
+    200: {
+      content: { "application/json": { schema: HealthResponse } },
+      description: "Layanan hidup"
+    }
+  }
+});
+var healthApp = new OpenAPIHono();
+healthApp.openapi(healthRoute, async (c) => {
+  const db = await checkDbHealth();
+  return c.json({ status: "ok", version: "0.1.0", db }, 200);
+});
+
 // src/services/features.ts
 var featuresCache = /* @__PURE__ */ new Map();
 function invalidateFeaturesCache(householdId) {
@@ -13080,12 +13223,16 @@ async function getHouseholdFeaturesInTx(tx, householdId) {
   return parseHouseholdFeatures(row?.features);
 }
 async function requireFeature(actor, feature) {
+  if (feature === "shopping_stock" || feature === "beneficiary") {
+    await requireEntitlement(actor, feature);
+  }
   const features = await getHouseholdFeatures(actor);
   if (!features[feature].enabled) {
     throw ApiError.fromCode("feature_disabled", { details: { feature } });
   }
 }
 async function assertBeneficiaryFieldAllowed(tx, actor, field = "beneficiary") {
+  await requireEntitlementInTx(tx, actor.householdId, "beneficiary");
   const features = await getHouseholdFeaturesInTx(tx, actor.householdId);
   if (!features.beneficiary.enabled) {
     throw ApiError.fromCode("validation_error", {
@@ -13644,6 +13791,7 @@ async function getHouseholdTimezone(actor) {
 async function selectCurrentHousehold(tx, householdId) {
   const [row] = await tx`
     select h.id, h.name, h.timezone, h.default_account_visibility::text, h.owners_can_view_private_totals, h.features,
+           h.plan_tier, h.plan_expires_at::text, h.entitlements,
            (select count(*) from household_members m where m.household_id = h.id and m.deleted_at is null)::text as member_count
     from households h where h.id = ${householdId}
   `;
@@ -13654,6 +13802,11 @@ async function selectCurrentHousehold(tx, householdId) {
     timezone: row.timezone,
     settings: { default_account_visibility: row.default_account_visibility, owners_can_view_private_totals: row.owners_can_view_private_totals },
     features: parseHouseholdFeatures(row.features),
+    plan: computeHouseholdPlanStatus({
+      plan_tier: row.plan_tier,
+      plan_expires_at: row.plan_expires_at,
+      entitlements: row.entitlements
+    }),
     member_count: Number(row.member_count)
   };
 }
@@ -13683,6 +13836,7 @@ async function updateHousehold(actor, patch) {
     }
     tzCache.delete(actor.householdId);
     invalidateFeaturesCache(actor.householdId);
+    invalidateEntitlementsCache(actor.householdId);
     return selectCurrentHousehold(tx, actor.householdId);
   });
 }
@@ -18972,8 +19126,10 @@ invitationsApp.openapi(
     responses: { 201: { content: { "application/json": { schema: external_exports.unknown() } }, description: "Dibuat" } }
   }),
   async (c) => {
-    assertScope(c.get("actor"), "admin");
-    return c.json(await createInvitation(c.get("actor"), c.req.valid("json")), 201);
+    const actor = c.get("actor");
+    assertScope(actor, "admin");
+    await requireEntitlement(actor, "multi_member");
+    return c.json(await createInvitation(actor, c.req.valid("json")), 201);
   }
 );
 invitationsApp.openapi(
@@ -19171,8 +19327,10 @@ apiKeysApp.openapi(
     responses: { 201: { content: { "application/json": { schema: external_exports.any() } }, description: "Dibuat \u2014 secret HANYA muncul di respons ini" } }
   }),
   async (c) => {
-    requireJwtOnly(c.get("actor"));
-    const result = await createApiKey(c.get("actor"), c.req.valid("json"));
+    const actor = c.get("actor");
+    requireJwtOnly(actor);
+    await requireEntitlement(actor, "api_access");
+    const result = await createApiKey(actor, c.req.valid("json"));
     return c.json(result, 201);
   }
 );
@@ -19203,8 +19361,10 @@ apiKeysApp.openapi(
     responses: { 200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" } }
   }),
   async (c) => {
-    requireJwtOnly(c.get("actor"));
-    const result = await rotateApiKey(c.get("actor"), c.req.valid("param").id);
+    const actor = c.get("actor");
+    requireJwtOnly(actor);
+    await requireEntitlement(actor, "api_access");
+    const result = await rotateApiKey(actor, c.req.valid("param").id);
     return c.json(result, 200);
   }
 );
@@ -19576,6 +19736,10 @@ var hermes_tools_default = [
         recorded_by: {
           type: "string",
           description: 'Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'
+        },
+        receipt_url: {
+          type: "string",
+          description: "Opsional: URL foto bukti struk/nota (mis. hasil dari POST /v1/receipts/upload atau CLI karaya --foto)."
         }
       },
       required: [
@@ -19624,6 +19788,10 @@ var hermes_tools_default = [
         recorded_by: {
           type: "string",
           description: 'Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. "Ibu", "Ayah").'
+        },
+        receipt_url: {
+          type: "string",
+          description: "Opsional: URL foto bukti transfer/nota."
         }
       },
       required: [
@@ -19660,6 +19828,10 @@ var hermes_tools_default = [
         recorded_by: {
           type: "string",
           description: 'Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. "Ibu", "Ayah").'
+        },
+        receipt_url: {
+          type: "string",
+          description: "Opsional: URL foto struk yang berlaku untuk semua item di batch ini."
         },
         items: {
           type: "array",
@@ -20133,6 +20305,10 @@ var hermes_tools_default = [
         recorded_by: {
           type: "string",
           description: 'Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. "Ibu", "Ayah"). Jika kosong, otomatis mengikuti pemilik akun pembayar.'
+        },
+        receipt_url: {
+          type: "string",
+          description: "Opsional: URL foto struk yang sudah diunggah (mis. via POST /v1/receipts/upload atau CLI karaya --foto) agar tertaut ke semua item struk ini."
         },
         items: {
           type: "array",
@@ -20737,6 +20913,7 @@ receiptsApp.openapi(
   async (c) => {
     const actor = c.get("actor");
     assertScope(actor, "write");
+    await requireEntitlement(actor, "receipt_storage");
     const result = await uploadReceiptImage(actor.householdId, c.req.valid("json"));
     return c.json(result, 201);
   }
@@ -20773,7 +20950,11 @@ pricesApp.openapi(
     request: { query: ComparePricesQuerySchema },
     responses: { 200: { content: { "application/json": { schema: ComparePricesResponseSchema } }, description: "OK" } }
   }),
-  async (c) => c.json(await comparePrices(c.get("actor"), c.req.valid("query")), 200)
+  async (c) => {
+    const actor = c.get("actor");
+    await requireEntitlement(actor, "price_compare");
+    return c.json(await comparePrices(actor, c.req.valid("query")), 200);
+  }
 );
 pricesApp.openapi(
   createRoute({
@@ -20786,8 +20967,10 @@ pricesApp.openapi(
     responses: { 200: { content: { "application/json": { schema: external_exports.object({ keyword: external_exports.string(), canonical_name: external_exports.string() }) } }, description: "OK" } }
   }),
   async (c) => {
-    assertScope(c.get("actor"), "write");
-    return c.json(await setProductAlias(c.get("actor"), c.req.valid("json")), 200);
+    const actor = c.get("actor");
+    assertScope(actor, "write");
+    await requireEntitlement(actor, "price_compare");
+    return c.json(await setProductAlias(actor, c.req.valid("json")), 200);
   }
 );
 

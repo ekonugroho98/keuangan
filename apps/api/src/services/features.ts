@@ -3,6 +3,7 @@ import { ApiError } from '@karaya/shared/errors'
 import { HouseholdFeaturesSchema, type HouseholdFeatures } from '@karaya/shared/schemas'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
+import { requireEntitlement, requireEntitlementInTx } from './entitlements'
 
 /**
  * F-0 (10-fitur-opsional-keluarga.md §2): flag opsional per household. Cache ringan per proses,
@@ -58,6 +59,9 @@ type FeatureKey = keyof HouseholdFeatures
  * agent tidak salah simpul "datanya kosong" padahal fiturnya belum pernah dinyalakan.
  */
 export async function requireFeature(actor: Actor, feature: FeatureKey): Promise<void> {
+  if (feature === 'shopping_stock' || feature === 'beneficiary') {
+    await requireEntitlement(actor, feature)
+  }
   const features = await getHouseholdFeatures(actor)
   if (!features[feature].enabled) {
     throw ApiError.fromCode('feature_disabled', { details: { feature } })
@@ -73,6 +77,7 @@ export async function requireFeature(actor: Actor, feature: FeatureKey): Promise
  * (`receipts/ingest`, `items[].for`) lolos karena gate-nya tadinya diulang manual di 4 tempat.
  */
 export async function assertBeneficiaryFieldAllowed(tx: postgres.TransactionSql, actor: Actor, field = 'beneficiary'): Promise<void> {
+  await requireEntitlementInTx(tx, actor.householdId, 'beneficiary')
   const features = await getHouseholdFeaturesInTx(tx, actor.householdId)
   if (!features.beneficiary.enabled) {
     throw ApiError.fromCode('validation_error', {

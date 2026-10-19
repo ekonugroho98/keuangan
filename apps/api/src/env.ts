@@ -39,6 +39,15 @@ const EnvSchema = z.object({
   R2_UPLOAD_WORKER_URL: z.string().url().optional(),
   R2_UPLOAD_TOKEN: z.string().optional(),
   FIREBASE_STORAGE_BUCKET: z.string().optional(),
+
+  // Saklar global penegakan fitur berbayar (services/entitlements.ts):
+  // Default false = semua fitur terbuka (early-adopter / promo launch).
+  // Ubah ke 'true' / '1' di env produksi saat mulai menegakkan pembatasan plan_tier = 'free'.
+  ENFORCE_PAID_FEATURES: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
 })
 
 export type Env = z.infer<typeof EnvSchema>

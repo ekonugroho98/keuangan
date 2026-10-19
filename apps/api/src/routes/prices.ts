@@ -1,10 +1,10 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { ComparePricesQuerySchema, ComparePricesResponseSchema, ProductAliasBodySchema } from '@karaya/shared/schemas'
 import { assertScope } from '../auth/middleware'
+import { requireEntitlement } from '../services/entitlements'
 import * as prices from '../services/prices'
 
-// Perbandingan harga antar toko (10-fitur-opsional-keluarga.md §6.8). Tidak digate feature flag:
-// riwayat harga terisi dari struk mana pun (ingest_receipt maupun simpan scan web).
+// Perbandingan harga antar toko (10-fitur-opsional-keluarga.md §6.8).
 export const pricesApp = new OpenAPIHono()
 
 pricesApp.openapi(
@@ -14,7 +14,11 @@ pricesApp.openapi(
     request: { query: ComparePricesQuerySchema },
     responses: { 200: { content: { 'application/json': { schema: ComparePricesResponseSchema } }, description: 'OK' } },
   }),
-  async (c) => c.json(await prices.comparePrices(c.get('actor'), c.req.valid('query')), 200),
+  async (c) => {
+    const actor = c.get('actor')
+    await requireEntitlement(actor, 'price_compare')
+    return c.json(await prices.comparePrices(actor, c.req.valid('query')), 200)
+  },
 )
 
 pricesApp.openapi(
@@ -25,7 +29,9 @@ pricesApp.openapi(
     responses: { 200: { content: { 'application/json': { schema: z.object({ keyword: z.string(), canonical_name: z.string() }) } }, description: 'OK' } },
   }),
   async (c) => {
-    assertScope(c.get('actor'), 'write')
-    return c.json(await prices.setProductAlias(c.get('actor'), c.req.valid('json')), 200)
+    const actor = c.get('actor')
+    assertScope(actor, 'write')
+    await requireEntitlement(actor, 'price_compare')
+    return c.json(await prices.setProductAlias(actor, c.req.valid('json')), 200)
   },
 )

@@ -277,6 +277,10 @@
         "recorded_by": {
           "type": "string",
           "description": "Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. \"Ibu\", \"Ayah\"). Jika kosong, otomatis mengikuti pemilik akun pembayar."
+        },
+        "receipt_url": {
+          "type": "string",
+          "description": "Opsional: URL foto bukti struk/nota (mis. hasil dari POST /v1/receipts/upload atau CLI karaya --foto)."
         }
       },
       "required": [
@@ -325,6 +329,10 @@
         "recorded_by": {
           "type": "string",
           "description": "Opsional: nama/alias anggota keluarga yang mencatat/melapor di chat (mis. \"Ibu\", \"Ayah\")."
+        },
+        "receipt_url": {
+          "type": "string",
+          "description": "Opsional: URL foto bukti transfer/nota."
         }
       },
       "required": [
@@ -361,6 +369,10 @@
         "recorded_by": {
           "type": "string",
           "description": "Opsional: nama/alias anggota keluarga yang mencatat batch ini (mis. \"Ibu\", \"Ayah\")."
+        },
+        "receipt_url": {
+          "type": "string",
+          "description": "Opsional: URL foto struk yang berlaku untuk semua item di batch ini."
         },
         "items": {
           "type": "array",
@@ -834,6 +846,10 @@
         "recorded_by": {
           "type": "string",
           "description": "Opsional: nama/alias anggota keluarga yang mengirim struk ini (mis. \"Ibu\", \"Ayah\"). Jika kosong, otomatis mengikuti pemilik akun pembayar."
+        },
+        "receipt_url": {
+          "type": "string",
+          "description": "Opsional: URL foto struk yang sudah diunggah (mis. via POST /v1/receipts/upload atau CLI karaya --foto) agar tertaut ke semua item struk ini."
         },
         "items": {
           "type": "array",

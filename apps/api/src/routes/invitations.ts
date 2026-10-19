@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { CreateInvitationBodySchema, AcceptInvitationBodySchema, UuidSchema } from '@karaya/shared/schemas'
 import { requireUserId, assertScope } from '../auth/middleware'
+import { requireEntitlement } from '../services/entitlements'
 import * as invitations from '../services/invitations'
 
 // ── Rute yang butuh household aktif (lihat/buat/revoke undangan) ────────────────────────────
@@ -24,8 +25,10 @@ invitationsApp.openapi(
     request: { body: { content: { 'application/json': { schema: CreateInvitationBodySchema } } } },
     responses: { 201: { content: { 'application/json': { schema: z.unknown() } }, description: 'Dibuat' } } }),
   async (c) => {
-    assertScope(c.get('actor'), 'admin')
-    return c.json(await invitations.createInvitation(c.get('actor'), c.req.valid('json')), 201)
+    const actor = c.get('actor')
+    assertScope(actor, 'admin')
+    await requireEntitlement(actor, 'multi_member')
+    return c.json(await invitations.createInvitation(actor, c.req.valid('json')), 201)
   },
 )
 

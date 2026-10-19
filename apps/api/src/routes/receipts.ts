@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { IngestReceiptBodySchema, UploadReceiptImageBodySchema, UploadReceiptImageResponseSchema } from '@karaya/shared/schemas'
 import { assertScope } from '../auth/middleware'
+import { requireEntitlement } from '../services/entitlements'
 import { ingestReceipt } from '../services/receipts'
 import { uploadReceiptImage } from '../services/storage'
 
@@ -20,6 +21,7 @@ receiptsApp.openapi(
   async (c) => {
     const actor = c.get('actor')
     assertScope(actor, 'write')
+    await requireEntitlement(actor, 'receipt_storage')
     const result = await uploadReceiptImage(actor.householdId, c.req.valid('json'))
     return c.json(result, 201)
   },

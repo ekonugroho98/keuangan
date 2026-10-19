@@ -95,4 +95,10 @@ export async function withIdempotency(c: Context, actor: Actor, next: Next): Pro
     update idempotency_keys set status = 'completed', response_status = ${status}, response_body = ${sql.json((stored ?? null) as unknown as postgres.JSONValue)}
     where credential_type = ${credentialType} and credential_id = ${credentialId} and key = ${key}
   `
+
+  // Pembersihan oportunistik non-blocking (~2% probabilitas per mutasi) agar baris
+  // idempotency_keys > 7 hari tidak menumpuk di kuota DB 500 MB.
+  if (Math.random() < 0.02) {
+    sql`select cleanup_expired_idempotency_keys()`.catch(() => {})
+  }
 }

@@ -5,6 +5,7 @@ import type { z } from '@hono/zod-openapi'
 import type { Actor } from '../auth/actor'
 import { withActor, withUserClaims } from '../db/tx'
 import { parseHouseholdFeatures, invalidateFeaturesCache } from './features'
+import { computeHouseholdPlanStatus, invalidateEntitlementsCache } from './entitlements'
 
 interface HouseholdRow {
   id: string
@@ -13,6 +14,9 @@ interface HouseholdRow {
   default_account_visibility: string
   owners_can_view_private_totals: boolean
   features: unknown
+  plan_tier: string
+  plan_expires_at: string | null
+  entitlements: unknown
   member_count: string
 }
 
@@ -67,6 +71,7 @@ export async function getHouseholdTimezone(actor: Actor): Promise<string> {
 async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: string) {
   const [row] = await tx<HouseholdRow[]>`
     select h.id, h.name, h.timezone, h.default_account_visibility::text, h.owners_can_view_private_totals, h.features,
+           h.plan_tier, h.plan_expires_at::text, h.entitlements,
            (select count(*) from household_members m where m.household_id = h.id and m.deleted_at is null)::text as member_count
     from households h where h.id = ${householdId}
   `
@@ -75,6 +80,11 @@ async function selectCurrentHousehold(tx: postgres.TransactionSql, householdId: 
     id: row.id, name: row.name, timezone: row.timezone,
     settings: { default_account_visibility: row.default_account_visibility, owners_can_view_private_totals: row.owners_can_view_private_totals },
     features: parseHouseholdFeatures(row.features),
+    plan: computeHouseholdPlanStatus({
+      plan_tier: row.plan_tier,
+      plan_expires_at: row.plan_expires_at,
+      entitlements: row.entitlements,
+    }),
     member_count: Number(row.member_count),
   }
 }
@@ -120,6 +130,7 @@ export async function updateHousehold(actor: Actor, patch: { name?: string; time
     }
     tzCache.delete(actor.householdId)
     invalidateFeaturesCache(actor.householdId)
+    invalidateEntitlementsCache(actor.householdId)
     return selectCurrentHousehold(tx, actor.householdId)
   })
 }

@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { CreateApiKeyBodySchema, UuidSchema } from '@karaya/shared/schemas'
 import { requireJwtOnly } from '../auth/middleware'
+import { requireEntitlement } from '../services/entitlements'
 import * as apiKeys from '../services/api-keys'
 
 // Seluruh resource ini "jwt" saja di matriks (05-api.md §4) — API key tidak boleh dipakai untuk
@@ -23,12 +24,14 @@ apiKeysApp.openapi(
     request: { body: { content: { 'application/json': { schema: CreateApiKeyBodySchema } } } },
     responses: { 201: { content: { 'application/json': { schema: z.any() } }, description: 'Dibuat — secret HANYA muncul di respons ini' } } }),
   async (c) => {
-    requireJwtOnly(c.get('actor'))
+    const actor = c.get('actor')
+    requireJwtOnly(actor)
+    await requireEntitlement(actor, 'api_access')
     // Diri sendiri vs member lain, dan scope <= role target, ditegakkan di create_api_key() (SQL)
     // lewat forbidden_owner/scope_exceeds_role — semua pemanggil di sini sudah pasti credential
     // jwt (scope selalu 'admin'), jadi pengecekan scope di layer HTTP tidak berarti apa-apa;
     // otorisasi nyata adalah actor.role, yang sudah dicek fungsi SQL.
-    const result = await apiKeys.createApiKey(c.get('actor'), c.req.valid('json'))
+    const result = await apiKeys.createApiKey(actor, c.req.valid('json'))
     return c.json(result, 201)
   },
 )
@@ -50,8 +53,10 @@ apiKeysApp.openapi(
     request: { params: z.object({ id: UuidSchema }) },
     responses: { 200: { content: { 'application/json': { schema: z.any() } }, description: 'OK' } } }),
   async (c) => {
-    requireJwtOnly(c.get('actor'))
-    const result = await apiKeys.rotateApiKey(c.get('actor'), c.req.valid('param').id)
+    const actor = c.get('actor')
+    requireJwtOnly(actor)
+    await requireEntitlement(actor, 'api_access')
+    const result = await apiKeys.rotateApiKey(actor, c.req.valid('param').id)
     return c.json(result, 200)
   },
 )

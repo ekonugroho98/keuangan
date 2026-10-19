@@ -5,6 +5,7 @@ import { withUserClaims } from '../db/tx'
 import { resolveApiKeyActor } from './api-key'
 import { withIdempotency } from '../middleware/idempotency'
 import { checkRateLimit } from '../middleware/rate-limit'
+import { requireEntitlement } from '../services/entitlements'
 import type { Actor } from './actor'
 
 declare module 'hono' {
@@ -106,6 +107,7 @@ export function requireAuth() {
     if (token.startsWith('kf_live_')) {
       const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
       const actor = await resolveApiKeyActor(token, ip)
+      await requireEntitlement(actor, 'api_access')
       assertScope(actor, defaultScopeForMethod(c.req.method))
       await checkRateLimit(c, actor)
       c.set('actor', actor)
