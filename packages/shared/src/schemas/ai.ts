@@ -14,7 +14,13 @@ export const AiChatBodySchema = z
   })
   .openapi('AiChatBody')
 
-export const AiChatResponseSchema = z.object({ reply: z.string() }).openapi('AiChatResponse')
+export const AiChatResponseSchema = z
+  .object({
+    reply: z.string(),
+    mutated: z.boolean().optional(),
+    tools_used: z.array(z.string()).optional(),
+  })
+  .openapi('AiChatResponse')
 
 // Salah satu dari (image_base64 + mime_type) untuk mode vision, atau ocr_text untuk mode
 // teks-saja (hasil OCR client-side yang perlu distrukturkan AI) — lihat AddTransactionModal.jsx.

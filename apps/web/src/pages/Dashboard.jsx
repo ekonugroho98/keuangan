@@ -557,8 +557,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       setAiChat((p) =>
         p.filter((m) => m.role !== "thinking").concat({ role: "ai", text: result.reply }),
       );
-      // Segarkan data dasbor bila AI mengeksekusi tool tulis (catat transaksi, belanja, stok kulkas, dll.)
-      queryClient.invalidateQueries();
+      // Hanya segarkan data dasbor bila AI benar-benar mengeksekusi tool tulis (catat transaksi, belanja, stok kulkas, dll.)
+      if (result?.mutated) {
+        queryClient.invalidateQueries();
+      }
     } catch (err) {
       setAiChat((p) =>
         p.filter((m) => m.role !== "thinking").concat({ role: "error", text: err.message }),
