@@ -1,4 +1,25 @@
 const fmtRp = (n: unknown) => `Rp ${Number(n ?? 0).toLocaleString('id-ID')}`
+const HARI_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+
+function formatDateWithDayAndTime(dateStr: string, createdAt?: string): string {
+  let dayLabel = dateStr
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr ?? '')
+  if (m) {
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+    const hari = HARI_ID[d.getUTCDay()]
+    if (hari) dayLabel = `${hari}, ${dateStr}`
+  }
+  if (createdAt) {
+    const dt = new Date(createdAt)
+    if (!Number.isNaN(dt.getTime())) {
+      const wib = new Date(dt.getTime() + 7 * 3600_000)
+      const hh = String(wib.getUTCHours()).padStart(2, '0')
+      const mm = String(wib.getUTCMinutes()).padStart(2, '0')
+      return `${dayLabel} (${hh}:${mm} WIB)`
+    }
+  }
+  return dayLabel
+}
 
 interface Acc { id: string; name: string; icon?: string; type: string; balance: number | null }
 interface Tx {
@@ -6,6 +27,7 @@ interface Tx {
   type: string
   amount: number
   date: string
+  created_at?: string
   note: string
   qty?: number | null
   unit_price?: number | null
@@ -15,6 +37,7 @@ interface Tx {
   canonical_name?: string | null
   category?: { name: string }
   account?: { name: string }
+  recorded_by?: { display_name?: string }
 }
 
 /**
@@ -51,7 +74,9 @@ export function formatToolResult(name: string, result: unknown): string {
           if (t.total_size_label) meta.push(`total ukuran: ${t.total_size_label}`)
           if (t.canonical_name) meta.push(`produk: ${t.canonical_name}`)
           const metaSuffix = meta.length ? ` (${meta.join(', ')})` : ''
-          return `${t.date} | ${t.type === 'income' ? 'Pemasukan' : t.type === 'transfer' ? 'Transfer' : 'Pengeluaran'} | ${fmtRp(t.amount)}${metaSuffix} | ${t.category?.name ?? '-'} | ${t.note || '-'} | ${t.account?.name ?? '-'}`
+          const dtLabel = formatDateWithDayAndTime(t.date, t.created_at)
+          const recorder = t.recorded_by?.display_name ? ` (oleh: ${t.recorded_by.display_name})` : ''
+          return `[id:${t.id}] ${dtLabel} | ${t.type === 'income' ? 'Pemasukan' : t.type === 'transfer' ? 'Transfer' : 'Pengeluaran'} | ${fmtRp(t.amount)}${metaSuffix} | ${t.category?.name ?? '-'} | ${t.note || '-'} | ${t.account?.name ?? '-'}${recorder}`
         })
         .join('\n')
       return `${data.length} transaksi ditemukan:\n${rows}`
