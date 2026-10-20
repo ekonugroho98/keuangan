@@ -30,13 +30,13 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Keluarga Berkembang — Berkembang Bersama dalam Kehangatan',
+        name: 'Keluarga Berkembang: Berkembang Bersama dalam Kehangatan',
         short_name: 'Keluarga Berkembang',
-        description: 'Berkembang Bersama dalam Kehangatan — Aplikasi keuangan rumah tangga, belanja dapur, dan stok kulkas keluarga',
+        description: 'Berkembang Bersama dalam Kehangatan. Aplikasi keuangan rumah tangga, belanja dapur, stok kulkas, dan asisten AI keluarga.',
         start_url: '/',
         display: 'standalone',
-        background_color: '#F5F3EC',
-        theme_color: '#46634E',
+        background_color: '#FFFDF9',
+        theme_color: '#3F5142',
         orientation: 'portrait',
         icons: [
           { src: '/logo-icon.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -49,8 +49,9 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        globIgnores: ['**/screenshots/**', '**/*.apk'],
         // Fase 4 (07-frontend.md §6): data domain sekarang lewat apps/api (VITE_API_BASE_URL),
-        // bukan *.supabase.co lagi — dan TIDAK di-cache sama sekali (data keuangan harus selalu
+        // bukan *.supabase.co lagi, dan TIDAK di-cache sama sekali (data keuangan harus selalu
         // fresh, bukan NetworkFirst dengan fallback cache). Supabase client di apps/web hanya
         // dipakai untuk auth (login/refresh token), jadi pattern dipersempit ke /auth/v1/ saja.
         runtimeCaching: [

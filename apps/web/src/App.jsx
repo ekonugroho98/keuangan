@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import LandingPage from "./pages/LandingPage";
+import LegalPage from "./pages/LegalPage";
 import Dashboard from "./pages/Dashboard";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import Toast from "./components/ui/Toast";
@@ -61,7 +62,7 @@ input, select, textarea { color: var(--color-text); background: var(--bg-surface
 @keyframes glow-pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
 @keyframes count-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* ═══ Typography Utilities — Keluarga Berkembang ═══ */
+/* ═══ Typography Utilities: Keluarga Berkembang ═══ */
 *, *::before, *::after { font-synthesis: none; }
 .gradient-text { background: linear-gradient(135deg, #3F5142, #839B7A, #7D513B, #B06443); background-size: 200% 200%; animation: gradient 5s ease infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: "tnum", "zero"; letter-spacing: -0.02em; }
@@ -172,7 +173,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
  * Layered moving aurora + grain texture + frosted bento surfaces
  * ═══════════════════════════════════════════════════════════════ */
 
-/* Animated aurora mesh — fixed behind everything */
+/* Animated aurora mesh: fixed behind everything */
 @keyframes aurora-drift-1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(6%,-4%) scale(1.08); } }
 @keyframes aurora-drift-2 { 0%,100% { transform: translate(0,0) scale(1.1); } 50% { transform: translate(-7%,5%) scale(1); } }
 @keyframes aurora-drift-3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(4%,6%) scale(1.12); } }
@@ -212,7 +213,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 [data-theme="light"] .aurora-layer { opacity: 0.45; filter: blur(90px); }
 [data-theme="light"] .grain-layer { opacity: 0.006; }
 
-/* Grain texture layer — sits on top of aurora but below content */
+/* Grain texture layer: sits on top of aurora but below content */
 .grain-layer {
   position: fixed; inset: 0; z-index: 0;
   pointer-events: none;
@@ -277,7 +278,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .aurora-content { position: relative; z-index: 1; }
 
 /* ═══════════════════════════════════════════════════════════════
- * AUTO-GLASS — any inline style using --bg-surface (but not the
+ * AUTO-GLASS: any inline style using --bg-surface (but not the
  * -low/-hover variants for inputs) gets backdrop-filter + edge.
  * This turns all 12 dashboard views into frosted glass with zero
  * per-file refactor needed.
@@ -352,11 +353,24 @@ export default function App() {
     const [session, setSession] = useState(undefined); // undefined = loading
     const [toast, setToast] = useState({ show: false, message: "", type: "success" });
     const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+    const [pathname, setPathname] = useState(() => window.location.pathname);
 
     const showToast = (msg, type = "success") => {
         setToast({ show: true, message: msg, type });
         setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3500);
     };
+
+    const navigateTo = (nextPath) => {
+        window.history.pushState({}, "", nextPath);
+        setPathname(window.location.pathname);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        const onPopState = () => setPathname(window.location.pathname);
+        window.addEventListener("popstate", onPopState);
+        return () => window.removeEventListener("popstate", onPopState);
+    }, []);
 
     useEffect(() => {
         const cleanAuthHash = () => {
@@ -392,9 +406,9 @@ export default function App() {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // Route manual /join/:code (07-frontend.md §4) — berlaku terlepas dari status login, karena
+    // Route manual /join/:code (07-frontend.md §4): berlaku terlepas dari status login, karena
     // JoinHouseholdPage sendiri menangani kasus belum login/masih loading session (lihat komponennya).
-    const joinMatch = window.location.pathname.match(/^\/join\/([^/]+)/);
+    const joinMatch = pathname.match(/^\/join\/([^/]+)/);
     if (joinMatch) {
         return (
             <div style={{ minHeight: "100vh", background: "var(--bg-app)", color: "var(--color-text)" }}>
@@ -405,7 +419,39 @@ export default function App() {
         );
     }
 
-    // Masih loading session awal
+    // Route dokumen legal resmi (/tos, /terms, /privacy, /refund) untuk KYC Duitku & pengguna
+    const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+    if (normalizedPath === "/tos" || normalizedPath === "/terms" || normalizedPath === "/privacy" || normalizedPath === "/refund") {
+        const legalTab = normalizedPath === "/privacy" ? "privacy" : normalizedPath === "/refund" ? "refund" : "tos";
+        return (
+            <div style={{ minHeight: "100vh", background: "#FFFDF9", color: "#1F2922" }}>
+                <style>{globalStyles}</style>
+                <Toast {...toast} />
+                <LegalPage initialTab={legalTab} onNavigate={navigateTo} />
+            </div>
+        );
+    }
+
+    // Deteksi apakah dibuka di root domain (keluargaberkembang.com) vs subdomain aplikasi (kelola.keluargaberkembang.com)
+    const hostname = window.location.hostname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const isRootDomain =
+        hostname === "keluargaberkembang.com" ||
+        hostname === "www.keluargaberkembang.com" ||
+        searchParams.get("domain") === "root";
+
+    // Di root domain (keluargaberkembang.com), selalu tampilkan Landing Page & Storefront tanpa menunggu session
+    if (isRootDomain && !isPasswordRecovery) {
+        return (
+            <div style={{ fontFamily: "'Quicksand',-apple-system,sans-serif", position: "relative", minHeight: "100vh" }}>
+                <style>{globalStyles}</style>
+                <Toast {...toast} />
+                <LandingPage showToast={showToast} onNavigate={navigateTo} isRootDomain={true} />
+            </div>
+        );
+    }
+
+    // Masih loading session awal untuk aplikasi (kelola.keluargaberkembang.com)
     if (session === undefined) {
         return (
             <div style={{ minHeight: "100vh", background: "var(--bg-app)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -421,7 +467,7 @@ export default function App() {
     return (
         <div style={{ fontFamily: "'Quicksand',-apple-system,sans-serif", position: "relative", minHeight: "100vh" }}>
             <style>{globalStyles}</style>
-            {/* Aurora + grain — fixed layers behind everything */}
+            {/* Aurora + grain: fixed layers behind everything */}
             <div className="aurora-layer" aria-hidden="true">
                 <span className="aurora-blob-3" />
                 <span className="aurora-blob-4" />
@@ -438,7 +484,7 @@ export default function App() {
                                 <AuthedApp session={session} onLogout={handleLogout} showToast={showToast} />
                             </HouseholdProvider>
                         )
-                        : <LandingPage showToast={showToast} />
+                        : <LandingPage showToast={showToast} onNavigate={navigateTo} isRootDomain={false} />
                 }
             </div>
         </div>

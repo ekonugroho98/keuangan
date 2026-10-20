@@ -31,43 +31,38 @@ const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
     };
 
     const handleFocus = e => {
-        e.target.style.borderColor = "var(--color-primary)";
-        e.target.style.background = "var(--color-primary-soft)";
+        e.target.style.borderColor = "#3F5142";
+        e.target.style.background = "#FFFDF9";
     };
     const handleBlur = e => {
-        e.target.style.borderColor = error ? "var(--color-expense)" : "var(--glass-border)";
-        e.target.style.background = "rgba(255,255,255,.03)";
+        e.target.style.borderColor = error ? "#B83B2A" : "#E5DEC9";
+        e.target.style.background = "#F7F3EB";
     };
 
     return (
         <Modal open={open} onClose={handleClose}>
             {({ isDesktop }) => (
                 <div style={{
-                    background: "var(--glass-hero)",
-                    backdropFilter: "var(--glass-blur)",
-                    WebkitBackdropFilter: "var(--glass-blur)",
-                    border: "1px solid var(--glass-border)",
-                    borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+                    background: "#FFFDF9",
+                    border: "1px solid #E5DEC9",
+                    borderRadius: isDesktop ? 24 : "24px 24px 0 0",
                     padding: isDesktop ? "36px 36px 32px" : "28px 22px calc(32px + env(safe-area-inset-bottom))",
                     maxHeight: "92vh", overflowY: "auto",
-                    boxShadow: "var(--glass-highlight), 0 32px 80px rgba(0,0,0,.45)",
+                    boxShadow: "0 24px 64px rgba(31, 41, 34, 0.25)",
                     position: "relative", overflow: "hidden",
+                    color: "#1F2922",
                 }}>
-                    {/* Ambient aurora orbs */}
-                    <div style={{ position: "absolute", top: -110, right: -70, width: 250, height: 250, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,.14), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
-                    <div style={{ position: "absolute", bottom: -120, left: -70, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle, rgba(131,155,122,.14), transparent 70%)", pointerEvents: "none", filter: "blur(12px)" }} />
-
                     {/* Close */}
                     <button
                         onClick={handleClose}
-                        aria-label="Close"
+                        aria-label="Tutup dialog"
                         style={{
-                            position: "absolute", top: 16, right: 16, zIndex: 3,
-                            background: "rgba(255,255,255,.06)",
-                            border: "1px solid var(--glass-border)",
-                            color: "var(--color-muted)",
-                            width: 34, height: 34, borderRadius: 12,
-                            cursor: "pointer", fontSize: 16,
+                            position: "absolute", top: 14, right: 14, zIndex: 3,
+                            background: "#F7F3EB",
+                            border: "1px solid #E5DEC9",
+                            color: "#4A584D",
+                            width: 44, height: 44, borderRadius: 12,
+                            cursor: "pointer", fontSize: 16, fontWeight: 700,
                             display: "flex", alignItems: "center", justifyContent: "center",
                         }}
                     >✕</button>
@@ -76,78 +71,72 @@ const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
                         {/* Header */}
                         <div style={{ textAlign: "center", marginBottom: 24 }}>
                             <div style={{
-                                width: 56, height: 56, margin: "0 auto 16px",
-                                borderRadius: 18,
-                                background: sent
-                                    ? "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep))"
-                                    : "linear-gradient(135deg, var(--color-amber), #f59e0b)",
+                                width: 52, height: 52, margin: "0 auto 14px",
+                                borderRadius: 16,
+                                background: sent ? "#3F5142" : "#9E472D",
+                                color: "#FFFDF9",
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 26,
-                                boxShadow: sent
-                                    ? "0 8px 24px rgba(131,155,122,.3), inset 0 1px 0 rgba(255,255,255,.35)"
-                                    : "0 8px 24px rgba(251,191,36,.3), inset 0 1px 0 rgba(255,255,255,.35)",
-                            }}>{sent ? "✉️" : "🔑"}</div>
+                                fontSize: 20, fontWeight: 700,
+                                fontFamily: "'Fredoka', sans-serif",
+                            }}>{sent ? "OK" : "?"}</div>
                             <h2 style={{
-                                fontSize: "clamp(22px, 3vw, 28px)",
-                                fontWeight: 900,
-                                color: "var(--color-text)",
-                                letterSpacing: "-.03em",
+                                fontSize: "clamp(22px, 3vw, 26px)",
+                                fontWeight: 600,
+                                color: "#1F2922",
+                                letterSpacing: "-.02em",
                                 margin: 0,
-                            }}>{sent ? "Cek email kamu" : "Lupa password?"}</h2>
-                            <p style={{ fontSize: 13, color: "var(--color-muted)", marginTop: 6, lineHeight: 1.5 }}>
+                                fontFamily: "'Fredoka', sans-serif",
+                            }}>{sent ? "Periksa Kotak Masuk Email" : "Atur Ulang Kata Sandi"}</h2>
+                            <p style={{ fontSize: 14, color: "#4A584D", marginTop: 6, lineHeight: 1.5 }}>
                                 {sent
-                                    ? "Link reset sudah dikirim. Cek inbox atau folder spam."
-                                    : "Masukin email yang terdaftar, kita kirim link buat reset password."}
+                                    ? "Tautan pemulihan kata sandi sudah dikirim ke alamat email Anda."
+                                    : "Masukkan alamat email yang terdaftar untuk menerima tautan pemulihan kata sandi."}
                             </p>
                         </div>
 
                         {sent ? (
                             <div>
-                                <div className="chip chip-mint" style={{ width: "100%", padding: "14px 16px", justifyContent: "flex-start", marginBottom: 16 }}>
-                                    <span style={{ marginRight: 8 }}>✓</span>
-                                    <span style={{ fontSize: 13, fontWeight: 600 }}>Email terkirim</span>
-                                </div>
                                 <div style={{
-                                    padding: 16, borderRadius: 16,
-                                    background: "var(--bg-surface)",
-                                    border: "1px solid var(--glass-border)",
+                                    padding: 16, borderRadius: 14,
+                                    background: "#F7F3EB",
+                                    border: "1px solid #E5DEC9",
                                     textAlign: "center", marginBottom: 20,
                                 }}>
-                                    <p style={{ color: "var(--color-muted)", fontSize: 12, margin: 0, marginBottom: 6 }}>
-                                        Link dikirim ke
+                                    <p style={{ color: "#4A584D", fontSize: 12, margin: 0, marginBottom: 6 }}>
+                                        Tautan pemulihan dikirim ke:
                                     </p>
-                                    <p style={{ color: "var(--color-primary)", fontSize: 14, fontWeight: 800, margin: 0, wordBreak: "break-all" }}>
+                                    <p style={{ color: "#3F5142", fontSize: 14, fontWeight: 700, margin: 0, wordBreak: "break-all" }}>
                                         {email}
                                     </p>
                                 </div>
-                                <p style={{ fontSize: 12, color: "var(--color-subtle)", lineHeight: 1.5, textAlign: "center", marginBottom: 0 }}>
-                                    Klik link di email untuk membuat password baru.
-                                    Kalau belum masuk dalam 2 menit, cek folder spam.
+                                <p style={{ fontSize: 13, color: "#4A584D", lineHeight: 1.5, textAlign: "center", marginBottom: 0 }}>
+                                    Buka tautan di dalam email untuk membuat kata sandi baru. Jika belum masuk dalam 2 menit, periksa folder Spam atau Promosi.
                                 </p>
                             </div>
                         ) : (
                             <>
                                 <div style={{ marginBottom: 16 }}>
-                                    <label style={{
-                                        fontSize: 11, fontWeight: 700,
-                                        color: "var(--color-subtle)",
+                                    <label htmlFor="reset-email" style={{
+                                        fontSize: 12, fontWeight: 700,
+                                        color: "#4A584D",
                                         textTransform: "uppercase",
-                                        letterSpacing: 1.4,
+                                        letterSpacing: "0.06em",
                                         display: "block", marginBottom: 8,
-                                    }}>Email</label>
+                                    }}>Alamat Email Terdaftar</label>
                                     <input
+                                        id="reset-email"
                                         type="email"
-                                        placeholder="email@example.com"
+                                        placeholder="nama@keluarga.com"
                                         value={email}
                                         onChange={e => { setEmail(e.target.value); setError(""); }}
                                         onFocus={handleFocus}
                                         onBlur={handleBlur}
                                         style={{
-                                            width: "100%", padding: "14px 16px", fontSize: 15,
-                                            borderRadius: 14,
-                                            border: `1px solid ${error ? "var(--color-expense)" : "var(--glass-border)"}`,
-                                            background: "rgba(255,255,255,.03)",
-                                            color: "var(--color-text)",
+                                            width: "100%", padding: "13px 16px", fontSize: 15,
+                                            borderRadius: 12,
+                                            border: `1px solid ${error ? "#B83B2A" : "#E5DEC9"}`,
+                                            background: "#F7F3EB",
+                                            color: "#1F2922",
                                             fontFamily: "inherit", outline: "none",
                                             minHeight: 48,
                                             transition: "all .2s",
@@ -155,37 +144,42 @@ const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
                                         }}
                                     />
                                     {error && (
-                                        <div style={{ fontSize: 12, color: "var(--color-expense)", marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                                            <span>⚠</span>{error}
+                                        <div style={{ fontSize: 12, color: "#B83B2A", fontWeight: 600, marginTop: 6 }}>
+                                            {error}
                                         </div>
                                     )}
                                 </div>
 
                                 <button
-                                    className="btn-primary"
+                                    type="button"
                                     onClick={handleSubmit}
                                     disabled={isLoading}
-                                    style={{ width: "100%", minHeight: 50, fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                                    style={{
+                                        width: "100%", minHeight: 48, fontSize: 15, fontWeight: 700,
+                                        background: "#3F5142", color: "#FFFDF9", border: "none", borderRadius: 12,
+                                        cursor: isLoading ? "not-allowed" : "pointer",
+                                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                        fontFamily: "'Fredoka', sans-serif",
+                                    }}
                                 >
-                                    {isLoading
-                                        ? <><span style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin .8s linear infinite" }} />Mengirim...</>
-                                        : "Kirim link reset"}
+                                    {isLoading ? "Mengirim tautan..." : "Kirim Tautan Pemulihan"}
                                 </button>
                             </>
                         )}
 
                         {/* Divider + back */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px" }}>
-                            <div style={{ flex: 1, height: 1, background: "var(--glass-border)" }} />
-                            <span style={{ fontSize: 11, color: "var(--color-subtle)", fontWeight: 600, letterSpacing: 1 }}>ATAU</span>
-                            <div style={{ flex: 1, height: 1, background: "var(--glass-border)" }} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
+                            <div style={{ flex: 1, height: 1, background: "#E5DEC9" }} />
+                            <span style={{ fontSize: 11, color: "#4A584D", fontWeight: 700, letterSpacing: "0.08em" }}>ATAU</span>
+                            <div style={{ flex: 1, height: 1, background: "#E5DEC9" }} />
                         </div>
 
-                        <div style={{ textAlign: "center", fontSize: 13, color: "var(--color-muted)" }}>
+                        <div style={{ textAlign: "center", fontSize: 14, color: "#4A584D" }}>
                             <button
-                                className="link-btn"
+                                type="button"
                                 onClick={() => { handleClose(); onBackToLogin(); }}
-                            >← Kembali ke login</button>
+                                style={{ background: "none", border: "none", color: "#3F5142", fontWeight: 700, fontSize: 14, cursor: "pointer", textDecoration: "underline", padding: "4px" }}
+                            >Kembali ke Halaman Masuk</button>
                         </div>
                     </div>
                 </div>
