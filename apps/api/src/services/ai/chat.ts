@@ -357,15 +357,15 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
       const resp = await callAnthropic(apiKey, model, msgs, systemPrompt, toolDefs)
       if (resp.stop_reason === 'tool_use') {
         msgs.push({ role: 'assistant', content: resp.content })
-        const results: unknown[] = []
-        for (const block of resp.content) {
-          if (block.type === 'tool_use') {
+        const toolBlocks = resp.content.filter((b) => b.type === 'tool_use')
+        const results = await Promise.all(
+          toolBlocks.map(async (block) => {
             toolsUsed.push(block.name!)
             const { output, isWrite } = await executeTool(actor, block.name!, (block.input as Record<string, unknown>) ?? {})
             if (isWrite) mutated = true
-            results.push({ type: 'tool_result', tool_use_id: block.id, content: output })
-          }
-        }
+            return { type: 'tool_result', tool_use_id: block.id, content: output }
+          }),
+        )
         msgs.push({ role: 'user', content: results })
         continue
       }
@@ -385,13 +385,14 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
       const fnCalls = parts.filter((p) => p.functionCall)
       if (fnCalls.length) {
         msgs.push({ role: 'model', parts })
-        const fnResponses: unknown[] = []
-        for (const p of fnCalls) {
-          toolsUsed.push(p.functionCall!.name)
-          const { output, isWrite } = await executeTool(actor, p.functionCall!.name, (p.functionCall!.args as Record<string, unknown>) ?? {})
-          if (isWrite) mutated = true
-          fnResponses.push({ functionResponse: { name: p.functionCall!.name, response: { result: output } } })
-        }
+        const fnResponses = await Promise.all(
+          fnCalls.map(async (p) => {
+            toolsUsed.push(p.functionCall!.name)
+            const { output, isWrite } = await executeTool(actor, p.functionCall!.name, (p.functionCall!.args as Record<string, unknown>) ?? {})
+            if (isWrite) mutated = true
+            return { functionResponse: { name: p.functionCall!.name, response: { result: output } } }
+          }),
+        )
         msgs.push({ role: 'user', parts: fnResponses })
         continue
       }
@@ -410,14 +411,17 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
     const msg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools)) as ChatMsg & { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }
     if (msg.tool_calls?.length) {
       msgs.push({ role: 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls })
-      for (const toolCall of msg.tool_calls) {
-        let args: Record<string, unknown> = {}
-        try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { /* arguments kosong/rusak -> panggil tool tanpa filter */ }
-        toolsUsed.push(toolCall.function.name)
-        const { output, isWrite } = await executeTool(actor, toolCall.function.name, args)
-        if (isWrite) mutated = true
-        msgs.push({ role: 'tool', tool_call_id: toolCall.id, content: output })
-      }
+      const toolMsgs = await Promise.all(
+        msg.tool_calls.map(async (toolCall) => {
+          let args: Record<string, unknown> = {}
+          try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { /* arguments kosong/rusak -> panggil tool tanpa filter */ }
+          toolsUsed.push(toolCall.function.name)
+          const { output, isWrite } = await executeTool(actor, toolCall.function.name, args)
+          if (isWrite) mutated = true
+          return { role: 'tool' as const, tool_call_id: toolCall.id, content: output }
+        }),
+      )
+      msgs.push(...toolMsgs)
       continue
     }
     return { reply: msg.content || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }

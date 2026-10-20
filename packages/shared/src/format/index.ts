@@ -106,6 +106,11 @@ export function parseReceiptNote(note: string): ParsedReceiptNote {
     out.refNo = ref[1]!.trim()
     rest = rest.slice(0, ref.index).trim()
   }
+  // Abaikan label kategori/aktivitas umum seperti [KANTOR], [PRIBADI], [DINAS], [REIMBURSE] agar tidak dianggap nama toko/merchant di product_prices
+  const nonMerchantTagRe = /^\[(?:kantor|pribadi|dinas|reimburse|klaim|rumah|kerja|lembur|titipan|rutin|project|proyek|bisnis|meeting|acara|liburan|mudik|operasional|ops)(?:\s+[^\]]*)?\]\s*/i
+  while (nonMerchantTagRe.test(rest)) {
+    rest = rest.replace(nonMerchantTagRe, '').trim()
+  }
   const lead = rest.match(/^\[([^\]]+)\]\s*/)
   if (lead) {
     out.merchant = lead[1]!.trim()

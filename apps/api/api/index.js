@@ -14399,6 +14399,10 @@ function parseReceiptNote(note) {
     out.refNo = ref[1].trim();
     rest = rest.slice(0, ref.index).trim();
   }
+  const nonMerchantTagRe = /^\[(?:kantor|pribadi|dinas|reimburse|klaim|rumah|kerja|lembur|titipan|rutin|project|proyek|bisnis|meeting|acara|liburan|mudik|operasional|ops)(?:\s+[^\]]*)?\]\s*/i;
+  while (nonMerchantTagRe.test(rest)) {
+    rest = rest.replace(nonMerchantTagRe, "").trim();
+  }
   const lead = rest.match(/^\[([^\]]+)\]\s*/);
   if (lead) {
     out.merchant = lead[1].trim();
@@ -15681,7 +15685,7 @@ async function createTransactionBatch(actor, input, timezone) {
 async function updateTransaction(actor, id, input) {
   const parsedNote = input.note ? parseReceiptNote(input.note) : null;
   if (parsedNote?.merchant && parsedNote.name) {
-    await canonicalizeProducts(actor, [parsedNote.name]);
+    void canonicalizeProducts(actor, [parsedNote.name]);
   }
   const receiptUrl = await resolveReceiptUrl(actor, input);
   return withActor(actor, async (tx) => {
@@ -19476,15 +19480,15 @@ async function chatWithAi(actor, messages2, allowWrite = false) {
       const resp = await callAnthropic(apiKey, model, msgs2, systemPrompt, toolDefs);
       if (resp.stop_reason === "tool_use") {
         msgs2.push({ role: "assistant", content: resp.content });
-        const results = [];
-        for (const block of resp.content) {
-          if (block.type === "tool_use") {
+        const toolBlocks = resp.content.filter((b2) => b2.type === "tool_use");
+        const results = await Promise.all(
+          toolBlocks.map(async (block) => {
             toolsUsed.push(block.name);
             const { output, isWrite } = await executeTool(actor, block.name, block.input ?? {});
             if (isWrite) mutated = true;
-            results.push({ type: "tool_result", tool_use_id: block.id, content: output });
-          }
-        }
+            return { type: "tool_result", tool_use_id: block.id, content: output };
+          })
+        );
         msgs2.push({ role: "user", content: results });
         continue;
       }
@@ -19503,13 +19507,14 @@ async function chatWithAi(actor, messages2, allowWrite = false) {
       const fnCalls = parts2.filter((p) => p.functionCall);
       if (fnCalls.length) {
         msgs2.push({ role: "model", parts: parts2 });
-        const fnResponses = [];
-        for (const p of fnCalls) {
-          toolsUsed.push(p.functionCall.name);
-          const { output, isWrite } = await executeTool(actor, p.functionCall.name, p.functionCall.args ?? {});
-          if (isWrite) mutated = true;
-          fnResponses.push({ functionResponse: { name: p.functionCall.name, response: { result: output } } });
-        }
+        const fnResponses = await Promise.all(
+          fnCalls.map(async (p) => {
+            toolsUsed.push(p.functionCall.name);
+            const { output, isWrite } = await executeTool(actor, p.functionCall.name, p.functionCall.args ?? {});
+            if (isWrite) mutated = true;
+            return { functionResponse: { name: p.functionCall.name, response: { result: output } } };
+          })
+        );
         msgs2.push({ role: "user", parts: fnResponses });
         continue;
       }
@@ -19526,17 +19531,20 @@ async function chatWithAi(actor, messages2, allowWrite = false) {
     const msg = await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools);
     if (msg.tool_calls?.length) {
       msgs.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-      for (const toolCall of msg.tool_calls) {
-        let args = {};
-        try {
-          args = JSON.parse(toolCall.function.arguments || "{}");
-        } catch {
-        }
-        toolsUsed.push(toolCall.function.name);
-        const { output, isWrite } = await executeTool(actor, toolCall.function.name, args);
-        if (isWrite) mutated = true;
-        msgs.push({ role: "tool", tool_call_id: toolCall.id, content: output });
-      }
+      const toolMsgs = await Promise.all(
+        msg.tool_calls.map(async (toolCall) => {
+          let args = {};
+          try {
+            args = JSON.parse(toolCall.function.arguments || "{}");
+          } catch {
+          }
+          toolsUsed.push(toolCall.function.name);
+          const { output, isWrite } = await executeTool(actor, toolCall.function.name, args);
+          if (isWrite) mutated = true;
+          return { role: "tool", tool_call_id: toolCall.id, content: output };
+        })
+      );
+      msgs.push(...toolMsgs);
       continue;
     }
     return { reply: msg.content || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };

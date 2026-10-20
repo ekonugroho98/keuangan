@@ -488,7 +488,7 @@ export interface UpdateTransactionInput {
 export async function updateTransaction(actor: Actor, id: string, input: UpdateTransactionInput) {
   const parsedNote = input.note ? parseReceiptNote(input.note) : null
   if (parsedNote?.merchant && parsedNote.name) {
-    await canonicalizeProducts(actor, [parsedNote.name])
+    void canonicalizeProducts(actor, [parsedNote.name])
   }
   const receiptUrl = await resolveReceiptUrl(actor, input)
   return withActor(actor, async (tx) => {
