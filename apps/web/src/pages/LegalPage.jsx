@@ -73,19 +73,20 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                             minHeight: 44,
                         }}
                     >
-                        <span style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 10,
-                            background: "#3F5142",
-                            color: "#FFFDF9",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontFamily: "'Fredoka', sans-serif",
-                            fontWeight: 700,
-                            fontSize: 16,
-                        }}>KB</span>
+                        <img
+                            src="/logo-icon.png"
+                            alt="Logo Keluarga Berkembang"
+                            width={38}
+                            height={38}
+                            style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: 10,
+                                objectFit: "cover",
+                                border: "1px solid #E5DEC9",
+                                background: "#FFFDF9",
+                            }}
+                        />
                         <div>
                             <div style={{
                                 fontFamily: "'Fredoka', sans-serif",

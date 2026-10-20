@@ -738,23 +738,21 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             minHeight: 44,
                         }}
                     >
-                        <div style={{
-                            width: 42,
-                            height: 42,
-                            borderRadius: 12,
-                            background: "#3F5142",
-                            color: "#FFFDF9",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontFamily: "'Fredoka', sans-serif",
-                            fontWeight: 700,
-                            fontSize: 18,
-                            boxShadow: "0 4px 12px rgba(63, 81, 66, 0.22)",
-                            flexShrink: 0,
-                        }}>
-                            KB
-                        </div>
+                        <img
+                            src="/logo-icon.png"
+                            alt="Logo Keluarga Berkembang"
+                            width={42}
+                            height={42}
+                            style={{
+                                width: 42,
+                                height: 42,
+                                borderRadius: 12,
+                                objectFit: "cover",
+                                border: "1px solid #E5DEC9",
+                                background: "#FFFDF9",
+                                flexShrink: 0,
+                            }}
+                        />
                         <div>
                             <div style={{
                                 fontFamily: "'Fredoka', sans-serif",
@@ -2228,21 +2226,20 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                         {/* Col 1: Brand Identity */}
                         <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                                <div style={{
-                                    width: 38,
-                                    height: 38,
-                                    borderRadius: 10,
-                                    background: "#3F5142",
-                                    color: "#FFFDF9",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontFamily: "'Fredoka', sans-serif",
-                                    fontWeight: 700,
-                                    fontSize: 16,
-                                }}>
-                                    KB
-                                </div>
+                                <img
+                                    src="/logo-icon.png"
+                                    alt="Logo Keluarga Berkembang"
+                                    width={38}
+                                    height={38}
+                                    style={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: 10,
+                                        objectFit: "cover",
+                                        border: "1px solid #D5CCB8",
+                                        background: "#FFFDF9",
+                                    }}
+                                />
                                 <div>
                                     <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 18, fontWeight: 600 }}>
                                         Keluarga Berkembang
