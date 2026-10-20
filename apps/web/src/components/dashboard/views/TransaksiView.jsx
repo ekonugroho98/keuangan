@@ -197,13 +197,19 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
         { id: "transfer", label: t("tx.transfer") || "Transfer"    },
     ];
 
-    const typeMeta = (type) => {
+    const typeMeta = (type, category) => {
+        if (category === "Piutang") {
+            return type === "income"
+                ? { badgeBg: "rgba(217,167,74,.14)", badgeColor: "#D9A74A", iconBg: "rgba(217,167,74,.12)", amtColor: "var(--color-primary)", sign: "+" }
+                : { badgeBg: "rgba(217,167,74,.14)", badgeColor: "#D9A74A", iconBg: "rgba(217,167,74,.12)", amtColor: "#D9A74A", sign: "-" };
+        }
         if (type === "income")   return { badgeBg: "rgba(131,155,122,.12)",  badgeColor: "var(--color-primary)", iconBg: "rgba(131,155,122,.1)",  amtColor: "var(--color-primary)", sign: "+"  };
         if (type === "transfer") return { badgeBg: "rgba(79,195,247,.12)",  badgeColor: "#4FC3F7", iconBg: "rgba(79,195,247,.1)",  amtColor: "#4FC3F7", sign: "↔ " }; // netral — bukan minus
         return                          { badgeBg: "rgba(255,113,108,.12)", badgeColor: "#ff716c", iconBg: "rgba(255,113,108,.1)", amtColor: "#ff716c", sign: "-"  };
     };
 
-    const typeText = (type) => {
+    const typeText = (type, category) => {
+        if (category === "Piutang") return "PIUTANG";
         if (type === "income")   return t("tx.income")   || "Pemasukan";
         if (type === "transfer") return t("tx.transfer") || "Transfer";
         return t("tx.expense") || "Pengeluaran";
@@ -755,7 +761,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                     </div>
                 ) : (
                     pagedFiltered.map((tx, idx) => {
-                        const meta = typeMeta(tx.type);
+                        const meta = typeMeta(tx.type, tx.category);
                         const isHovered = hoveredId === tx.id;
                         /* alternating row: even = #13131a, odd = rgba(37,37,47,.3) */
                         const rowBg = isHovered
@@ -803,7 +809,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
                                                 fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
                                                 whiteSpace: "nowrap",
                                             }}>
-                                                {typeText(tx.type)}
+                                                {typeText(tx.type, tx.category)}
                                             </span>
                                             {members.length > 1 && <RecordedByChip recordedBy={tx.recorded_by} />}
                                             {beneficiaryEnabled && tx.beneficiary && (

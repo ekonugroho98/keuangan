@@ -312,7 +312,7 @@ export async function analyzeSpending(actor: Actor, input: AnalyzeSpendingInput)
       t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
       and t.date between ${from} and ${to}
       and c.system_key is distinct from 'transfer'
-      ${categoryId ? tx`and t.category_id = ${categoryId}` : tx``}
+      ${categoryId ? tx`and t.category_id = ${categoryId}` : tx`and c.system_key is distinct from 'piutang'`}
       ${accountId ? tx`and t.account_id = ${accountId}` : tx``}
       ${beneficiaryId ? tx`and t.beneficiary_id = ${beneficiaryId}` : tx``}
       ${q ? tx`and norm_text(t.note) like ${q}` : tx``}

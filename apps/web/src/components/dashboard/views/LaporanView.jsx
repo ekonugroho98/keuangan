@@ -568,11 +568,8 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
     Object.entries(dailyExpenseMap).forEach(([d, v]) => { if (v > biggestVal) { biggestDay = d; biggestVal = v; } });
 
     const catTotals = {};
-    filtered.filter(tx => tx.type === "expense").forEach(tx => {
+    filtered.filter(tx => tx.type === "expense" && tx.category && tx.category !== "Piutang").forEach(tx => {
         catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
-    });
-    filtered.filter(isScopePiutangOffset).forEach(tx => {
-        catTotals.Piutang = Math.max(0, (catTotals.Piutang || 0) - tx.amount);
     });
     const sortedCats = Object.entries(catTotals).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
 
@@ -586,7 +583,7 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
 
     /* ═══ KEBIASAAN & POLA BELANJA (mirrors apps/api/src/services/insights.ts) ═══ */
     const habitStats = useMemo(() => {
-        const expRows = filtered.filter(isScopeExpense);
+        const expRows = filtered.filter(tx => isScopeExpense(tx) && tx.category !== "Piutang");
         const totalExp = expRows.reduce((s, r) => s + r.amount, 0);
         const countExp = expRows.length;
         const avgTx = countExp > 0 ? Math.round(totalExp / countExp) : 0;

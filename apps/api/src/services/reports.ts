@@ -49,10 +49,12 @@ export async function getMonthlyReport(actor: Actor, opts: { month?: string }) {
     const accounts = accountRows.map((r) => ({ name: r.name, balance: r.balance === null ? null : Number(r.balance) }))
 
     const largestRows = await tx<{ date: string; note: string; amount: string }[]>`
-      select date::text, note, amount::text from transactions
-      where household_id = ${actor.householdId} and deleted_at is null and type = 'expense'
-        and date between ${summary.period.from} and ${summary.period.to}
-      order by amount desc limit 5
+      select t.date::text as date, t.note, t.amount::text as amount from transactions t
+      join categories c on c.id = t.category_id
+      where t.household_id = ${actor.householdId} and t.deleted_at is null and t.type = 'expense'
+        and c.system_key is distinct from 'piutang'
+        and t.date between ${summary.period.from} and ${summary.period.to}
+      order by t.amount desc limit 5
     `
     const largestTransactions = largestRows.map((r) => ({ date: r.date, note: r.note, amount: Number(r.amount) }))
 

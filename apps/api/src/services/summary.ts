@@ -96,6 +96,7 @@ export async function getSummary(
       from transactions t join categories c on c.id = t.category_id
       left join accounts a on a.id = t.account_id left join accounts ta on ta.id = t.to_account_id
       where t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
+        and c.system_key is distinct from 'piutang'
         and t.date between ${period.from} and ${period.to}
       group by c.name, c.icon order by sum(t.amount) desc limit 8
     `

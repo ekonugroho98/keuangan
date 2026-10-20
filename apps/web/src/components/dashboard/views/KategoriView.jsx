@@ -55,11 +55,9 @@ const KategoriView = ({ transactions = [], customCategories, allCategoriesFromAp
         const exp = {};
         const inc = {};
         monthTxs.forEach(tx => {
-            if (!tx.category) return;
+            if (!tx.category || tx.category === "Piutang") return;
             if (tx.type === "expense") {
                 exp[tx.category] = (exp[tx.category] || 0) + tx.amount;
-            } else if (tx.type === "income" && tx.category === "Piutang") {
-                exp.Piutang = Math.max(0, (exp.Piutang || 0) - tx.amount);
             } else if (tx.type === "income") {
                 inc[tx.category] = (inc[tx.category] || 0) + tx.amount;
             }
@@ -73,9 +71,9 @@ const KategoriView = ({ transactions = [], customCategories, allCategoriesFromAp
             return allCategoriesFromApi
                 .filter(c => {
                     if (!c.is_system) return true;
-                    // Sembunyikan Transfer & Koreksi Saldo dari manajemen kategori;
-                    // kategori sistem pengeluaran (Tabungan & Goal, Hutang & Cicilan, Piutang) tetap ditampilkan bila ada transaksi
-                    if (c.system_key === "transfer" || c.system_key === "balance_adjustment") return false;
+                    // Sembunyikan Transfer, Koreksi Saldo & Piutang dari manajemen kategori;
+                    // kategori sistem pengeluaran (Tabungan & Goal, Hutang & Cicilan) tetap ditampilkan bila ada transaksi
+                    if (c.system_key === "transfer" || c.system_key === "balance_adjustment" || c.system_key === "piutang") return false;
                     return (expenseTotals[c.name] || 0) > 0;
                 })
                 .map(c => ({
@@ -86,7 +84,7 @@ const KategoriView = ({ transactions = [], customCategories, allCategoriesFromAp
         }
         const INCOME_FALLBACK = ["Gaji","Freelance","Bisnis","Investasi"];
         const defaultCats = Object.entries(categoryIcons)
-            .filter(([name]) => name !== "Transfer" && name !== "Makanan")
+            .filter(([name]) => name !== "Transfer" && name !== "Makanan" && name !== "Piutang")
             .map(([name, icon]) => ({
                 id: null, name, icon,
                 type: INCOME_FALLBACK.includes(name) ? "income" : name === "Lainnya" ? "both" : "expense",

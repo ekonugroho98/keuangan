@@ -327,11 +327,8 @@ const DasborView = ({
 
     const scopedSortedCats = (() => {
         const map = {};
-        txThis.filter(isScopeExpense).forEach(tx => {
+        txThis.filter(tx => isScopeExpense(tx) && tx.category && tx.category !== "Piutang").forEach(tx => {
             map[tx.category] = (map[tx.category] || 0) + tx.amount;
-        });
-        txThis.filter(isScopePiutangOffset).forEach(tx => {
-            map.Piutang = Math.max(0, (map.Piutang || 0) - tx.amount);
         });
         return Object.entries(map).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
     })();

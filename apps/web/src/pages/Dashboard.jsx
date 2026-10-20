@@ -358,10 +358,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
 
   const catTotals = {};
   transactions.forEach((t) => {
-    if (t.type === "expense" && t.category) {
+    if (t.type === "expense" && t.category && t.category !== "Piutang") {
       catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
-    } else if (t.type === "income" && t.category === "Piutang") {
-      catTotals.Piutang = Math.max(0, (catTotals.Piutang || 0) - t.amount);
     }
   });
   const sortedCats = Object.entries(catTotals)

@@ -17006,6 +17006,7 @@ async function getSummary(actor, opts) {
       from transactions t join categories c on c.id = t.category_id
       left join accounts a on a.id = t.account_id left join accounts ta on ta.id = t.to_account_id
       where t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
+        and c.system_key is distinct from 'piutang'
         and t.date between ${period.from} and ${period.to}
       group by c.name, c.icon order by sum(t.amount) desc limit 8
     `;
@@ -17657,10 +17658,12 @@ async function getMonthlyReport(actor, opts) {
     `;
     const accounts = accountRows.map((r) => ({ name: r.name, balance: r.balance === null ? null : Number(r.balance) }));
     const largestRows = await tx`
-      select date::text, note, amount::text from transactions
-      where household_id = ${actor.householdId} and deleted_at is null and type = 'expense'
-        and date between ${summary.period.from} and ${summary.period.to}
-      order by amount desc limit 5
+      select t.date::text as date, t.note, t.amount::text as amount from transactions t
+      join categories c on c.id = t.category_id
+      where t.household_id = ${actor.householdId} and t.deleted_at is null and t.type = 'expense'
+        and c.system_key is distinct from 'piutang'
+        and t.date between ${summary.period.from} and ${summary.period.to}
+      order by t.amount desc limit 5
     `;
     const largestTransactions = largestRows.map((r) => ({ date: r.date, note: r.note, amount: Number(r.amount) }));
     const textId = buildTextId({ label: summary.period.label, totals: summary.totals, topCategories: summary.top_categories, piutangOpen, debtsDueSoon });
@@ -18244,7 +18247,7 @@ async function analyzeSpending(actor, input) {
       t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
       and t.date between ${from} and ${to}
       and c.system_key is distinct from 'transfer'
-      ${categoryId ? tx`and t.category_id = ${categoryId}` : tx``}
+      ${categoryId ? tx`and t.category_id = ${categoryId}` : tx`and c.system_key is distinct from 'piutang'`}
       ${accountId ? tx`and t.account_id = ${accountId}` : tx``}
       ${beneficiaryId ? tx`and t.beneficiary_id = ${beneficiaryId}` : tx``}
       ${q ? tx`and norm_text(t.note) like ${q}` : tx``}
