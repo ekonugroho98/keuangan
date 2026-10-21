@@ -117,7 +117,7 @@ export default function AiFloatingChat({
             left: isMobile ? 12 : "auto",
             width: isMobile ? "auto" : 400,
             height: isMobile ? "min(74vh, calc(100vh - 104px))" : "min(580px, calc(100vh - 120px))",
-            zIndex: 950,
+            zIndex: 180,
             display: "flex",
             flexDirection: "column",
             background: "var(--bg-elevated, var(--bg-surface))",
@@ -310,11 +310,12 @@ export default function AiFloatingChat({
                 💎
               </div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
-                  Aktifkan {APP_AI_NAME}
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
+                  💎 Pakai Kuota Resmi Keluarga Berkembang (Mulai Rp 9.000)
                 </div>
                 <div style={{ fontSize: 12.5, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                  Tanya sisa jatah harian, cek stok kulkas, evaluasi anggaran, atau suruh AI langsung mencatat transaksi lewat chat.
+                  Tidak perlu mendaftar API key teknis. Cukup masukkan Kode Key <code>sk-kb-...</code> dari{" "}
+                  <strong>@KaraAutoBot</strong> untuk mengaktifkan tanya-jawab AI &amp; scan struk belanja.
                 </div>
               </div>
               <button
@@ -337,10 +338,29 @@ export default function AiFloatingChat({
                   boxShadow: "0 6px 18px rgba(63,81,66,0.28)",
                 }}
               >
-                ⚙️ Pasang Token / API Key AI
+                🔑 Masukkan Key / Klaim Voucher di Pengaturan
               </button>
+              <a
+                href="https://t.me/KaraAutoBot"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: "1px solid var(--color-border-strong)",
+                  background: "var(--bg-surface)",
+                  color: "var(--color-primary)",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  boxSizing: "border-box",
+                }}
+              >
+                🛒 Beli Paket Sachet Rp 9.000 via @KaraAutoBot
+              </a>
               <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                Mendukung Token Resmi Keluarga Berkembang (<code>sk-kb-...</code>) maupun Groq / Gemini / OpenAI.
+                Atau gunakan API Key pribadi (Groq, Gemini, OpenAI, DeepSeek) di menu Pengaturan.
               </div>
             </div>
           ) : (
@@ -555,7 +575,7 @@ export default function AiFloatingChat({
           position: "fixed",
           bottom: isMobile ? 20 : 26,
           right: isMobile ? 18 : 26,
-          zIndex: 951,
+          zIndex: 181,
           width: 56,
           height: 56,
           minHeight: 56,

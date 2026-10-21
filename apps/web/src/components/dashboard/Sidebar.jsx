@@ -97,6 +97,56 @@ const Sidebar = ({
     const [aiSaving,    setAiSaving]    = useState(false);
     const [aiTestMsg,   setAiTestMsg]   = useState("");
 
+    // Gatekeeper Wallet & Voucher state
+    const [walletInfo,    setWalletInfo]    = useState(null);
+    const [walletLoading, setWalletLoading] = useState(false);
+    const [walletError,   setWalletError]   = useState("");
+    const [voucherCode,   setVoucherCode]   = useState("");
+    const [redeemBusy,    setRedeemBusy]    = useState(false);
+    const [redeemMsg,     setRedeemMsg]     = useState("");
+
+    const fetchGatekeeperWallet = async (keyToCheck) => {
+        const trimmedKey = (keyToCheck || "").trim();
+        if (!trimmedKey.startsWith("sk-kb-")) {
+            setWalletInfo(null);
+            setWalletError("");
+            return;
+        }
+        setWalletLoading(true);
+        setWalletError("");
+        try {
+            const res = await fetch("https://9router.cortex-ai.my.id/v1/wallet", {
+                method: "GET",
+                headers: { Authorization: `Bearer ${trimmedKey}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok || !data?.wallet) {
+                setWalletInfo(null);
+                setWalletError(data?.error || "Kode key tidak ditemukan atau belum aktif.");
+            } else {
+                setWalletInfo(data.wallet);
+            }
+        } catch {
+            setWalletError("Gagal memuat info kuota. Periksa koneksi internet Anda.");
+        } finally {
+            setWalletLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (profileView !== "ai") return;
+        const trimmed = aiKey.trim();
+        if (!trimmed.startsWith("sk-kb-")) {
+            setWalletInfo(null);
+            setWalletError("");
+            return;
+        }
+        const timer = setTimeout(() => {
+            fetchGatekeeperWallet(trimmed);
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [profileView, aiKey]);
+
     const isDark = themeId === "dark";
 
     /* sync state from DB when userSettings loads (overrides localStorage cache) */
@@ -117,7 +167,7 @@ const Sidebar = ({
 
     /* sync browser tab title with custom app name on mount */
     useEffect(() => {
-        document.title = `${appName} — ${appTagline}`;
+        document.title = `${appName} · ${appTagline}`;
     }, [appName, appTagline]);
 
     /* open AI settings panel when triggered externally (from AiView "⚙️ Ganti" button) */
@@ -161,7 +211,7 @@ const Sidebar = ({
         setAppTagline(tagline);
         localStorage.setItem("karaya_app_name",    name);
         localStorage.setItem("karaya_app_tagline", tagline);
-        document.title = `${name} — ${tagline}`;
+        document.title = `${name} · ${tagline}`;
         onSaveSettings?.({ app_name: name, app_tagline: tagline });
         setProfileView("menu");
     };
@@ -369,7 +419,7 @@ const Sidebar = ({
                 {hiddenMenus.length > 0 && (
                     <button onClick={() => { setHiddenMenus([]); localStorage.removeItem("karaya_hidden_menus"); onSaveSettings?.({ hidden_menus: [] }); }}
                         style={{ marginTop: 14, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-                        ↺ Reset — Tampilkan Semua
+                        ↺ Reset · Tampilkan Semua
                     </button>
                 )}
             </div>
@@ -436,7 +486,7 @@ const Sidebar = ({
                         setAppName(APP_NAME); setAppTagline(APP_TAGLINE);
                         localStorage.removeItem("karaya_app_name");
                         localStorage.removeItem("karaya_app_tagline");
-                        document.title = `${APP_NAME} — ${APP_TAGLINE}`;
+                        document.title = `${APP_NAME} · ${APP_TAGLINE}`;
                         onSaveSettings?.({ app_name: APP_NAME, app_tagline: APP_TAGLINE });
                         setProfileView("menu");
                     }} style={{ marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
@@ -449,6 +499,41 @@ const Sidebar = ({
         /* ── AI Settings Panel ── */
         if (profileView === "ai") {
             const currentProvider = AI_PROVIDERS[aiProvider];
+            const isGatekeeperKey = aiKey.trim().startsWith("sk-kb-");
+            const showGatekeeperBox = aiProvider === "gatekeeper" || isGatekeeperKey;
+
+            const handleRedeemVoucher = async () => {
+                const code = voucherCode.trim();
+                const trimmedKey = aiKey.trim();
+                if (!code || !trimmedKey.startsWith("sk-kb-") || redeemBusy) return;
+                setRedeemBusy(true);
+                setRedeemMsg("");
+                try {
+                    const res = await fetch("https://9router.cortex-ai.my.id/v1/wallet/redeem", {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${trimmedKey}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ code }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok) {
+                        setRedeemMsg(`❌ ${data?.error || "Gagal mengklaim kode voucher"}`);
+                    } else {
+                        const added = Number(data.added_tokens || 0).toLocaleString("id-ID");
+                        setVoucherCode("");
+                        setRedeemMsg(`✅ Berhasil! +${added} kuota ditambahkan.`);
+                        showToast?.(`Voucher berhasil diklaim (+${added} kuota)`);
+                        await fetchGatekeeperWallet(trimmedKey);
+                    }
+                } catch {
+                    setRedeemMsg("❌ Gagal menghubungi server voucher. Coba lagi.");
+                } finally {
+                    setRedeemBusy(false);
+                }
+            };
+
             const handleSaveAi = async () => {
                 if (!aiKey.trim() && !aiDisabled) { setAiTestMsg("❌ API key tidak boleh kosong"); return; }
                 setAiSaving(true); setAiTestMsg("");
@@ -461,8 +546,8 @@ const Sidebar = ({
             const inputSt = { width: "100%", padding: "10px 14px", background: "var(--color-border-soft)", border: "1px solid var(--color-border-soft)", borderRadius: 10, color: "var(--color-text)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
             return (
                 <div>
-                    <button style={backBtn} onClick={() => { setAiTestMsg(""); setProfileView("menu"); }}>← Kembali</button>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>🤖 AI Coach Settings</div>
+                    <button style={backBtn} onClick={() => { setAiTestMsg(""); setRedeemMsg(""); setProfileView("menu"); }}>← Kembali</button>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginBottom: 16 }}>🤖 Pengaturan Asisten AI</div>
 
                     {/* Provider */}
                     <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8 }}>PROVIDER</div>
@@ -488,13 +573,13 @@ const Sidebar = ({
                     <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>MODEL</div>
                     <select value={aiModel} onChange={e => setAiModel(e.target.value)} style={{ ...inputSt, marginBottom: 16, cursor: "pointer" }}>
                         {currentProvider?.models.map(m => (
-                            <option key={m.id} value={m.id}>{m.label} — {m.note}</option>
+                            <option key={m.id} value={m.id}>{m.label} · {m.note}</option>
                         ))}
                     </select>
 
                     {/* API Key */}
                     <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-muted)", marginBottom: 6 }}>
-                        API KEY
+                        KODE KEY AI
                         <a href={currentProvider?.docsUrl} target="_blank" rel="noopener noreferrer"
                             style={{ marginLeft: 8, fontSize: 10, color: "var(--color-primary)", textDecoration: "none" }}>
                             Dapatkan key →
@@ -519,7 +604,139 @@ const Sidebar = ({
                             {aiKeyShow ? "🙈" : "👁️"}
                         </button>
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 16 }}>🔒 Disimpan aman di database. Tombol Chat AI di pojok kanan bawah otomatis muncul saat AI aktif.</div>
+                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginBottom: 14 }}>🔒 Disimpan aman di database. Tombol Chat AI di pojok kanan bawah otomatis muncul saat AI aktif.</div>
+
+                    {/* Info Dompet Kuota AI & Klaim Voucher (Khusus Gatekeeper / sk-kb-) */}
+                    {showGatekeeperBox && (
+                        isGatekeeperKey ? (
+                            <div style={{
+                                background: "var(--color-primary-soft)",
+                                border: "1px solid var(--color-border-strong)",
+                                borderRadius: 12,
+                                padding: "12px 14px",
+                                marginBottom: 14,
+                            }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", letterSpacing: "0.04em" }}>
+                                        💎 INFO DOMPET KUOTA AI
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fetchGatekeeperWallet(aiKey)}
+                                        disabled={walletLoading}
+                                        style={{
+                                            background: "transparent",
+                                            border: "1px solid var(--color-border-strong)",
+                                            borderRadius: 6,
+                                            padding: "3px 8px",
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            color: "var(--color-primary)",
+                                            cursor: walletLoading ? "not-allowed" : "pointer",
+                                            fontFamily: "inherit",
+                                        }}
+                                    >
+                                        {walletLoading ? "Memuat..." : "↻ Cek Ulang"}
+                                    </button>
+                                </div>
+
+                                {walletLoading && !walletInfo ? (
+                                    <div style={{ fontSize: 12, color: "var(--color-muted)", padding: "4px 0 8px" }}>
+                                        Memeriksa sisa kuota token Anda...
+                                    </div>
+                                ) : walletError ? (
+                                    <div style={{ fontSize: 11, color: "#ff716c", padding: "4px 0 8px", fontWeight: 600 }}>
+                                        ⚠️ {walletError}
+                                    </div>
+                                ) : walletInfo ? (
+                                    <div style={{ marginBottom: 10 }}>
+                                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                                            <span style={{ fontSize: 11, color: "var(--color-muted)" }}>Sisa Kuota Token:</span>
+                                            <span style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", fontFamily: "var(--font-mono, monospace)" }}>
+                                                {Number(walletInfo.token_balance || 0).toLocaleString("id-ID")}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4, fontSize: 11, color: "var(--color-muted)" }}>
+                                            <span>Status: <strong style={{ color: walletInfo.is_suspended ? "#ff716c" : "var(--color-primary)" }}>{walletInfo.is_suspended ? "Ditangguhkan" : "Aktif"}</strong></span>
+                                            <span>Terpakai: {Number(walletInfo.lifetime_requests || 0).toLocaleString("id-ID")}x tanya/scan</span>
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {/* Form Klaim Voucher Isi Ulang */}
+                                <div style={{ borderTop: "1px dashed var(--color-border-strong)", paddingTop: 10, marginTop: 6 }}>
+                                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>
+                                        Punya Kode Voucher Isi Ulang (<code>KB-...</code>)?
+                                    </label>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                        <input
+                                            type="text"
+                                            value={voucherCode}
+                                            onChange={e => setVoucherCode(e.target.value)}
+                                            onKeyDown={e => e.key === "Enter" && handleRedeemVoucher()}
+                                            placeholder="Contoh: KB-1M-XXXX"
+                                            style={{ ...inputSt, flex: 1, padding: "8px 10px", fontSize: 12, background: "var(--bg-surface-low)" }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleRedeemVoucher}
+                                            disabled={redeemBusy || !voucherCode.trim()}
+                                            style={{
+                                                padding: "8px 14px",
+                                                borderRadius: 10,
+                                                border: "none",
+                                                background: (redeemBusy || !voucherCode.trim()) ? "var(--color-border-soft)" : "var(--color-primary)",
+                                                color: (redeemBusy || !voucherCode.trim()) ? "var(--color-muted)" : "var(--color-on-primary)",
+                                                fontSize: 12,
+                                                fontWeight: 700,
+                                                cursor: (redeemBusy || !voucherCode.trim()) ? "not-allowed" : "pointer",
+                                                fontFamily: "inherit",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {redeemBusy ? "..." : "Klaim"}
+                                        </button>
+                                    </div>
+                                    {redeemMsg && (
+                                        <div style={{ fontSize: 11, marginTop: 6, fontWeight: 600, color: redeemMsg.startsWith("✅") ? "var(--color-primary)" : "#ff716c" }}>
+                                            {redeemMsg}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{
+                                background: "var(--color-primary-soft)",
+                                border: "1px solid var(--color-border-strong)",
+                                borderRadius: 12,
+                                padding: "12px 14px",
+                                marginBottom: 14,
+                                fontSize: 12,
+                                lineHeight: 1.5,
+                            }}>
+                                <div style={{ fontWeight: 700, color: "var(--color-text)", marginBottom: 4 }}>
+                                    💎 Belum punya Kode Key Resmi (<code>sk-kb-...</code>)?
+                                </div>
+                                <div style={{ color: "var(--color-muted)", marginBottom: 8, fontSize: 11 }}>
+                                    Aktifkan tanya-jawab AI & scan foto struk belanja otomatis tanpa ribet daftar akun teknis.
+                                </div>
+                                <a
+                                    href="https://t.me/KaraAutoBot"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: "inline-block",
+                                        color: "var(--color-primary)",
+                                        fontWeight: 800,
+                                        fontSize: 12,
+                                        textDecoration: "underline",
+                                    }}
+                                >
+                                    Belum punya kode? Ambil Paket Sachet Rp 9.000 di @KaraAutoBot →
+                                </a>
+                            </div>
+                        )
+                    )}
 
                     {/* Toggle nonaktifkan AI */}
                     <div onClick={() => setAiDisabled(v => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, border: `1px solid ${aiDisabled ? "rgba(255,113,108,.25)" : "var(--color-border-soft)"}`, background: aiDisabled ? "rgba(255,113,108,.06)" : "transparent", cursor: "pointer", marginBottom: 14, userSelect: "none" }}>

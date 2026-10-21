@@ -285,34 +285,34 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                 <tbody>
                                     <tr style={{ borderBottom: "1px solid #E5DEC9" }}>
                                         <td style={{ padding: "14px 16px", fontWeight: 700 }}>Aplikasi Web & Android Keluarga Berkembang</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Akses Web App & APK Mandiri</td>
-                                        <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>Rp 0 (Akses Dasar)</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Gratis Selamanya · Tanpa Iklan</td>
+                                        <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>Rp 0 (Gratis Selamanya)</td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Akses langsung via <code>kelola.keluargaberkembang.com</code></td>
                                     </tr>
                                     <tr style={{ borderBottom: "1px solid #E5DEC9", background: "#FCF9F2" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Ebook Panduan Mandiri Step-by-Step + Source Code</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Sekali Bayar (Akses Selamanya)</td>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Layanan Asisten AI Keluarga (Grup WhatsApp, Telegram & Scan Struk)</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Sachet (7 Hari) / Bulanan (30 Hari)</td>
+                                        <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>
+                                            Rp 9.000 / 7 hari (Paket Sachet)<br />
+                                            Rp 19.000 / 30 hari (Paket Hemat Web & Telegram)<br />
+                                            Rp 29.000 / 30 hari (Paket Lengkap Grup WhatsApp + Telegram)
+                                        </td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi otomatis dalam &lt; 3 menit via bot resmi <code>@KaraAutoBot</code></td>
+                                    </tr>
+                                    <tr style={{ borderBottom: "1px solid #E5DEC9" }}>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Ebook Panduan Mandiri 37 Layar + Full Source Code</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Sekali Bayar (Hak Milik Selamanya)</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>Rp 99.000</td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Tautan unduhan PDF/HTML interaktif (37 layar) & paket kode sumber dikirim instan ke email/Telegram</td>
                                     </tr>
-                                    <tr style={{ borderBottom: "1px solid #E5DEC9" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Sewa Workspace Asisten AI Keluarga Siap Pakai</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Langganan Harian / Mingguan / Bulanan</td>
-                                        <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>
-                                            Rp 10.000 / hari<br />
-                                            Rp 49.000 / 7 hari<br />
-                                            Rp 149.000 / 30 hari
-                                        </td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi container otomatis dalam 3 menit via bot resmi <code>@KaraAutoBot</code></td>
-                                    </tr>
                                     <tr style={{ background: "#FCF9F2" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Bundel VIP: Ebook + Voucher Kuota Token AI & Bimbingan Privat 14 Hari</td>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Bundel Lengkap VIP: Ebook + Source Code + Bimbingan Privat 14 Hari</td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Lengkap + Pendampingan 14 Hari</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>
                                             Rp 599.000<br />
-                                            <span style={{ fontSize: 12, color: "#4A584D", fontWeight: 500 }}>(Upgrade dari Ebook: Rp 500.000)</span>
+                                            <span style={{ fontSize: 12, color: "#4A584D", fontWeight: 500 }}>(Upgrade dari pemilik Ebook: Rp 500.000)</span>
                                         </td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Unduhan Ebook instan + Kode Voucher Token AI + Undangan sesi bimbingan privat</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Unduhan Ebook instan + Kode Voucher Kuota AI + Undangan sesi bimbingan privat</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -329,7 +329,7 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                 <strong>Verifikasi Otomatis (Real-Time):</strong> Sistem kami menerima notifikasi pembayaran (callback) secara otomatis begitu dana terkonfirmasi oleh gerbang pembayaran tanpa perlu mengirimkan bukti transfer manual.
                             </li>
                             <li style={{ marginBottom: 10 }}>
-                                <strong>Waktu Pengiriman (SLA Pemenuhan Pesanan):</strong> Untuk pembelian Ebook dan Voucher Kuota Token AI, tautan unduhan dan kode lisensi dikirimkan seketika (kurang dari 1 menit) ke alamat email dan/atau akun Telegram pembeli. Untuk layanan Sewa Workspace Asisten AI, container pribadi menyala dan siap ditautkan ke Telegram atau Grup WhatsApp keluarga dalam waktu maksimal 3 menit.
+                                <strong>Waktu Pengiriman (SLA Pemenuhan Pesanan):</strong> Untuk pembelian Ebook dan Voucher Kuota AI, tautan unduhan dan kode lisensi dikirimkan seketika (kurang dari 1 menit) ke alamat email dan/atau akun Telegram pembeli. Untuk Layanan Asisten AI Keluarga, akses asisten pribadi aktif dan siap ditautkan ke Telegram atau Grup WhatsApp keluarga dalam waktu maksimal 3 menit.
                             </li>
                         </ul>
 
@@ -430,7 +430,7 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                 <strong>Pembayaran Ganda (Double Charge):</strong> Apabila terjadi pemotongan saldo lebih dari satu kali untuk satu pesanan produk yang sama akibat gangguan teknis jaringan pembayaran. Kelebihan dana akan dikembalikan 100% secara utuh.
                             </li>
                             <li style={{ marginBottom: 10 }}>
-                                <strong>Kendala Teknis Layanan Sewa Workspace AI:</strong> Apabila container Workspace Asisten AI yang disewa mengalami kegagalan sistem (gagal menyala atau tidak dapat terhubung) dan tim teknis kami tidak dapat memperbaikinya dalam waktu 1x24 jam, pelanggan berhak memilih pengembalian dana penuh (100%) atau penggantian masa aktif layanan.
+                                <strong>Kendala Teknis Layanan Asisten AI Keluarga:</strong> Apabila layanan Asisten AI Keluarga yang dipesan mengalami kegagalan sistem (gagal aktif atau tidak dapat terhubung) dan tim teknis kami tidak dapat memperbaikinya dalam waktu 1x24 jam, pelanggan berhak memilih pengembalian dana penuh (100%) atau penggantian masa aktif layanan.
                             </li>
                         </ul>
 

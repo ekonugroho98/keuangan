@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Modal from "../ui/Modal";
+import { supabase } from "../../lib/supabase";
 
 const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
     const [email, setEmail] = useState("");
@@ -20,7 +21,6 @@ const ForgotPasswordModal = ({ open, onClose, onBackToLogin }) => {
         setError("");
         setIsLoading(true);
 
-        const { supabase } = await import("../../lib/supabase");
         const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin,
         });

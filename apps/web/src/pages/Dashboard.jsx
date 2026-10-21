@@ -117,11 +117,14 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const [activeMenu, setActiveMenu] = useState(() =>
     window.location.pathname === "/admin" || window.location.hash === "#admin"
       ? "admin"
-      : "dasbor",
+      : window.location.hash === "#ai"
+        ? "ai"
+        : "dasbor",
   );
   useEffect(() => {
     const onHashChange = () => {
       if (window.location.hash === "#admin") setActiveMenu("admin");
+      if (window.location.hash === "#ai") setActiveMenu("ai");
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);

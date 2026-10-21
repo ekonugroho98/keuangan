@@ -12,7 +12,7 @@ export const AI_PROVIDERS = {
       { id: "kb-vision",  label: "KB Vision (Scan Struk)",   note: "Multimodal" },
       { id: "kb-premium", label: "KB Premium (Reasoning)",   note: "Analisa mendalam" },
     ],
-    docsUrl: "https://9router.cortex-ai.my.id/gatekeeper", docsLabel: "Token Gatekeeper",
+    docsUrl: "https://t.me/KaraAutoBot", docsLabel: "@KaraAutoBot",
     keyHint: "sk-kb-...", supportsTools: true,
     baseUrl: "https://9router.cortex-ai.my.id/v1",
   },

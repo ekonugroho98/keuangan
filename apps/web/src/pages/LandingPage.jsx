@@ -161,17 +161,17 @@ const CATALOG_PRODUCTS = [
     {
         id: "webapp",
         code: "KB-APP-01",
-        category: "Perangkat Lunak Web & Android",
-        name: "Aplikasi Web & Mobile Keluarga Berkembang",
-        subtitle: "Akses pencatatan keuangan rumah tangga, anggaran 2 lapis, stok kulkas, & banding harga toko.",
+        category: "Aplikasi Web & Android · Gratis Selamanya",
+        name: "Aplikasi Web & Android Keluarga Berkembang",
+        subtitle: "Buat yang rajin catat sendiri lewat tombol Web atau HP. Sudah termasuk Rekening Bersama vs Privat, Kalkulator Adu Harga Minimarket (per 100ml/100g), Stok Kulkas & Daftar Belanja, serta Export Excel (.xlsx).",
         priceDisplay: "Rp 0",
         priceNumeric: 0,
-        billingNote: "Akses Dasar Mandiri · Bebas Iklan",
+        billingNote: "Gratis Selamanya · Tanpa Iklan",
         deliveryMethod: "Aktif seketika di browser melalui kelola.keluargaberkembang.com atau instalasi APK Android.",
         features: [
-            "Dasbor arus kas keluarga dengan pemisahan rekening Bersama dan rekening Privat.",
-            "Kalkulator Banding Harga minimarket otomatis (hitung harga per 100ml, 100g, atau per pcs).",
-            "Manajemen Stok Kulkas & Dapur terhubung langsung dengan Daftar Belanja Keluarga.",
+            "Dasbor arus kas keluarga dengan pemisahan Rekening Bersama dan Rekening Privat.",
+            "Kalkulator Adu Harga Minimarket otomatis (hitung harga per 100ml, 100g, atau per pcs).",
+            "Stok Kulkas & Daftar Belanja keluarga yang tersinkronisasi antara suami dan istri.",
             "Laporan grafik bulanan dan fitur unduh pembukuan ke format Excel (.xlsx).",
         ],
         ctaLabel: "Buka Aplikasi Web Sekarang",
@@ -179,66 +179,67 @@ const CATALOG_PRODUCTS = [
         isFreeApp: true,
     },
     {
+        id: "asisten",
+        code: "KB-AST-AI",
+        category: "Layanan Asisten Otomatis · Paling Praktis (Tanpa Ketik Manual)",
+        name: "Asisten AI Keluarga: Catat dari Grup WhatsApp & Foto Struk",
+        subtitle: "Malas ketik struk belanja panjang satu per satu? Cukup foto struk yang lecek atau ketik 1 baris di Grup WhatsApp suami-istri, beres dalam 5 detik.",
+        priceDisplay: "Mulai Rp 9.000",
+        priceNumeric: 9000,
+        billingNote: "Lebih hemat dari parkir minimarket (~Rp 900/hari untuk dipakai berdua suami-istri)",
+        deliveryMethod: "Jalur koneksi asisten pribadi keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
+        subOptions: [
+            { id: "ast-sachet", label: "Paket Sachet Coba Dulu (Aktif 7 Hari · Web, Telegram & Foto Struk)", priceDisplay: "Rp 9.000", priceNumeric: 9000 },
+            { id: "ast-hemat", label: "Paket Hemat Bulanan (Aktif 30 Hari · Web, Telegram & Foto Struk)", priceDisplay: "Rp 19.000", priceNumeric: 19000 },
+            { id: "ast-keluarga", label: "Paket Lengkap Keluarga (Aktif 30 Hari · Masuk Grup WhatsApp Suami-Istri + Telegram + Foto Struk)", priceDisplay: "Rp 29.000", priceNumeric: 29000 },
+        ],
+        features: [
+            "Beres dalam 5 detik: cukup kirim foto struk Alfamart/Indomaret/Superindo, daftar barang & diskon langsung tercatat otomatis.",
+            "Bisa dimasukkan ke 1 Grup WhatsApp berdua pasangan (suami-istri), tidak perlu memaksa pasangan buka aplikasi baru.",
+            "Sudah termasuk kuota pembacaan foto struk dan tanya-jawab asisten keuangan 24 jam tanpa perlu daftar API Key sendiri.",
+            "Jalur koneksi khusus yang aman dan privat untuk grup keluarga Anda (aktif otomatis dalam < 3 menit setelah pembayaran QRIS).",
+        ],
+        ctaLabel: "Pilih Paket Asisten AI (Mulai Rp 9.000)",
+        featured: true,
+    },
+    {
         id: "ebook",
         code: "KB-EBK-99",
         category: "Produk Digital Unduhan · Paling Banyak Dipilih",
-        name: "Ebook Panduan Mandiri Step-by-Step + Source Code",
-        subtitle: "Panduan lengkap 37 tangkapan layar asli per tombol untuk membangun sistem keuangan keluarga & asisten AI sendiri.",
+        name: "Ebook Panduan Mandiri 37 Layar + Full Source Code",
+        subtitle: "Untuk yang ingin memiliki full source code dan memasang sistem sendiri mengikuti 37 tangkapan layar asli per tombol.",
         priceDisplay: "Rp 99.000",
         priceNumeric: 99000,
-        billingNote: "Sekali Bayar · Hak Pakai Selamanya",
+        billingNote: "Sekali Bayar · Hak Milik Selamanya",
         deliveryMethod: "Tautan unduhan Ebook (PDF & HTML interaktif) beserta paket Source Code dikirim otomatis ke Email & Telegram dalam < 1 menit setelah pembayaran QRIS / Virtual Account terverifikasi.",
         features: [
             "Ebook panduan bahasa Indonesia santai dengan 37 tangkapan layar nyata (tinggal ikuti urutan tombol, tanpa perlu latar belakang coding).",
             "Full Source Code Web App, file APK Android, dan modul penghubung Asisten AI Telegram & Grup WhatsApp.",
-            "Bebas memilih 3 jalur server sesuai kebutuhan (Cloud Free Tier, VPS lokal Rp 25.000/bulan via QRIS, atau container instan).",
+            "Bebas memilih 3 jalur sesuai kebutuhan (Cloud Free Tier, VPS lokal Rp 25.000/bulan via QRIS, atau layanan praktis @KaraAutoBot).",
             "Termasuk Kamus Solusi Kendala (Troubleshooting) lengkap dan pembaruan materi panduan.",
         ],
         ctaLabel: "Pesan Ebook + Source Code (Rp 99.000)",
         featured: true,
     },
     {
-        id: "workspace",
-        code: "KB-WKS-AI",
-        category: "Layanan Cloud Container Siap Pakai (SaaS)",
-        name: "Sewa Workspace Asisten AI Keluarga Siap Pakai (@KaraAutoBot)",
-        subtitle: "Container asisten AI 24 jam yang langsung terhubung ke Telegram & Grup WhatsApp keluarga dalam 3 menit tanpa perlu urus server.",
-        priceDisplay: "Mulai Rp 10.000 / hari",
-        priceNumeric: 10000,
-        billingNote: "Tersedia Paket Harian (Rp 10.000), 7 Hari (Rp 49.000), atau 30 Hari (Rp 149.000)",
-        deliveryMethod: "Aktivasi container otomatis dalam waktu maksimal 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
-        subOptions: [
-            { id: "ws-1d", label: "Paket Harian (Uji Coba 24 Jam)", priceDisplay: "Rp 10.000", priceNumeric: 10000 },
-            { id: "ws-7d", label: "Paket Mingguan (Aktif 7 Hari)", priceDisplay: "Rp 49.000", priceNumeric: 49000 },
-            { id: "ws-30d", label: "Paket Bulanan (Aktif 30 Hari)", priceDisplay: "Rp 149.000", priceNumeric: 149000 },
-        ],
-        features: [
-            "Terima beres tanpa instalasi VPS: container asisten AI pribadi menyala otomatis dalam 3 menit.",
-            "Tersambung ke Telegram dan 1 Grup WhatsApp keluarga berdua pasangan untuk catat pengeluaran & scan foto struk.",
-            "Dilengkapi cadangan otomatis (auto-backup) pengaturan dan pemantauan sisa masa aktif transparan.",
-            "Dapat diperpanjang kapan saja sesuai kebutuhan menggunakan QRIS atau Virtual Account.",
-        ],
-        ctaLabel: "Pesan Workspace Asisten AI",
-    },
-    {
         id: "vip",
         code: "KB-VIP-599",
         category: "Paket Lengkap & Pendampingan Privat",
-        name: "Voucher Kuota Token AI & Bundel Bimbingan Privat 14 Hari",
-        subtitle: "Paket lengkap Ebook + Source Code, saldo kuota Token AI siap pakai, dan pendampingan privat 1-on-1 selama 14 hari.",
+        name: "Bundel Lengkap VIP: Ebook + Source Code + Bimbingan Privat 14 Hari",
+        subtitle: "Paket lengkap Ebook + Full Source Code, saldo kuota Asisten AI siap pakai, dan pendampingan privat 1-on-1 selama 14 hari.",
         priceDisplay: "Rp 599.000",
         priceNumeric: 599000,
-        billingNote: "Sekali Bayar · (Upgrade bagi pemilik Ebook cukup Rp 500.000)",
-        deliveryMethod: "Unduhan instan Ebook + Kode Voucher Token AI dikirim otomatis ke Email/Telegram, dilanjutkan penjadwalan sesi bimbingan privat.",
+        billingNote: "Sekali Bayar · Upgrade dari pemilik Ebook cukup Rp 500.000",
+        deliveryMethod: "Unduhan instan Ebook + Kode Voucher Kuota AI dikirim otomatis ke Email/Telegram, dilanjutkan penjadwalan sesi bimbingan privat.",
         subOptions: [
-            { id: "vip-full", label: "Bundel Lengkap VIP Baru (Ebook + Token AI + Bimbingan 14 Hari)", priceDisplay: "Rp 599.000", priceNumeric: 599000 },
+            { id: "vip-full", label: "Bundel Lengkap VIP Baru (Ebook + Source Code + Kuota AI + Bimbingan 14 Hari)", priceDisplay: "Rp 599.000", priceNumeric: 599000 },
             { id: "vip-upgrade", label: "Upgrade ke VIP (Khusus Pembeli Ebook Rp 99.000)", priceDisplay: "Rp 500.000", priceNumeric: 500000 },
         ],
         features: [
-            "Seluruh fasilitas paket Ebook Panduan Mandiri 37 Layar beserta paket Source Code lengkap.",
-            "Voucher Kuota Token AI (Key Gatekeeper) siap pakai untuk pemrosesan chat dan pembacaan foto struk belanja.",
+            "Seluruh fasilitas paket Ebook Panduan Mandiri 37 Layar beserta paket Full Source Code lengkap.",
+            "Voucher Kuota Asisten AI siap pakai untuk tanya-jawab keuangan dan pembacaan foto struk belanja otomatis.",
             "Pendampingan privat 1-on-1 selama 14 hari penuh melalui chat/layar sampai sistem keluarga Anda berjalan 100% lancar.",
-            "Prioritas bantuan teknis langsung dari tim pengembang Keluarga Berkembang.",
+            "Prioritas bantuan langsung dari tim pengembang Keluarga Berkembang.",
         ],
         ctaLabel: "Pesan Bundel VIP (Rp 599.000)",
     },
@@ -247,23 +248,27 @@ const CATALOG_PRODUCTS = [
 const FAQ_ITEMS = [
     {
         q: "Apakah saya harus mengerti coding atau punya latar belakang IT untuk memakai sistem ini?",
-        a: "Sama sekali tidak perlu. Jika Anda hanya ingin langsung memakai aplikasinya, Anda cukup membuka aplikasi web di kelola.keluargaberkembang.com atau menyewa Workspace Asisten AI siap pakai mulai Rp 10.000 per hari. Jika Anda ingin membangun sistem mandiri lewat Ebook Rp 99.000, seluruh langkah sudah difoto per tombol sebanyak 37 layar (tinggal salin-tempel perintah yang sudah disiapkan).",
+        a: "Sama sekali tidak perlu. Untuk pencatatan manual di Web dan HP (termasuk Rekening Bersama vs Privat, Adu Harga Minimarket per 100ml/100g, Stok Kulkas, dan Export Excel), Anda bisa langsung memakainya Gratis Selamanya (Rp 0) di kelola.keluargaberkembang.com. Jika malas ketik manual, cukup aktifkan Paket Sachet Asisten AI mulai Rp 9.000 (7 hari) atau Paket Lengkap Grup WhatsApp Suami-Istri Rp 29.000/bulan.",
+    },
+    {
+        q: "Apa bedanya versi Web Gratis Rp 0 dengan Paket Asisten AI (Mulai Rp 9.000)?",
+        a: "Versi Web Gratis Rp 0 sudah mencakup seluruh fitur pencatatan manual, pisah rekening Bersama dan Privat, kalkulator harga per 100ml/100g, stok kulkas, serta unduh laporan Excel (.xlsx) tanpa iklan. Paket Asisten AI (Rp 9.000 untuk Sachet 7 hari, Rp 19.000/bulan untuk Web & Telegram, atau Rp 29.000/bulan untuk Paket Lengkap Grup WhatsApp Suami-Istri) menambahkan kemudahan otomatis: cukup kirim foto struk belanja yang lecek atau ketik 1 baris di chat, langsung beres tercatat dalam 5 detik.",
     },
     {
         q: "Apakah ada biaya bulanan setelah membeli Ebook Rp 99.000? Bagaimana rincian jujurnya?",
-        a: "Pembelian Ebook + Source Code Rp 99.000 adalah sekali bayar untuk selamanya. Untuk menjalankan asisten bot 24 jam, Anda bebas memilih 1 dari 3 jalur sesuai kondisi Anda: (1) Jalur Cloud Free Tier Rp 0/bulan jika Anda sudah memiliki kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun cloud; (2) Jalur VPS lokal Indonesia sekitar Rp 25.000/bulan yang bisa dibayar via QRIS tanpa kartu kredit; atau (3) Jalur Terima Beres di @KaraAutoBot mulai Rp 10.000/hari tanpa perlu mengurus server sama sekali.",
+        a: "Pembelian Ebook + Full Source Code Rp 99.000 adalah sekali bayar untuk hak milik selamanya. Jika Anda ingin menyalakan asisten bot 24 jam secara mandiri, Anda bebas memilih 1 dari 3 jalur: (1) Jalur Cloud Free Tier Rp 0/bulan jika memiliki kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun cloud; (2) Jalur VPS lokal Indonesia sekitar Rp 25.000/bulan via QRIS tanpa kartu kredit; atau (3) Jalur Terima Beres di @KaraAutoBot mulai Rp 9.000 (Paket Sachet) hingga Rp 29.000/bulan (Paket Lengkap Grup WhatsApp).",
     },
     {
         q: "Kalau dipakai berdua dengan pasangan, apakah saldo tabungan pribadi saya ikut terlihat?",
         a: "Tidak. Di dalam Keluarga Berkembang terdapat pemisahan tegas antara rekening berlabel Bersama (Shared) dan rekening berlabel Privat. Rekening Bersama (seperti Kas Dapur atau Tabungan Anak) terlihat oleh suami dan istri, sedangkan rekening berlabel Privat hanya menampilkan rincian saldo kepada pemilik akun itu sendiri.",
     },
     {
-        q: "Apakah aman menghubungkan asisten AI ke Grup WhatsApp keluarga berdua?",
-        a: "Aman karena dirancang khusus untuk pemakaian internal 1 Grup WhatsApp keluarga (suami, istri, dan bot asisten), bukan untuk pengiriman pesan massal (blast/spam) ke nomor asing. Pola percakapan terjadi secara alami layaknya obrolan rumah tangga sehari-hari.",
+        q: "Apakah aman menghubungkan Asisten AI ke Grup WhatsApp suami-istri?",
+        a: "Aman karena dirancang khusus untuk pemakaian internal 1 Grup WhatsApp keluarga berdua pasangan (suami, istri, dan asisten pribadi), bukan untuk pengiriman pesan massal (blast/spam) ke nomor asing. Pola percakapan terjadi secara alami layaknya obrolan rumah tangga sehari-hari.",
     },
     {
         q: "Bagaimana metode pembayaran, kecepatan pengiriman produk digital, dan garansi pengembalian dana (Refund)?",
-        a: "Seluruh pembayaran diproses dalam mata uang Rupiah (Rp) melalui QRIS (mendukung semua bank dan e-wallet) serta Virtual Account Bank Nasional. Produk digital dikirim otomatis segera setelah pembayaran terverifikasi (< 1 menit untuk Ebook/Voucher, dan maksimal 3 menit untuk aktivasi Workspace AI). Kami memberikan garansi 100% uang kembali apabila produk gagal terkirim atau workspace gagal menyala sesuai Kebijakan Pengembalian Dana (/refund).",
+        a: "Seluruh pembayaran diproses dalam mata uang Rupiah (Rp) melalui QRIS (mendukung semua bank dan e-wallet) serta Virtual Account Bank Nasional. Produk digital dikirim otomatis segera setelah pembayaran terverifikasi (< 1 menit untuk Ebook/Voucher, dan maksimal 3 menit untuk aktivasi Asisten AI Keluarga). Kami memberikan garansi 100% uang kembali apabila produk gagal terkirim atau layanan gagal aktif sesuai Kebijakan Pengembalian Dana (/refund).",
     },
 ];
 
@@ -928,7 +933,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14 }}>
                                         <span style={{ color: "#2E3D30", fontWeight: 700 }}>03.</span>
                                         <span>
-                                            <strong>Fleksibel Cara Pakainya:</strong> Pakai langsung di Web App, bangun mandiri dengan Ebook <span className="kb-mono" style={{ fontWeight: 700, color: "#9E472D" }}>Rp 99.000</span>, atau sewa bot siap pakai mulai <span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30" }}>Rp 10.000/hari</span>.
+                                            <strong>Fleksibel Cara Pakainya:</strong> Pakai gratis selamanya di Web App (<span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30" }}>Rp 0</span>), aktifkan Asisten Grup WA & Foto Struk mulai <span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30" }}>Rp 9.000</span>, atau miliki Ebook + Source Code <span className="kb-mono" style={{ fontWeight: 700, color: "#9E472D" }}>Rp 99.000</span>.
                                         </span>
                                     </div>
                                 </div>
@@ -1599,12 +1604,12 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                 padding: "18px 20px",
                                 textAlign: "left",
                             }}>
-                                <div style={{ fontSize: 12, color: "#4A584D", fontWeight: 700 }}>Akses Aplikasi Web Mandiri</div>
+                                <div style={{ fontSize: 12, color: "#4A584D", fontWeight: 700 }}>{CATALOG_PRODUCTS[0].billingNote}</div>
                                 <div className="kb-mono" style={{ fontSize: 28, fontWeight: 700, color: "#2E3D30", lineHeight: 1.2, margin: "4px 0" }}>
                                     {CATALOG_PRODUCTS[0].priceDisplay}
                                 </div>
                                 <div style={{ fontSize: 12, color: "#4A584D", marginBottom: 14 }}>
-                                    Langsung aktif di browser tanpa kartu kredit
+                                    Gratis selamanya untuk catat sendiri di Web/HP
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                     <a
@@ -1626,7 +1631,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             </div>
                         </div>
 
-                        {/* Middle Row: 2 Primary Paid Offerings (Ebook Rp 99.000 & Workspace AI Rp 10.000/hari) */}
+                        {/* Middle Row: 2 Primary Paid Offerings (Asisten AI Mulai Rp 9.000 & Ebook Rp 99.000) */}
                         <div className="kb-catalog-featured-grid">
                             {[CATALOG_PRODUCTS[1], CATALOG_PRODUCTS[2]].map((prod) => (
                                 <div
@@ -1696,12 +1701,12 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                     paddingTop: 10,
                                                     borderTop: "1px dashed #D5CCB8",
                                                     display: "grid",
-                                                    gap: 6,
+                                                    gap: 8,
                                                 }}>
                                                     {prod.subOptions.map((sub) => (
-                                                        <div key={sub.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                                                        <div key={sub.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, fontSize: 13 }}>
                                                             <span style={{ color: "#1F2922", fontWeight: 600 }}>{sub.label}</span>
-                                                            <span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30" }}>{sub.priceDisplay}</span>
+                                                            <span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30", flexShrink: 0 }}>{sub.priceDisplay}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1878,12 +1883,12 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     {
                                         step: "TAHAP 03",
                                         title: "Verifikasi & Pengiriman Instan",
-                                        desc: "Sistem mendeteksi pembayaran otomatis. Tautan Ebook & Voucher dikirim dalam < 1 menit, atau Workspace AI aktif dalam < 3 menit.",
+                                        desc: "Sistem mendeteksi pembayaran otomatis. Tautan Ebook & Voucher dikirim dalam < 1 menit, atau Asisten AI Keluarga aktif dalam < 3 menit.",
                                     },
                                     {
                                         step: "TAHAP 04",
                                         title: "Jaminan 100% Uang Kembali",
-                                        desc: "Apabila terjadi kendala pengiriman sistem atau kegagalan aktivasi container yang tidak terselesaikan dalam 1x24 jam, dana dikembalikan 100%.",
+                                        desc: "Apabila terjadi kendala pengiriman sistem atau kegagalan aktivasi layanan asisten yang tidak terselesaikan dalam 1x24 jam, dana dikembalikan 100%.",
                                     },
                                 ].map((item) => (
                                     <div
@@ -2007,13 +2012,13 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                         <span className="kb-mono" style={{ fontSize: 12, color: "#D5E3D7", fontWeight: 700 }}>PILAR 02</span>
                                     </div>
                                     <h3 style={{ fontSize: 22, color: "#FFFDF9", marginBottom: 8 }}>
-                                        Asisten AI Keluarga 24 Jam
+                                        Asisten Pribadi Keluarga 24 Jam
                                     </h3>
                                     <div className="kb-mono" style={{ fontSize: 13, color: "#D5E3D7", fontWeight: 700, marginBottom: 12 }}>
                                         Telegram @KaraAutoBot & Grup WhatsApp
                                     </div>
                                     <p style={{ fontSize: 14, color: "#E6EFE8", marginBottom: 18 }}>
-                                        Container asisten AI pribadi yang tersambung ke Telegram dan Grup WhatsApp keluarga untuk mencatat pengeluaran lewat chat, membaca foto struk belanja, dan mengecek sisa anggaran.
+                                        Asisten AI pribadi 24 jam yang tersambung ke Telegram dan Grup WhatsApp suami-istri untuk mencatat pengeluaran lewat chat, membaca foto struk belanja dalam 5 detik, dan mengecek sisa anggaran.
                                     </p>
                                 </div>
                                 <div style={{ display: "grid", gap: 8 }}>
@@ -2135,9 +2140,9 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                             </div>
                                         </div>
                                         <div>
-                                            <strong style={{ color: "#1F2922" }}>3. Jalur Terima Beres via @KaraAutoBot (<span className="kb-mono">Mulai Rp 10.000 / hari</span>):</strong>
+                                            <strong style={{ color: "#1F2922" }}>3. Jalur Terima Beres via @KaraAutoBot (<span className="kb-mono">Mulai Rp 9.000</span>):</strong>
                                             <div style={{ color: "#4A584D", marginTop: 2 }}>
-                                                Tanpa urus server sama sekali, container langsung aktif dalam 3 menit.
+                                                Tanpa urus teknis sama sekali: Paket Sachet Rp 9.000 (7 hari), Paket Hemat Rp 19.000 (30 hari), atau Paket Lengkap Grup WA Suami-Istri Rp 29.000/bulan.
                                             </div>
                                         </div>
                                     </div>
@@ -2275,7 +2280,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                 </li>
                                 <li>
                                     <a href="#paket" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
-                                        Sewa Workspace AI (@KaraAutoBot)
+                                        Asisten Grup WA & Foto Struk (Mulai Rp 9.000)
                                     </a>
                                 </li>
                                 <li>
@@ -2542,6 +2547,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                             display: "flex",
                                                             justifyContent: "space-between",
                                                             alignItems: "center",
+                                                            gap: 12,
                                                             padding: "12px 14px",
                                                             minHeight: 46,
                                                             borderRadius: 12,
@@ -2555,7 +2561,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                         }}
                                                     >
                                                         <span>{opt.label}</span>
-                                                        <span className="kb-mono" style={{ color: "#2E3D30" }}>{opt.priceDisplay}</span>
+                                                        <span className="kb-mono" style={{ color: "#2E3D30", flexShrink: 0 }}>{opt.priceDisplay}</span>
                                                     </button>
                                                 );
                                             })}

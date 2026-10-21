@@ -362,6 +362,34 @@ function PlanTab({ plan }) {
                     </div>
                 );
             })}
+
+            <div style={{
+                ...featureCard,
+                marginTop: 14,
+                background: "var(--color-primary-soft)",
+                border: "1px solid var(--glass-border)",
+                padding: "14px 14px",
+            }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
+                    🤖 Ingin Catat Otomatis dari Grup WhatsApp & Foto Struk?
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-muted)", lineHeight: 1.55, marginBottom: 12 }}>
+                    Pencatatan manual di Web dan aplikasi Android <strong>Gratis Selamanya (Rp 0)</strong>. Jika malas ketik satu per satu, aktifkan Asisten Grup WA suami-istri & baca foto struk belanja otomatis mulai <strong>Rp 9.000</strong> (Paket Sachet 7 hari) atau <strong>Rp 29.000/bulan</strong> (Paket Lengkap Grup WA).
+                </div>
+                <a
+                    href="https://t.me/KaraAutoBot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: "100%", boxSizing: "border-box", minHeight: 40, padding: "9px 12px",
+                        borderRadius: 10, background: "var(--color-primary)", color: "var(--color-on-primary)",
+                        fontSize: 12, fontWeight: 700, textDecoration: "none", textAlign: "center",
+                    }}
+                >
+                    Buka @KaraAutoBot di Telegram
+                </a>
+            </div>
         </div>
     );
 }
