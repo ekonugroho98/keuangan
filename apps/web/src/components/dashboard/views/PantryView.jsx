@@ -89,9 +89,10 @@ const modalBox = {
 const emptyForm = { name: "", unit: "pcs", qty: "1", min_qty: "", location: "fridge", expires_at: "" };
 
 const PantryView = ({ showToast, setActiveMenu }) => {
-    const { household } = useHouseholdInfo();
+    const { household, updateHouseholdInfo } = useHouseholdInfo();
     const enabled = !!household?.features?.shopping_stock?.enabled;
-    const { items, pantryLoading, addItem, updateItem, deleteItem, addMovement } = usePantry(enabled);
+    const autoStock = household?.features?.shopping_stock?.auto_stock ?? { enabled: false, create_new_items: true };
+    const { items, pantryLoading, addItem, updateItem, deleteItem, addMovement, syncPurchases } = usePantry(enabled);
     const { expired, expiring } = usePantryExpiring(3, enabled);
     const { addItem: addShoppingItem, needed: shoppingNeeded } = useShopping(enabled);
 
@@ -101,6 +102,8 @@ const PantryView = ({ showToast, setActiveMenu }) => {
     const [locFilter, setLocFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
     const [search, setSearch] = useState("");
+    const [syncBusy, setSyncBusy] = useState(false);
+    const [toggleBusy, setToggleBusy] = useState(false);
 
     const expiredIds = useMemo(() => new Set(expired.map((i) => i.id)), [expired]);
     const expiringIds = useMemo(() => new Set(expiring.map((i) => i.id)), [expiring]);
@@ -221,10 +224,51 @@ const PantryView = ({ showToast, setActiveMenu }) => {
         }
     };
 
+    const handleSyncPurchases = async () => {
+        if (syncBusy) return;
+        setSyncBusy(true);
+        try {
+            const res = await syncPurchases("this_month");
+            const totalChanged = (res?.created_count || 0) + (res?.updated_count || 0);
+            if (totalChanged > 0) {
+                toast(`✅ ${res.created_count || 0} item baru & ${res.updated_count || 0} stok diperbarui dari belanja bulan ini`);
+            } else {
+                toast("Semua belanja Bahan Makanan bulan ini sudah sinkron di stok rumah");
+            }
+        } catch (err) {
+            toast(err.message || "Gagal menyinkronkan belanja bulan ini", "error");
+        } finally {
+            setSyncBusy(false);
+        }
+    };
+
+    const handleToggleAutoStock = async () => {
+        if (toggleBusy) return;
+        setToggleBusy(true);
+        try {
+            const nextEnabled = !autoStock.enabled;
+            await updateHouseholdInfo({
+                features: {
+                    shopping_stock: {
+                        auto_stock: {
+                            enabled: nextEnabled,
+                            create_new_items: autoStock.create_new_items ?? true,
+                        },
+                    },
+                },
+            });
+            toast(nextEnabled ? "✅ Auto-Stok Belanja diaktifkan" : "Auto-Stok Belanja dimatikan");
+        } catch (err) {
+            toast(err.message || "Gagal mengubah pengaturan Auto-Stok", "error");
+        } finally {
+            setToggleBusy(false);
+        }
+    };
+
     return (
         <div style={{ animation: "fadeIn .4s" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
                 <div>
                     <div style={{ ...eyebrow, marginBottom: 8 }}>KELUARGA &amp; RUMAH</div>
                     <h1 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "var(--color-text)", letterSpacing: "-.03em", margin: 0 }}>
@@ -235,6 +279,25 @@ const PantryView = ({ showToast, setActiveMenu }) => {
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                        onClick={handleSyncPurchases}
+                        disabled={syncBusy}
+                        title="Tarik transaksi kategori Bahan Makanan bulan ini yang belum masuk ke Stok Rumah"
+                        style={{
+                            padding: "11px 16px",
+                            borderRadius: 12,
+                            border: "1px solid var(--glass-border)",
+                            background: "var(--glass-1)",
+                            color: "var(--color-text)",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            cursor: syncBusy ? "wait" : "pointer",
+                            fontFamily: "inherit",
+                            opacity: syncBusy ? 0.65 : 1,
+                        }}
+                    >
+                        {syncBusy ? "⏳ Menyinkronkan..." : "🔄 Sinkronkan Belanja Bulan Ini"}
+                    </button>
                     {setActiveMenu && (
                         <button
                             onClick={() => setActiveMenu("belanja")}
@@ -270,6 +333,52 @@ const PantryView = ({ showToast, setActiveMenu }) => {
                         + Tambah Stok
                     </button>
                 </div>
+            </div>
+
+            {/* Auto-Stok Quick Toggle Bar */}
+            <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                padding: "12px 16px",
+                marginBottom: 18,
+                borderRadius: 14,
+                background: autoStock.enabled ? "rgba(131,155,122,.12)" : "var(--glass-1)",
+                border: autoStock.enabled ? "1px solid rgba(131,155,122,.32)" : "1px solid var(--glass-border)",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>🍗</span>
+                    <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 800, color: "var(--color-text)" }}>
+                            Auto-Stok dari Transaksi Belanja: {autoStock.enabled ? "Aktif" : "Nonaktif"}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--color-muted)", marginTop: 2 }}>
+                            {autoStock.enabled
+                                ? "Setiap transaksi kategori Bahan Makanan (ayam, sayur, telur, bumbu) otomatis masuk ke Kulkas/Freezer/Lemari."
+                                : "Nyalakan agar belanjaan Bahan Makanan otomatis masuk ke daftar stok tanpa input dua kali."}
+                        </div>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleToggleAutoStock}
+                    disabled={toggleBusy}
+                    style={{
+                        padding: "7px 14px",
+                        borderRadius: 99,
+                        border: autoStock.enabled ? "1px solid var(--color-primary)" : "1px solid var(--glass-border)",
+                        background: autoStock.enabled ? "var(--color-primary)" : "var(--bg-surface-low)",
+                        color: autoStock.enabled ? "var(--color-on-primary)" : "var(--color-text)",
+                        fontSize: 11.5,
+                        fontWeight: 800,
+                        cursor: toggleBusy ? "wait" : "pointer",
+                        fontFamily: "inherit",
+                    }}
+                >
+                    {autoStock.enabled ? "✓ Aktif (Matikan)" : "Aktifkan Auto-Stok"}
+                </button>
             </div>
 
             {/* KPI Summary Row */}

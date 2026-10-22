@@ -1,8 +1,12 @@
+import type postgres from 'postgres'
 import { ApiError } from '@karaya/shared/errors'
+import { parseReceiptNote } from '@karaya/shared/format'
 import { PANTRY_LOCATION_ALIASES } from '@karaya/shared/schemas'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { requireFeature } from './features'
+import { getHouseholdTimezone } from './households'
+import { resolvePeriod } from './period'
 
 export interface PantryItemOut {
   id: string
@@ -192,5 +196,362 @@ export async function ackExpiring(actor: Actor, ids: string[]): Promise<{ succes
   return withActor(actor, async (tx) => {
     await tx`update pantry_items set expiry_notified_on = current_date where id = any(${ids}) and household_id = ${actor.householdId}`
     return { success: true as const }
+  })
+}
+
+// ── Auto-Stok dari Transaksi Belanja (§6.9) ───────────────────────────────────────────
+
+const FREEZER_RE = /\b(ayam|daging|sapi|kambing|ikan|mujair|nila|lele|tongkol|bandeng|salmon|tuna|dori|cumi|sotong|udang|kepiting|kerang|sosis|nugget|pangsit|dimsum|bakso|otak[-\s]*otak|frozen|es\s*krim|ice\s*cream)\b/i
+const FRIDGE_RE = /\b(sayur|bayam|kangkung|sawi|pakcoy|wortel|tomat|cabe|cabai|bawang\s*daun|daun\s*bawang|seledri|brokoli|kembang\s*kol|kol|kubis|buncis|kacang\s*panjang|timun|terong|labu|jagung|oyong|tauge|toge|jamur|jeruk|pisang|apel|anggur|mangga|pepaya|semangka|melon|alpukat|pir|buah|tempe|tahu|telur|telor|susu|keju|mentega|margarin|butter|yogurt|yoghurt|yakult|cincau|santan\s*segar)\b/i
+const SHELF_RE = /\b(beras|minyak|tepung|terigu|maizena|tapioka|sagu|gula|garam|kecap|saus|saos|sambal|mie|mi\s*instan|indomie|bihun|soun|makaroni|pasta|spaghetti|bumbu|ladaku|merica|lada|ketumbar|kapulaga|kayu\s*manis|bunga\s*lawang|cengkeh|pala|asam\s*jawa|kemiri|kunyit|jahe|lengkuas|sereh|serai|daun\s*salam|daun\s*jeruk|bawang\s*merah|bawang\s*putih|bawang\s*bombay|penyedap|royco|masako|sasa|ajinomoto|totole|kaldu|santan|kara|teh|kopi|sirup|madu|selai|meses|cokelat\s*bubuk|galon|aqua|air\s*mineral|roti|popok|pampers|diapers|sabun|shampoo|odol|pasta\s*gigi|deterjen|rinso|sunlight|mama\s*lemon|tisu|tissue)\b/i
+
+const LONGER_FRIDGE_RE = /\b(telur|telor|jeruk|apel|pir|keju|mentega|margarin|butter|yakult|susu\s*uht)\b/i
+const SHORT_SHELF_RE = /\b(roti|donat|bolu)\b/i
+const NON_STOCK_SNACK_RE = /^(es\s+teh|es\s+jeruk|kopi\s+kenangan|janji\s+jiwa|fore\s+coffee|gofood|grabfood|shopeefood|parkir|bensin|pertalite|pertamax|tol|pulsa|token\s+listrik|keripik|chiki|permen|biskuit|wafer|Seblak|Martabak|Nasi\s+Padang|Nasi\s+Goreng|Mie\s+Ayam|Bakso\s+Malang|Sate\s+Ayam|Pecel\s+Lele)\b/i
+
+export function inferPantryLocation(itemName: string): 'fridge' | 'freezer' | 'shelf' | 'other' {
+  const s = itemName.trim()
+  if (FREEZER_RE.test(s)) return 'freezer'
+  if (SHELF_RE.test(s)) return 'shelf'
+  if (FRIDGE_RE.test(s)) return 'fridge'
+  return 'fridge'
+}
+
+export function inferExpiryDate(
+  itemName: string,
+  location: 'fridge' | 'freezer' | 'shelf' | 'other',
+  baseDateStr?: string,
+): string | null {
+  const base = baseDateStr && /^\d{4}-\d{2}-\d{2}$/.test(baseDateStr)
+    ? new Date(`${baseDateStr}T00:00:00Z`)
+    : new Date()
+  if (Number.isNaN(base.getTime())) return null
+
+  let addDays: number | null = null
+  if (location === 'freezer') {
+    addDays = 30
+  } else if (location === 'fridge') {
+    addDays = LONGER_FRIDGE_RE.test(itemName) ? 14 : 5
+  } else if (location === 'shelf') {
+    addDays = SHORT_SHELF_RE.test(itemName) ? 4 : null
+  }
+  if (addDays === null) return null
+  const target = new Date(base.getTime() + addDays * 86_400_000)
+  return target.toISOString().slice(0, 10)
+}
+
+/**
+ * Mengurai nama barang, kuantitas, dan satuan dari note transaksi atau nama item struk.
+ * Contoh:
+ *  - "[Hari Hari Pasar Swalayan BCP] Ayam Broiler 3 ekor" -> { cleanName: "Ayam Broiler", qty: 3, unit: "ekor" }
+ *  - "[Kios Sayur Caman] Pisang 1 sikat" -> { cleanName: "Pisang", qty: 1, unit: "sikat" }
+ *  - "[Kios Sayur Caman] Ikan mujair 0.5 kg" -> { cleanName: "Ikan mujair", qty: 0.5, unit: "kg" }
+ *  - "[Kios Sayur Caman] Wortel x3" -> { cleanName: "Wortel", qty: 3, unit: "pcs" }
+ */
+export function extractStockItemInfo(
+  rawNoteOrName: string,
+  explicitQty?: number | null,
+): { cleanName: string; qty: number; unit: string } {
+  const parsed = parseReceiptNote(rawNoteOrName || '')
+  let name = (parsed.name || rawNoteOrName || '').trim()
+  // Buang tag awalan seperti [KANTOR], [PRIBADI], [KELUARGA]
+  name = name.replace(/^\[(?:KANTOR|PRIBADI|KELUARGA|RUMAH)\]\s*/i, '').trim()
+  // Buang akhiran (titipan ...) jika ada
+  name = name.replace(/\s*\(titipan[^)]*\)\s*$/i, '').trim()
+
+  const baseQty = explicitQty && explicitQty > 0 ? explicitQty : parsed.qty && parsed.qty > 0 ? parsed.qty : 1
+
+  // Cek pola "<Nama Barang> <angka> <satuan dapur>" di akhir kalimat
+  // Satuan dapur kontekstual (ekor, ikat, sikat, sisir, papan, tray, bungkus, bks, pak, pack, potong, ptg, butir, btr, buah, bh, kg, ons, liter, galon)
+  const unitMatch = name.match(
+    /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(ekor|ikat|sikat|sisir|papan|tray|bungkus|bks|pak|pack|potong|ptg|butir|btr|buah|bh|kg|ons|galon)$/i,
+  )
+  if (unitMatch) {
+    const cleanName = unitMatch[1]!.trim()
+    const num = Number(unitMatch[2]!.replace(',', '.'))
+    const rawUnit = unitMatch[3]!.toLowerCase()
+    const unitMap: Record<string, string> = {
+      bks: 'bungkus',
+      pak: 'pack',
+      ptg: 'potong',
+      btr: 'butir',
+      bh: 'buah',
+    }
+    const unit = unitMap[rawUnit] ?? rawUnit
+    if (cleanName && num > 0) {
+      return { cleanName, qty: +(num * (baseQty > 1 && baseQty !== num ? baseQty : 1)).toFixed(3), unit }
+    }
+  }
+
+  // Cek pola "<Nama Barang> x<angka>" atau "<Nama Barang> (<angka> pcs)"
+  const multMatch = name.match(/^(.+?)\s+(?:x(\d+(?:[.,]\d+)?)|\((\d+(?:[.,]\d+)?)\s*(pcs|pack|bungkus|ekor|ikat|kg)\))$/i)
+  if (multMatch) {
+    const cleanName = multMatch[1]!.trim()
+    const num = Number((multMatch[2] ?? multMatch[3] ?? '1').replace(',', '.'))
+    const unit = (multMatch[4] ?? 'pcs').toLowerCase()
+    if (cleanName && num > 0) {
+      return { cleanName, qty: num, unit }
+    }
+  }
+
+  return {
+    cleanName: name,
+    qty: baseQty,
+    unit: 'pcs',
+  }
+}
+
+export interface SyncPurchaseResult {
+  action: 'updated' | 'created' | 'skipped'
+  id?: string
+  name: string
+  qty_before?: number
+  qty_after?: number
+  unit?: string
+  location?: string
+}
+
+export async function syncPurchaseToPantry(
+  tx: postgres.TransactionSql,
+  actor: Actor,
+  params: {
+    txId?: string
+    rawName: string
+    explicitQty?: number | null
+    categoryName?: string | null
+    date?: string
+    isTitipan?: boolean
+    createNewItems: boolean
+    sourceLabel?: string
+  },
+): Promise<SyncPurchaseResult> {
+  if (params.isTitipan) {
+    return { action: 'skipped', name: params.rawName }
+  }
+  const catLower = (params.categoryName ?? '').trim().toLowerCase()
+  if (['piutang', 'transfer', 'koreksi saldo', 'tabungan & goal', 'hutang & cicilan'].includes(catLower)) {
+    return { action: 'skipped', name: params.rawName }
+  }
+
+  // Idempotensi: jika transaksi ini sudah pernah tercatat di pantry_movements, lewati
+  if (params.txId) {
+    const [existingMov] = await tx<{ id: string }[]>`
+      select id from pantry_movements
+      where household_id = ${actor.householdId} and transaction_id = ${params.txId}
+      limit 1
+    `
+    if (existingMov) {
+      return { action: 'skipped', name: params.rawName }
+    }
+  }
+
+  const info = extractStockItemInfo(params.rawName, params.explicitQty)
+  if (!info.cleanName || info.cleanName.length < 2) {
+    return { action: 'skipped', name: params.rawName }
+  }
+
+  // 1. Cari kecocokan di pantry_items yang sudah ada
+  const [pantryRow] = await tx<{ id: string; name: string; qty: string; unit: string; location: string; expires_at: string | null }[]>`
+    select id, name, qty::text, unit, location::text as location, expires_at::text as expires_at
+    from pantry_items
+    where id = find_pantry_match(${actor.householdId}, ${info.cleanName})
+  `
+
+  const notePrefix = params.sourceLabel ?? 'otomatis dari belanja'
+
+  if (pantryRow) {
+    const before = Number(pantryRow.qty)
+    await tx`
+      select apply_pantry_movement(
+        ${actor.householdId},
+        ${actor.memberId},
+        ${pantryRow.id},
+        ${info.qty},
+        'purchase',
+        ${params.txId ?? null},
+        ${notePrefix + ': ' + info.cleanName}
+      )
+    `
+    // Bila stok sebelumnya habis (<= 0), perbarui estimasi kedaluwarsa untuk batch baru
+    if (before <= 0) {
+      const loc = (pantryRow.location as 'fridge' | 'freezer' | 'shelf' | 'other') || 'fridge'
+      const newExp = inferExpiryDate(pantryRow.name, loc, params.date)
+      if (newExp) {
+        await tx`
+          update pantry_items
+          set expires_at = ${newExp}::date, expires_estimated = true, expiry_notified_on = null, updated_at = now()
+          where id = ${pantryRow.id} and household_id = ${actor.householdId}
+        `
+      }
+    }
+    return {
+      action: 'updated',
+      id: pantryRow.id,
+      name: pantryRow.name,
+      qty_before: before,
+      qty_after: +(before + info.qty).toFixed(3),
+      unit: pantryRow.unit,
+      location: pantryRow.location,
+    }
+  }
+
+  // 2. Jika belum ada di pantry_items, cek apakah boleh membuat item baru
+  const isBahanMakanan = catLower === 'bahan makanan' || catLower === 'groceries' || catLower === 'sembako'
+  if (!params.createNewItems || !isBahanMakanan || NON_STOCK_SNACK_RE.test(info.cleanName)) {
+    return { action: 'skipped', name: info.cleanName }
+  }
+
+  const location = inferPantryLocation(info.cleanName)
+  const expiresAt = inferExpiryDate(info.cleanName, location, params.date)
+  const safeName = info.cleanName.slice(0, 80)
+
+  // Insert dengan qty=0 terlebih dahulu, lalu tambahkan melalui apply_pantry_movement agar tercatat di pantry_movements dengan transaction_id
+  const [inserted] = await tx<{ id: string; name: string }[]>`
+    insert into pantry_items (
+      household_id, name, unit, qty, min_qty, location, category, expires_at, expires_estimated, aliases
+    )
+    values (
+      ${actor.householdId},
+      ${safeName},
+      ${info.unit},
+      0,
+      1,
+      ${location},
+      'Bahan Makanan',
+      ${expiresAt},
+      ${expiresAt !== null},
+      '{}'::text[]
+    )
+    on conflict (household_id, lower(name)) where deleted_at is null
+    do update set updated_at = now()
+    returning id, name
+  `
+  if (!inserted) {
+    return { action: 'skipped', name: info.cleanName }
+  }
+
+  await tx`
+    select apply_pantry_movement(
+      ${actor.householdId},
+      ${actor.memberId},
+      ${inserted.id},
+      ${info.qty},
+      'purchase',
+      ${params.txId ?? null},
+      ${notePrefix + ': ' + safeName}
+    )
+  `
+
+  return {
+    action: 'created',
+    id: inserted.id,
+    name: inserted.name,
+    qty_before: 0,
+    qty_after: info.qty,
+    unit: info.unit,
+    location,
+  }
+}
+
+/**
+ * Ketika transaksi dihapus (soft-delete), batalkan penambahan stok yang berasal dari transaksi tersebut.
+ */
+export async function reversePurchaseFromPantry(
+  tx: postgres.TransactionSql,
+  householdId: string,
+  memberId: string,
+  transactionId: string,
+): Promise<void> {
+  const movements = await tx<{ id: string; pantry_item_id: string; delta: string }[]>`
+    select id, pantry_item_id, delta::text
+    from pantry_movements
+    where household_id = ${householdId}
+      and transaction_id = ${transactionId}
+      and reason = 'purchase'
+      and delta > 0
+  `
+  for (const mov of movements) {
+    const deltaNum = Number(mov.delta)
+    if (deltaNum > 0) {
+      await tx`
+        update pantry_items
+        set qty = greatest(0, qty - ${deltaNum}), updated_at = now()
+        where id = ${mov.pantry_item_id} and household_id = ${householdId} and deleted_at is null
+      `
+      await tx`
+        delete from pantry_movements where id = ${mov.id} and household_id = ${householdId}
+      `
+    }
+  }
+}
+
+/**
+ * Endpoint `POST /v1/pantry/sync-purchases`: menarik belanjaan Bahan Makanan dari transaksi
+ * pada periode berjalan (`this_month` atau `last_30_days`) yang belum masuk ke stok rumah.
+ */
+export async function syncPurchasesForPeriod(
+  actor: Actor,
+  period: 'this_month' | 'last_30_days' = 'this_month',
+) {
+  await requireFeature(actor, 'shopping_stock')
+  const timezone = await getHouseholdTimezone(actor)
+  const resolved = resolvePeriod(period, timezone)
+
+  return withActor(actor, async (tx) => {
+    const txRows = await tx<{
+      id: string
+      note: string
+      date: string
+      category_name: string
+      item_qty: string | null
+    }[]>`
+      select t.id, t.note, t.date::text as date, c.name as category_name, pp.qty::text as item_qty
+      from transactions t
+      join categories c on c.id = t.category_id
+      left join product_prices pp on pp.transaction_id = t.id
+      where t.household_id = ${actor.householdId}
+        and t.deleted_at is null
+        and t.type = 'expense'
+        and t.date >= ${resolved.from}::date
+        and t.date <= ${resolved.to}::date
+        and lower(c.name) in ('bahan makanan', 'groceries', 'sembako')
+        and not exists (
+          select 1 from pantry_movements pm
+          where pm.household_id = ${actor.householdId}
+            and pm.transaction_id = t.id
+        )
+      order by t.date asc, t.created_at asc
+    `
+
+    const created: SyncPurchaseResult[] = []
+    const updated: SyncPurchaseResult[] = []
+    let skipped = 0
+
+    for (const row of txRows) {
+      const explicitQty = row.item_qty != null ? Number(row.item_qty) : undefined
+      const res = await syncPurchaseToPantry(tx, actor, {
+        txId: row.id,
+        rawName: row.note,
+        explicitQty,
+        categoryName: row.category_name,
+        date: row.date,
+        isTitipan: /\(titipan\b/i.test(row.note),
+        createNewItems: true,
+        sourceLabel: 'sinkron belanja',
+      })
+      if (res.action === 'created') created.push(res)
+      else if (res.action === 'updated') updated.push(res)
+      else skipped++
+    }
+
+    return {
+      period: { from: resolved.from, to: resolved.to },
+      scanned: txRows.length,
+      created_count: created.length,
+      updated_count: updated.length,
+      skipped_count: skipped,
+      created,
+      updated,
+    }
   })
 }

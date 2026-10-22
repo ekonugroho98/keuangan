@@ -50,6 +50,42 @@ pantryApp.openapi(
 
 pantryApp.openapi(
   createRoute({
+    method: 'post',
+    path: '/v1/pantry/sync-purchases',
+    tags: ['pantry'],
+    summary: 'Sinkronkan transaksi belanja Bahan Makanan ke stok rumah (§6.9)',
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: z.object({
+              period: z.enum(['this_month', 'last_30_days']).default('this_month'),
+            }).default({}),
+          },
+        },
+        required: false,
+      },
+    },
+    responses: {
+      200: { content: { 'application/json': { schema: z.any() } }, description: 'OK' },
+    },
+  }),
+  async (c) => {
+    assertScope(c.get('actor'), 'write')
+    let period: 'this_month' | 'last_30_days' = 'this_month'
+    try {
+      const body = await c.req.json().catch(() => ({}))
+      if (body?.period === 'last_30_days') period = 'last_30_days'
+    } catch {
+      // default this_month
+    }
+    return c.json(await pantry.syncPurchasesForPeriod(c.get('actor'), period), 200)
+  },
+)
+
+pantryApp.openapi(
+  createRoute({
     method: 'post', path: '/v1/pantry', tags: ['pantry'], summary: 'Tambah item stok',
     security: [{ bearerJwt: [] }],
     request: { body: { content: { 'application/json': { schema: CreatePantryItemBodySchema } } } },

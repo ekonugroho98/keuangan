@@ -46,7 +46,14 @@ export function usePantry(enabled = true) {
         return result;
     };
 
-    return { items: query.data ?? [], pantryLoading: query.isLoading, addItem, updateItem, deleteItem, addMovement };
+    const syncPurchases = async (period = "this_month") => {
+        const result = await unwrap(await api.POST("/v1/pantry/sync-purchases", { body: { period } }));
+        invalidate();
+        queryClient.invalidateQueries({ queryKey: ["pantry-expiring", activeHouseholdId] });
+        return result;
+    };
+
+    return { items: query.data ?? [], pantryLoading: query.isLoading, addItem, updateItem, deleteItem, addMovement, syncPurchases };
 }
 
 export function usePantryExpiring(withinDays = 3, enabled = true) {

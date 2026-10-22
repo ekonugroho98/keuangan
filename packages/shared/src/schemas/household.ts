@@ -24,6 +24,12 @@ export const MonthlyReportFeatureSchema = z
 
 export const ReconciliationFeatureSchema = z.object({ enabled: z.boolean().default(false) })
 
+export const AutoStockSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    create_new_items: z.boolean().default(true),
+  })
+
 export const ExpiryReminderSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -35,6 +41,7 @@ export const ExpiryReminderSchema = z
 export const ShoppingStockFeatureSchema = z
   .object({
     enabled: z.boolean().default(false),
+    auto_stock: AutoStockSchema.default({}),
     expiry_reminder: ExpiryReminderSchema.default({}),
   })
 
@@ -58,6 +65,7 @@ export const UpdateHouseholdFeaturesBodySchema = z
     shopping_stock: z
       .object({
         enabled: z.boolean().optional(),
+        auto_stock: AutoStockSchema.partial().strict().optional(),
         expiry_reminder: ExpiryReminderSchema.partial().strict().optional(),
       })
       .strict()

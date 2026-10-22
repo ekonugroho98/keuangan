@@ -7,6 +7,7 @@ import { APP_NAME, APP_TAGLINE } from "../../config/app";
 import { PASSWORD_MIN_LENGTH } from "../../constants/validation";
 import HouseholdPanel from "../household/HouseholdPanel";
 import ApiKeysPanel from "../household/ApiKeysPanel";
+import WhatsAppPanel from "../household/WhatsAppPanel";
 import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
 import { useHousehold } from "../../auth/HouseholdProvider";
 
@@ -334,6 +335,11 @@ const Sidebar = ({
         /* ── API Key (F6-T1/T3) ── */
         if (profileView === "apikeys") return (
             <ApiKeysPanel onBack={() => setProfileView("menu")} showToast={showToast} />
+        );
+
+        /* ── WhatsApp Bot (Hermes QR & Grup WA) ── */
+        if (profileView === "whatsapp") return (
+            <WhatsAppPanel onBack={() => setProfileView("menu")} showToast={showToast} />
         );
 
         /* ── Ganti Nama ── */
@@ -835,6 +841,17 @@ const Sidebar = ({
         /* Each tile: SVG icon + gradient tile background per category */
         const tiles = [
             {
+                id: "whatsapp",
+                label: "WhatsApp Bot",
+                sub: "Scan QR & Grup WA",
+                badge: true,
+                grad: "linear-gradient(135deg, #2E6B47, #1F4E32)",
+                tint: "rgba(46,107,71,.16)",
+                iconColor: "#FFFDF8",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>),
+                action: () => setProfileView("whatsapp"),
+            },
+            {
                 id: "ai",
                 label: "Asisten AI",
                 sub: aiConfig?.disabled ? "Dinonaktifkan" : aiStatus,
@@ -1093,7 +1110,7 @@ const Sidebar = ({
                     <div style={{
                         position: "fixed",
                         bottom: 70, left: 12,
-                        width: 320,
+                        width: profileView === "whatsapp" ? 372 : 320,
                         background: "var(--glass-2, rgba(28,28,38,.88))",
                         backdropFilter: "var(--glass-blur)",
                         WebkitBackdropFilter: "var(--glass-blur)",
@@ -1311,9 +1328,42 @@ const Sidebar = ({
                 </div>
             )}
 
-            {/* ═══ Pinned Superadmin button right above profile bar ═══ */}
-            {isSuperadmin && (
-                <div style={{ padding: "6px 10px 6px" }}>
+            {/* ═══ Pinned WhatsApp Bot (Hermes) & Superadmin buttons right above profile bar ═══ */}
+            <div style={{ padding: "6px 10px 6px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                    onClick={() => {
+                        setShowProfileMenu(true);
+                        setProfileView("whatsapp");
+                    }}
+                    style={{
+                        display: "flex", alignItems: "center", gap: 10, width: "100%",
+                        padding: "8px 11px", borderRadius: 10,
+                        border: (showProfileMenu && profileView === "whatsapp")
+                            ? "1px solid var(--color-border-strong)"
+                            : "1px solid rgba(46,107,71,.32)",
+                        background: (showProfileMenu && profileView === "whatsapp")
+                            ? "var(--color-primary-soft)"
+                            : "rgba(46,107,71,.1)",
+                        color: "var(--color-primary)",
+                        fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+                        transition: "all .2s", textAlign: "left",
+                    }}
+                >
+                    <span style={{
+                        width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                        background: "var(--color-primary-soft)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13,
+                    }}>📱</span>
+                    <span style={{ flex: 1 }}>WhatsApp Bot</span>
+                    <span style={{
+                        fontSize: 9, fontWeight: 800, padding: "2px 6px",
+                        borderRadius: 99, background: "#2E6B47",
+                        color: "#FFFDF8", letterSpacing: ".04em",
+                    }}>QR WA</span>
+                </button>
+
+                {isSuperadmin && (
                     <button
                         onClick={() => setActiveMenu("admin")}
                         style={{
@@ -1343,8 +1393,8 @@ const Sidebar = ({
                             color: "#FFFDF8", letterSpacing: ".06em",
                         }}>ADMIN</span>
                     </button>
-                </div>
-            )}
+                )}
+            </div>
 
             {/* ═══ Unified footer — profile + theme + lang in one row ═══ */}
             <div style={{

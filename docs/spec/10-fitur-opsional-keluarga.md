@@ -5,6 +5,7 @@ Bergantung pada: 03-database.md, 05-api.md, 06-agent-integration.md, 07-frontend
 > **Riwayat perubahan**
 > | Tanggal | Bagian | Perubahan | Alasan |
 > |---|---|---|---|
+> | 2026-10-20 | §2.1, §6.3, §6.9 (baru) | Sub-toggle `features.shopping_stock.auto_stock` (`enabled`, `create_new_items`) untuk sinkronisasi otomatis transaksi belanja (`Bahan Makanan`) ke `pantry_items` dari semua jalur (`receipts/ingest`, `transactions/batch`, `transactions` satuan) + endpoint backfill `POST /v1/pantry/sync-purchases` | Permintaan pemilik produk 2026-10-20: belanjaan seperti ayam, sayur, bumbu harus bisa otomatis masuk stok, dengan toggle ON/OFF sesuai preferensi keluarga |
 > | 2026-10-13 | §6.3, §6.8 (baru) | Titipan → Piutang otomatis + note struk `[Toko] item`; perbandingan harga antar toko (migrasi `00000000000025`, `prices.ts`, `GET /v1/prices/compare`, `POST /v1/prices/aliases`, `cheapest` di daftar belanja, tool `compare_prices`/`merge_products`) | Permintaan pemilik produk 2026-10-13 |
 > | 2026-10-07 | (file baru) | Spec 4 fitur opsional "kelola keluarga" + mekanisme feature flag per household | Permintaan pemilik produk setelah Fase 6 + migrasi data Hermes: aplikasi tetap **fokus keuangan**, tapi fitur keluarga di luar keuangan murni harus bisa **diaktifkan/dimatikan per household** tanpa mengubah perilaku inti saat mati. Ide dipilih dari lubang nyata yang kelihatan saat migrasi (dimensi `untuk` hilang, 3 silo belanja/stok/keuangan, lupa catat, lupa settle). |
 > | 2026-10-07 | §6.2, §6.4, §6.5 | `pantry_items` dapat kolom `location` (enum `pantry_location`: `fridge` kulkas, `freezer`, `shelf` lemari/rak dapur, `other`); filter `GET /v1/pantry?location=`; Hermes menebak lokasi dari jenis barang | Pemilik produk: istilahnya tetap "pantry" (stok rumah), bukan "kulkas", tapi harus bisa dibedakan mana yang di kulkas dan mana yang bukan. |
@@ -66,6 +67,7 @@ field opsional, default mati, **`.strict()` di tiap level** supaya salah ketik k
   "monthly_report": { "enabled": false, "day": 1, "hour": 8, "channel": "both", "recipients": "all" },
   "reconciliation": { "enabled": false },
   "shopping_stock": { "enabled": false,
+                      "auto_stock": { "enabled": false, "create_new_items": true },
                       "expiry_reminder": { "enabled": false, "hour": 7, "days_before": 2, "recipients": "all" } }
 }
 ```
@@ -642,6 +644,41 @@ menampilkan "💰 Termurah di …" per item dan panel "⚖️ Banding harga anta
 **Batasan yang diketahui**: tanpa BYOK atau saat AI ragu, nama kasir yang berbeda tidak otomatis bertemu; harga yang
 dicatat adalah harga NET per baris struk (diskon per item ikut, diskon total struk tidak dialokasikan); qty transaksi lama
 (backfill) dianggap 1.
+
+### 6.9 Auto-Stok dari Transaksi Belanja (`auto_stock`, 2026-10-20)
+
+**Masalah**: sebelumnya `ingest_receipt` hanya menambah `qty` untuk barang yang **sudah terdaftar** di `pantry_items`
+(`find_pantry_match`), sedangkan barang baru (mis. *Ayam Broiler 3 ekor, Cumi, Tempe, Wortel, Tomat*) dilewati ke
+`pantry_unmatched`. Selain itu, pencatatan belanja lewat `POST /v1/transactions` (satuan) maupun
+`POST /v1/transactions/batch` (modal scan web / `record_expense_batch`) belum menyentuh `pantry_items` sama sekali.
+
+**Konfigurasi Per-Household (`households.features.shopping_stock.auto_stock`)**:
+- `enabled` (`boolean`, default `false`): saklar utama apakah transaksi pengeluaran belanja otomatis menyinkronkan stok rumah.
+- `create_new_items` (`boolean`, default `true`):
+  - `true` (**Mode Otomatis Penuh**): jika barang kategori `Bahan Makanan` belum ada di `pantry_items`, sistem otomatis membuat item stok baru beserta tebakan lokasi (`freezer` / `fridge` / `shelf`), satuan (`kg` / `L` / `ekor` / `pcs`), dan perkiraan kedaluwarsa (`expires_at`, `expires_estimated = true`).
+  - `false` (**Mode Hanya Barang Terdaftar**): hanya menambah `qty` untuk barang yang sudah pernah didaftarkan di `pantry_items` (`find_pantry_match`), tanpa membuat baris baru.
+
+**Aturan Sinkronisasi (`syncPurchaseToPantry`)**:
+1. **Cakupan Jalur**: dipanggil di dalam transaksi DB yang sama pada:
+   - `POST /v1/receipts/ingest` (saat `input.pantry !== false` dan `shopping_stock.enabled`)
+   - `POST /v1/transactions/batch` (saat `shopping_stock.enabled && shopping_stock.auto_stock.enabled`)
+   - `POST /v1/transactions` (untuk `type = 'expense'`, saat `shopping_stock.enabled && shopping_stock.auto_stock.enabled`)
+2. **Saringan Anti-Sampah**:
+   - Transaksi `titipan` / kategori sistem `Piutang`, `Transfer`, `Koreksi Saldo`, `Tabungan & Goal`, `Hutang & Cicilan` **selalu diabaikan**.
+   - Jika barang **sudah cocok** di `pantry_items` (`find_pantry_match`), tambah `qty` lewat `apply_pantry_movement(..., 'purchase', txId, note)` dan coret dari `shopping_items` (`status = 'needed'`) bila cocok.
+   - Jika barang **belum ada** di `pantry_items` dan `create_new_items = true`: hanya dibuatkan item baru apabila kategori transaksi adalah **`Bahan Makanan`** (dan bukan camilan/minuman kemasan langsung santap seperti keripik/biskuit/kopi siap minum).
+3. **Ekstraksi Nama, Kuantitas, Satuan, Lokasi, & Kedaluwarsa**:
+   - Nama diurai via `parseReceiptNote(note)` (membuang prefix `[Nama Toko]`, `[ref: ...]`, dan label `[KANTOR]` dkk.).
+   - Kuantitas & satuan diambil dari pola ukuran/kelipatan di nama (mis. `"Ayam Broiler 3 ekor"` → nama `"Ayam Broiler"`, `qty: 3`, `unit: "ekor"`; `"Pisang 1 sikat"` → `qty: 1`, `unit: "sikat"`; `"Ikan mujair 0.5 kg"` → `qty: 0.5`, `unit: "kg"`; `"Wortel x3"` → `qty: 3`, `unit: "pcs"`).
+   - Lokasi ditebak otomatis (`inferPantryLocation`):
+     - `freezer`: ayam, daging, sapi, kambing, ikan, mujair, nila, lele, cumi, udang, sosis, nugget, pangsit, bakso frozen, es krim / ice cream.
+     - `fridge`: sayur, bayam, kangkung, sawi, wortel, tomat, cabe, jeruk, pisang, buah, tempe, tahu, telur, susu, keju, mentega, yakult, cincau.
+     - `shelf`: beras, minyak, tepung, gula, garam, kecap, saus, mie, bumbu, ladaku, ketumbar, kapulaga, kayu manis, bunga lawang, asam jawa, galon, air mineral.
+   - Umur simpan (`inferExpiryDate` dari tanggal transaksi): `fridge` sayur/tempe/tahu `+5 hari`, `fridge` telur/susu/buah `+14 hari`, `freezer` daging/ayam/ikan/cumi `+30 hari`, `shelf` `null` (awet).
+4. **Idempotensi & Sinkronisasi Riwayat (`POST /v1/pantry/sync-purchases`)**:
+   - Setiap transaksi yang sudah masuk ke stok dicatat di `pantry_movements.transaction_id`. Transaksi yang sudah punya baris di `pantry_movements` tidak akan pernah dihitung ganda.
+   - Endpoint `POST /v1/pantry/sync-purchases` (body `{ period?: 'this_month' | 'last_30_days' }`) memindai transaksi pengeluaran `Bahan Makanan` yang belum tercatat di `pantry_movements` dan memasukkannya ke stok secara idempoten.
+   - Saat transaksi dihapus (`DELETE /v1/transactions/:id`), bila ada `pantry_movements` dengan `transaction_id` tersebut dan `reason = 'purchase'`, stok dikurangi kembali sebesar `delta` yang sama.
 
 ## 7. Urutan, dependensi, ukuran
 

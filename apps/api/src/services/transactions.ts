@@ -10,6 +10,8 @@ import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayN
 import { canonicalizeProducts, recordPrices, syncTransactionPrice, type PriceItem } from './prices'
 import { resolveReceiptUrl } from './storage'
 import { formatReceiptNote, parseReceiptNote } from '@karaya/shared/format'
+import { getHouseholdFeaturesInTx } from './features'
+import { syncPurchaseToPantry, reversePurchaseFromPantry } from './pantry'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -357,6 +359,21 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
       })
     }
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [row!.id])
+    if (input.type === 'expense' && rows[0]?.note) {
+      const hhFeatures = await getHouseholdFeaturesInTx(tx, actor.householdId)
+      if (hhFeatures.shopping_stock.enabled && hhFeatures.shopping_stock.auto_stock.enabled) {
+        await syncPurchaseToPantry(tx, actor, {
+          txId: row!.id,
+          rawName: rows[0].note,
+          explicitQty: rows[0].item_qty != null ? Number(rows[0].item_qty) : undefined,
+          categoryName: rows[0].category_name,
+          date: txDate,
+          isTitipan: /\(titipan\b/i.test(rows[0].note) || rows[0].category_name.toLowerCase() === 'piutang',
+          createNewItems: hhFeatures.shopping_stock.auto_stock.create_new_items,
+          sourceLabel: 'otomatis dari transaksi',
+        })
+      }
+    }
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
     return { transaction: mapTx(rows[0]!), account: { id: accountId, balance: Number(accRow!.balance) } }
   })
@@ -459,6 +476,23 @@ export async function createTransactionBatch(
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, ownerMemberId: recorderId, created: titipanCreated }) : []
     for (const [merchant, list] of pricesByMerchant) await recordPrices(tx, actor.householdId, merchant, date, list)
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
+    const hhFeatures = await getHouseholdFeaturesInTx(tx, actor.householdId)
+    if (hhFeatures.shopping_stock.enabled && hhFeatures.shopping_stock.auto_stock.enabled) {
+      for (const txRow of rows) {
+        if (txRow.type === 'expense' && txRow.note) {
+          await syncPurchaseToPantry(tx, actor, {
+            txId: txRow.id,
+            rawName: txRow.note,
+            explicitQty: txRow.item_qty != null ? Number(txRow.item_qty) : undefined,
+            categoryName: txRow.category_name,
+            date: txRow.date,
+            isTitipan: /\(titipan\b/i.test(txRow.note) || txRow.category_name.toLowerCase() === 'piutang',
+            createNewItems: hhFeatures.shopping_stock.auto_stock.create_new_items,
+            sourceLabel: 'otomatis dari belanja',
+          })
+        }
+      }
+    }
     const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
     return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow!.balance) }, ...(piutang.length ? { piutang } : {}) }
   })
@@ -538,6 +572,7 @@ export async function updateTransaction(actor: Actor, id: string, input: UpdateT
 export async function deleteTransaction(actor: Actor, id: string) {
   return withActor(actor, async (tx) => {
     await tx`select delete_transaction(${actor.householdId}, ${actor.memberId}, ${id})`
+    await reversePurchaseFromPantry(tx, actor.householdId, actor.memberId, id)
     // TX_SELECT tidak menyertakan filter deleted_at; baris yang baru di-soft-delete tetap terbaca di sini.
     const rows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = $1`, [id])
     return mapTx(rows[0]!)

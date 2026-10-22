@@ -2,7 +2,8 @@ import type postgres from 'postgres'
 import { ApiError } from '@karaya/shared/errors'
 import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
-import { requireFeature } from './features'
+import { getHouseholdFeaturesInTx, requireFeature } from './features'
+import { syncPurchaseToPantry } from './pantry'
 import { resolveAccountRef, resolveCategoryRef, resolveBeneficiaryRef, resolveEffectiveRecorder, resolveExplicitRecorder } from './resolver'
 import { classifyItems } from './categorize'
 import { formatReceiptNote } from '@karaya/shared/format'
@@ -125,10 +126,19 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
 
     const shoppingMarked: { id: string; name: string }[] = []
     const shoppingUnmatched: string[] = []
-    const pantryUpdated: { name: string; qty_before: number; qty_after: number }[] = []
+    const pantryUpdated: { name: string; qty_before: number; qty_after: number; action?: string }[] = []
     const pantryUnmatched: string[] = []
     const titipanCreated: TitipanCreated[] = []
     const priceItems: PriceItem[] = []
+    const hhFeatures = input.pantry ? await getHouseholdFeaturesInTx(tx, actor.householdId) : null
+    const autoCreateNew = !!(hhFeatures?.shopping_stock?.auto_stock?.enabled && hhFeatures?.shopping_stock?.auto_stock?.create_new_items)
+
+    // Map category_id -> category_name bila butuh cek 'Bahan Makanan' untuk autoCreateNew
+    const catIds = Array.from(new Set(items.map((it) => it.category_id)))
+    const catNameRows = catIds.length
+      ? await tx<{ id: string; name: string }[]>`select id, name from categories where id = any(${catIds})`
+      : []
+    const catNameById = new Map(catNameRows.map((c) => [c.id, c.name]))
 
     for (const [idx, item] of input.items.entries()) {
       const txId = takeMatch(idx, item.amount)
@@ -146,13 +156,24 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
       }
 
       if (input.pantry) {
-        const [pantryRow] = await tx<{ id: string; qty: string }[]>`
-          select id, qty::text from pantry_items where id = find_pantry_match(${actor.householdId}, ${item.name})
-        `
-        if (pantryRow) {
-          const before = Number(pantryRow.qty)
-          await tx`select apply_pantry_movement(${actor.householdId}, ${actor.memberId}, ${pantryRow.id}, ${item.qty}, 'purchase', ${txId ?? null}, ${'dari struk: ' + item.name})`
-          pantryUpdated.push({ name: item.name, qty_before: before, qty_after: before + item.qty })
+        const catName = catNameById.get(items[idx]!.category_id) ?? classified.get(idx)?.category ?? null
+        const syncRes = await syncPurchaseToPantry(tx, actor, {
+          txId,
+          rawName: item.name,
+          explicitQty: item.qty,
+          categoryName: catName,
+          date,
+          isTitipan: !!titipan[idx],
+          createNewItems: autoCreateNew,
+          sourceLabel: 'dari struk',
+        })
+        if (syncRes.action === 'updated' || syncRes.action === 'created') {
+          pantryUpdated.push({
+            name: syncRes.name,
+            qty_before: syncRes.qty_before ?? 0,
+            qty_after: syncRes.qty_after ?? item.qty,
+            ...(syncRes.action === 'created' ? { action: 'created' } : {}),
+          })
         } else {
           pantryUnmatched.push(item.name)
         }

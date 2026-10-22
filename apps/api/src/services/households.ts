@@ -38,6 +38,7 @@ function mergeFeatures(current: ReturnType<typeof parseHouseholdFeatures>, patch
     shopping_stock: {
       ...current.shopping_stock,
       ...(patch.shopping_stock ?? {}),
+      auto_stock: { ...current.shopping_stock.auto_stock, ...(patch.shopping_stock?.auto_stock ?? {}) },
       expiry_reminder: { ...current.shopping_stock.expiry_reminder, ...(patch.shopping_stock?.expiry_reminder ?? {}) },
     },
   }

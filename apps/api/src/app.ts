@@ -34,6 +34,7 @@ import { receiptsApp } from './routes/receipts'
 import { pricesApp } from './routes/prices'
 import { insightsApp } from './routes/insights'
 import { adminApp } from './routes/admin'
+import { whatsappApp } from './routes/whatsapp'
 import { auditMiddleware } from './middleware/audit'
 
 export function buildApp() {
@@ -170,6 +171,7 @@ export function buildApp() {
   app.route('/', pricesApp)
   app.route('/', insightsApp)
   app.route('/', adminApp)
+  app.route('/', whatsappApp)
 
   return app
 }

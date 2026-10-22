@@ -437,7 +437,12 @@ function FeaturesTab({ features, plan, isOwner, busy, onPatch, toast }) {
     if (!features) return <div style={{ fontSize: 12, color: "var(--color-muted)", textAlign: "center", padding: 10 }}>Memuat...</div>;
 
     const report = features.monthly_report ?? { enabled: false, day: 1, hour: 8, channel: "both" };
-    const stock = features.shopping_stock ?? { enabled: false, expiry_reminder: { enabled: false, hour: 7, days_before: 2 } };
+    const stock = features.shopping_stock ?? {
+        enabled: false,
+        auto_stock: { enabled: false, create_new_items: true },
+        expiry_reminder: { enabled: false, hour: 7, days_before: 2 },
+    };
+    const autoStock = stock.auto_stock ?? { enabled: false, create_new_items: true };
     const expiry = stock.expiry_reminder ?? { enabled: false, hour: 7, days_before: 2 };
 
     const handleAddBen = async () => {
@@ -586,7 +591,47 @@ function FeaturesTab({ features, plan, isOwner, busy, onPatch, toast }) {
                 </div>
                 {stock.enabled && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--glass-border)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {/* Auto-Stok dari Transaksi Belanja */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: autoStock.enabled ? 8 : 10 }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text)" }}>🍗 Auto-Stok dari Transaksi Belanja</div>
+                                <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>
+                                    Belanja bahan makanan (ayam, sayur, telur, bumbu) otomatis masuk ke Stok Rumah.
+                                </div>
+                            </div>
+                            <Toggle
+                                on={!!autoStock.enabled}
+                                disabled={!isOwner || busy === "shopping_stock"}
+                                onClick={() =>
+                                    onPatch("shopping_stock", {
+                                        auto_stock: { ...autoStock, enabled: !autoStock.enabled },
+                                    })
+                                }
+                            />
+                        </div>
+                        {autoStock.enabled && (
+                            <div style={{ marginBottom: 12 }}>
+                                <label style={fieldLabel}>Mode penambahan stok otomatis</label>
+                                <select
+                                    disabled={!isOwner || busy === "shopping_stock"}
+                                    style={miniInputSt}
+                                    value={autoStock.create_new_items !== false ? "all" : "existing_only"}
+                                    onChange={(e) =>
+                                        onPatch("shopping_stock", {
+                                            auto_stock: {
+                                                ...autoStock,
+                                                create_new_items: e.target.value === "all",
+                                            },
+                                        })
+                                    }
+                                >
+                                    <option value="all">Otomatis Penuh (Buat item baru + tebak lokasi kulkas/freezer)</option>
+                                    <option value="existing_only">Hanya Barang yang Sudah Terdaftar di Stok</option>
+                                </select>
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 8, borderTop: "1px solid var(--glass-border)" }}>
                             <div style={{ flex: 1, fontSize: 12, color: "var(--color-text)" }}>Pengingat kedaluwarsa harian</div>
                             <Toggle
                                 on={expiry.enabled} disabled={!isOwner || busy === "shopping_stock"}
