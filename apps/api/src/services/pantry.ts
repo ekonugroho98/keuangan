@@ -396,7 +396,13 @@ export async function syncPurchaseToPantry(
   }
 
   // 2. Jika belum ada di pantry_items, cek apakah boleh membuat item baru
-  const isBahanMakanan = catLower === 'bahan makanan' || catLower === 'groceries' || catLower === 'sembako'
+  const rawGroceryRe =
+    /\b(ayam|daging|sapi|kambing|ikan|mujair|nila|lele|salmon|tuna|tongkol|bandeng|udang|cumi|sosis|nugget|sayur|bayam|kangkung|sawi|brokoli|wortel|kentang|tomat|timun|terong|buncis|kacang|kol|kubis|cabe|cabai|bawang|jeruk|apel|anggur|mangga|pisang|pepaya|semangka|melon|buah|tempe|tahu|telur|susu|keju|yogurt|yakult|mentega|butter|beras|minyak|tepung|gula|garam|kecap|saus|sambal|mie|indomie|pasta|bumbu|royco|masako|sasa|ladaku|ketumbar|merica|lada|kemiri|kunyit|jahe|lengkuas|serai|sereh|daun\s+salam|daun\s+jeruk|kapulaga|kayu\s+manis|bunga\s+lawang|cengkeh|asam\s+jawa|santan|kara|teh|kopi\s+bubuk|galon|aqua)\b/i
+  const isBahanMakanan =
+    catLower === 'bahan makanan' ||
+    catLower === 'groceries' ||
+    catLower === 'sembako' ||
+    (catLower.includes('makanan') && rawGroceryRe.test(info.cleanName))
   if (!params.createNewItems || !isBahanMakanan || NON_STOCK_SNACK_RE.test(info.cleanName)) {
     return { action: 'skipped', name: info.cleanName }
   }
