@@ -316,6 +316,7 @@ export interface CreateTransactionInput {
   receipt_url?: string
   receipt_image_base64?: string
   receipt_mime_type?: string
+  source?: 'web' | 'api_key' | 'import'
 }
 
 export async function createTransaction(actor: Actor, input: CreateTransactionInput, timezone: string) {
@@ -338,7 +339,7 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
     const [row] = await tx<{ id: string }[]>`
       select id from post_transaction(
         ${actor.householdId}, ${actor.memberId}, ${input.type}, ${accountId}, ${categoryId},
-        ${amount}, ${txDate}, ${input.note ?? ''}, ${txSource(actor)}, null, ${beneficiaryId}
+        ${amount}, ${txDate}, ${input.note ?? ''}, ${input.source ?? txSource(actor)}, null, ${beneficiaryId}
       )
     `
     if (recorderId !== actor.memberId || receiptUrl) {

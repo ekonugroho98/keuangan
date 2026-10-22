@@ -437,6 +437,7 @@ function FeaturesTab({ features, plan, isOwner, busy, onPatch, toast }) {
     if (!features) return <div style={{ fontSize: 12, color: "var(--color-muted)", textAlign: "center", padding: 10 }}>Memuat...</div>;
 
     const report = features.monthly_report ?? { enabled: false, day: 1, hour: 8, channel: "both" };
+    const recon = features.reconciliation ?? { enabled: false };
     const stock = features.shopping_stock ?? {
         enabled: false,
         auto_stock: { enabled: false, create_new_items: true },
@@ -656,6 +657,22 @@ function FeaturesTab({ features, plan, isOwner, busy, onPatch, toast }) {
                         )}
                     </div>
                 )}
+            </div>
+
+            <div style={featureCard}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>🔍 Cek Mutasi Bank (Rekonsiliasi Akhir Bulan)</div>
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 2 }}>
+                            Cocokkan CSV atau screenshot mutasi BCA, BRI, Mandiri, & GoPay untuk menemukan transaksi yang lupa dicatat. Menu "Cek Mutasi Bank" muncul di sidebar saat aktif.
+                        </div>
+                    </div>
+                    <Toggle
+                        on={!!recon.enabled}
+                        disabled={!isOwner || busy === "reconciliation"}
+                        onClick={() => onPatch("reconciliation", { enabled: !recon.enabled })}
+                    />
+                </div>
             </div>
         </div>
     );

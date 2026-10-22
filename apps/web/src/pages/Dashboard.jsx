@@ -72,6 +72,9 @@ const BelanjaView = lazy(
 const PantryView = lazy(
   () => import("../components/dashboard/views/PantryView"),
 );
+const ReconciliationView = lazy(
+  () => import("../components/dashboard/views/ReconciliationView"),
+);
 const AdminView = lazy(
   () => import("../components/dashboard/views/AdminView"),
 );
@@ -102,6 +105,7 @@ const NAV_LABELS = {
   prediksi: "nav.prediksi",
   belanja: "nav.shopping",
   pantry: "nav.pantry",
+  rekonsiliasi: "nav.reconciliation",
   admin: "nav.admin",
 };
 
@@ -1008,6 +1012,14 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             )}
             {activeMenu === "belanja" && <BelanjaView showToast={showToast} setActiveMenu={setActiveMenu} />}
             {activeMenu === "pantry" && <PantryView showToast={showToast} setActiveMenu={setActiveMenu} />}
+            {activeMenu === "rekonsiliasi" && (
+              <ReconciliationView
+                accounts={accounts}
+                categories={categories}
+                onAdjustAccountBalance={adjustBalance}
+                showToast={showToast}
+              />
+            )}
             {activeMenu === "admin" && <AdminView showToast={showToast} />}
           </Suspense>
         </div>

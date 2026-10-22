@@ -264,6 +264,7 @@ const Sidebar = ({
             { id: "kategori",  label: t("nav.categories"),   icon: "🏷️" },
             { id: "berulang",  label: t("nav.recurring"),    icon: "🔄" },
             { id: "splitbill", label: t("nav.splitbill"),    icon: "🧾" },
+            { id: "rekonsiliasi", label: t("nav.reconciliation") === "nav.reconciliation" ? "Cek Mutasi Bank" : t("nav.reconciliation"), icon: "🔍" },
         ]},
         { key: "planning", group: t("nav.planning"), collapsible: true, items: [
             { id: "anggaran",  label: t("nav.budgets"),      icon: "💰" },

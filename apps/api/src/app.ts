@@ -35,6 +35,7 @@ import { pricesApp } from './routes/prices'
 import { insightsApp } from './routes/insights'
 import { adminApp } from './routes/admin'
 import { whatsappApp } from './routes/whatsapp'
+import { reconciliationApp } from './routes/reconciliation'
 import { auditMiddleware } from './middleware/audit'
 
 export function buildApp() {
@@ -172,6 +173,7 @@ export function buildApp() {
   app.route('/', insightsApp)
   app.route('/', adminApp)
   app.route('/', whatsappApp)
+  app.route('/', reconciliationApp)
 
   return app
 }
