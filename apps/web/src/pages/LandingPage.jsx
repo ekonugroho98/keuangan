@@ -161,12 +161,12 @@ const CATALOG_PRODUCTS = [
     {
         id: "webapp",
         code: "KB-APP-01",
-        category: "Aplikasi Web & Android · Gratis Selamanya",
-        name: "Aplikasi Web & Android Keluarga Berkembang",
+        category: "Paket Mandiri · Input Manual",
+        name: "Paket Mandiri (Web & Android)",
         subtitle: "Buat yang rajin catat sendiri lewat tombol Web atau HP. Sudah termasuk Rekening Bersama vs Privat, Kalkulator Adu Harga Minimarket (per 100ml/100g), Stok Kulkas & Daftar Belanja, serta Export Excel (.xlsx).",
         priceDisplay: "Rp 0",
         priceNumeric: 0,
-        billingNote: "Gratis Selamanya · Tanpa Iklan",
+        billingNote: "Gratis Selamanya · Input Manual",
         deliveryMethod: "Aktif seketika di browser melalui kelola.keluargaberkembang.com atau instalasi APK Android.",
         features: [
             "Dasbor arus kas keluarga dengan pemisahan Rekening Bersama dan Rekening Privat.",
@@ -174,32 +174,52 @@ const CATALOG_PRODUCTS = [
             "Stok Kulkas & Daftar Belanja keluarga yang tersinkronisasi antara suami dan istri.",
             "Laporan grafik bulanan dan fitur unduh pembukuan ke format Excel (.xlsx).",
         ],
-        ctaLabel: "Buka Aplikasi Web Sekarang",
-        secondaryLabel: "Buat Akun Keluarga Baru",
+        ctaLabel: "Buka Aplikasi Web Gratis",
+        secondaryLabel: "Daftar Akun Keluarga Baru",
         isFreeApp: true,
     },
     {
-        id: "asisten",
-        code: "KB-AST-AI",
-        category: "Layanan Asisten Otomatis · Paling Praktis (Tanpa Ketik Manual)",
-        name: "Asisten AI Keluarga: Catat dari Grup WhatsApp & Foto Struk",
-        subtitle: "Malas ketik struk belanja panjang satu per satu? Cukup foto struk yang lecek atau ketik 1 baris di Grup WhatsApp suami-istri, beres dalam 5 detik.",
+        id: "asisten-sachet",
+        code: "KB-AST-SACHET",
+        category: "Paket Sachet & Hemat · Tanpa Ketik Manual",
+        name: "Paket Sachet & Hemat (Web + Telegram + Foto Struk)",
+        subtitle: "Cocok untuk coba dulu atau dipakai sendiri lewat Web & Telegram. Cukup foto struk belanja yang lecek atau ketik 1 kalimat di chat, langsung tercatat otomatis dalam 5 detik.",
         priceDisplay: "Mulai Rp 9.000",
         priceNumeric: 9000,
-        billingNote: "Lebih hemat dari parkir minimarket (~Rp 900/hari untuk dipakai berdua suami-istri)",
-        deliveryMethod: "Jalur koneksi asisten pribadi keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
+        billingNote: "Pilihan: Sachet 7 Hari Rp 9.000 atau Hemat 30 Hari Rp 19.000",
+        deliveryMethod: "Kode kuota & koneksi asisten AI aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
         subOptions: [
             { id: "ast-sachet", label: "Paket Sachet Coba Dulu (Aktif 7 Hari · Web, Telegram & Foto Struk)", priceDisplay: "Rp 9.000", priceNumeric: 9000 },
             { id: "ast-hemat", label: "Paket Hemat Bulanan (Aktif 30 Hari · Web, Telegram & Foto Struk)", priceDisplay: "Rp 19.000", priceNumeric: 19000 },
-            { id: "ast-keluarga", label: "Paket Lengkap Keluarga (Aktif 30 Hari · Masuk Grup WhatsApp Suami-Istri + Telegram + Foto Struk)", priceDisplay: "Rp 29.000", priceNumeric: 29000 },
         ],
         features: [
             "Beres dalam 5 detik: cukup kirim foto struk Alfamart/Indomaret/Superindo, daftar barang & diskon langsung tercatat otomatis.",
-            "Bisa dimasukkan ke 1 Grup WhatsApp berdua pasangan (suami-istri), tidak perlu memaksa pasangan buka aplikasi baru.",
+            "Tanya-jawab asisten keuangan 24 jam lewat chat Web dan Telegram pribadi tanpa perlu daftar API Key teknis.",
+            "Otomatis memperbarui sisa anggaran bulanan dan perbandingan harga barang antar toko.",
+            "Fleksibel: bisa mulai dari Paket Sachet 7 hari (Rp 9.000) sebelum lanjut ke bulanan (Rp 19.000).",
+        ],
+        ctaLabel: "Pilih Paket Sachet / Hemat (Mulai Rp 9.000)",
+    },
+    {
+        id: "asisten-wa",
+        code: "KB-AST-WA",
+        category: "Paling Laris · Rekomendasi Pasangan",
+        name: "Paket Lengkap Keluarga (Grup WhatsApp Suami-Istri + Telegram + Foto Struk)",
+        subtitle: "Tidak perlu memaksa pasangan buka aplikasi baru. Cukup masukkan asisten ke 1 Grup WhatsApp berdua suami-istri, kirim foto struk atau ketik pengeluaran, beres tercatat bersama.",
+        priceDisplay: "Rp 29.000 / 30 hari",
+        priceNumeric: 29000,
+        billingNote: "~Rp 900/hari untuk berdua suami-istri",
+        deliveryMethod: "Jalur koneksi asisten Grup WhatsApp & Telegram keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
+        subOptions: [
+            { id: "ast-keluarga", label: "Paket Lengkap Keluarga (Aktif 30 Hari · Masuk Grup WhatsApp Suami-Istri + Telegram + Foto Struk)", priceDisplay: "Rp 29.000", priceNumeric: 29000 },
+        ],
+        features: [
+            "Bisa dimasukkan ke 1 Grup WhatsApp berdua pasangan (suami-istri) + akses penuh di Telegram & Web.",
+            "Suami atau istri cukup kirim foto struk belanja atau ketik 1 baris di Grup WA, langsung tercatat rapi.",
             "Sudah termasuk kuota pembacaan foto struk dan tanya-jawab asisten keuangan 24 jam tanpa perlu daftar API Key sendiri.",
             "Jalur koneksi khusus yang aman dan privat untuk grup keluarga Anda (aktif otomatis dalam < 3 menit setelah pembayaran QRIS).",
         ],
-        ctaLabel: "Pilih Paket Asisten AI (Mulai Rp 9.000)",
+        ctaLabel: "Pilih Paket Lengkap Keluarga (Rp 29.000)",
         featured: true,
     },
     {
@@ -220,6 +240,7 @@ const CATALOG_PRODUCTS = [
         ],
         ctaLabel: "Pesan Ebook + Source Code (Rp 99.000)",
         featured: true,
+        hidden: true,
     },
     {
         id: "vip",
@@ -242,6 +263,7 @@ const CATALOG_PRODUCTS = [
             "Prioritas bantuan langsung dari tim pengembang Keluarga Berkembang.",
         ],
         ctaLabel: "Pesan Bundel VIP (Rp 599.000)",
+        hidden: true,
     },
 ];
 
@@ -251,12 +273,13 @@ const FAQ_ITEMS = [
         a: "Sama sekali tidak perlu. Untuk pencatatan manual di Web dan HP (termasuk Rekening Bersama vs Privat, Adu Harga Minimarket per 100ml/100g, Stok Kulkas, dan Export Excel), Anda bisa langsung memakainya Gratis Selamanya (Rp 0) di kelola.keluargaberkembang.com. Jika malas ketik manual, cukup aktifkan Paket Sachet Asisten AI mulai Rp 9.000 (7 hari) atau Paket Lengkap Grup WhatsApp Suami-Istri Rp 29.000/bulan.",
     },
     {
-        q: "Apa bedanya versi Web Gratis Rp 0 dengan Paket Asisten AI (Mulai Rp 9.000)?",
-        a: "Versi Web Gratis Rp 0 sudah mencakup seluruh fitur pencatatan manual, pisah rekening Bersama dan Privat, kalkulator harga per 100ml/100g, stok kulkas, serta unduh laporan Excel (.xlsx) tanpa iklan. Paket Asisten AI (Rp 9.000 untuk Sachet 7 hari, Rp 19.000/bulan untuk Web & Telegram, atau Rp 29.000/bulan untuk Paket Lengkap Grup WhatsApp Suami-Istri) menambahkan kemudahan otomatis: cukup kirim foto struk belanja yang lecek atau ketik 1 baris di chat, langsung beres tercatat dalam 5 detik.",
+        q: "Apa bedanya versi Web Gratis Rp 0, Paket Sachet/Hemat (Rp 9.000 / Rp 19.000), dan Paket Lengkap Keluarga (Rp 29.000)?",
+        a: "Versi Web Gratis Rp 0 sudah mencakup seluruh fitur pencatatan manual, pisah rekening Bersama dan Privat, kalkulator harga per 100ml/100g, stok kulkas, serta unduh laporan Excel (.xlsx) tanpa iklan. Paket Sachet (Rp 9.000 / 7 hari) dan Paket Hemat (Rp 19.000 / 30 hari) menambahkan asisten AI di Web & Telegram serta scan foto struk otomatis 5 detik. Paket Lengkap Keluarga (Rp 29.000 / 30 hari) memungkinkan asisten dimasukkan langsung ke 1 Grup WhatsApp berdua suami-istri.",
     },
     {
         q: "Apakah ada biaya bulanan setelah membeli Ebook Rp 99.000? Bagaimana rincian jujurnya?",
         a: "Pembelian Ebook + Full Source Code Rp 99.000 adalah sekali bayar untuk hak milik selamanya. Jika Anda ingin menyalakan asisten bot 24 jam secara mandiri, Anda bebas memilih 1 dari 3 jalur: (1) Jalur Cloud Free Tier Rp 0/bulan jika memiliki kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun cloud; (2) Jalur VPS lokal Indonesia sekitar Rp 25.000/bulan via QRIS tanpa kartu kredit; atau (3) Jalur Terima Beres di @KaraAutoBot mulai Rp 9.000 (Paket Sachet) hingga Rp 29.000/bulan (Paket Lengkap Grup WhatsApp).",
+        hidden: true,
     },
     {
         q: "Kalau dipakai berdua dengan pasangan, apakah saldo tabungan pribadi saya ikut terlihat?",
@@ -267,8 +290,8 @@ const FAQ_ITEMS = [
         a: "Aman karena dirancang khusus untuk pemakaian internal 1 Grup WhatsApp keluarga berdua pasangan (suami, istri, dan asisten pribadi), bukan untuk pengiriman pesan massal (blast/spam) ke nomor asing. Pola percakapan terjadi secara alami layaknya obrolan rumah tangga sehari-hari.",
     },
     {
-        q: "Bagaimana metode pembayaran, kecepatan pengiriman produk digital, dan garansi pengembalian dana (Refund)?",
-        a: "Seluruh pembayaran diproses dalam mata uang Rupiah (Rp) melalui QRIS (mendukung semua bank dan e-wallet) serta Virtual Account Bank Nasional. Produk digital dikirim otomatis segera setelah pembayaran terverifikasi (< 1 menit untuk Ebook/Voucher, dan maksimal 3 menit untuk aktivasi Asisten AI Keluarga). Kami memberikan garansi 100% uang kembali apabila produk gagal terkirim atau layanan gagal aktif sesuai Kebijakan Pengembalian Dana (/refund).",
+        q: "Bagaimana metode pembayaran, kecepatan aktivasi layanan digital, dan garansi pengembalian dana (Refund)?",
+        a: "Seluruh pembayaran diproses dalam mata uang Rupiah (Rp) melalui QRIS (mendukung semua bank dan e-wallet) serta Virtual Account Bank Nasional. Kuota dan layanan Asisten AI Keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran terverifikasi. Kami memberikan garansi 100% uang kembali apabila layanan gagal aktif sesuai Kebijakan Pengembalian Dana (/refund).",
     },
 ];
 
@@ -328,6 +351,13 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
 
     const currentScenario = SCENARIOS[activeScenarioIdx] || SCENARIOS[0];
     const currentShot = currentScenario.screenshots[activeShotIdx] || currentScenario.screenshots[0];
+
+    // Default: tampilkan 3 kartu SaaS; tambahkan ?catalog=all untuk menampilkan Ebook & VIP yang di-hide
+    const showAllCatalog =
+        typeof window !== "undefined" && new URLSearchParams(window.location.search).get("catalog") === "all";
+    const saasProducts = CATALOG_PRODUCTS.filter((p) => !p.hidden);
+    const hiddenProducts = CATALOG_PRODUCTS.filter((p) => p.hidden);
+    const visibleFaqs = FAQ_ITEMS.filter((item) => showAllCatalog || !item.hidden);
 
     const handleScenarioSelect = (idx) => {
         setActiveScenarioIdx(idx);
@@ -640,6 +670,13 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                     align-items: start;
                 }
                 /* Catalog Ledger Grid */
+                .kb-catalog-saas-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 22px;
+                    margin-bottom: 24px;
+                    align-items: stretch;
+                }
                 .kb-catalog-featured-grid {
                     display: grid;
                     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -673,6 +710,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                 .kb-hero-grid > *,
                 .kb-scenario-tabs > *,
                 .kb-scenario-stage > *,
+                .kb-catalog-saas-grid > *,
                 .kb-catalog-featured-grid > *,
                 .kb-payment-steps > *,
                 .kb-pillars-grid > *,
@@ -696,6 +734,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                     }
                     .kb-hero-grid,
                     .kb-scenario-stage,
+                    .kb-catalog-saas-grid,
                     .kb-catalog-featured-grid,
                     .kb-pillars-grid,
                     .kb-faq-grid {
@@ -1555,97 +1594,21 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             </div>
                         </div>
 
-                        {/* Top Row: Web App (Free Access) */}
-                        <div style={{
-                            background: "#FFFDF9",
-                            border: "1px solid #D5CCB8",
-                            borderRadius: 20,
-                            padding: "26px 28px",
-                            marginBottom: 24,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            flexWrap: "wrap",
-                            gap: 24,
-                        }}>
-                            <div style={{ flex: "1 1 480px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-                                    <span className="kb-mono" style={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        padding: "3px 10px",
-                                        borderRadius: 6,
-                                        background: "#E6EFE8",
-                                        color: "#2E3D30",
-                                    }}>
-                                        KODE: {CATALOG_PRODUCTS[0].code}
-                                    </span>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: "#4A584D", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                        {CATALOG_PRODUCTS[0].category}
-                                    </span>
-                                </div>
-                                <h3 style={{ fontSize: 22, marginBottom: 6 }}>{CATALOG_PRODUCTS[0].name}</h3>
-                                <p style={{ fontSize: 14, color: "#4A584D", marginBottom: 12, maxWidth: "65ch" }}>
-                                    {CATALOG_PRODUCTS[0].subtitle}
-                                </p>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", fontSize: 13, color: "#1F2922", fontWeight: 600 }}>
-                                    <span>✓ Akun Bersama & Privat</span>
-                                    <span>✓ Adu Harga Minimarket per 100ml/100g</span>
-                                    <span>✓ Stok Kulkas & Daftar Belanja</span>
-                                    <span>✓ Ekspor Laporan Excel (.xlsx)</span>
-                                </div>
-                            </div>
-
-                            <div style={{
-                                flex: "0 1 300px",
-                                background: "#F7F3EB",
-                                border: "1px solid #E5DEC9",
-                                borderRadius: 16,
-                                padding: "18px 20px",
-                                textAlign: "left",
-                            }}>
-                                <div style={{ fontSize: 12, color: "#4A584D", fontWeight: 700 }}>{CATALOG_PRODUCTS[0].billingNote}</div>
-                                <div className="kb-mono" style={{ fontSize: 28, fontWeight: 700, color: "#2E3D30", lineHeight: 1.2, margin: "4px 0" }}>
-                                    {CATALOG_PRODUCTS[0].priceDisplay}
-                                </div>
-                                <div style={{ fontSize: 12, color: "#4A584D", marginBottom: 14 }}>
-                                    Gratis selamanya untuk catat sendiri di Web/HP
-                                </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    <a
-                                        href="https://kelola.keluargaberkembang.com"
-                                        className="kb-btn-primary"
-                                        style={{ width: "100%", fontSize: 14, minHeight: 44, padding: "10px 16px" }}
-                                    >
-                                        Buka kelola.keluargaberkembang.com
-                                    </a>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowSignup(true)}
-                                        className="kb-btn-secondary"
-                                        style={{ width: "100%", fontSize: 13, minHeight: 44, padding: "8px 14px" }}
-                                    >
-                                        Daftar Akun Keluarga Baru
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Middle Row: 2 Primary Paid Offerings (Asisten AI Mulai Rp 9.000 & Ebook Rp 99.000) */}
-                        <div className="kb-catalog-featured-grid">
-                            {[CATALOG_PRODUCTS[1], CATALOG_PRODUCTS[2]].map((prod) => (
+                        {/* 3 Kartu SaaS Berjenjang (Mandiri Rp 0 · Sachet/Hemat Mulai Rp 9.000 · Lengkap Grup WA Rp 29.000) */}
+                        <div className="kb-catalog-saas-grid">
+                            {saasProducts.map((prod) => (
                                 <div
                                     key={prod.id}
                                     style={{
                                         background: "#FFFDF9",
                                         border: prod.featured ? "2px solid #3F5142" : "1px solid #D5CCB8",
                                         borderRadius: 22,
-                                        padding: "30px 28px",
+                                        padding: "28px 24px",
                                         display: "flex",
                                         flexDirection: "column",
                                         justifyContent: "space-between",
                                         boxShadow: prod.featured
-                                            ? "0 20px 45px -20px rgba(46, 61, 48, 0.22)"
+                                            ? "0 20px 45px -20px rgba(46, 61, 48, 0.24)"
                                             : "0 10px 30px -15px rgba(31, 41, 34, 0.08)",
                                     }}
                                 >
@@ -1658,8 +1621,16 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                 letterSpacing: "0.05em",
                                                 padding: "4px 10px",
                                                 borderRadius: 99,
-                                                background: prod.featured ? "#3F5142" : "#FBF0EA",
-                                                color: prod.featured ? "#FFFDF9" : "#9E472D",
+                                                background: prod.featured
+                                                    ? "#3F5142"
+                                                    : prod.isFreeApp
+                                                        ? "#E6EFE8"
+                                                        : "#FBF0EA",
+                                                color: prod.featured
+                                                    ? "#FFFDF9"
+                                                    : prod.isFreeApp
+                                                        ? "#2E3D30"
+                                                        : "#9E472D",
                                             }}>
                                                 {prod.category}
                                             </span>
@@ -1668,10 +1639,10 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                             </span>
                                         </div>
 
-                                        <h3 style={{ fontSize: 24, lineHeight: 1.2, marginBottom: 8 }}>
+                                        <h3 style={{ fontSize: 22, lineHeight: 1.22, marginBottom: 8 }}>
                                             {prod.name}
                                         </h3>
-                                        <p style={{ fontSize: 14, color: "#4A584D", marginBottom: 18 }}>
+                                        <p style={{ fontSize: 14, color: "#4A584D", marginBottom: 16 }}>
                                             {prod.subtitle}
                                         </p>
 
@@ -1680,11 +1651,11 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                             background: "#F7F3EB",
                                             border: "1px solid #E5DEC9",
                                             borderRadius: 14,
-                                            padding: "16px 18px",
-                                            marginBottom: 18,
+                                            padding: "16px 16px",
+                                            marginBottom: 16,
                                         }}>
                                             <div className="kb-mono" style={{
-                                                fontSize: "clamp(26px, 3vw, 32px)",
+                                                fontSize: "clamp(24px, 2.6vw, 30px)",
                                                 fontWeight: 700,
                                                 color: prod.featured ? "#9E472D" : "#2E3D30",
                                                 lineHeight: 1.15,
@@ -1704,7 +1675,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                     gap: 8,
                                                 }}>
                                                     {prod.subOptions.map((sub) => (
-                                                        <div key={sub.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, fontSize: 13 }}>
+                                                        <div key={sub.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, fontSize: 12.5 }}>
                                                             <span style={{ color: "#1F2922", fontWeight: 600 }}>{sub.label}</span>
                                                             <span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30", flexShrink: 0 }}>{sub.priceDisplay}</span>
                                                         </div>
@@ -1714,9 +1685,9 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                         </div>
 
                                         {/* Features List */}
-                                        <ul style={{ listStyle: "none", padding: 0, margin: "0 0 20px 0", display: "grid", gap: 10 }}>
+                                        <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px 0", display: "grid", gap: 10 }}>
                                             {prod.features.map((f, i) => (
-                                                <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "#1F2922" }}>
+                                                <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13.5, color: "#1F2922" }}>
                                                     <span style={{ color: "#3F5142", fontWeight: 700 }}>✓</span>
                                                     <span>{f}</span>
                                                 </li>
@@ -1730,15 +1701,112 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                             background: "#FAF1E2",
                                             border: "1px solid #E5D4B8",
                                             borderRadius: 12,
-                                            padding: "10px 14px",
+                                            padding: "10px 12px",
                                             fontSize: 12,
                                             color: "#7A4710",
                                             fontWeight: 600,
                                             marginBottom: 14,
                                         }}>
-                                            <strong>Pengiriman Produk Digital:</strong> {prod.deliveryMethod}
+                                            <strong>Pengiriman Layanan Digital:</strong> {prod.deliveryMethod}
                                         </div>
 
+                                        {prod.isFreeApp ? (
+                                            <div style={{ display: "grid", gap: 8 }}>
+                                                <a
+                                                    href="https://kelola.keluargaberkembang.com"
+                                                    className="kb-btn-primary"
+                                                    style={{ width: "100%", fontSize: 14 }}
+                                                >
+                                                    {prod.ctaLabel}
+                                                </a>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSignup(true)}
+                                                    className="kb-btn-secondary"
+                                                    style={{ width: "100%", fontSize: 13, minHeight: 44, padding: "9px 14px" }}
+                                                >
+                                                    {prod.secondaryLabel}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => openOrderModal(prod)}
+                                                className="kb-btn-primary"
+                                                style={{
+                                                    width: "100%",
+                                                    fontSize: 14,
+                                                    background: prod.featured ? "#9E472D" : "#3F5142",
+                                                    borderColor: prod.featured ? "#7E3620" : "#2E3D30",
+                                                }}
+                                            >
+                                                {prod.ctaLabel}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Hidden Ebook & VIP Offerings (Hanya tampil jika ?catalog=all) */}
+                        {showAllCatalog && hiddenProducts.length > 0 && (
+                            <div className="kb-catalog-featured-grid" style={{ marginBottom: 32 }}>
+                                {hiddenProducts.map((prod) => (
+                                    <div
+                                        key={prod.id}
+                                        style={{
+                                            background: "#FFFDF9",
+                                            border: "1px solid #D5CCB8",
+                                            borderRadius: 22,
+                                            padding: "28px 26px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            justifyContent: "space-between",
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                                                <span style={{
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.05em",
+                                                    padding: "4px 10px",
+                                                    borderRadius: 99,
+                                                    background: "#FBF0EA",
+                                                    color: "#9E472D",
+                                                }}>
+                                                    {prod.category}
+                                                </span>
+                                                <span className="kb-mono" style={{ fontSize: 12, color: "#4A584D", fontWeight: 700 }}>
+                                                    {prod.code}
+                                                </span>
+                                            </div>
+                                            <h3 style={{ fontSize: 22, lineHeight: 1.2, marginBottom: 8 }}>{prod.name}</h3>
+                                            <p style={{ fontSize: 14, color: "#4A584D", marginBottom: 16 }}>{prod.subtitle}</p>
+                                            <div style={{
+                                                background: "#F7F3EB",
+                                                border: "1px solid #E5DEC9",
+                                                borderRadius: 14,
+                                                padding: "14px 16px",
+                                                marginBottom: 16,
+                                            }}>
+                                                <div className="kb-mono" style={{ fontSize: 28, fontWeight: 700, color: "#9E472D" }}>
+                                                    {prod.priceDisplay}
+                                                </div>
+                                                <div style={{ fontSize: 13, color: "#4A584D", fontWeight: 600, marginTop: 4 }}>
+                                                    {prod.billingNote}
+                                                </div>
+                                            </div>
+                                            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px 0", display: "grid", gap: 8 }}>
+                                                {prod.features.map((f, i) => (
+                                                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13.5, color: "#1F2922" }}>
+                                                        <span style={{ color: "#9E472D", fontWeight: 700 }}>✓</span>
+                                                        <span>{f}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => openOrderModal(prod)}
@@ -1748,92 +1816,9 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                             {prod.ctaLabel}
                                         </button>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Bottom Row: VIP Bundle & Token AI Voucher (Rp 599.000) */}
-                        <div style={{
-                            background: "#FFFDF9",
-                            border: "2px solid #C86D51",
-                            borderRadius: 22,
-                            padding: "28px 28px",
-                            marginBottom: 32,
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                            gap: 28,
-                            alignItems: "center",
-                        }}>
-                            <div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-                                    <span style={{
-                                        padding: "4px 12px",
-                                        borderRadius: 99,
-                                        background: "#FBF0EA",
-                                        color: "#9E472D",
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.05em",
-                                    }}>
-                                        {CATALOG_PRODUCTS[3].category}
-                                    </span>
-                                    <span className="kb-mono" style={{ fontSize: 12, color: "#4A584D", fontWeight: 700 }}>
-                                        KODE: {CATALOG_PRODUCTS[3].code}
-                                    </span>
-                                </div>
-                                <h3 style={{ fontSize: 24, marginBottom: 8 }}>
-                                    {CATALOG_PRODUCTS[3].name}
-                                </h3>
-                                <p style={{ fontSize: 14, color: "#4A584D", marginBottom: 14 }}>
-                                    {CATALOG_PRODUCTS[3].subtitle}
-                                </p>
-                                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
-                                    {CATALOG_PRODUCTS[3].features.map((f, i) => (
-                                        <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 14, color: "#1F2922" }}>
-                                            <span style={{ color: "#9E472D", fontWeight: 700 }}>✓</span>
-                                            <span>{f}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                ))}
                             </div>
-
-                            <div style={{
-                                background: "#F7F3EB",
-                                border: "1px solid #E5DEC9",
-                                borderRadius: 16,
-                                padding: "22px 22px",
-                            }}>
-                                <div style={{ fontSize: 12, color: "#4A584D", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    Investasi Paket Lengkap + Bimbingan
-                                </div>
-                                <div className="kb-mono" style={{ fontSize: 32, fontWeight: 700, color: "#9E472D", margin: "4px 0" }}>
-                                    {CATALOG_PRODUCTS[3].priceDisplay}
-                                </div>
-                                <div style={{ fontSize: 13, color: "#4A584D", fontWeight: 600, marginBottom: 12 }}>
-                                    {CATALOG_PRODUCTS[3].billingNote}
-                                </div>
-                                <div style={{
-                                    fontSize: 12,
-                                    color: "#4A584D",
-                                    background: "#FFFDF9",
-                                    border: "1px solid #E5DEC9",
-                                    padding: "10px 12px",
-                                    borderRadius: 10,
-                                    marginBottom: 14,
-                                }}>
-                                    <strong>Metode Pemenuhan:</strong> {CATALOG_PRODUCTS[3].deliveryMethod}
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => openOrderModal(CATALOG_PRODUCTS[3])}
-                                    className="kb-btn-primary"
-                                    style={{ width: "100%", background: "#9E472D", borderColor: "#7E3620" }}
-                                >
-                                    {CATALOG_PRODUCTS[3].ctaLabel}
-                                </button>
-                            </div>
-                        </div>
+                        )}
 
                         {/* Payment & Automated Delivery Explanation (Duitku KYC Requirement) */}
                         <div style={{
@@ -1852,10 +1837,10 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             }}>
                                 <div>
                                     <h3 style={{ fontSize: 20, marginBottom: 4 }}>
-                                        Alur Pembayaran & Pengiriman Produk Digital Otomatis
+                                        Alur Pembayaran & Pengiriman Layanan Digital Otomatis
                                     </h3>
                                     <p style={{ fontSize: 14, color: "#4A584D", margin: 0 }}>
-                                        Transaksi diproses secara aman dalam mata uang Rupiah (IDR) dengan pengiriman produk digital instan 24 jam.
+                                        Transaksi diproses secara aman dalam mata uang Rupiah (IDR) dengan aktivasi kuota dan asisten keluarga otomatis 24 jam.
                                     </p>
                                 </div>
                                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1873,7 +1858,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     {
                                         step: "TAHAP 01",
                                         title: "Pilih Paket & Isi Identitas",
-                                        desc: "Pilih paket produk digital di katalog atas, lalu masukkan alamat Email dan nomor WhatsApp atau username Telegram penerima.",
+                                        desc: "Pilih paket layanan di katalog atas, lalu masukkan alamat Email dan nomor WhatsApp atau username Telegram penerima.",
                                     },
                                     {
                                         step: "TAHAP 02",
@@ -1882,8 +1867,8 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     },
                                     {
                                         step: "TAHAP 03",
-                                        title: "Verifikasi & Pengiriman Instan",
-                                        desc: "Sistem mendeteksi pembayaran otomatis. Tautan Ebook & Voucher dikirim dalam < 1 menit, atau Asisten AI Keluarga aktif dalam < 3 menit.",
+                                        title: "Verifikasi & Aktivasi Instan",
+                                        desc: "Sistem mendeteksi pembayaran otomatis. Kode kuota AI dan jalur koneksi Asisten AI Keluarga aktif dalam waktu kurang dari 3 menit.",
                                     },
                                     {
                                         step: "TAHAP 04",
@@ -2116,7 +2101,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     Kami menuliskan rincian teknis dan biaya apa adanya di depan agar Anda bisa memilih jalur yang paling sesuai dengan kenyamanan rumah tangga Anda.
                                 </p>
 
-                                {/* 3 Server Jalur Breakdown Card */}
+                                {/* Summary Card: 3 SaaS Tiers (default) or 3 Server Options (showAllCatalog) */}
                                 <div style={{
                                     background: "#F7F3EB",
                                     border: "1px solid #E5DEC9",
@@ -2124,34 +2109,59 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     padding: "22px 22px",
                                 }}>
                                     <div className="kb-handwritten" style={{ fontSize: 21, color: "#9E472D", marginBottom: 6 }}>
-                                        ✎ Ringkasan 3 Opsi Menjalankan Bot AI 24 Jam:
+                                        {showAllCatalog
+                                            ? "✎ Ringkasan 3 Opsi Menjalankan Bot AI 24 Jam:"
+                                            : "✎ Ringkasan 3 Pilihan Paket Keluarga Berkembang:"}
                                     </div>
-                                    <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
-                                        <div style={{ paddingBottom: 10, borderBottom: "1px solid #E5DEC9" }}>
-                                            <strong style={{ color: "#1F2922" }}>1. Jalur Cloud Free Tier (<span className="kb-mono">Rp 0 / bulan</span>):</strong>
-                                            <div style={{ color: "#4A584D", marginTop: 2 }}>
-                                                Cocok bagi pemilik kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun gratis Google Cloud / Azure.
+                                    {showAllCatalog ? (
+                                        <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
+                                            <div style={{ paddingBottom: 10, borderBottom: "1px solid #E5DEC9" }}>
+                                                <strong style={{ color: "#1F2922" }}>1. Jalur Cloud Free Tier (<span className="kb-mono">Rp 0 / bulan</span>):</strong>
+                                                <div style={{ color: "#4A584D", marginTop: 2 }}>
+                                                    Cocok bagi pemilik kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun gratis Google Cloud / Azure.
+                                                </div>
+                                            </div>
+                                            <div style={{ paddingBottom: 10, borderBottom: "1px solid #E5DEC9" }}>
+                                                <strong style={{ color: "#1F2922" }}>2. Jalur VPS Lokal Tanpa Kartu Kredit (<span className="kb-mono">~Rp 25.000 / bulan</span>):</strong>
+                                                <div style={{ color: "#4A584D", marginTop: 2 }}>
+                                                    Pembayaran mudah menggunakan QRIS tanpa memerlukan kartu kredit.
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <strong style={{ color: "#1F2922" }}>3. Jalur Terima Beres via @KaraAutoBot (<span className="kb-mono">Mulai Rp 9.000</span>):</strong>
+                                                <div style={{ color: "#4A584D", marginTop: 2 }}>
+                                                    Tanpa urus teknis sama sekali: Paket Sachet Rp 9.000 (7 hari), Paket Hemat Rp 19.000 (30 hari), atau Paket Lengkap Grup WA Suami-Istri Rp 29.000/bulan.
+                                                </div>
                                             </div>
                                         </div>
-                                        <div style={{ paddingBottom: 10, borderBottom: "1px solid #E5DEC9" }}>
-                                            <strong style={{ color: "#1F2922" }}>2. Jalur VPS Lokal Tanpa Kartu Kredit (<span className="kb-mono">~Rp 25.000 / bulan</span>):</strong>
-                                            <div style={{ color: "#4A584D", marginTop: 2 }}>
-                                                Pembayaran mudah menggunakan QRIS tanpa memerlukan kartu kredit.
+                                    ) : (
+                                        <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
+                                            <div style={{ paddingBottom: 10, borderBottom: "1px solid #E5DEC9" }}>
+                                                <strong style={{ color: "#1F2922" }}>1. Paket Mandiri Web & Android (<span className="kb-mono">Rp 0 / Selamanya</span>):</strong>
+                                                <div style={{ color: "#4A584D", marginTop: 2 }}>
+                                                    Catat sendiri di Web/HP tanpa biaya langganan. Termasuk Rekening Bersama vs Privat, Adu Harga Minimarket, Stok Kulkas, dan Export Excel.
+                                                </div>
+                                            </div>
+                                            <div style={{ paddingBottom: 10, borderBottom: "1px solid #E5DEC9" }}>
+                                                <strong style={{ color: "#1F2922" }}>2. Paket Sachet & Hemat (<span className="kb-mono">Rp 9.000 / 7 hari · Rp 19.000 / 30 hari</span>):</strong>
+                                                <div style={{ color: "#4A584D", marginTop: 2 }}>
+                                                    Malas ketik manual? Kirim foto struk belanja atau chat via Web & Telegram, langsung tercatat otomatis dalam 5 detik.
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <strong style={{ color: "#1F2922" }}>3. Paket Lengkap Grup WhatsApp (<span className="kb-mono">Rp 29.000 / 30 hari</span>):</strong>
+                                                <div style={{ color: "#4A584D", marginTop: 2 }}>
+                                                    Paling praktis untuk suami-istri (~Rp 900/hari berdua): asisten AI masuk ke Grup WhatsApp keluarga + Telegram + Scan Struk Otomatis.
+                                                </div>
                                             </div>
                                         </div>
-                                        <div>
-                                            <strong style={{ color: "#1F2922" }}>3. Jalur Terima Beres via @KaraAutoBot (<span className="kb-mono">Mulai Rp 9.000</span>):</strong>
-                                            <div style={{ color: "#4A584D", marginTop: 2 }}>
-                                                Tanpa urus teknis sama sekali: Paket Sachet Rp 9.000 (7 hari), Paket Hemat Rp 19.000 (30 hari), atau Paket Lengkap Grup WA Suami-Istri Rp 29.000/bulan.
-                                            </div>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Right Column: Interactive Accordion */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                                {FAQ_ITEMS.map((item, idx) => {
+                                {visibleFaqs.map((item, idx) => {
                                     const isOpen = openFaqIdx === idx;
                                     return (
                                         <div
@@ -2270,24 +2280,33 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8, fontSize: 14 }}>
                                 <li>
                                     <a href="https://kelola.keluargaberkembang.com" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
-                                        Web App Kelola Keuangan
+                                        Paket Mandiri Web & Android (Rp 0)
                                     </a>
                                 </li>
                                 <li>
                                     <a href="#paket" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
-                                        Ebook Panduan + Source Code (Rp 99.000)
+                                        Paket Sachet & Hemat AI (Mulai Rp 9.000)
                                     </a>
                                 </li>
                                 <li>
                                     <a href="#paket" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
-                                        Asisten Grup WA & Foto Struk (Mulai Rp 9.000)
+                                        Paket Lengkap Grup WA Suami-Istri (Rp 29.000)
                                     </a>
                                 </li>
-                                <li>
-                                    <a href="#paket" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
-                                        Bundel VIP & Bimbingan 14 Hari (Rp 599.000)
-                                    </a>
-                                </li>
+                                {showAllCatalog && (
+                                    <>
+                                        <li>
+                                            <a href="#paket" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
+                                                Ebook Panduan + Source Code (Rp 99.000)
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="#paket" style={{ color: "#4A584D", textDecoration: "none", fontWeight: 600 }}>
+                                                Bundel VIP & Bimbingan 14 Hari (Rp 599.000)
+                                            </a>
+                                        </li>
+                                    </>
+                                )}
                             </ul>
                         </div>
 

@@ -8,6 +8,9 @@ const TABS = [
 
 export default function LegalPage({ initialTab = "tos", onNavigate }) {
     const [activeTab, setActiveTab] = useState(initialTab);
+    const showAllCatalog =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("catalog") === "all";
 
     useEffect(() => {
         setActiveTab(initialTab);
@@ -284,36 +287,47 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                 </thead>
                                 <tbody>
                                     <tr style={{ borderBottom: "1px solid #E5DEC9" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Aplikasi Web & Android Keluarga Berkembang</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Gratis Selamanya · Tanpa Iklan</td>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Mandiri: Aplikasi Web & Android Keluarga Berkembang (<code>KB-APP-01</code>)</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Gratis Selamanya · Tanpa Iklan (Input Manual)</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>Rp 0 (Gratis Selamanya)</td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Akses langsung via <code>kelola.keluargaberkembang.com</code></td>
                                     </tr>
                                     <tr style={{ borderBottom: "1px solid #E5DEC9", background: "#FCF9F2" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Layanan Asisten AI Keluarga (Grup WhatsApp, Telegram & Scan Struk)</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Sachet (7 Hari) / Bulanan (30 Hari)</td>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Sachet & Hemat: Asisten Scan Struk & Chat AI (<code>KB-AST-SACHET</code>)</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Sachet (7 Hari) / Paket Hemat (30 Hari) · Web, Telegram & Foto Struk</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>
                                             Rp 9.000 / 7 hari (Paket Sachet)<br />
-                                            Rp 19.000 / 30 hari (Paket Hemat Web & Telegram)<br />
-                                            Rp 29.000 / 30 hari (Paket Lengkap Grup WhatsApp + Telegram)
+                                            Rp 19.000 / 30 hari (Paket Hemat Bulanan)
                                         </td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi otomatis dalam &lt; 3 menit via bot resmi <code>@KaraAutoBot</code></td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Kode Key Kuota AI / Aktivasi otomatis dalam &lt; 3 menit via <code>@KaraAutoBot</code></td>
                                     </tr>
-                                    <tr style={{ borderBottom: "1px solid #E5DEC9" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Ebook Panduan Mandiri 37 Layar + Full Source Code</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Sekali Bayar (Hak Milik Selamanya)</td>
-                                        <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>Rp 99.000</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Tautan unduhan PDF/HTML interaktif (37 layar) & paket kode sumber dikirim instan ke email/Telegram</td>
-                                    </tr>
-                                    <tr style={{ background: "#FCF9F2" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Bundel Lengkap VIP: Ebook + Source Code + Bimbingan Privat 14 Hari</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Lengkap + Pendampingan 14 Hari</td>
+                                    <tr style={{ borderBottom: showAllCatalog ? "1px solid #E5DEC9" : "none" }}>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Lengkap Keluarga: Grup WhatsApp Suami-Istri + Telegram + Foto Struk (<code>KB-AST-WA</code>)</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Langganan Bulanan (30 Hari) · Grup WhatsApp, Telegram & Foto Struk</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>
-                                            Rp 599.000<br />
-                                            <span style={{ fontSize: 12, color: "#4A584D", fontWeight: 500 }}>(Upgrade dari pemilik Ebook: Rp 500.000)</span>
+                                            Rp 29.000 / 30 hari
                                         </td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Unduhan Ebook instan + Kode Voucher Kuota AI + Undangan sesi bimbingan privat</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi asisten Grup WhatsApp &amp; Telegram otomatis dalam &lt; 3 menit via <code>@KaraAutoBot</code></td>
                                     </tr>
+                                    {showAllCatalog && (
+                                        <>
+                                            <tr style={{ borderBottom: "1px solid #E5DEC9", background: "#FCF9F2" }}>
+                                                <td style={{ padding: "14px 16px", fontWeight: 700 }}>Ebook Panduan Mandiri 37 Layar + Full Source Code (<code>KB-EBK-99</code>)</td>
+                                                <td style={{ padding: "14px 16px", color: "#4A584D" }}>Sekali Bayar (Hak Milik Selamanya)</td>
+                                                <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>Rp 99.000</td>
+                                                <td style={{ padding: "14px 16px", color: "#4A584D" }}>Tautan unduhan PDF/HTML interaktif (37 layar) &amp; paket kode sumber dikirim instan ke email/Telegram</td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ padding: "14px 16px", fontWeight: 700 }}>Bundel Lengkap VIP: Ebook + Source Code + Bimbingan Privat 14 Hari (<code>KB-VIP-599</code>)</td>
+                                                <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Lengkap + Pendampingan 14 Hari</td>
+                                                <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>
+                                                    Rp 599.000<br />
+                                                    <span style={{ fontSize: 12, color: "#4A584D", fontWeight: 500 }}>(Upgrade dari pemilik Ebook: Rp 500.000)</span>
+                                                </td>
+                                                <td style={{ padding: "14px 16px", color: "#4A584D" }}>Unduhan Ebook instan + Kode Voucher Kuota AI + Undangan sesi bimbingan privat</td>
+                                            </tr>
+                                        </>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
