@@ -12738,6 +12738,10 @@ var MonthlyReportFeatureSchema = external_exports.object({
   recipients: external_exports.union([external_exports.literal("all"), external_exports.array(UuidSchema)]).default("all")
 });
 var ReconciliationFeatureSchema = external_exports.object({ enabled: external_exports.boolean().default(false) });
+var AutoStockSchema = external_exports.object({
+  enabled: external_exports.boolean().default(false),
+  create_new_items: external_exports.boolean().default(true)
+});
 var ExpiryReminderSchema = external_exports.object({
   enabled: external_exports.boolean().default(false),
   hour: external_exports.number().int().min(0).max(23).default(7),
@@ -12746,6 +12750,7 @@ var ExpiryReminderSchema = external_exports.object({
 });
 var ShoppingStockFeatureSchema = external_exports.object({
   enabled: external_exports.boolean().default(false),
+  auto_stock: AutoStockSchema.default({}),
   expiry_reminder: ExpiryReminderSchema.default({})
 });
 var HouseholdFeaturesSchema = external_exports.object({
@@ -12760,6 +12765,7 @@ var UpdateHouseholdFeaturesBodySchema = external_exports.object({
   reconciliation: ReconciliationFeatureSchema.partial().strict().optional(),
   shopping_stock: external_exports.object({
     enabled: external_exports.boolean().optional(),
+    auto_stock: AutoStockSchema.partial().strict().optional(),
     expiry_reminder: ExpiryReminderSchema.partial().strict().optional()
   }).strict().optional()
 }).strict().openapi("UpdateHouseholdFeaturesBody");
@@ -14177,6 +14183,7 @@ function mergeFeatures(current, patch) {
     shopping_stock: {
       ...current.shopping_stock,
       ...patch.shopping_stock ?? {},
+      auto_stock: { ...current.shopping_stock.auto_stock, ...patch.shopping_stock?.auto_stock ?? {} },
       expiry_reminder: { ...current.shopping_stock.expiry_reminder, ...patch.shopping_stock?.expiry_reminder ?? {} }
     }
   };
@@ -15371,6 +15378,401 @@ async function resolveReceiptUrl(actor, input) {
   return input.receipt_url;
 }
 
+// src/services/pantry.ts
+var SELECT = `select id, name, unit, qty::float as qty, min_qty::float as min_qty, location::text as location, category, expires_at::text as expires_at, expires_estimated, aliases from pantry_items`;
+function normalizeLocation(input, field = "location") {
+  if (input === void 0) return void 0;
+  const key = input.trim().toLowerCase();
+  const value = PANTRY_LOCATION_ALIASES[key];
+  if (!value) throw ApiError.fromCode("validation_error", { message: `Lokasi "${input}" tidak dikenal.`, details: { field, allowed: Object.keys(PANTRY_LOCATION_ALIASES) } });
+  return value;
+}
+async function listPantry(actor, location) {
+  await requireFeature(actor, "shopping_stock");
+  const loc = normalizeLocation(location, "location");
+  return withActor(actor, async (tx) => {
+    const rows = await tx.unsafe(
+      loc ? `${SELECT} where household_id = $1 and deleted_at is null and location = $2 order by name` : `${SELECT} where household_id = $1 and deleted_at is null order by location, name`,
+      loc ? [actor.householdId, loc] : [actor.householdId]
+    );
+    return rows;
+  });
+}
+async function createPantryItem(actor, input) {
+  await requireFeature(actor, "shopping_stock");
+  const location = normalizeLocation(input.location) ?? "other";
+  return withActor(actor, async (tx) => {
+    try {
+      const [row] = await tx`
+        insert into pantry_items (household_id, name, unit, qty, min_qty, location, category, expires_at, expires_estimated, aliases)
+        values (${actor.householdId}, ${input.name}, ${input.unit}, ${input.qty}, ${input.min_qty ?? null}, ${location}, ${input.category ?? null}, ${input.expires_at ?? null}, ${input.expires_estimated}, ${input.aliases})
+        returning id
+      `;
+      const rows = await tx.unsafe(`${SELECT} where id = $1`, [row.id]);
+      return rows[0];
+    } catch (err) {
+      if (err && typeof err === "object" && err.code === "23505") {
+        throw ApiError.fromCode("validation_error", { message: "Sudah ada item pantry dengan nama ini.", details: { field: "name" } });
+      }
+      throw err;
+    }
+  });
+}
+async function updatePantryItem(actor, id, input) {
+  await requireFeature(actor, "shopping_stock");
+  const location = normalizeLocation(input.location);
+  return withActor(actor, async (tx) => {
+    const [existing] = await tx`select id from pantry_items where id = ${id} and household_id = ${actor.householdId} and deleted_at is null`;
+    if (!existing) throw ApiError.fromCode("pantry_item_not_found");
+    try {
+      await tx`
+        update pantry_items set
+          name = coalesce(${input.name ?? null}, name),
+          unit = coalesce(${input.unit ?? null}, unit),
+          min_qty = case when ${input.min_qty === void 0} then min_qty else ${input.min_qty ?? null}::numeric end,
+          location = coalesce(${location ?? null}, location),
+          category = case when ${input.category === void 0} then category else ${input.category ?? null}::text end,
+          expires_at = case when ${input.expires_at === void 0} then expires_at else ${input.expires_at ?? null}::date end,
+          expires_estimated = coalesce(${input.expires_estimated ?? null}, expires_estimated),
+          aliases = coalesce(${input.aliases ?? null}, aliases),
+          updated_at = now()
+        where id = ${id} and household_id = ${actor.householdId}
+      `;
+    } catch (err) {
+      if (err && typeof err === "object" && err.code === "23505") {
+        throw ApiError.fromCode("validation_error", { message: "Sudah ada item pantry lain dengan nama ini.", details: { field: "name" } });
+      }
+      throw err;
+    }
+    const rows = await tx.unsafe(`${SELECT} where id = $1`, [id]);
+    return rows[0];
+  });
+}
+async function deletePantryItem(actor, id) {
+  await requireFeature(actor, "shopping_stock");
+  return withActor(actor, async (tx) => {
+    const [row] = await tx`
+      update pantry_items set deleted_at = now(), updated_at = now()
+      where id = ${id} and household_id = ${actor.householdId} and deleted_at is null
+      returning id
+    `;
+    if (!row) throw ApiError.fromCode("pantry_item_not_found");
+    return { success: true };
+  });
+}
+async function addPantryMovement(actor, id, input) {
+  await requireFeature(actor, "shopping_stock");
+  return withActor(actor, async (tx) => {
+    await tx`select apply_pantry_movement(${actor.householdId}, ${actor.memberId}, ${id}, ${input.delta}, ${input.reason}, null, ${input.note})`;
+    const rows = await tx.unsafe(`${SELECT} where id = $1`, [id]);
+    if (!rows[0]) throw ApiError.fromCode("pantry_item_not_found");
+    return rows[0];
+  });
+}
+async function getExpiring(actor, withinDays, includeExpired, excludeAcked) {
+  await requireFeature(actor, "shopping_stock");
+  return withActor(actor, async (tx) => {
+    const rows = await tx`
+      select id, name, qty::text, unit, location::text as location, expires_at::text as expires_at, expires_estimated,
+        (expires_at - current_date)::int as days_left
+      from pantry_items
+      where household_id = ${actor.householdId} and deleted_at is null and qty > 0 and expires_at is not null
+        and expires_at <= current_date + ${withinDays}::int
+        and (${includeExpired} or expires_at >= current_date)
+        and (
+          not ${excludeAcked}
+          or expiry_notified_on is null
+          or (expires_at = current_date and expiry_notified_on < current_date)
+        )
+      order by expires_at
+    `;
+    const expired = rows.filter((r) => r.days_left < 0).map(mapExpiring);
+    const expiring = rows.filter((r) => r.days_left >= 0).map(mapExpiring);
+    const text = buildExpiringText(expired, expiring);
+    return { expired, expiring, text_id: text };
+  });
+}
+function mapExpiring(r) {
+  return { id: r.id, name: r.name, qty: Number(r.qty), unit: r.unit, location: r.location, expires_at: r.expires_at, expires_estimated: r.expires_estimated, days_left: r.days_left };
+}
+var LOCATION_LABEL_ID = { fridge: "Kulkas", freezer: "Freezer", shelf: "Lemari", other: "Lainnya" };
+function buildExpiringText(expired, expiring) {
+  if (expired.length === 0 && expiring.length === 0) return "";
+  const lines = ["\u{1F95B} Pantry \u2014 cek hari ini"];
+  const describe = (i) => `${i.name} (${LOCATION_LABEL_ID[i.location] ?? i.location}${i.expires_estimated ? ", perkiraan" : ""} ${i.expires_at.slice(8, 10)}/${i.expires_at.slice(5, 7)})`;
+  for (const i of expired) lines.push(`Sudah lewat: ${describe(i)}`);
+  for (const i of expiring) {
+    const label = i.days_left === 0 ? "Hari ini" : i.days_left === 1 ? "Besok" : `${i.days_left} hari lagi`;
+    lines.push(`${label}: ${describe(i)}`);
+  }
+  lines.push('Balas "X dibuang" / "X udah abis" biar stoknya diupdate.');
+  return lines.join("\n");
+}
+async function ackExpiring(actor, ids) {
+  await requireFeature(actor, "shopping_stock");
+  return withActor(actor, async (tx) => {
+    await tx`update pantry_items set expiry_notified_on = current_date where id = any(${ids}) and household_id = ${actor.householdId}`;
+    return { success: true };
+  });
+}
+var FREEZER_RE = /\b(ayam|daging|sapi|kambing|ikan|mujair|nila|lele|tongkol|bandeng|salmon|tuna|dori|cumi|sotong|udang|kepiting|kerang|sosis|nugget|pangsit|dimsum|bakso|otak[-\s]*otak|frozen|es\s*krim|ice\s*cream)\b/i;
+var FRIDGE_RE = /\b(sayur|bayam|kangkung|sawi|pakcoy|wortel|tomat|cabe|cabai|bawang\s*daun|daun\s*bawang|seledri|brokoli|kembang\s*kol|kol|kubis|buncis|kacang\s*panjang|timun|terong|labu|jagung|oyong|tauge|toge|jamur|jeruk|pisang|apel|anggur|mangga|pepaya|semangka|melon|alpukat|pir|buah|tempe|tahu|telur|telor|susu|keju|mentega|margarin|butter|yogurt|yoghurt|yakult|cincau|santan\s*segar)\b/i;
+var SHELF_RE = /\b(beras|minyak|tepung|terigu|maizena|tapioka|sagu|gula|garam|kecap|saus|saos|sambal|mie|mi\s*instan|indomie|bihun|soun|makaroni|pasta|spaghetti|bumbu|ladaku|merica|lada|ketumbar|kapulaga|kayu\s*manis|bunga\s*lawang|cengkeh|pala|asam\s*jawa|kemiri|kunyit|jahe|lengkuas|sereh|serai|daun\s*salam|daun\s*jeruk|bawang\s*merah|bawang\s*putih|bawang\s*bombay|penyedap|royco|masako|sasa|ajinomoto|totole|kaldu|santan|kara|teh|kopi|sirup|madu|selai|meses|cokelat\s*bubuk|galon|aqua|air\s*mineral|roti|popok|pampers|diapers|sabun|shampoo|odol|pasta\s*gigi|deterjen|rinso|sunlight|mama\s*lemon|tisu|tissue)\b/i;
+var LONGER_FRIDGE_RE = /\b(telur|telor|jeruk|apel|pir|keju|mentega|margarin|butter|yakult|susu\s*uht)\b/i;
+var SHORT_SHELF_RE = /\b(roti|donat|bolu)\b/i;
+var NON_STOCK_SNACK_RE = /^(es\s+teh|es\s+jeruk|kopi\s+kenangan|janji\s+jiwa|fore\s+coffee|gofood|grabfood|shopeefood|parkir|bensin|pertalite|pertamax|tol|pulsa|token\s+listrik|keripik|chiki|permen|biskuit|wafer|Seblak|Martabak|Nasi\s+Padang|Nasi\s+Goreng|Mie\s+Ayam|Bakso\s+Malang|Sate\s+Ayam|Pecel\s+Lele)\b/i;
+function inferPantryLocation(itemName) {
+  const s = itemName.trim();
+  if (FREEZER_RE.test(s)) return "freezer";
+  if (SHELF_RE.test(s)) return "shelf";
+  if (FRIDGE_RE.test(s)) return "fridge";
+  return "fridge";
+}
+function inferExpiryDate(itemName, location, baseDateStr) {
+  const base = baseDateStr && /^\d{4}-\d{2}-\d{2}$/.test(baseDateStr) ? /* @__PURE__ */ new Date(`${baseDateStr}T00:00:00Z`) : /* @__PURE__ */ new Date();
+  if (Number.isNaN(base.getTime())) return null;
+  let addDays2 = null;
+  if (location === "freezer") {
+    addDays2 = 30;
+  } else if (location === "fridge") {
+    addDays2 = LONGER_FRIDGE_RE.test(itemName) ? 14 : 5;
+  } else if (location === "shelf") {
+    addDays2 = SHORT_SHELF_RE.test(itemName) ? 4 : null;
+  }
+  if (addDays2 === null) return null;
+  const target = new Date(base.getTime() + addDays2 * 864e5);
+  return target.toISOString().slice(0, 10);
+}
+function extractStockItemInfo(rawNoteOrName, explicitQty) {
+  const parsed = parseReceiptNote(rawNoteOrName || "");
+  let name = (parsed.name || rawNoteOrName || "").trim();
+  name = name.replace(/^\[(?:KANTOR|PRIBADI|KELUARGA|RUMAH)\]\s*/i, "").trim();
+  name = name.replace(/\s*\(titipan[^)]*\)\s*$/i, "").trim();
+  const baseQty = explicitQty && explicitQty > 0 ? explicitQty : parsed.qty && parsed.qty > 0 ? parsed.qty : 1;
+  const unitMatch = name.match(
+    /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(ekor|ikat|sikat|sisir|papan|tray|bungkus|bks|pak|pack|potong|ptg|butir|btr|buah|bh|kg|ons|galon)$/i
+  );
+  if (unitMatch) {
+    const cleanName = unitMatch[1].trim();
+    const num2 = Number(unitMatch[2].replace(",", "."));
+    const rawUnit = unitMatch[3].toLowerCase();
+    const unitMap = {
+      bks: "bungkus",
+      pak: "pack",
+      ptg: "potong",
+      btr: "butir",
+      bh: "buah"
+    };
+    const unit = unitMap[rawUnit] ?? rawUnit;
+    if (cleanName && num2 > 0) {
+      return { cleanName, qty: +(num2 * (baseQty > 1 && baseQty !== num2 ? baseQty : 1)).toFixed(3), unit };
+    }
+  }
+  const multMatch = name.match(/^(.+?)\s+(?:x(\d+(?:[.,]\d+)?)|\((\d+(?:[.,]\d+)?)\s*(pcs|pack|bungkus|ekor|ikat|kg)\))$/i);
+  if (multMatch) {
+    const cleanName = multMatch[1].trim();
+    const num2 = Number((multMatch[2] ?? multMatch[3] ?? "1").replace(",", "."));
+    const unit = (multMatch[4] ?? "pcs").toLowerCase();
+    if (cleanName && num2 > 0) {
+      return { cleanName, qty: num2, unit };
+    }
+  }
+  return {
+    cleanName: name,
+    qty: baseQty,
+    unit: "pcs"
+  };
+}
+async function syncPurchaseToPantry(tx, actor, params) {
+  if (params.isTitipan) {
+    return { action: "skipped", name: params.rawName };
+  }
+  const catLower = (params.categoryName ?? "").trim().toLowerCase();
+  if (["piutang", "transfer", "koreksi saldo", "tabungan & goal", "hutang & cicilan"].includes(catLower)) {
+    return { action: "skipped", name: params.rawName };
+  }
+  if (params.txId) {
+    const [existingMov] = await tx`
+      select id from pantry_movements
+      where household_id = ${actor.householdId} and transaction_id = ${params.txId}
+      limit 1
+    `;
+    if (existingMov) {
+      return { action: "skipped", name: params.rawName };
+    }
+  }
+  const info = extractStockItemInfo(params.rawName, params.explicitQty);
+  if (!info.cleanName || info.cleanName.length < 2) {
+    return { action: "skipped", name: params.rawName };
+  }
+  const [pantryRow] = await tx`
+    select id, name, qty::text, unit, location::text as location, expires_at::text as expires_at
+    from pantry_items
+    where id = find_pantry_match(${actor.householdId}, ${info.cleanName})
+  `;
+  const notePrefix = params.sourceLabel ?? "otomatis dari belanja";
+  if (pantryRow) {
+    const before = Number(pantryRow.qty);
+    await tx`
+      select apply_pantry_movement(
+        ${actor.householdId},
+        ${actor.memberId},
+        ${pantryRow.id},
+        ${info.qty},
+        'purchase',
+        ${params.txId ?? null},
+        ${notePrefix + ": " + info.cleanName}
+      )
+    `;
+    if (before <= 0) {
+      const loc = pantryRow.location || "fridge";
+      const newExp = inferExpiryDate(pantryRow.name, loc, params.date);
+      if (newExp) {
+        await tx`
+          update pantry_items
+          set expires_at = ${newExp}::date, expires_estimated = true, expiry_notified_on = null, updated_at = now()
+          where id = ${pantryRow.id} and household_id = ${actor.householdId}
+        `;
+      }
+    }
+    return {
+      action: "updated",
+      id: pantryRow.id,
+      name: pantryRow.name,
+      qty_before: before,
+      qty_after: +(before + info.qty).toFixed(3),
+      unit: pantryRow.unit,
+      location: pantryRow.location
+    };
+  }
+  const isBahanMakanan = catLower === "bahan makanan" || catLower === "groceries" || catLower === "sembako";
+  if (!params.createNewItems || !isBahanMakanan || NON_STOCK_SNACK_RE.test(info.cleanName)) {
+    return { action: "skipped", name: info.cleanName };
+  }
+  const location = inferPantryLocation(info.cleanName);
+  const expiresAt = inferExpiryDate(info.cleanName, location, params.date);
+  const safeName = info.cleanName.slice(0, 80);
+  const [inserted] = await tx`
+    insert into pantry_items (
+      household_id, name, unit, qty, min_qty, location, category, expires_at, expires_estimated, aliases
+    )
+    values (
+      ${actor.householdId},
+      ${safeName},
+      ${info.unit},
+      0,
+      1,
+      ${location},
+      'Bahan Makanan',
+      ${expiresAt},
+      ${expiresAt !== null},
+      '{}'::text[]
+    )
+    on conflict (household_id, lower(name)) where deleted_at is null
+    do update set updated_at = now()
+    returning id, name
+  `;
+  if (!inserted) {
+    return { action: "skipped", name: info.cleanName };
+  }
+  await tx`
+    select apply_pantry_movement(
+      ${actor.householdId},
+      ${actor.memberId},
+      ${inserted.id},
+      ${info.qty},
+      'purchase',
+      ${params.txId ?? null},
+      ${notePrefix + ": " + safeName}
+    )
+  `;
+  return {
+    action: "created",
+    id: inserted.id,
+    name: inserted.name,
+    qty_before: 0,
+    qty_after: info.qty,
+    unit: info.unit,
+    location
+  };
+}
+async function reversePurchaseFromPantry(tx, householdId, memberId, transactionId) {
+  const movements = await tx`
+    select id, pantry_item_id, delta::text
+    from pantry_movements
+    where household_id = ${householdId}
+      and transaction_id = ${transactionId}
+      and reason = 'purchase'
+      and delta > 0
+  `;
+  for (const mov of movements) {
+    const deltaNum = Number(mov.delta);
+    if (deltaNum > 0) {
+      await tx`
+        update pantry_items
+        set qty = greatest(0, qty - ${deltaNum}), updated_at = now()
+        where id = ${mov.pantry_item_id} and household_id = ${householdId} and deleted_at is null
+      `;
+      await tx`
+        delete from pantry_movements where id = ${mov.id} and household_id = ${householdId}
+      `;
+    }
+  }
+}
+async function syncPurchasesForPeriod(actor, period = "this_month") {
+  await requireFeature(actor, "shopping_stock");
+  const timezone = await getHouseholdTimezone(actor);
+  const resolved = resolvePeriod(period, timezone);
+  return withActor(actor, async (tx) => {
+    const txRows = await tx`
+      select t.id, t.note, t.date::text as date, c.name as category_name, pp.qty::text as item_qty
+      from transactions t
+      join categories c on c.id = t.category_id
+      left join product_prices pp on pp.transaction_id = t.id
+      where t.household_id = ${actor.householdId}
+        and t.deleted_at is null
+        and t.type = 'expense'
+        and t.date >= ${resolved.from}::date
+        and t.date <= ${resolved.to}::date
+        and lower(c.name) in ('bahan makanan', 'groceries', 'sembako')
+        and not exists (
+          select 1 from pantry_movements pm
+          where pm.household_id = ${actor.householdId}
+            and pm.transaction_id = t.id
+        )
+      order by t.date asc, t.created_at asc
+    `;
+    const created = [];
+    const updated = [];
+    let skipped = 0;
+    for (const row of txRows) {
+      const explicitQty = row.item_qty != null ? Number(row.item_qty) : void 0;
+      const res = await syncPurchaseToPantry(tx, actor, {
+        txId: row.id,
+        rawName: row.note,
+        explicitQty,
+        categoryName: row.category_name,
+        date: row.date,
+        isTitipan: /\(titipan\b/i.test(row.note),
+        createNewItems: true,
+        sourceLabel: "sinkron belanja"
+      });
+      if (res.action === "created") created.push(res);
+      else if (res.action === "updated") updated.push(res);
+      else skipped++;
+    }
+    return {
+      period: { from: resolved.from, to: resolved.to },
+      scanned: txRows.length,
+      created_count: created.length,
+      updated_count: updated.length,
+      skipped_count: skipped,
+      created,
+      updated
+    };
+  });
+}
+
 // src/services/transactions.ts
 function touchesBeneficiary(ref) {
   return ref.beneficiary_id !== void 0 || ref.beneficiary !== void 0;
@@ -15610,6 +16012,21 @@ async function createTransaction(actor, input, timezone) {
       });
     }
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [row.id]);
+    if (input.type === "expense" && rows[0]?.note) {
+      const hhFeatures = await getHouseholdFeaturesInTx(tx, actor.householdId);
+      if (hhFeatures.shopping_stock.enabled && hhFeatures.shopping_stock.auto_stock.enabled) {
+        await syncPurchaseToPantry(tx, actor, {
+          txId: row.id,
+          rawName: rows[0].note,
+          explicitQty: rows[0].item_qty != null ? Number(rows[0].item_qty) : void 0,
+          categoryName: rows[0].category_name,
+          date: txDate,
+          isTitipan: /\(titipan\b/i.test(rows[0].note) || rows[0].category_name.toLowerCase() === "piutang",
+          createNewItems: hhFeatures.shopping_stock.auto_stock.create_new_items,
+          sourceLabel: "otomatis dari transaksi"
+        });
+      }
+    }
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
     return { transaction: mapTx(rows[0]), account: { id: accountId, balance: Number(accRow.balance) } };
   });
@@ -15678,6 +16095,23 @@ async function createTransactionBatch(actor, input, timezone) {
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, ownerMemberId: recorderId, created: titipanCreated }) : [];
     for (const [merchant, list] of pricesByMerchant) await recordPrices(tx, actor.householdId, merchant, date, list);
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
+    const hhFeatures = await getHouseholdFeaturesInTx(tx, actor.householdId);
+    if (hhFeatures.shopping_stock.enabled && hhFeatures.shopping_stock.auto_stock.enabled) {
+      for (const txRow of rows) {
+        if (txRow.type === "expense" && txRow.note) {
+          await syncPurchaseToPantry(tx, actor, {
+            txId: txRow.id,
+            rawName: txRow.note,
+            explicitQty: txRow.item_qty != null ? Number(txRow.item_qty) : void 0,
+            categoryName: txRow.category_name,
+            date: txRow.date,
+            isTitipan: /\(titipan\b/i.test(txRow.note) || txRow.category_name.toLowerCase() === "piutang",
+            createNewItems: hhFeatures.shopping_stock.auto_stock.create_new_items,
+            sourceLabel: "otomatis dari belanja"
+          });
+        }
+      }
+    }
     const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
     return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow.balance) }, ...piutang.length ? { piutang } : {} };
   });
@@ -15728,6 +16162,7 @@ async function updateTransaction(actor, id, input) {
 async function deleteTransaction(actor, id) {
   return withActor(actor, async (tx) => {
     await tx`select delete_transaction(${actor.householdId}, ${actor.memberId}, ${id})`;
+    await reversePurchaseFromPantry(tx, actor.householdId, actor.memberId, id);
     const rows = await tx.unsafe(`${TX_SELECT} where t.id = $1`, [id]);
     return mapTx(rows[0]);
   });
@@ -17553,7 +17988,7 @@ function assertNotReservedName(name) {
     });
   }
 }
-var SELECT = `
+var SELECT2 = `
   select b.id, coalesce(m.display_name, b.name) as name, b.kind, b.member_id, b.aliases, b.icon, b.color
   from beneficiaries b
   left join household_members m on m.id = b.member_id and m.deleted_at is null
@@ -17562,7 +17997,7 @@ async function listBeneficiaries(actor) {
   await requireFeature(actor, "beneficiary");
   return withActor(actor, async (tx) => {
     const rows = await tx.unsafe(
-      `${SELECT} where b.household_id = $1 and b.deleted_at is null order by b.sort_order, b.created_at`,
+      `${SELECT2} where b.household_id = $1 and b.deleted_at is null order by b.sort_order, b.created_at`,
       [actor.householdId]
     );
     return rows;
@@ -17579,7 +18014,7 @@ async function createBeneficiary(actor, input) {
         values (${actor.householdId}, ${input.name}, ${input.kind}, ${memberId}, ${input.aliases}, ${input.icon ?? "\u{1F464}"}, ${input.color ?? "#6366f1"})
         returning id
       `;
-      const rows = await tx.unsafe(`${SELECT} where b.id = $1`, [row.id]);
+      const rows = await tx.unsafe(`${SELECT2} where b.id = $1`, [row.id]);
       return rows[0];
     } catch (err) {
       if (err && typeof err === "object" && err.code === "23505") {
@@ -17611,7 +18046,7 @@ async function updateBeneficiary(actor, id, input) {
       }
       throw err;
     }
-    const rows = await tx.unsafe(`${SELECT} where b.id = $1`, [id]);
+    const rows = await tx.unsafe(`${SELECT2} where b.id = $1`, [id]);
     return rows[0];
   });
 }
@@ -17707,12 +18142,12 @@ function buildTextId(input) {
 }
 
 // src/services/shopping.ts
-var SELECT2 = `select id, name, qty_text, notes, status, source, bought_transaction_id from shopping_items`;
+var SELECT3 = `select id, name, qty_text, notes, status, source, bought_transaction_id from shopping_items`;
 async function listShopping(actor, status) {
   await requireFeature(actor, "shopping_stock");
   return withActor(actor, async (tx) => {
     const rows = await tx.unsafe(
-      `${SELECT2} where household_id = $1 and deleted_at is null and status = $2 order by created_at`,
+      `${SELECT3} where household_id = $1 and deleted_at is null and status = $2 order by created_at`,
       [actor.householdId, status ?? "needed"]
     );
     if ((status ?? "needed") !== "needed" || !rows.length) return rows;
@@ -17728,7 +18163,7 @@ async function createShoppingItem(actor, input) {
       values (${actor.householdId}, ${input.name}, ${input.qty_text ?? null}, ${input.notes}, ${actor.memberId})
       returning id
     `;
-    const rows = await tx.unsafe(`${SELECT2} where id = $1`, [row.id]);
+    const rows = await tx.unsafe(`${SELECT3} where id = $1`, [row.id]);
     return rows[0];
   });
 }
@@ -17753,7 +18188,7 @@ async function updateShoppingItem(actor, id, input) {
         updated_at = now()
       where id = ${id} and household_id = ${actor.householdId}
     `;
-    const rows = await tx.unsafe(`${SELECT2} where id = $1`, [id]);
+    const rows = await tx.unsafe(`${SELECT3} where id = $1`, [id]);
     return rows[0];
   });
 }
@@ -17785,144 +18220,6 @@ async function listShoppingSuggestions(actor) {
       order by p.name
     `;
     return rows;
-  });
-}
-
-// src/services/pantry.ts
-var SELECT3 = `select id, name, unit, qty::float as qty, min_qty::float as min_qty, location::text as location, category, expires_at::text as expires_at, expires_estimated, aliases from pantry_items`;
-function normalizeLocation(input, field = "location") {
-  if (input === void 0) return void 0;
-  const key = input.trim().toLowerCase();
-  const value = PANTRY_LOCATION_ALIASES[key];
-  if (!value) throw ApiError.fromCode("validation_error", { message: `Lokasi "${input}" tidak dikenal.`, details: { field, allowed: Object.keys(PANTRY_LOCATION_ALIASES) } });
-  return value;
-}
-async function listPantry(actor, location) {
-  await requireFeature(actor, "shopping_stock");
-  const loc = normalizeLocation(location, "location");
-  return withActor(actor, async (tx) => {
-    const rows = await tx.unsafe(
-      loc ? `${SELECT3} where household_id = $1 and deleted_at is null and location = $2 order by name` : `${SELECT3} where household_id = $1 and deleted_at is null order by location, name`,
-      loc ? [actor.householdId, loc] : [actor.householdId]
-    );
-    return rows;
-  });
-}
-async function createPantryItem(actor, input) {
-  await requireFeature(actor, "shopping_stock");
-  const location = normalizeLocation(input.location) ?? "other";
-  return withActor(actor, async (tx) => {
-    try {
-      const [row] = await tx`
-        insert into pantry_items (household_id, name, unit, qty, min_qty, location, category, expires_at, expires_estimated, aliases)
-        values (${actor.householdId}, ${input.name}, ${input.unit}, ${input.qty}, ${input.min_qty ?? null}, ${location}, ${input.category ?? null}, ${input.expires_at ?? null}, ${input.expires_estimated}, ${input.aliases})
-        returning id
-      `;
-      const rows = await tx.unsafe(`${SELECT3} where id = $1`, [row.id]);
-      return rows[0];
-    } catch (err) {
-      if (err && typeof err === "object" && err.code === "23505") {
-        throw ApiError.fromCode("validation_error", { message: "Sudah ada item pantry dengan nama ini.", details: { field: "name" } });
-      }
-      throw err;
-    }
-  });
-}
-async function updatePantryItem(actor, id, input) {
-  await requireFeature(actor, "shopping_stock");
-  const location = normalizeLocation(input.location);
-  return withActor(actor, async (tx) => {
-    const [existing] = await tx`select id from pantry_items where id = ${id} and household_id = ${actor.householdId} and deleted_at is null`;
-    if (!existing) throw ApiError.fromCode("pantry_item_not_found");
-    try {
-      await tx`
-        update pantry_items set
-          name = coalesce(${input.name ?? null}, name),
-          unit = coalesce(${input.unit ?? null}, unit),
-          min_qty = case when ${input.min_qty === void 0} then min_qty else ${input.min_qty ?? null}::numeric end,
-          location = coalesce(${location ?? null}, location),
-          category = case when ${input.category === void 0} then category else ${input.category ?? null}::text end,
-          expires_at = case when ${input.expires_at === void 0} then expires_at else ${input.expires_at ?? null}::date end,
-          expires_estimated = coalesce(${input.expires_estimated ?? null}, expires_estimated),
-          aliases = coalesce(${input.aliases ?? null}, aliases),
-          updated_at = now()
-        where id = ${id} and household_id = ${actor.householdId}
-      `;
-    } catch (err) {
-      if (err && typeof err === "object" && err.code === "23505") {
-        throw ApiError.fromCode("validation_error", { message: "Sudah ada item pantry lain dengan nama ini.", details: { field: "name" } });
-      }
-      throw err;
-    }
-    const rows = await tx.unsafe(`${SELECT3} where id = $1`, [id]);
-    return rows[0];
-  });
-}
-async function deletePantryItem(actor, id) {
-  await requireFeature(actor, "shopping_stock");
-  return withActor(actor, async (tx) => {
-    const [row] = await tx`
-      update pantry_items set deleted_at = now(), updated_at = now()
-      where id = ${id} and household_id = ${actor.householdId} and deleted_at is null
-      returning id
-    `;
-    if (!row) throw ApiError.fromCode("pantry_item_not_found");
-    return { success: true };
-  });
-}
-async function addPantryMovement(actor, id, input) {
-  await requireFeature(actor, "shopping_stock");
-  return withActor(actor, async (tx) => {
-    await tx`select apply_pantry_movement(${actor.householdId}, ${actor.memberId}, ${id}, ${input.delta}, ${input.reason}, null, ${input.note})`;
-    const rows = await tx.unsafe(`${SELECT3} where id = $1`, [id]);
-    if (!rows[0]) throw ApiError.fromCode("pantry_item_not_found");
-    return rows[0];
-  });
-}
-async function getExpiring(actor, withinDays, includeExpired, excludeAcked) {
-  await requireFeature(actor, "shopping_stock");
-  return withActor(actor, async (tx) => {
-    const rows = await tx`
-      select id, name, qty::text, unit, location::text as location, expires_at::text as expires_at, expires_estimated,
-        (expires_at - current_date)::int as days_left
-      from pantry_items
-      where household_id = ${actor.householdId} and deleted_at is null and qty > 0 and expires_at is not null
-        and expires_at <= current_date + ${withinDays}::int
-        and (${includeExpired} or expires_at >= current_date)
-        and (
-          not ${excludeAcked}
-          or expiry_notified_on is null
-          or (expires_at = current_date and expiry_notified_on < current_date)
-        )
-      order by expires_at
-    `;
-    const expired = rows.filter((r) => r.days_left < 0).map(mapExpiring);
-    const expiring = rows.filter((r) => r.days_left >= 0).map(mapExpiring);
-    const text = buildExpiringText(expired, expiring);
-    return { expired, expiring, text_id: text };
-  });
-}
-function mapExpiring(r) {
-  return { id: r.id, name: r.name, qty: Number(r.qty), unit: r.unit, location: r.location, expires_at: r.expires_at, expires_estimated: r.expires_estimated, days_left: r.days_left };
-}
-var LOCATION_LABEL_ID = { fridge: "Kulkas", freezer: "Freezer", shelf: "Lemari", other: "Lainnya" };
-function buildExpiringText(expired, expiring) {
-  if (expired.length === 0 && expiring.length === 0) return "";
-  const lines = ["\u{1F95B} Pantry \u2014 cek hari ini"];
-  const describe = (i) => `${i.name} (${LOCATION_LABEL_ID[i.location] ?? i.location}${i.expires_estimated ? ", perkiraan" : ""} ${i.expires_at.slice(8, 10)}/${i.expires_at.slice(5, 7)})`;
-  for (const i of expired) lines.push(`Sudah lewat: ${describe(i)}`);
-  for (const i of expiring) {
-    const label = i.days_left === 0 ? "Hari ini" : i.days_left === 1 ? "Besok" : `${i.days_left} hari lagi`;
-    lines.push(`${label}: ${describe(i)}`);
-  }
-  lines.push('Balas "X dibuang" / "X udah abis" biar stoknya diupdate.');
-  return lines.join("\n");
-}
-async function ackExpiring(actor, ids) {
-  await requireFeature(actor, "shopping_stock");
-  return withActor(actor, async (tx) => {
-    await tx`update pantry_items set expiry_notified_on = current_date where id = any(${ids}) and household_id = ${actor.householdId}`;
-    return { success: true };
   });
 }
 
@@ -17984,6 +18281,11 @@ async function ingestReceipt(actor, input) {
     const pantryUnmatched = [];
     const titipanCreated = [];
     const priceItems = [];
+    const hhFeatures = input.pantry ? await getHouseholdFeaturesInTx(tx, actor.householdId) : null;
+    const autoCreateNew = !!(hhFeatures?.shopping_stock?.auto_stock?.enabled && hhFeatures?.shopping_stock?.auto_stock?.create_new_items);
+    const catIds = Array.from(new Set(items.map((it) => it.category_id)));
+    const catNameRows = catIds.length ? await tx`select id, name from categories where id = any(${catIds})` : [];
+    const catNameById = new Map(catNameRows.map((c) => [c.id, c.name]));
     for (const [idx, item] of input.items.entries()) {
       const txId = takeMatch(idx, item.amount);
       priceItems.push({ transaction_id: txId, name: item.name, qty: item.qty, amount: item.amount, discount: item.discount });
@@ -17998,13 +18300,24 @@ async function ingestReceipt(actor, input) {
         }
       }
       if (input.pantry) {
-        const [pantryRow] = await tx`
-          select id, qty::text from pantry_items where id = find_pantry_match(${actor.householdId}, ${item.name})
-        `;
-        if (pantryRow) {
-          const before = Number(pantryRow.qty);
-          await tx`select apply_pantry_movement(${actor.householdId}, ${actor.memberId}, ${pantryRow.id}, ${item.qty}, 'purchase', ${txId ?? null}, ${"dari struk: " + item.name})`;
-          pantryUpdated.push({ name: item.name, qty_before: before, qty_after: before + item.qty });
+        const catName = catNameById.get(items[idx].category_id) ?? classified.get(idx)?.category ?? null;
+        const syncRes = await syncPurchaseToPantry(tx, actor, {
+          txId,
+          rawName: item.name,
+          explicitQty: item.qty,
+          categoryName: catName,
+          date,
+          isTitipan: !!titipan[idx],
+          createNewItems: autoCreateNew,
+          sourceLabel: "dari struk"
+        });
+        if (syncRes.action === "updated" || syncRes.action === "created") {
+          pantryUpdated.push({
+            name: syncRes.name,
+            qty_before: syncRes.qty_before ?? 0,
+            qty_after: syncRes.qty_after ?? item.qty,
+            ...syncRes.action === "created" ? { action: "created" } : {}
+          });
         } else {
           pantryUnmatched.push(item.name);
         }
@@ -21475,6 +21788,40 @@ pantryApp.openapi(
 pantryApp.openapi(
   createRoute({
     method: "post",
+    path: "/v1/pantry/sync-purchases",
+    tags: ["pantry"],
+    summary: "Sinkronkan transaksi belanja Bahan Makanan ke stok rumah (\xA76.9)",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: external_exports.object({
+              period: external_exports.enum(["this_month", "last_30_days"]).default("this_month")
+            }).default({})
+          }
+        },
+        required: false
+      }
+    },
+    responses: {
+      200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+    }
+  }),
+  async (c) => {
+    assertScope(c.get("actor"), "write");
+    let period = "this_month";
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      if (body?.period === "last_30_days") period = "last_30_days";
+    } catch {
+    }
+    return c.json(await syncPurchasesForPeriod(c.get("actor"), period), 200);
+  }
+);
+pantryApp.openapi(
+  createRoute({
+    method: "post",
     path: "/v1/pantry",
     tags: ["pantry"],
     summary: "Tambah item stok",
@@ -21762,6 +22109,183 @@ adminApp.openapi(
   }
 );
 
+// src/routes/whatsapp.ts
+var whatsappApp = new OpenAPIHono();
+var WA_GATEKEEPER_BASE = process.env.WA_GATEKEEPER_URL || "https://9router.cortex-ai.my.id";
+var WA_INTERNAL_TOKEN = process.env.WA_BRIDGE_INTERNAL_TOKEN || "kb-wa-bridge-internal-2026-v1";
+async function callWaBridge(path, method, householdId, body, query) {
+  const url = new URL(path, WA_GATEKEEPER_BASE);
+  url.searchParams.set("household_id", householdId);
+  if (query) {
+    for (const [k, v] of Object.entries(query)) {
+      if (v) url.searchParams.set(k, v);
+    }
+  }
+  const res = await fetch(url.toString(), {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "X-WA-Internal-Token": WA_INTERNAL_TOKEN,
+      "X-Household-Id": householdId
+    },
+    ...method === "POST" ? {
+      body: JSON.stringify({
+        household_id: householdId,
+        ...body ?? {}
+      })
+    } : {}
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw ApiError.fromCode("validation_error", {
+      message: data?.error || `Gagal menghubungi WhatsApp Bridge (${res.status})`
+    });
+  }
+  return data;
+}
+whatsappApp.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/whatsapp/status",
+    tags: ["whatsapp"],
+    summary: "Status koneksi WhatsApp Hermes, daftar grup, dan QR pairing aktif",
+    security: [{ bearerJwt: [] }],
+    request: {
+      query: external_exports.object({
+        target: external_exports.string().optional()
+      })
+    },
+    responses: {
+      200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+    }
+  }),
+  async (c) => {
+    const actor = c.get("actor");
+    const { target } = c.req.valid("query");
+    const data = await callWaBridge("/v1/whatsapp/status", "GET", actor.householdId, void 0, { target });
+    return c.json(data, 200);
+  }
+);
+whatsappApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/whatsapp/pair/start",
+    tags: ["whatsapp"],
+    summary: "Mulai sesi pairing WhatsApp baru dan generate QR Code",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: external_exports.object({ target: external_exports.string().optional() }).default({})
+          }
+        },
+        required: false
+      }
+    },
+    responses: {
+      200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+    }
+  }),
+  async (c) => {
+    const actor = c.get("actor");
+    assertScope(actor, "write");
+    const body = await c.req.json().catch(() => ({}));
+    const data = await callWaBridge("/v1/whatsapp/pair/start", "POST", actor.householdId, body);
+    return c.json(data, 200);
+  }
+);
+whatsappApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/whatsapp/pair/cancel",
+    tags: ["whatsapp"],
+    summary: "Batalkan proses scan QR yang sedang berjalan",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: external_exports.object({ target: external_exports.string().optional() }).default({})
+          }
+        },
+        required: false
+      }
+    },
+    responses: {
+      200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+    }
+  }),
+  async (c) => {
+    const actor = c.get("actor");
+    assertScope(actor, "write");
+    const body = await c.req.json().catch(() => ({}));
+    const data = await callWaBridge("/v1/whatsapp/pair/cancel", "POST", actor.householdId, body);
+    return c.json(data, 200);
+  }
+);
+whatsappApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/whatsapp/groups",
+    tags: ["whatsapp"],
+    summary: "Simpan daftar Grup WhatsApp keluarga yang diizinkan",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: external_exports.object({
+              allowed_groups: external_exports.array(external_exports.string()).default([]),
+              require_mention: external_exports.boolean().default(false),
+              target: external_exports.string().optional()
+            })
+          }
+        }
+      }
+    },
+    responses: {
+      200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+    }
+  }),
+  async (c) => {
+    const actor = c.get("actor");
+    assertScope(actor, "write");
+    const body = c.req.valid("json");
+    const data = await callWaBridge("/v1/whatsapp/groups", "POST", actor.householdId, body);
+    return c.json(data, 200);
+  }
+);
+whatsappApp.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/whatsapp/disconnect",
+    tags: ["whatsapp"],
+    summary: "Putuskan tautan nomor WhatsApp dari bot Hermes",
+    security: [{ bearerJwt: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: external_exports.object({ target: external_exports.string().optional() }).default({})
+          }
+        },
+        required: false
+      }
+    },
+    responses: {
+      200: { content: { "application/json": { schema: external_exports.any() } }, description: "OK" }
+    }
+  }),
+  async (c) => {
+    const actor = c.get("actor");
+    assertScope(actor, "write");
+    const body = await c.req.json().catch(() => ({}));
+    const data = await callWaBridge("/v1/whatsapp/disconnect", "POST", actor.householdId, body);
+    return c.json(data, 200);
+  }
+);
+
 // src/middleware/audit.ts
 var REDACT_KEYS = /* @__PURE__ */ new Set(["api_key", "secret", "password", "new_password", "authorization", "api_key_pepper"]);
 function redact(value) {
@@ -21923,6 +22447,7 @@ function buildApp() {
   app2.route("/", pricesApp);
   app2.route("/", insightsApp);
   app2.route("/", adminApp);
+  app2.route("/", whatsappApp);
   return app2;
 }
 
