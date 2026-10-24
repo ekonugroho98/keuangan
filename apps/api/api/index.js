@@ -15854,7 +15854,7 @@ var TX_SELECT = `
          t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
          t.receipt_url,
-         t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
+         t.source, t.recurring_id, t.created_at, t.created_at::text as created_at_raw, t.updated_at, t.deleted_at,
          pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
          pp.discount::text as item_discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as item_normal_unit_price,
          pp.size_value::text as item_size_value, pp.size_unit as item_size_unit,
@@ -15882,7 +15882,8 @@ function decodeCursor(cursor) {
   }
 }
 function encodeCursor(date, createdAt, id) {
-  return Buffer.from(`${date}|${createdAt}|${id}`, "utf8").toString("base64url");
+  const raw2 = createdAt instanceof Date ? createdAt.toISOString() : String(createdAt);
+  return Buffer.from(`${date}|${raw2}|${id}`, "utf8").toString("base64url");
 }
 function buildTxFilter(actor, query, resolved, cur) {
   const params = [actor.householdId];
@@ -15949,7 +15950,8 @@ async function listTransactions(actor, query, timezone) {
     );
     const hasMore = rows.length > query.limit;
     const page = hasMore ? rows.slice(0, query.limit) : rows;
-    const nextCursor = hasMore && page.length > 0 ? encodeCursor(page[page.length - 1].date, page[page.length - 1].created_at, page[page.length - 1].id) : null;
+    const lastRow = page[page.length - 1];
+    const nextCursor = hasMore && lastRow ? encodeCursor(lastRow.date, lastRow.created_at_raw ?? lastRow.created_at, lastRow.id) : null;
     const { where: totalsWhere, params: totalsParams } = buildTxFilter(actor, query, resolved, null);
     const [totalsRow] = await tx.unsafe(
       `select
