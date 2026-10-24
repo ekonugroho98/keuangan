@@ -373,6 +373,23 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const rawKey = (params.get("ai_key") || "").trim();
+            if (rawKey.startsWith("sk-kb-")) {
+                sessionStorage.setItem("kb_pending_ai_key", rawKey);
+                params.delete("ai_key");
+                const nextSearch = params.toString();
+                window.history.replaceState(
+                    null,
+                    "",
+                    window.location.pathname + (nextSearch ? `?${nextSearch}` : "") + window.location.hash,
+                );
+            }
+        } catch {
+            // ignore
+        }
+
         const cleanAuthHash = () => {
             if (window.location.hash && /(access_token=|error=|type=signup|type=recovery)/.test(window.location.hash)) {
                 window.history.replaceState(null, "", window.location.pathname + window.location.search);

@@ -210,6 +210,29 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 1-Click Zero-Setup AI Key Activation (?ai_key=sk-kb-... dari @KaraAutoBot)
+  useEffect(() => {
+    try {
+      const pendingKey = (sessionStorage.getItem("kb_pending_ai_key") || "").trim();
+      if (pendingKey.startsWith("sk-kb-")) {
+        sessionStorage.removeItem("kb_pending_ai_key");
+        saveAiConfig({
+          provider: "gatekeeper",
+          model: "kb-auto",
+          apiKey: pendingKey,
+          disabled: false,
+        })
+          .then(() => {
+            showToast("🎉 Paket Asisten AI Keluarga Berkembang aktif! Siap scan struk & chat 24 jam.");
+            setActiveMenu("ai");
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const queryClient = useQueryClient();
   const [showAiChat, setShowAiChat] = useState(false);
 

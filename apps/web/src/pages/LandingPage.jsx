@@ -390,7 +390,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
         setOrderInvoice(null);
     };
 
-    const handleOrderSubmit = (e) => {
+    const handleOrderSubmit = async (e) => {
         e.preventDefault();
         const errs = {};
         if (!orderForm.buyerName.trim()) errs.buyerName = "Nama penerima wajib diisi";
@@ -406,29 +406,60 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
         if (Object.keys(errs).length > 0) return;
 
         setOrderSubmitting(true);
-        setTimeout(() => {
-            const activePrice = selectedSubOption ? selectedSubOption.priceDisplay : selectedProduct.priceDisplay;
-            const activeItemName = selectedSubOption
-                ? `${selectedProduct.name} (${selectedSubOption.label})`
-                : selectedProduct.name;
-            const invoiceId = `INV-KB-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(Math.floor(1000 + Math.random() * 9000))}`;
-            setOrderSubmitting(false);
-            setOrderInvoice({
-                invoiceId,
-                itemName: activeItemName,
-                code: selectedProduct.code,
-                priceDisplay: activePrice,
-                buyerName: orderForm.buyerName.trim(),
-                buyerEmail: orderForm.buyerEmail.trim(),
-                buyerContact: orderForm.buyerContact.trim(),
-                paymentMethod: orderForm.paymentMethod,
-                deliveryMethod: selectedProduct.deliveryMethod,
-                createdAt: new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }),
+        const planCode = selectedSubOption ? selectedSubOption.id : selectedProduct.id;
+        const tagMap = {
+            "ast-sachet": "SACHET",
+            "ast-hemat": "HEMAT",
+            "ast-keluarga": "WA",
+            "ebook": "EBK",
+            "vip": "VIP",
+        };
+        const invTag = tagMap[planCode] || "ORD";
+        const ym = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+        let invoiceId = `INV-KB-${invTag}-${ym}-${String(Math.floor(1000 + Math.random() * 9000))}`;
+        const activePrice = selectedSubOption ? selectedSubOption.priceDisplay : selectedProduct.priceDisplay;
+        const activeItemName = selectedSubOption
+            ? `${selectedProduct.name} (${selectedSubOption.label})`
+            : selectedProduct.name;
+
+        try {
+            const resp = await fetch("https://9router.cortex-ai.my.id/v1/orders", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    plan_code: planCode,
+                    invoice_id: invoiceId,
+                    buyer_name: orderForm.buyerName.trim(),
+                    buyer_email: orderForm.buyerEmail.trim(),
+                    buyer_contact: orderForm.buyerContact.trim(),
+                    payment_method: orderForm.paymentMethod,
+                }),
             });
-            if (showToast) {
-                showToast(`Ringkasan pesanan ${invoiceId} berhasil dibuat`, "success");
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data?.order?.invoice_id) {
+                invoiceId = data.order.invoice_id;
             }
-        }, 450);
+        } catch {
+            // Fallback to deterministic INV-KB-<TAG>-YYYYMM-XXXX so @KaraAutoBot can still parse & fulfill it
+        }
+
+        setOrderSubmitting(false);
+        setOrderInvoice({
+            invoiceId,
+            planCode,
+            itemName: activeItemName,
+            code: selectedProduct.code,
+            priceDisplay: activePrice,
+            buyerName: orderForm.buyerName.trim(),
+            buyerEmail: orderForm.buyerEmail.trim(),
+            buyerContact: orderForm.buyerContact.trim(),
+            paymentMethod: orderForm.paymentMethod,
+            deliveryMethod: selectedProduct.deliveryMethod,
+            createdAt: new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }),
+        });
+        if (showToast) {
+            showToast(`Ringkasan pesanan ${invoiceId} berhasil dibuat`, "success");
+        }
     };
 
     const handleSignup = async () => {
