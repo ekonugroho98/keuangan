@@ -299,7 +299,7 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                             Rp 9.000 / 7 hari <span style={{ fontSize: 12, color: "#847D70", textDecoration: "line-through", fontWeight: 500 }}>Rp 15.000</span><br />
                                             Rp 19.000 / 30 hari <span style={{ fontSize: 12, color: "#847D70", textDecoration: "line-through", fontWeight: 500 }}>Rp 39.000</span>
                                         </td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Kode Key Kuota AI / Aktivasi otomatis dalam &lt; 3 menit via <code>@KaraAutoBot</code></td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Kode Key Kuota AI / Aktivasi otomatis dalam &lt; 3 menit via <code>@KelolaKeluargaBot</code></td>
                                     </tr>
                                     <tr style={{ borderBottom: showAllCatalog ? "1px solid #E5DEC9" : "none" }}>
                                         <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Lengkap Keluarga: Grup WhatsApp Suami-Istri + Telegram + Foto Struk (<code>KB-AST-WA</code>)</td>
@@ -307,7 +307,7 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>
                                             Rp 29.000 / 30 hari <span style={{ fontSize: 12, color: "#847D70", textDecoration: "line-through", fontWeight: 500 }}>Rp 59.000</span>
                                         </td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi asisten Grup WhatsApp &amp; Telegram otomatis dalam &lt; 3 menit via <code>@KaraAutoBot</code></td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi asisten Grup WhatsApp &amp; Telegram otomatis dalam &lt; 3 menit via <code>@KelolaKeluargaBot</code></td>
                                     </tr>
                                     {showAllCatalog && (
                                         <>
@@ -460,7 +460,7 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                         </h2>
                         <ol style={{ paddingLeft: 20, marginBottom: 0, color: "#1F2922", fontSize: 15 }}>
                             <li style={{ marginBottom: 10 }}>
-                                Hubungi layanan pelanggan resmi kami melalui email <strong>support@keluargaberkembang.com</strong> atau Telegram <strong>@KaraAutoBot</strong> maksimal <strong>7 (tujuh) hari kalender</strong> sejak tanggal transaksi.
+                                Hubungi layanan pelanggan resmi kami melalui email <strong>support@keluargaberkembang.com</strong> atau Telegram <strong>@KelolaKeluargaBot</strong> maksimal <strong>7 (tujuh) hari kalender</strong> sejak tanggal transaksi.
                             </li>
                             <li style={{ marginBottom: 10 }}>
                                 Sertakan alamat email transaksi, nomor referensi pembayaran (QRIS / Virtual Account), serta penjelasan kendala yang dialami.
@@ -559,8 +559,8 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                 Telegram & Jam Operasional
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
-                                <a href="https://t.me/KaraAutoBot" target="_blank" rel="noopener noreferrer" style={{ color: "#FFFDF9", textDecoration: "underline" }}>
-                                    @KaraAutoBot (Layanan 24 Jam)
+                                <a href="https://t.me/KelolaKeluargaBot" target="_blank" rel="noopener noreferrer" style={{ color: "#FFFDF9", textDecoration: "underline" }}>
+                                    @KelolaKeluargaBot (Layanan 24 Jam)
                                 </a>
                             </div>
                             <div style={{ fontSize: 13, color: "#E6EFE8" }}>

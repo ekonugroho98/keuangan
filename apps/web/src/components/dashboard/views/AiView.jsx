@@ -53,7 +53,7 @@ function AiSetupScreen({ onOpenSettings }) {
                         💎 Pakai Kuota Resmi Keluarga Berkembang (Mulai Rp 9.000)
                     </h3>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "0 0 16px", lineHeight: 1.6 }}>
-                        Tidak perlu pusing mendaftar API key teknis di situs luar. Cukup masukkan Kode Key <code style={{ fontWeight: 700, color: "var(--color-text)" }}>sk-kb-...</code> dari <strong>@KaraAutoBot</strong> untuk langsung mengaktifkan tanya-jawab AI dan baca foto struk belanja otomatis.
+                        Tidak perlu pusing mendaftar API key teknis di situs luar. Cukup masukkan Kode Key <code style={{ fontWeight: 700, color: "var(--color-text)" }}>sk-kb-...</code> dari <strong>@KelolaKeluargaBot</strong> untuk langsung mengaktifkan tanya-jawab AI dan baca foto struk belanja otomatis.
                     </p>
 
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
@@ -66,7 +66,7 @@ function AiSetupScreen({ onOpenSettings }) {
                             🔑 Masukkan Key / Klaim Voucher di Pengaturan
                         </button>
                         <a
-                            href="https://t.me/KaraAutoBot"
+                            href="https://t.me/KelolaKeluargaBot"
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
@@ -78,7 +78,7 @@ function AiSetupScreen({ onOpenSettings }) {
                                 textDecoration: "none",
                             }}
                         >
-                            🛒 Beli Paket Sachet Rp 9.000 via @KaraAutoBot
+                            🛒 Beli Paket Sachet Rp 9.000 via @KelolaKeluargaBot
                         </a>
                     </div>
                 </div>

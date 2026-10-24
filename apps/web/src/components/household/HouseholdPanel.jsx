@@ -377,7 +377,7 @@ function PlanTab({ plan }) {
                     Pencatatan manual di Web dan aplikasi Android <strong>Gratis Selamanya (Rp 0)</strong>. Jika malas ketik satu per satu, aktifkan Asisten Grup WA suami-istri & baca foto struk belanja otomatis mulai <strong>Rp 9.000</strong> (Paket Sachet 7 hari) atau <strong>Rp 29.000/bulan</strong> (Paket Lengkap Grup WA).
                 </div>
                 <a
-                    href="https://t.me/KaraAutoBot"
+                    href="https://t.me/KelolaKeluargaBot"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -387,7 +387,7 @@ function PlanTab({ plan }) {
                         fontSize: 12, fontWeight: 700, textDecoration: "none", textAlign: "center",
                     }}
                 >
-                    Buka @KaraAutoBot di Telegram
+                    Buka @KelolaKeluargaBot di Telegram
                 </a>
             </div>
         </div>

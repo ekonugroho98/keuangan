@@ -8,6 +8,7 @@ import { PASSWORD_MIN_LENGTH } from "../../constants/validation";
 import HouseholdPanel from "../household/HouseholdPanel";
 import ApiKeysPanel from "../household/ApiKeysPanel";
 import WhatsAppPanel from "../household/WhatsAppPanel";
+import TelegramPanel from "../household/TelegramPanel";
 import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
 import { useHousehold } from "../../auth/HouseholdProvider";
 
@@ -341,6 +342,11 @@ const Sidebar = ({
         /* ── WhatsApp Bot (Hermes QR & Grup WA) ── */
         if (profileView === "whatsapp") return (
             <WhatsAppPanel onBack={() => setProfileView("menu")} showToast={showToast} />
+        );
+
+        /* ── Telegram Bot (Suami, Istri & Grup Telegram) ── */
+        if (profileView === "telegram") return (
+            <TelegramPanel onBack={() => setProfileView("menu")} showToast={showToast} aiKey={aiKey} />
         );
 
         /* ── Ganti Nama ── */
@@ -728,7 +734,7 @@ const Sidebar = ({
                                     Aktifkan tanya-jawab AI & scan foto struk belanja otomatis tanpa ribet daftar akun teknis.
                                 </div>
                                 <a
-                                    href="https://t.me/KaraAutoBot"
+                                    href="https://t.me/KelolaKeluargaBot"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
@@ -739,7 +745,7 @@ const Sidebar = ({
                                         textDecoration: "underline",
                                     }}
                                 >
-                                    Belum punya kode? Ambil Paket Sachet Rp 9.000 di @KaraAutoBot →
+                                    Belum punya kode? Ambil Paket Sachet Rp 9.000 di @KelolaKeluargaBot →
                                 </a>
                             </div>
                         )
@@ -841,6 +847,17 @@ const Sidebar = ({
 
         /* Each tile: SVG icon + gradient tile background per category */
         const tiles = [
+            {
+                id: "telegram",
+                label: "Telegram Bot",
+                sub: "Suami, Istri & Grup",
+                badge: true,
+                grad: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+                tint: "rgba(37,99,235,.16)",
+                iconColor: "#FFFDF8",
+                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>),
+                action: () => setProfileView("telegram"),
+            },
             {
                 id: "whatsapp",
                 label: "WhatsApp Bot",

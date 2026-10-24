@@ -210,7 +210,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 1-Click Zero-Setup AI Key Activation (?ai_key=sk-kb-... dari @KaraAutoBot)
+  // 1-Click Zero-Setup AI Key Activation (?ai_key=sk-kb-... dari @KelolaKeluargaBot)
   useEffect(() => {
     try {
       const pendingKey = (sessionStorage.getItem("kb_pending_ai_key") || "").trim();

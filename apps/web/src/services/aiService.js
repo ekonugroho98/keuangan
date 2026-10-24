@@ -12,7 +12,7 @@ export const AI_PROVIDERS = {
       { id: "kb-vision",  label: "KB Vision (Scan Struk)",   note: "Multimodal" },
       { id: "kb-premium", label: "KB Premium (Reasoning)",   note: "Analisa mendalam" },
     ],
-    docsUrl: "https://t.me/KaraAutoBot", docsLabel: "@KaraAutoBot",
+    docsUrl: "https://t.me/KelolaKeluargaBot", docsLabel: "@KelolaKeluargaBot",
     keyHint: "sk-kb-...", supportsTools: true,
     baseUrl: "https://9router.cortex-ai.my.id/v1",
   },

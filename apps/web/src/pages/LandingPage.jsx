@@ -189,7 +189,7 @@ const CATALOG_PRODUCTS = [
         priceDisplay: "Mulai Rp 9.000",
         priceNumeric: 9000,
         billingNote: "Pilihan: Sachet 7 Hari Rp 9.000 (Normal Rp 15.000) atau Hemat 30 Hari Rp 19.000 (Normal Rp 39.000)",
-        deliveryMethod: "Kode kuota & koneksi asisten AI aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
+        deliveryMethod: "Kode kuota & koneksi asisten AI aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KelolaKeluargaBot.",
         subOptions: [
             { id: "ast-sachet", label: "Paket Sachet Coba Dulu (Aktif 7 Hari · Web, Telegram & Foto Struk)", originalPriceDisplay: "Rp 15.000", discountBadge: "Hemat 40%", priceDisplay: "Rp 9.000", priceNumeric: 9000 },
             { id: "ast-hemat", label: "Paket Hemat Bulanan (Aktif 30 Hari · Web, Telegram & Foto Struk)", originalPriceDisplay: "Rp 39.000", discountBadge: "Hemat 51%", priceDisplay: "Rp 19.000", priceNumeric: 19000 },
@@ -213,7 +213,7 @@ const CATALOG_PRODUCTS = [
         priceDisplay: "Rp 29.000 / 30 hari",
         priceNumeric: 29000,
         billingNote: "~Rp 900/hari untuk berdua suami-istri (Harga Normal Rp 59.000/bulan)",
-        deliveryMethod: "Jalur koneksi asisten Grup WhatsApp & Telegram keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
+        deliveryMethod: "Jalur koneksi asisten Grup WhatsApp & Telegram keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KelolaKeluargaBot.",
         subOptions: [
             { id: "ast-keluarga", label: "Paket Lengkap Keluarga (Aktif 30 Hari · Masuk Grup WhatsApp Suami-Istri + Telegram + Foto Struk)", originalPriceDisplay: "Rp 59.000", discountBadge: "Hemat 50%", priceDisplay: "Rp 29.000", priceNumeric: 29000 },
         ],
@@ -239,7 +239,7 @@ const CATALOG_PRODUCTS = [
         features: [
             "Ebook panduan bahasa Indonesia santai dengan 37 tangkapan layar nyata (tinggal ikuti urutan tombol, tanpa perlu latar belakang coding).",
             "Full Source Code Web App, file APK Android, dan modul penghubung Asisten AI Telegram & Grup WhatsApp.",
-            "Bebas memilih 3 jalur sesuai kebutuhan (Cloud Free Tier, VPS lokal Rp 25.000/bulan via QRIS, atau layanan praktis @KaraAutoBot).",
+            "Bebas memilih 3 jalur sesuai kebutuhan (Cloud Free Tier, VPS lokal Rp 25.000/bulan via QRIS, atau layanan praktis @KelolaKeluargaBot).",
             "Termasuk Kamus Solusi Kendala (Troubleshooting) lengkap dan pembaruan materi panduan.",
         ],
         ctaLabel: "Pesan Ebook + Source Code (Rp 99.000)",
@@ -282,7 +282,7 @@ const FAQ_ITEMS = [
     },
     {
         q: "Apakah ada biaya bulanan setelah membeli Ebook Rp 99.000? Bagaimana rincian jujurnya?",
-        a: "Pembelian Ebook + Full Source Code Rp 99.000 adalah sekali bayar untuk hak milik selamanya. Jika Anda ingin menyalakan asisten bot 24 jam secara mandiri, Anda bebas memilih 1 dari 3 jalur: (1) Jalur Cloud Free Tier Rp 0/bulan jika memiliki kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun cloud; (2) Jalur VPS lokal Indonesia sekitar Rp 25.000/bulan via QRIS tanpa kartu kredit; atau (3) Jalur Terima Beres di @KaraAutoBot mulai Rp 9.000 (Paket Sachet) hingga Rp 29.000/bulan (Paket Lengkap Grup WhatsApp).",
+        a: "Pembelian Ebook + Full Source Code Rp 99.000 adalah sekali bayar untuk hak milik selamanya. Jika Anda ingin menyalakan asisten bot 24 jam secara mandiri, Anda bebas memilih 1 dari 3 jalur: (1) Jalur Cloud Free Tier Rp 0/bulan jika memiliki kartu debit/kredit berlogo Visa/Mastercard untuk verifikasi akun cloud; (2) Jalur VPS lokal Indonesia sekitar Rp 25.000/bulan via QRIS tanpa kartu kredit; atau (3) Jalur Terima Beres di @KelolaKeluargaBot mulai Rp 9.000 (Paket Sachet) hingga Rp 29.000/bulan (Paket Lengkap Grup WhatsApp).",
         hidden: true,
     },
     {
@@ -440,7 +440,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                 invoiceId = data.order.invoice_id;
             }
         } catch {
-            // Fallback to deterministic INV-KB-<TAG>-YYYYMM-XXXX so @KaraAutoBot can still parse & fulfill it
+            // Fallback to deterministic INV-KB-<TAG>-YYYYMM-XXXX so @KelolaKeluargaBot can still parse & fulfill it
         }
 
         setOrderSubmitting(false);
@@ -2070,7 +2070,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                         Asisten Pribadi Keluarga 24 Jam
                                     </h3>
                                     <div className="kb-mono" style={{ fontSize: 13, color: "#D5E3D7", fontWeight: 700, marginBottom: 12 }}>
-                                        Telegram @KaraAutoBot & Grup WhatsApp
+                                        Telegram @KelolaKeluargaBot & Grup WhatsApp
                                     </div>
                                     <p style={{ fontSize: 14, color: "#E6EFE8", marginBottom: 18 }}>
                                         Asisten AI pribadi 24 jam yang tersambung ke Telegram dan Grup WhatsApp suami-istri untuk mencatat pengeluaran lewat chat, membaca foto struk belanja dalam 5 detik, dan mengecek sisa anggaran.
@@ -2078,13 +2078,13 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                 </div>
                                 <div style={{ display: "grid", gap: 8 }}>
                                     <a
-                                        href="https://t.me/KaraAutoBot"
+                                        href="https://t.me/KelolaKeluargaBot"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="kb-btn-secondary"
                                         style={{ width: "100%", fontSize: 14, background: "#FFFDF9", color: "#1F2922" }}
                                     >
-                                        Buka @KaraAutoBot di Telegram
+                                        Buka @KelolaKeluargaBot di Telegram
                                     </a>
                                 </div>
                             </div>
@@ -2198,7 +2198,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                 </div>
                                             </div>
                                             <div>
-                                                <strong style={{ color: "#1F2922" }}>3. Jalur Terima Beres via @KaraAutoBot (<span className="kb-mono">Mulai Rp 9.000</span>):</strong>
+                                                <strong style={{ color: "#1F2922" }}>3. Jalur Terima Beres via @KelolaKeluargaBot (<span className="kb-mono">Mulai Rp 9.000</span>):</strong>
                                                 <div style={{ color: "#4A584D", marginTop: 2 }}>
                                                     Tanpa urus teknis sama sekali: Paket Sachet Rp 9.000 (7 hari), Paket Hemat Rp 19.000 (30 hari), atau Paket Lengkap Grup WA Suami-Istri Rp 29.000/bulan.
                                                 </div>
@@ -2441,8 +2441,8 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                 </div>
                                 <div>
                                     <strong style={{ color: "#1F2922" }}>Telegram Resmi (24 Jam):</strong><br />
-                                    <a href="https://t.me/KaraAutoBot" target="_blank" rel="noopener noreferrer" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
-                                        @KaraAutoBot
+                                    <a href="https://t.me/KelolaKeluargaBot" target="_blank" rel="noopener noreferrer" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
+                                        @KelolaKeluargaBot
                                     </a>
                                     {" · "}
                                     <a href="https://t.me/keluargaberkembang" target="_blank" rel="noopener noreferrer" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
@@ -2888,13 +2888,13 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
 
                                 <div style={{ display: "grid", gap: 10 }}>
                                     <a
-                                        href={`https://t.me/KaraAutoBot?start=${encodeURIComponent(orderInvoice.invoiceId)}`}
+                                        href={`https://t.me/KelolaKeluargaBot?start=${encodeURIComponent(orderInvoice.invoiceId)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="kb-btn-primary"
                                         style={{ width: "100%", textAlign: "center" }}
                                     >
-                                        Lanjutkan Pembayaran Otomatis via @KaraAutoBot
+                                        Lanjutkan Pembayaran Otomatis via @KelolaKeluargaBot
                                     </a>
                                     <a
                                         href={`mailto:halo@keluargaberkembang.com?subject=${encodeURIComponent(`Pesanan ${orderInvoice.invoiceId} - ${orderInvoice.itemName}`)}&body=${encodeURIComponent(`Halo Tim Keluarga Berkembang,\n\nSaya ingin menyelesaikan pesanan berikut:\nNomor Invoice: ${orderInvoice.invoiceId}\nProduk: ${orderInvoice.itemName}\nNominal: ${orderInvoice.priceDisplay}\nMetode Pembayaran: ${orderInvoice.paymentMethod}\nNama: ${orderInvoice.buyerName}\nEmail: ${orderInvoice.buyerEmail}\nKontak WA/Telegram: ${orderInvoice.buyerContact}\n\nTerima kasih.`)}`}

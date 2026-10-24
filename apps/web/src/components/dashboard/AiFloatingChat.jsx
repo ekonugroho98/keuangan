@@ -315,7 +315,7 @@ export default function AiFloatingChat({
                 </div>
                 <div style={{ fontSize: 12.5, color: "var(--color-muted)", lineHeight: 1.6 }}>
                   Tidak perlu mendaftar API key teknis. Cukup masukkan Kode Key <code>sk-kb-...</code> dari{" "}
-                  <strong>@KaraAutoBot</strong> untuk mengaktifkan tanya-jawab AI &amp; scan struk belanja.
+                  <strong>@KelolaKeluargaBot</strong> untuk mengaktifkan tanya-jawab AI &amp; scan struk belanja.
                 </div>
               </div>
               <button
@@ -341,7 +341,7 @@ export default function AiFloatingChat({
                 🔑 Masukkan Key / Klaim Voucher di Pengaturan
               </button>
               <a
-                href="https://t.me/KaraAutoBot"
+                href="https://t.me/KelolaKeluargaBot"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -357,7 +357,7 @@ export default function AiFloatingChat({
                   boxSizing: "border-box",
                 }}
               >
-                🛒 Beli Paket Sachet Rp 9.000 via @KaraAutoBot
+                🛒 Beli Paket Sachet Rp 9.000 via @KelolaKeluargaBot
               </a>
               <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
                 Atau gunakan API Key pribadi (Groq, Gemini, OpenAI, DeepSeek) di menu Pengaturan.
