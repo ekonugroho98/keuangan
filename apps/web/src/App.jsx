@@ -22,7 +22,13 @@ function AuthedApp({ session, onLogout, showToast }) {
         );
     }
     if (!hasHousehold) {
-        return <OnboardingHousehold userEmail={session.user.email} onLogout={onLogout} />;
+        return (
+            <OnboardingHousehold
+                userEmail={session.user.email}
+                userFullName={session.user.user_metadata?.full_name || session.user.user_metadata?.name}
+                onLogout={onLogout}
+            />
+        );
     }
     return <Dashboard session={session} onLogout={onLogout} showToast={showToast} />;
 }
@@ -374,6 +380,18 @@ export default function App() {
 
     useEffect(() => {
         try {
+            const host = window.location.hostname;
+            if (
+                (host === "keluargaberkembang.com" || host === "www.keluargaberkembang.com") &&
+                window.location.hash &&
+                /access_token=/.test(window.location.hash) &&
+                !/type=recovery/.test(window.location.hash)
+            ) {
+                window.location.replace(
+                    `https://kelola.keluargaberkembang.com${window.location.pathname}${window.location.search}${window.location.hash}`,
+                );
+                return;
+            }
             const params = new URLSearchParams(window.location.search);
             const rawKey = (params.get("ai_key") || "").trim();
             if (rawKey.startsWith("sk-kb-")) {

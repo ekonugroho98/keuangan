@@ -7,10 +7,10 @@ import { useHousehold } from "../../auth/HouseholdProvider";
  * App.jsx). Memanggil POST /v1/households (onboarding, 05-api.md §4.2). Setelah sukses, refetch
  * /v1/me supaya HouseholdProvider mendeteksi household baru dan merender <Dashboard> normal.
  */
-export default function OnboardingHousehold({ userEmail, onLogout }) {
+export default function OnboardingHousehold({ userEmail, userFullName, onLogout }) {
     const { refetchMe } = useHousehold();
     const [name, setName] = useState("Keluarga");
-    const [displayName, setDisplayName] = useState(userEmail?.split("@")[0] || "");
+    const [displayName, setDisplayName] = useState(userFullName || userEmail?.split("@")[0] || "");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 

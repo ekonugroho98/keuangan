@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Modal from "../ui/Modal";
+import GoogleAuthButton from "./GoogleAuthButton";
 
 const calcPasswordStrength = (pw) => {
     if (!pw) return 0;
@@ -20,9 +21,10 @@ const STRENGTH_COLOR = [
     "#2E3D30",
 ];
 
-const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, setStep, onSubmit, isLoading, onSwitchToLogin }) => {
+const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, setStep, onSubmit, isLoading, onSwitchToLogin, redirectTo }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [oauthError, setOauthError] = useState("");
 
     const validateStep1 = () => {
         const err = {};
@@ -140,6 +142,24 @@ const SignupModal = ({ open, onClose, form, setForm, errors, setErrors, step, se
 
                         {step === 1 ? (
                             <div style={{ animation: "slideUp .25s" }}>
+                                {oauthError && (
+                                    <div style={{ width: "100%", marginBottom: 14, padding: "10px 14px", borderRadius: 12, background: "#FDF2F0", border: "1px solid #E6B3A8", color: "#9E3B24", fontSize: 13, fontWeight: 600 }}>
+                                        {oauthError}
+                                    </div>
+                                )}
+
+                                <GoogleAuthButton
+                                    label="Daftar 1-Klik dengan Google"
+                                    redirectTo={redirectTo}
+                                    onError={(msg) => setOauthError(msg)}
+                                />
+
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
+                                    <div style={{ flex: 1, height: 1, background: "#E5DEC9" }} />
+                                    <span style={{ fontSize: 11, color: "#4A584D", fontWeight: 700, letterSpacing: "0.08em" }}>ATAU DAFTAR DENGAN EMAIL</span>
+                                    <div style={{ flex: 1, height: 1, background: "#E5DEC9" }} />
+                                </div>
+
                                 {/* Name */}
                                 <div style={{ marginBottom: 16 }}>
                                     <label htmlFor="signup-name" style={labelStyle}>Nama Panggilan / Lengkap</label>

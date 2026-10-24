@@ -1,8 +1,10 @@
 import { useState } from "react";
 import Modal from "../ui/Modal";
+import GoogleAuthButton from "./GoogleAuthButton";
 
-const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading, onSwitchToSignup, onForgotPassword }) => {
+const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading, onSwitchToSignup, onForgotPassword, redirectTo }) => {
     const [showPassword, setShowPassword] = useState(false);
+    const [oauthError, setOauthError] = useState("");
 
     const handleFocus = e => {
         e.target.style.borderColor = "#3F5142";
@@ -13,7 +15,7 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
         e.target.style.background = "#F7F3EB";
     };
 
-    const hasTopError = errors.general || errors.auth;
+    const hasTopError = errors.general || errors.auth || oauthError;
 
     return (
         <Modal open={open} onClose={onClose}>
@@ -71,9 +73,22 @@ const LoginModal = ({ open, onClose, form, setForm, errors, onSubmit, isLoading,
                         {/* Top-level error banner */}
                         {hasTopError && (
                             <div style={{ width: "100%", marginBottom: 16, padding: "10px 14px", borderRadius: 12, background: "#FDF2F0", border: "1px solid #E6B3A8", color: "#9E3B24", fontSize: 13, fontWeight: 600 }}>
-                                {errors.general || errors.auth}
+                                {errors.general || errors.auth || oauthError}
                             </div>
                         )}
+
+                        {/* Google OAuth 1-Click */}
+                        <GoogleAuthButton
+                            label="Masuk dengan Google"
+                            redirectTo={redirectTo}
+                            onError={(msg) => setOauthError(msg)}
+                        />
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
+                            <div style={{ flex: 1, height: 1, background: "#E5DEC9" }} />
+                            <span style={{ fontSize: 11, color: "#4A584D", fontWeight: 700, letterSpacing: "0.08em" }}>ATAU DENGAN EMAIL</span>
+                            <div style={{ flex: 1, height: 1, background: "#E5DEC9" }} />
+                        </div>
 
                         {/* Email */}
                         <div style={{ marginBottom: 16 }}>

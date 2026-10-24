@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { PASSWORD_MIN_LENGTH } from "../constants/validation";
 import LoginModal from "../components/landing/LoginModal";
 import SignupModal from "../components/landing/SignupModal";
+import GoogleAuthButton from "../components/landing/GoogleAuthButton";
 import { previewInvitationApi, acceptInvitationApi } from "../hooks/useInvitations";
 
 /**
@@ -135,12 +136,22 @@ export default function JoinHouseholdPage({ code, session, showToast }) {
 
                 {!session ? (
                     <>
-                        <button style={btn(false)} onClick={() => setShowLogin(true)}>Login untuk bergabung</button>
+                        <GoogleAuthButton
+                            label="Lanjutkan dengan Google"
+                            redirectTo={typeof window !== "undefined" ? window.location.href : undefined}
+                            onError={(msg) => showToast && showToast(msg, "error")}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
+                            <div style={{ flex: 1, height: 1, background: "var(--color-border-soft, rgba(255,255,255,.1))" }} />
+                            <span style={{ fontSize: 10, color: "var(--color-muted)", fontWeight: 700, letterSpacing: "0.08em" }}>ATAU EMAIL</span>
+                            <div style={{ flex: 1, height: 1, background: "var(--color-border-soft, rgba(255,255,255,.1))" }} />
+                        </div>
+                        <button style={btn(false)} onClick={() => setShowLogin(true)}>Login dengan Email</button>
                         <button
                             onClick={() => setShowSignup(true)}
                             style={{ width: "100%", marginTop: 10, padding: "11px 0", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "transparent", color: "var(--color-text)", fontSize: 13, cursor: "pointer" }}
                         >
-                            Belum punya akun? Daftar
+                            Belum punya akun? Daftar Email
                         </button>
                     </>
                 ) : (
