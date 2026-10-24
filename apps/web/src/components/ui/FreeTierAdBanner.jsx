@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
 
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID || "ca-pub-8774599188370439";
-const ADSENSE_SLOT = import.meta.env.VITE_ADSENSE_SLOT_ID || "";
+const ADSENSE_SLOT = import.meta.env.VITE_ADSENSE_SLOT_ID || "1620311146";
 
 function hasActivePaidAiKey() {
     try {

@@ -6,6 +6,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import { useMembers } from "../../../hooks/useMembers";
 import { useBeneficiaries } from "../../../hooks/useBeneficiaries";
 import RecordedByChip from "../../household/RecordedByChip";
+import FreeTierAdBanner from "../../ui/FreeTierAdBanner";
 
 const MONTHS_ID = [
     { v: "01", l: "Januari" }, { v: "02", l: "Februari" }, { v: "03", l: "Maret" },
@@ -217,6 +218,7 @@ const TransaksiView = ({ transactions, onEdit, onDelete, accounts = [], initialC
 
     return (
         <div style={{ animation: "fadeIn .4s", display: "flex", flexDirection: "column", gap: 20 }}>
+            <FreeTierAdBanner compact />
 
             {/* ── Confirm Delete Modal ── */}
             {confirmDelete && (
