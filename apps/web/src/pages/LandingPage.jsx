@@ -162,17 +162,17 @@ const CATALOG_PRODUCTS = [
         id: "webapp",
         code: "KB-APP-01",
         category: "Paket Mandiri · Input Manual",
-        name: "Paket Mandiri (Web & Android)",
-        subtitle: "Buat yang rajin catat sendiri lewat tombol Web atau HP. Sudah termasuk Rekening Bersama vs Privat, Kalkulator Adu Harga Minimarket (per 100ml/100g), Stok Kulkas & Daftar Belanja, serta Export Excel (.xlsx).",
+        name: "Paket Mandiri (Web & Aplikasi HP)",
+        subtitle: "Buat yang rajin catat sendiri lewat tombol Web atau HP. Sudah termasuk Rekening Bersama vs Privat, Kalkulator Adu Harga Minimarket (per 100ml/100g), Stok Kulkas Otomatis, Rekonsiliasi Mutasi Bank (CSV), serta Export Excel (.xlsx).",
         priceDisplay: "Rp 0",
         priceNumeric: 0,
-        billingNote: "Gratis Selamanya · Input Manual",
-        deliveryMethod: "Aktif seketika di browser melalui kelola.keluargaberkembang.com atau instalasi APK Android.",
+        billingNote: "Gratis Selamanya · Tanpa Iklan · Input Manual",
+        deliveryMethod: "Aktif seketika di browser melalui kelola.keluargaberkembang.com atau pasang langsung ke layar utama HP (PWA Android & iOS).",
         features: [
             "Dasbor arus kas keluarga dengan pemisahan Rekening Bersama dan Rekening Privat.",
             "Kalkulator Adu Harga Minimarket otomatis (hitung harga per 100ml, 100g, atau per pcs).",
-            "Stok Kulkas & Daftar Belanja keluarga yang tersinkronisasi antara suami dan istri.",
-            "Laporan grafik bulanan dan fitur unduh pembukuan ke format Excel (.xlsx).",
+            "Stok Kulkas Otomatis & Daftar Belanja keluarga yang tersinkronisasi antara suami dan istri.",
+            "Rekonsiliasi Mutasi Bank (CSV), grafik bulanan, dan unduh pembukuan ke Excel (.xlsx).",
         ],
         ctaLabel: "Buka Aplikasi Web Gratis",
         secondaryLabel: "Daftar Akun Keluarga Baru",
@@ -184,18 +184,20 @@ const CATALOG_PRODUCTS = [
         category: "Paket Sachet & Hemat · Tanpa Ketik Manual",
         name: "Paket Sachet & Hemat (Web + Telegram + Foto Struk)",
         subtitle: "Cocok untuk coba dulu atau dipakai sendiri lewat Web & Telegram. Cukup foto struk belanja yang lecek atau ketik 1 kalimat di chat, langsung tercatat otomatis dalam 5 detik.",
+        originalPriceDisplay: "Rp 15.000",
+        discountBadge: "HEMAT HINGGA 51%",
         priceDisplay: "Mulai Rp 9.000",
         priceNumeric: 9000,
-        billingNote: "Pilihan: Sachet 7 Hari Rp 9.000 atau Hemat 30 Hari Rp 19.000",
+        billingNote: "Pilihan: Sachet 7 Hari Rp 9.000 (Normal Rp 15.000) atau Hemat 30 Hari Rp 19.000 (Normal Rp 39.000)",
         deliveryMethod: "Kode kuota & koneksi asisten AI aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
         subOptions: [
-            { id: "ast-sachet", label: "Paket Sachet Coba Dulu (Aktif 7 Hari · Web, Telegram & Foto Struk)", priceDisplay: "Rp 9.000", priceNumeric: 9000 },
-            { id: "ast-hemat", label: "Paket Hemat Bulanan (Aktif 30 Hari · Web, Telegram & Foto Struk)", priceDisplay: "Rp 19.000", priceNumeric: 19000 },
+            { id: "ast-sachet", label: "Paket Sachet Coba Dulu (Aktif 7 Hari · Web, Telegram & Foto Struk)", originalPriceDisplay: "Rp 15.000", discountBadge: "Hemat 40%", priceDisplay: "Rp 9.000", priceNumeric: 9000 },
+            { id: "ast-hemat", label: "Paket Hemat Bulanan (Aktif 30 Hari · Web, Telegram & Foto Struk)", originalPriceDisplay: "Rp 39.000", discountBadge: "Hemat 51%", priceDisplay: "Rp 19.000", priceNumeric: 19000 },
         ],
         features: [
             "Beres dalam 5 detik: cukup kirim foto struk Alfamart/Indomaret/Superindo, daftar barang & diskon langsung tercatat otomatis.",
             "Tanya-jawab asisten keuangan 24 jam lewat chat Web dan Telegram pribadi tanpa perlu daftar API Key teknis.",
-            "Otomatis memperbarui sisa anggaran bulanan dan perbandingan harga barang antar toko.",
+            "Otomatis memperbarui sisa anggaran bulanan, stok kulkas, dan perbandingan harga barang antar toko.",
             "Fleksibel: bisa mulai dari Paket Sachet 7 hari (Rp 9.000) sebelum lanjut ke bulanan (Rp 19.000).",
         ],
         ctaLabel: "Pilih Paket Sachet / Hemat (Mulai Rp 9.000)",
@@ -206,12 +208,14 @@ const CATALOG_PRODUCTS = [
         category: "Paling Laris · Rekomendasi Pasangan",
         name: "Paket Lengkap Keluarga (Grup WhatsApp Suami-Istri + Telegram + Foto Struk)",
         subtitle: "Tidak perlu memaksa pasangan buka aplikasi baru. Cukup masukkan asisten ke 1 Grup WhatsApp berdua suami-istri, kirim foto struk atau ketik pengeluaran, beres tercatat bersama.",
+        originalPriceDisplay: "Rp 59.000",
+        discountBadge: "PROMO PASANGAN · HEMAT 50%",
         priceDisplay: "Rp 29.000 / 30 hari",
         priceNumeric: 29000,
-        billingNote: "~Rp 900/hari untuk berdua suami-istri",
+        billingNote: "~Rp 900/hari untuk berdua suami-istri (Harga Normal Rp 59.000/bulan)",
         deliveryMethod: "Jalur koneksi asisten Grup WhatsApp & Telegram keluarga aktif otomatis dalam waktu kurang dari 3 menit setelah pembayaran QRIS / Virtual Account melalui sistem @KaraAutoBot.",
         subOptions: [
-            { id: "ast-keluarga", label: "Paket Lengkap Keluarga (Aktif 30 Hari · Masuk Grup WhatsApp Suami-Istri + Telegram + Foto Struk)", priceDisplay: "Rp 29.000", priceNumeric: 29000 },
+            { id: "ast-keluarga", label: "Paket Lengkap Keluarga (Aktif 30 Hari · Masuk Grup WhatsApp Suami-Istri + Telegram + Foto Struk)", originalPriceDisplay: "Rp 59.000", discountBadge: "Hemat 50%", priceDisplay: "Rp 29.000", priceNumeric: 29000 },
         ],
         features: [
             "Bisa dimasukkan ke 1 Grup WhatsApp berdua pasangan (suami-istri) + akses penuh di Telegram & Web.",
@@ -1654,6 +1658,34 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                             padding: "16px 16px",
                                             marginBottom: 16,
                                         }}>
+                                            {(prod.originalPriceDisplay || prod.discountBadge) && (
+                                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                                                    {prod.originalPriceDisplay && (
+                                                        <span className="kb-mono" style={{
+                                                            fontSize: 13.5,
+                                                            color: "#847D70",
+                                                            textDecoration: "line-through",
+                                                            fontWeight: 600,
+                                                        }}>
+                                                            {prod.originalPriceDisplay}
+                                                        </span>
+                                                    )}
+                                                    {prod.discountBadge && (
+                                                        <span style={{
+                                                            fontSize: 10.5,
+                                                            fontWeight: 700,
+                                                            padding: "2px 8px",
+                                                            borderRadius: 99,
+                                                            background: prod.featured ? "#9E472D" : "#2E3D30",
+                                                            color: "#FFFDF9",
+                                                            letterSpacing: "0.04em",
+                                                            textTransform: "uppercase",
+                                                        }}>
+                                                            {prod.discountBadge}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                             <div className="kb-mono" style={{
                                                 fontSize: "clamp(24px, 2.6vw, 30px)",
                                                 fontWeight: 700,
@@ -1677,7 +1709,14 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                     {prod.subOptions.map((sub) => (
                                                         <div key={sub.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, fontSize: 12.5 }}>
                                                             <span style={{ color: "#1F2922", fontWeight: 600 }}>{sub.label}</span>
-                                                            <span className="kb-mono" style={{ fontWeight: 700, color: "#2E3D30", flexShrink: 0 }}>{sub.priceDisplay}</span>
+                                                            <span className="kb-mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                                                {sub.originalPriceDisplay && (
+                                                                    <span style={{ color: "#847D70", textDecoration: "line-through", fontSize: 11.5, fontWeight: 500 }}>
+                                                                        {sub.originalPriceDisplay}
+                                                                    </span>
+                                                                )}
+                                                                <span style={{ fontWeight: 700, color: "#2E3D30" }}>{sub.priceDisplay}</span>
+                                                            </span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -2544,8 +2583,28 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                 <h2 style={{ fontSize: 22, marginBottom: 6, paddingRight: 40 }}>
                                     {selectedProduct.name}
                                 </h2>
-                                <div className="kb-mono" style={{ fontSize: 22, fontWeight: 700, color: "#9E472D", marginBottom: 16 }}>
-                                    {selectedSubOption ? selectedSubOption.priceDisplay : selectedProduct.priceDisplay}
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+                                    {(selectedSubOption?.originalPriceDisplay || selectedProduct.originalPriceDisplay) && (
+                                        <span className="kb-mono" style={{ fontSize: 15, color: "#847D70", textDecoration: "line-through", fontWeight: 600 }}>
+                                            {selectedSubOption ? selectedSubOption.originalPriceDisplay : selectedProduct.originalPriceDisplay}
+                                        </span>
+                                    )}
+                                    <span className="kb-mono" style={{ fontSize: 22, fontWeight: 700, color: "#9E472D" }}>
+                                        {selectedSubOption ? selectedSubOption.priceDisplay : selectedProduct.priceDisplay}
+                                    </span>
+                                    {(selectedSubOption?.discountBadge || selectedProduct.discountBadge) && (
+                                        <span style={{
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            padding: "3px 8px",
+                                            borderRadius: 99,
+                                            background: "#2E3D30",
+                                            color: "#FFFDF9",
+                                            textTransform: "uppercase",
+                                        }}>
+                                            {selectedSubOption ? selectedSubOption.discountBadge : selectedProduct.discountBadge}
+                                        </span>
+                                    )}
                                 </div>
 
                                 {/* Sub-option selector if product has durations/variants */}
@@ -2580,7 +2639,14 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                                         }}
                                                     >
                                                         <span>{opt.label}</span>
-                                                        <span className="kb-mono" style={{ color: "#2E3D30", flexShrink: 0 }}>{opt.priceDisplay}</span>
+                                                        <span className="kb-mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                                            {opt.originalPriceDisplay && (
+                                                                <span style={{ color: "#847D70", textDecoration: "line-through", fontSize: 11.5, fontWeight: 500 }}>
+                                                                    {opt.originalPriceDisplay}
+                                                                </span>
+                                                            )}
+                                                            <span style={{ color: "#2E3D30" }}>{opt.priceDisplay}</span>
+                                                        </span>
                                                     </button>
                                                 );
                                             })}

@@ -287,25 +287,25 @@ export default function LegalPage({ initialTab = "tos", onNavigate }) {
                                 </thead>
                                 <tbody>
                                     <tr style={{ borderBottom: "1px solid #E5DEC9" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Mandiri: Aplikasi Web & Android Keluarga Berkembang (<code>KB-APP-01</code>)</td>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Mandiri: Aplikasi Web &amp; HP Keluarga Berkembang (<code>KB-APP-01</code>)</td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Gratis Selamanya · Tanpa Iklan (Input Manual)</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>Rp 0 (Gratis Selamanya)</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Akses langsung via <code>kelola.keluargaberkembang.com</code></td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Akses langsung via <code>kelola.keluargaberkembang.com</code> (Web &amp; PWA HP)</td>
                                     </tr>
                                     <tr style={{ borderBottom: "1px solid #E5DEC9", background: "#FCF9F2" }}>
-                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Sachet & Hemat: Asisten Scan Struk & Chat AI (<code>KB-AST-SACHET</code>)</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Sachet (7 Hari) / Paket Hemat (30 Hari) · Web, Telegram & Foto Struk</td>
+                                        <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Sachet &amp; Hemat: Asisten Scan Struk &amp; Chat AI (<code>KB-AST-SACHET</code>)</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Paket Sachet (7 Hari) / Paket Hemat (30 Hari) · Web, Telegram &amp; Foto Struk</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#2E3D30" }}>
-                                            Rp 9.000 / 7 hari (Paket Sachet)<br />
-                                            Rp 19.000 / 30 hari (Paket Hemat Bulanan)
+                                            Rp 9.000 / 7 hari <span style={{ fontSize: 12, color: "#847D70", textDecoration: "line-through", fontWeight: 500 }}>Rp 15.000</span><br />
+                                            Rp 19.000 / 30 hari <span style={{ fontSize: 12, color: "#847D70", textDecoration: "line-through", fontWeight: 500 }}>Rp 39.000</span>
                                         </td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Kode Key Kuota AI / Aktivasi otomatis dalam &lt; 3 menit via <code>@KaraAutoBot</code></td>
                                     </tr>
                                     <tr style={{ borderBottom: showAllCatalog ? "1px solid #E5DEC9" : "none" }}>
                                         <td style={{ padding: "14px 16px", fontWeight: 700 }}>Paket Lengkap Keluarga: Grup WhatsApp Suami-Istri + Telegram + Foto Struk (<code>KB-AST-WA</code>)</td>
-                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Langganan Bulanan (30 Hari) · Grup WhatsApp, Telegram & Foto Struk</td>
+                                        <td style={{ padding: "14px 16px", color: "#4A584D" }}>Langganan Bulanan (30 Hari) · Grup WhatsApp, Telegram &amp; Foto Struk</td>
                                         <td style={{ padding: "14px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "#9E472D" }}>
-                                            Rp 29.000 / 30 hari
+                                            Rp 29.000 / 30 hari <span style={{ fontSize: 12, color: "#847D70", textDecoration: "line-through", fontWeight: 500 }}>Rp 59.000</span>
                                         </td>
                                         <td style={{ padding: "14px 16px", color: "#4A584D" }}>Aktivasi asisten Grup WhatsApp &amp; Telegram otomatis dalam &lt; 3 menit via <code>@KaraAutoBot</code></td>
                                     </tr>
