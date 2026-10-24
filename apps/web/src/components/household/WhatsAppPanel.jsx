@@ -51,7 +51,7 @@ const inputSt = {
     boxSizing: "border-box",
 };
 
-export default function WhatsAppPanel({ onBack, showToast }) {
+export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiSettings }) {
     const { activeHouseholdId, activeMember } = useHousehold();
     const isOwner = activeMember?.role === "owner";
 
@@ -76,23 +76,7 @@ export default function WhatsAppPanel({ onBack, showToast }) {
         async (path, method = "GET", bodyObj = null, queryTarget = "") => {
             if (!activeHouseholdId) throw new Error("Household belum aktif");
             const effectiveTarget = queryTarget || target || undefined;
-
-            // Try Karaya API first, fallback directly to VPS Gatekeeper WA Controller
-            try {
-                if (method === "GET") {
-                    const res = await api.GET(path, {
-                        params: { query: effectiveTarget ? { target: effectiveTarget } : {} },
-                    });
-                    if (res?.data?.ok) return res.data;
-                } else {
-                    const res = await api.POST(path, {
-                        body: { ...(bodyObj || {}), ...(effectiveTarget ? { target: effectiveTarget } : {}) },
-                    });
-                    if (res?.data?.ok) return res.data;
-                }
-            } catch {
-                // Fallback to direct HTTPS endpoint on 9router.cortex-ai.my.id
-            }
+            const trimmedKey = (aiKey || "").trim();
 
             const url = new URL(path, DIRECT_WA_BASE);
             url.searchParams.set("household_id", activeHouseholdId);
@@ -104,11 +88,13 @@ export default function WhatsAppPanel({ onBack, showToast }) {
                     "Content-Type": "application/json",
                     "X-WA-Internal-Token": DIRECT_WA_TOKEN,
                     "X-Household-Id": activeHouseholdId,
+                    ...(trimmedKey.startsWith("sk-kb-") ? { "X-AI-Api-Key": trimmedKey } : {}),
                 },
                 ...(method === "POST"
                     ? {
                           body: JSON.stringify({
                               household_id: activeHouseholdId,
+                              ...(trimmedKey.startsWith("sk-kb-") ? { ai_api_key: trimmedKey } : {}),
                               ...(effectiveTarget ? { target: effectiveTarget } : {}),
                               ...(bodyObj || {}),
                           }),
@@ -121,7 +107,7 @@ export default function WhatsAppPanel({ onBack, showToast }) {
             }
             return data;
         },
-        [activeHouseholdId, target]
+        [activeHouseholdId, target, aiKey]
     );
 
     const fetchStatus = useCallback(
@@ -373,7 +359,75 @@ export default function WhatsAppPanel({ onBack, showToast }) {
                 </div>
             )}
 
-            {/* Status Card */}
+            {!loading && statusData && statusData.entitled === false ? (
+                <div
+                    style={{
+                        ...cardBox,
+                        border: "1.5px solid rgba(212,157,63,.45)",
+                        background: "linear-gradient(145deg, rgba(212,157,63,.12), rgba(212,157,63,.04))",
+                        padding: "16px 14px",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 18 }}>🔒</span>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--color-text)" }}>
+                            Fitur Khusus Paket Lengkap Keluarga (Rp 29.000)
+                        </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", lineHeight: 1.55, marginBottom: 12 }}>
+                        Fitur <strong>Bot Grup WhatsApp Suami-Istri (Hermes)</strong> membutuhkan slot mesin WhatsApp
+                        khusus dan hanya tersedia pada <strong>Paket Lengkap Keluarga (Rp 29.000 / 30 hari)</strong>.
+                        {statusData.telegram_allowed ? (
+                            <div style={{ marginTop: 8, color: "var(--color-text)" }}>
+                                💡 Paket Anda saat ini sudah mencakup <strong>Bot Telegram Suami-Istri</strong>. Upgrade
+                                ke Paket Lengkap Rp 29.000 jika ingin membuka Bot Grup WhatsApp!
+                            </div>
+                        ) : null}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <a
+                            href="https://keluargaberkembang.com/#paket"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                display: "block",
+                                textAlign: "center",
+                                padding: "11px 14px",
+                                borderRadius: 10,
+                                background: "var(--color-primary)",
+                                color: "var(--color-on-primary)",
+                                fontSize: 12.5,
+                                fontWeight: 800,
+                                textDecoration: "none",
+                            }}
+                        >
+                            🛒 Beli / Upgrade Paket Lengkap WA (Rp 29.000)
+                        </a>
+                        {onOpenAiSettings && (
+                            <button
+                                type="button"
+                                onClick={onOpenAiSettings}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid var(--color-border)",
+                                    background: "var(--bg-surface)",
+                                    color: "var(--color-text)",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                🔑 Sudah Punya Kode Key / Voucher Paket WA? Masukkan di Sini
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* Status Card */}
             <div style={{
                 ...cardBox,
                 background: paired
@@ -762,6 +816,8 @@ export default function WhatsAppPanel({ onBack, showToast }) {
                     </button>
                 )}
             </div>
+                </>
+            )}
         </div>
     );
 }

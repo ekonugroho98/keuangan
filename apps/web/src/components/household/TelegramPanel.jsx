@@ -58,7 +58,7 @@ const ROLE_PRESETS = [
     { id: "Ibu", label: "👩 Istri / Ibu" },
 ];
 
-export default function TelegramPanel({ onBack, showToast, aiKey = "" }) {
+export default function TelegramPanel({ onBack, showToast, aiKey = "", onOpenAiSettings }) {
     const { activeHouseholdId, activeMember } = useHousehold();
     const { household } = useHouseholdInfo();
     const { members } = useMembers();
@@ -81,6 +81,7 @@ export default function TelegramPanel({ onBack, showToast, aiKey = "" }) {
             if (!activeHouseholdId) throw new Error("Household belum aktif");
             const url = new URL(path, DIRECT_TG_BASE);
             url.searchParams.set("household_id", activeHouseholdId);
+            const trimmedKey = (aiKey || "").trim();
 
             const resp = await fetch(url.toString(), {
                 method,
@@ -88,11 +89,13 @@ export default function TelegramPanel({ onBack, showToast, aiKey = "" }) {
                     "Content-Type": "application/json",
                     "X-WA-Internal-Token": DIRECT_TG_TOKEN,
                     "X-Household-Id": activeHouseholdId,
+                    ...(trimmedKey.startsWith("sk-kb-") ? { "X-AI-Api-Key": trimmedKey } : {}),
                 },
                 ...(method === "POST"
                     ? {
                           body: JSON.stringify({
                               household_id: activeHouseholdId,
+                              ...(trimmedKey.startsWith("sk-kb-") ? { ai_api_key: trimmedKey } : {}),
                               ...(bodyObj || {}),
                           }),
                       }
@@ -257,127 +260,192 @@ export default function TelegramPanel({ onBack, showToast, aiKey = "" }) {
                 </div>
             )}
 
-            {/* ── Langkah 1: Hubungkan Sekarang ── */}
-            <div style={sectionLabel}>1. PILIH PERAN & HUBUNGKAN</div>
-            <div style={cardBox}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>
-                    Siapa yang akan dihubungkan?
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
-                    {ROLE_PRESETS.map((r) => {
-                        const active = selectedRole === r.id;
-                        return (
+            {/* ── Langkah 1: Hubungkan Sekarang (atau Paywall jika belum berlangganan) ── */}
+            {!loading && statusData && statusData.entitled === false ? (
+                <div
+                    style={{
+                        ...cardBox,
+                        border: "1.5px solid rgba(212,157,63,.45)",
+                        background: "linear-gradient(145deg, rgba(212,157,63,.12), rgba(212,157,63,.04))",
+                        padding: "16px 14px",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 18 }}>🔒</span>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--color-text)" }}>
+                            Fitur Khusus Paket Asisten AI (Mulai Rp 9.000)
+                        </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", lineHeight: 1.55, marginBottom: 12 }}>
+                        Akun gratis dapat menggunakan seluruh fitur pencatatan mandiri di Web Keuangan sepuasnya. Untuk
+                        menghubungkan <strong>Bot Telegram Suami-Istri (@{botUsername})</strong> serta fitur{" "}
+                        <strong>Scan Foto Struk Belanja AI</strong>, silakan aktifkan paket kuota AI terlebih dahulu:
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <a
+                            href="https://keluargaberkembang.com/#paket"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                display: "block",
+                                textAlign: "center",
+                                padding: "11px 14px",
+                                borderRadius: 10,
+                                background: "var(--color-primary)",
+                                color: "var(--color-on-primary)",
+                                fontSize: 12.5,
+                                fontWeight: 800,
+                                textDecoration: "none",
+                            }}
+                        >
+                            🛒 Pilih Paket AI (Mulai Rp 9.000 / 7 Hari)
+                        </a>
+                        {onOpenAiSettings && (
                             <button
-                                key={r.id}
                                 type="button"
-                                onClick={() => setSelectedRole(r.id)}
+                                onClick={onOpenAiSettings}
                                 style={{
-                                    padding: "8px 10px",
+                                    width: "100%",
+                                    padding: "10px 12px",
                                     borderRadius: 10,
-                                    border: active
-                                        ? "1.5px solid var(--color-primary)"
-                                        : "1px solid var(--color-border)",
-                                    background: active ? "var(--color-primary-soft)" : "var(--bg-surface)",
-                                    color: active ? "var(--color-primary)" : "var(--color-text)",
+                                    border: "1px solid var(--color-border)",
+                                    background: "var(--bg-surface)",
+                                    color: "var(--color-text)",
                                     fontSize: 12,
                                     fontWeight: 700,
                                     cursor: "pointer",
                                     fontFamily: "inherit",
                                 }}
                             >
-                                {r.label}
+                                🔑 Sudah Punya Kode Key / Voucher? Masukkan di Sini
                             </button>
-                        );
-                    })}
-                </div>
-
-                {isOwner && members && members.length > 1 && (
-                    <div style={{ marginBottom: 10 }}>
-                        <select
-                            value={selectedMemberId}
-                            onChange={(e) => setSelectedMemberId(e.target.value)}
-                            style={inputSt}
-                        >
-                            <option value="me">Akun Anggota: Saya ({activeMember?.display_name || "Owner"})</option>
-                            {members
-                                .filter((m) => !m.is_me)
-                                .map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                        Akun Anggota: {m.display_name}
-                                    </option>
-                                ))}
-                        </select>
+                        )}
                     </div>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button
-                        type="button"
-                        disabled={!!busyAction}
-                        onClick={() => handleCreatePairLink("private")}
-                        style={{
-                            width: "100%",
-                            padding: "11px 14px",
-                            borderRadius: 10,
-                            border: "none",
-                            background: "var(--color-primary)",
-                            color: "var(--color-on-primary)",
-                            fontSize: 12.5,
-                            fontWeight: 800,
-                            cursor: busyAction ? "wait" : "pointer",
-                            fontFamily: "inherit",
-                        }}
-                    >
-                        {busyAction === "private"
-                            ? "⏳ Menyiapkan Koneksi..."
-                            : `✈️ Hubungkan Telegram Saya (${selectedRole})`}
-                    </button>
-
-                    <button
-                        type="button"
-                        disabled={!!busyAction}
-                        onClick={() => handleCreatePairLink("spouse")}
-                        style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            borderRadius: 10,
-                            border: "1px solid var(--color-border)",
-                            background: "var(--bg-surface)",
-                            color: "var(--color-text)",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            cursor: busyAction ? "wait" : "pointer",
-                            fontFamily: "inherit",
-                        }}
-                    >
-                        {busyAction === "spouse"
-                            ? "⏳ Membuat Link..."
-                            : `💌 Buat Link Undangan untuk HP ${selectedRole}`}
-                    </button>
-
-                    <button
-                        type="button"
-                        disabled={!!busyAction}
-                        onClick={() => handleCreatePairLink("group")}
-                        style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            borderRadius: 10,
-                            border: "1px solid var(--color-primary)",
-                            background: "var(--color-primary-soft)",
-                            color: "var(--color-primary)",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            cursor: busyAction ? "wait" : "pointer",
-                            fontFamily: "inherit",
-                        }}
-                    >
-                        {busyAction === "group"
-                            ? "⏳ Menyiapkan Grup..."
-                            : "👨‍👩‍👧 Masukkan Bot ke Grup Telegram Suami-Istri"}
-                    </button>
                 </div>
-            </div>
+            ) : (
+                <>
+                    <div style={sectionLabel}>1. PILIH PERAN & HUBUNGKAN</div>
+                    <div style={cardBox}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--color-text)", marginBottom: 6 }}>
+                            Siapa yang akan dihubungkan?
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+                            {ROLE_PRESETS.map((r) => {
+                                const active = selectedRole === r.id;
+                                return (
+                                    <button
+                                        key={r.id}
+                                        type="button"
+                                        onClick={() => setSelectedRole(r.id)}
+                                        style={{
+                                            padding: "8px 10px",
+                                            borderRadius: 10,
+                                            border: active
+                                                ? "1.5px solid var(--color-primary)"
+                                                : "1px solid var(--color-border)",
+                                            background: active ? "var(--color-primary-soft)" : "var(--bg-surface)",
+                                            color: active ? "var(--color-primary)" : "var(--color-text)",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                            fontFamily: "inherit",
+                                        }}
+                                    >
+                                        {r.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {isOwner && members && members.length > 1 && (
+                            <div style={{ marginBottom: 10 }}>
+                                <select
+                                    value={selectedMemberId}
+                                    onChange={(e) => setSelectedMemberId(e.target.value)}
+                                    style={inputSt}
+                                >
+                                    <option value="me">Akun Anggota: Saya ({activeMember?.display_name || "Owner"})</option>
+                                    {members
+                                        .filter((m) => !m.is_me)
+                                        .map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                Akun Anggota: {m.display_name}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <button
+                                type="button"
+                                disabled={!!busyAction || loading}
+                                onClick={() => handleCreatePairLink("private")}
+                                style={{
+                                    width: "100%",
+                                    padding: "11px 14px",
+                                    borderRadius: 10,
+                                    border: "none",
+                                    background: "var(--color-primary)",
+                                    color: "var(--color-on-primary)",
+                                    fontSize: 12.5,
+                                    fontWeight: 800,
+                                    cursor: busyAction || loading ? "wait" : "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                {busyAction === "private"
+                                    ? "⏳ Menyiapkan Koneksi..."
+                                    : `✈️ Hubungkan Telegram Saya (${selectedRole})`}
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={!!busyAction || loading}
+                                onClick={() => handleCreatePairLink("spouse")}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid var(--color-border)",
+                                    background: "var(--bg-surface)",
+                                    color: "var(--color-text)",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: busyAction || loading ? "wait" : "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                {busyAction === "spouse"
+                                    ? "⏳ Membuat Link..."
+                                    : `💌 Buat Link Undangan untuk HP ${selectedRole}`}
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={!!busyAction || loading}
+                                onClick={() => handleCreatePairLink("group")}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid var(--color-primary)",
+                                    background: "var(--color-primary-soft)",
+                                    color: "var(--color-primary)",
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    cursor: busyAction || loading ? "wait" : "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                {busyAction === "group"
+                                    ? "⏳ Menyiapkan Grup..."
+                                    : "👨‍👩‍👧 Masukkan Bot ke Grup Telegram Suami-Istri"}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* ── Hasil Link / Kode Pairing ── */}
             {generatedPair && (

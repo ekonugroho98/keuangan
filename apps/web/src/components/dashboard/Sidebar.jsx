@@ -341,12 +341,22 @@ const Sidebar = ({
 
         /* ── WhatsApp Bot (Hermes QR & Grup WA) ── */
         if (profileView === "whatsapp") return (
-            <WhatsAppPanel onBack={() => setProfileView("menu")} showToast={showToast} />
+            <WhatsAppPanel
+                onBack={() => setProfileView("menu")}
+                showToast={showToast}
+                aiKey={aiKey}
+                onOpenAiSettings={() => setProfileView("ai")}
+            />
         );
 
         /* ── Telegram Bot (Suami, Istri & Grup Telegram) ── */
         if (profileView === "telegram") return (
-            <TelegramPanel onBack={() => setProfileView("menu")} showToast={showToast} aiKey={aiKey} />
+            <TelegramPanel
+                onBack={() => setProfileView("menu")}
+                showToast={showToast}
+                aiKey={aiKey}
+                onOpenAiSettings={() => setProfileView("ai")}
+            />
         );
 
         /* ── Ganti Nama ── */
