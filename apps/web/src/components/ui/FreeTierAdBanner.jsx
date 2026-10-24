@@ -27,7 +27,12 @@ export default function FreeTierAdBanner({ onUpgrade, compact = false }) {
         return () => window.removeEventListener("storage", sync);
     }, []);
 
-    const isFreeTier = !householdLoading && (!household?.plan || household.plan === "free") && !hasPaidKey;
+    const forcePreview =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("preview_ads") === "1";
+    const isFreeTier =
+        forcePreview ||
+        (!householdLoading && (!household?.plan || household.plan === "free") && !hasPaidKey);
 
     useEffect(() => {
         if (!isFreeTier || !ADSENSE_SLOT) return;

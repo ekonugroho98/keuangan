@@ -5,6 +5,7 @@ import { exportTransactionsCSV, exportTransactionsExcel } from "../../../utils/e
 import { useLanguage } from "../../../i18n/LanguageContext";
 import ScopeSwitcher from "../../household/ScopeSwitcher";
 import PrediksiView from "./PrediksiView";
+import FreeTierAdBanner from "../../ui/FreeTierAdBanner";
 
 const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const KIND_RULES = [
@@ -766,6 +767,8 @@ const LaporanView = ({ transactions: allTransactions = [], accounts = [], budget
                 <div style={{ marginBottom: 16 }}>
                     <ScopeSwitcher value={scope} onChange={setScope} />
                 </div>
+
+                <FreeTierAdBanner compact />
 
                 {/* ═══ HEADER ═══ */}
                 <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 18 }}>
