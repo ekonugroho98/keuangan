@@ -333,14 +333,74 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
     });
     const [orderErrors, setOrderErrors] = useState({});
     const [orderSubmitting, setOrderSubmitting] = useState(false);
+    const [orderChecking, setOrderChecking] = useState(false);
     const [orderInvoice, setOrderInvoice] = useState(null);
 
-    // Check URL query params (?auth=login or ?auth=signup)
+    const checkOrderPaymentStatus = async (invId) => {
+        if (!invId) return;
+        setOrderChecking(true);
+        try {
+            const resp = await fetch(`https://api.keluargaberkembang.com/v1/orders/${encodeURIComponent(invId)}/check`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ invoice_id: invId }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data?.order) {
+                const ord = data.order;
+                setOrderInvoice((prev) => ({
+                    ...(prev || {}),
+                    invoiceId: ord.invoice_id || invId,
+                    planCode: ord.plan_code || prev?.planCode || "ast-hemat",
+                    itemName: ord.item_name || prev?.itemName || "Paket Keluarga Berkembang",
+                    code: ord.product_code || prev?.code || "KB-AI",
+                    priceDisplay: prev?.priceDisplay || `Rp ${Number(ord.amount_idr || 0).toLocaleString("id-ID")}`,
+                    buyerName: ord.buyer_name || prev?.buyerName || "",
+                    buyerEmail: ord.buyer_email || prev?.buyerEmail || "",
+                    buyerContact: ord.buyer_contact || prev?.buyerContact || "",
+                    paymentMethod: ord.payment_method || prev?.paymentMethod || "QRIS",
+                    paymentUrl: ord.payment_url || prev?.paymentUrl || "",
+                    duitkuReference: ord.duitku_reference || prev?.duitkuReference || "",
+                    status: data.paid || ord.status === "paid" ? "paid" : ord.status || "pending",
+                    oneClickWebUrl: data.one_click_web_url || ord.one_click_web_url || prev?.oneClickWebUrl || "",
+                    walletPortalUrl: data.wallet_portal_url || ord.wallet_portal_url || prev?.walletPortalUrl || "",
+                    deliveryMethod: prev?.deliveryMethod || "Otomatis aktif di Web Keuangan & Telegram @KelolaKeluargaBot",
+                    createdAt: prev?.createdAt || ord.created_at || "",
+                }));
+                if (data.paid || ord.status === "paid") {
+                    if (showToast) showToast("Pembayaran terverifikasi! Paket AI siap diaktifkan.", "success");
+                } else if (showToast) {
+                    showToast("Pembayaran belum terdeteksi lunas. Silakan selesaikan pembayaran terlebih dahulu.", "info");
+                }
+            }
+        } catch {
+            if (showToast) showToast("Gagal memeriksa status pembayaran, silakan coba lagi.", "error");
+        } finally {
+            setOrderChecking(false);
+        }
+    };
+
+    // Check URL query params (?auth=login, ?auth=signup, or ?duitku_order=INV-KB-...)
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const authParam = params.get("auth");
         if (authParam === "login") setShowLogin(true);
         if (authParam === "signup") setShowSignup(true);
+        const duitkuOrder = params.get("duitku_order") || params.get("merchantOrderId");
+        if (duitkuOrder) {
+            setSelectedProduct(CATALOG_PRODUCTS[1] || CATALOG_PRODUCTS[0]);
+            setOrderInvoice({
+                invoiceId: duitkuOrder,
+                itemName: "Paket Keluarga Berkembang",
+                priceDisplay: "-",
+                buyerName: "-",
+                buyerEmail: "-",
+                paymentMethod: "Duitku",
+                deliveryMethod: "Otomatis aktif di Web Keuangan & Telegram @KelolaKeluargaBot",
+                createdAt: new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }),
+            });
+            checkOrderPaymentStatus(duitkuOrder);
+        }
     }, []);
 
     // Close lightbox on Escape
@@ -422,8 +482,10 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
             ? `${selectedProduct.name} (${selectedSubOption.label})`
             : selectedProduct.name;
 
+        let paymentUrl = "";
+        let duitkuReference = "";
         try {
-            const resp = await fetch("https://9router.cortex-ai.my.id/v1/orders", {
+            const resp = await fetch("https://api.keluargaberkembang.com/v1/orders", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -438,6 +500,8 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
             const data = await resp.json().catch(() => ({}));
             if (resp.ok && data?.order?.invoice_id) {
                 invoiceId = data.order.invoice_id;
+                paymentUrl = data.order.payment_url || "";
+                duitkuReference = data.order.duitku_reference || "";
             }
         } catch {
             // Fallback to deterministic INV-KB-<TAG>-YYYYMM-XXXX so @KelolaKeluargaBot can still parse & fulfill it
@@ -454,6 +518,9 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
             buyerEmail: orderForm.buyerEmail.trim(),
             buyerContact: orderForm.buyerContact.trim(),
             paymentMethod: orderForm.paymentMethod,
+            paymentUrl,
+            duitkuReference,
+            status: "pending",
             deliveryMethod: selectedProduct.deliveryMethod,
             createdAt: new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }),
         });
@@ -2887,14 +2954,52 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                 </div>
 
                                 <div style={{ display: "grid", gap: 10 }}>
+                                    {orderInvoice.oneClickWebUrl && (
+                                        <a
+                                            href={orderInvoice.oneClickWebUrl}
+                                            className="kb-btn-primary"
+                                            style={{
+                                                width: "100%",
+                                                textAlign: "center",
+                                                background: "#1E5631",
+                                                borderColor: "#1E5631",
+                                            }}
+                                        >
+                                            🎉 Pembayaran Lunas! Klik untuk Aktifkan Kuota AI Sekarang
+                                        </a>
+                                    )}
+                                    {orderInvoice.paymentUrl && !orderInvoice.oneClickWebUrl && (
+                                        <a
+                                            href={orderInvoice.paymentUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="kb-btn-primary"
+                                            style={{ width: "100%", textAlign: "center" }}
+                                        >
+                                            💳 Bayar Sekarang via Duitku (QRIS / Virtual Account)
+                                        </a>
+                                    )}
+                                    {!orderInvoice.oneClickWebUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => checkOrderPaymentStatus(orderInvoice.invoiceId)}
+                                            disabled={orderChecking}
+                                            className="kb-btn-secondary"
+                                            style={{ width: "100%", textAlign: "center", cursor: "pointer" }}
+                                        >
+                                            {orderChecking
+                                                ? "Memeriksa Status Pembayaran..."
+                                                : "🔄 Sudah Bayar? Cek Status & Aktifkan Otomatis"}
+                                        </button>
+                                    )}
                                     <a
                                         href={`https://t.me/KelolaKeluargaBot?start=${encodeURIComponent(orderInvoice.invoiceId)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="kb-btn-primary"
+                                        className={orderInvoice.paymentUrl ? "kb-btn-secondary" : "kb-btn-primary"}
                                         style={{ width: "100%", textAlign: "center" }}
                                     >
-                                        Lanjutkan Pembayaran Otomatis via @KelolaKeluargaBot
+                                        Lanjutkan / Konfirmasi via @KelolaKeluargaBot
                                     </a>
                                     <a
                                         href={`mailto:halo@keluargaberkembang.com?subject=${encodeURIComponent(`Pesanan ${orderInvoice.invoiceId} - ${orderInvoice.itemName}`)}&body=${encodeURIComponent(`Halo Tim Keluarga Berkembang,\n\nSaya ingin menyelesaikan pesanan berikut:\nNomor Invoice: ${orderInvoice.invoiceId}\nProduk: ${orderInvoice.itemName}\nNominal: ${orderInvoice.priceDisplay}\nMetode Pembayaran: ${orderInvoice.paymentMethod}\nNama: ${orderInvoice.buyerName}\nEmail: ${orderInvoice.buyerEmail}\nKontak WA/Telegram: ${orderInvoice.buyerContact}\n\nTerima kasih.`)}`}
