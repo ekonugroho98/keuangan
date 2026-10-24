@@ -3,6 +3,7 @@ import { fmtRp, fmtDate } from "../../../utils/formatters";
 import { categoryColors } from "../../../constants/categories";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import ScopeSwitcher from "../../household/ScopeSwitcher";
+import FreeTierAdBanner from "../../ui/FreeTierAdBanner";
 
 /* ═══════════════════════════════════════════════════════════════
  * ASYMMETRIC BENTO DESIGN
@@ -444,6 +445,8 @@ const DasborView = ({
             <div style={{ marginBottom: 14 }}>
                 <ScopeSwitcher value={scope} onChange={setScope} />
             </div>
+
+            <FreeTierAdBanner onUpgrade={() => setActiveMenu && setActiveMenu("ai")} />
 
             <div className="bento-grid">
 
