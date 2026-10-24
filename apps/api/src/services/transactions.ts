@@ -62,9 +62,10 @@ export interface TxRow {
   receipt_url?: string | null
   source: string
   recurring_id: string | null
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
+  created_at: string | Date
+  created_at_raw?: string
+  updated_at: string | Date
+  deleted_at: string | Date | null
   item_qty?: string | null
   item_unit_price?: string | null
   item_discount?: string | null
@@ -132,7 +133,7 @@ export const TX_SELECT = `
          t.beneficiary_id, coalesce(bm.display_name, b.name) as beneficiary_name, b.kind::text as beneficiary_kind,
          t.recorded_by_member_id, rm.display_name as recorded_by_display_name,
          t.receipt_url,
-         t.source, t.recurring_id, t.created_at, t.updated_at, t.deleted_at,
+         t.source, t.recurring_id, t.created_at, t.created_at::text as created_at_raw, t.updated_at, t.deleted_at,
          pp.qty::text as item_qty, pp.unit_price::text as item_unit_price,
          pp.discount::text as item_discount, round((pp.amount + pp.discount)::numeric / pp.qty, 2)::text as item_normal_unit_price,
          pp.size_value::text as item_size_value, pp.size_unit as item_size_unit,
@@ -183,8 +184,9 @@ function decodeCursor(cursor?: string): { date: string; createdAt: string; id: s
   }
 }
 
-function encodeCursor(date: string, createdAt: string, id: string): string {
-  return Buffer.from(`${date}|${createdAt}|${id}`, 'utf8').toString('base64url')
+function encodeCursor(date: string, createdAt: string | Date, id: string): string {
+  const raw = createdAt instanceof Date ? createdAt.toISOString() : String(createdAt)
+  return Buffer.from(`${date}|${raw}|${id}`, 'utf8').toString('base64url')
 }
 
 /** Bangun klausa WHERE + array parameter secara dinamis, $N selalu sinkron dengan posisi di params. */
@@ -262,7 +264,8 @@ export async function listTransactions(actor: Actor, query: TransactionListQuery
 
     const hasMore = rows.length > query.limit
     const page = hasMore ? rows.slice(0, query.limit) : rows
-    const nextCursor = hasMore && page.length > 0 ? encodeCursor(page[page.length - 1]!.date, page[page.length - 1]!.created_at, page[page.length - 1]!.id) : null
+    const lastRow = page[page.length - 1]
+    const nextCursor = hasMore && lastRow ? encodeCursor(lastRow.date, lastRow.created_at_raw ?? lastRow.created_at, lastRow.id) : null
 
     // Totals: hitung ulang filter TANPA klausa cursor (totals atas seluruh hasil filter, 05-api.md §4.5).
     const { where: totalsWhere, params: totalsParams } = buildTxFilter(actor, query, resolved, null)
