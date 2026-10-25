@@ -345,7 +345,6 @@ const Sidebar = ({
                 onBack={() => setProfileView("menu")}
                 showToast={showToast}
                 aiKey={aiKey}
-                onOpenAiSettings={() => setProfileView("ai")}
             />
         );
 
@@ -355,7 +354,6 @@ const Sidebar = ({
                 onBack={() => setProfileView("menu")}
                 showToast={showToast}
                 aiKey={aiKey}
-                onOpenAiSettings={() => setProfileView("ai")}
             />
         );
 
@@ -878,17 +876,6 @@ const Sidebar = ({
                 iconColor: "#FFFDF8",
                 icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>),
                 action: () => setProfileView("whatsapp"),
-            },
-            {
-                id: "ai",
-                label: "Asisten AI",
-                sub: aiConfig?.disabled ? "Dinonaktifkan" : aiStatus,
-                badge: aiActive && !aiConfig?.disabled,
-                grad: "linear-gradient(135deg, #3F5142, #2D3B30)",
-                tint: "rgba(63,81,66,.16)",
-                iconColor: "#FFFDF8",
-                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4Z"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></svg>),
-                action: () => setProfileView("ai"),
             },
             {
                 id: "household",

@@ -279,7 +279,7 @@ export default function TelegramPanel({ onBack, showToast, aiKey = "", onOpenAiS
                     <div style={{ fontSize: 12, color: "var(--color-muted)", lineHeight: 1.55, marginBottom: 12 }}>
                         Akun gratis dapat menggunakan seluruh fitur pencatatan mandiri di Web Keuangan sepuasnya. Untuk
                         menghubungkan <strong>Bot Telegram Suami-Istri (@{botUsername})</strong> serta fitur{" "}
-                        <strong>Scan Foto Struk Belanja AI</strong>, silakan aktifkan paket kuota AI terlebih dahulu:
+                        <strong>Scan Foto Struk Belanja AI</strong>, silakan aktifkan Paket Asisten AI terlebih dahulu:
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         <a
@@ -298,28 +298,8 @@ export default function TelegramPanel({ onBack, showToast, aiKey = "", onOpenAiS
                                 textDecoration: "none",
                             }}
                         >
-                            🛒 Pilih Paket AI (Mulai Rp 9.000 / 7 Hari)
+                            🛒 Pilih Paket Asisten AI (Mulai Rp 9.000 / 7 Hari)
                         </a>
-                        {onOpenAiSettings && (
-                            <button
-                                type="button"
-                                onClick={onOpenAiSettings}
-                                style={{
-                                    width: "100%",
-                                    padding: "10px 12px",
-                                    borderRadius: 10,
-                                    border: "1px solid var(--color-border)",
-                                    background: "var(--bg-surface)",
-                                    color: "var(--color-text)",
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    fontFamily: "inherit",
-                                }}
-                            >
-                                🔑 Sudah Punya Kode Key / Voucher? Masukkan di Sini
-                            </button>
-                        )}
                     </div>
                 </div>
             ) : (
@@ -598,7 +578,7 @@ export default function TelegramPanel({ onBack, showToast, aiKey = "", onOpenAiS
                                 </div>
                                 <div style={{ fontSize: 11, color: "var(--color-muted)" }}>
                                     {item.tg_username ? `@${item.tg_username} · ` : ""}
-                                    {item.ai_key_masked ? "🟢 Kuota AI Terhubung" : "🟡 Belum ada Kuota AI"}
+                                    {item.ai_key_masked ? "🟢 Asisten AI Aktif" : "🟡 Paket AI Belum Aktif"}
                                 </div>
                             </div>
                             <button

@@ -20,6 +20,93 @@ export async function tryGetAiConfig(actor: Actor): Promise<AiConfig | null> {
     return row?.ai_config ?? {}
   })
   const trimmedKey = config.apiKey?.trim()
+  if (trimmedKey && trimmedKey.startsWith('sk-kb-') && !config.disabled) {
+    return {
+      ...config,
+      apiKey: trimmedKey,
+      provider: 'gatekeeper',
+      model: config.model && config.model.startsWith('kb-') ? config.model : 'kb-auto',
+    }
+  }
+
+  // Fallback otomatis tingkat Household: bila salah satu anggota keluarga (Suami/Istri) sudah punya
+  // key sk-kb- ATAU household berstatus Pro/Lifetime, seluruh anggota otomatis memakai AI Keluarga Berkembang.
+  if (actor.householdId) {
+    try {
+      const hhCtx = await withUserClaims(actor.userId, async (tx) => {
+        const [row] = await tx<
+          [
+            {
+              result: {
+                id: string
+                name: string
+                plan_tier: string
+                member_emails: string[]
+                existing_gatekeeper_key: string | null
+              }
+            },
+          ]
+        >`select public.admin_get_household_ai_context(${actor.householdId}) as result`
+        return row?.result ?? null
+      })
+
+      if (hhCtx?.existing_gatekeeper_key?.startsWith('sk-kb-')) {
+        const sharedKey = hhCtx.existing_gatekeeper_key.trim()
+        await withUserClaims(actor.userId, async (tx) => {
+          await tx`select public.admin_set_household_ai_key(${actor.householdId}, ${sharedKey}, ${'gatekeeper'}, ${'kb-auto'})`
+        }).catch(() => null)
+        return {
+          provider: 'gatekeeper',
+          model: 'kb-auto',
+          apiKey: sharedKey,
+          disabled: false,
+        }
+      }
+
+      const adminToken = env.GATEKEEPER_ADMIN_TOKEN.trim()
+      if (
+        adminToken &&
+        hhCtx &&
+        (hhCtx.plan_tier === 'pro' || hhCtx.plan_tier === 'lifetime')
+      ) {
+        const aliases = [`hh:${actor.householdId}`, actor.householdId, ...(hhCtx.member_emails ?? [])]
+        const res = await fetch(`${env.GATEKEEPER_BASE_URL}/gatekeeper/api/wallets/provision`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Token': adminToken,
+          },
+          body: JSON.stringify({
+            owner_id: `hh:${actor.householdId}`,
+            display_name: hhCtx.name || 'Keluarga',
+            aliases,
+            delta_tokens: 2_500_000,
+            create_key_if_missing: true,
+            force_new_key: true,
+            key_name: `Keluarga ${hhCtx.name || ''}`.trim(),
+            reference_id: `auto_plan:${hhCtx.plan_tier}`,
+          }),
+          signal: AbortSignal.timeout(4500),
+        })
+        const gkData = (await res.json().catch(() => ({}))) as { created_api_key?: string | null }
+        const newKey = gkData?.created_api_key?.trim()
+        if (newKey && newKey.startsWith('sk-kb-')) {
+          await withUserClaims(actor.userId, async (tx) => {
+            await tx`select public.admin_set_household_ai_key(${actor.householdId}, ${newKey}, ${'gatekeeper'}, ${'kb-auto'})`
+          }).catch(() => null)
+          return {
+            provider: 'gatekeeper',
+            model: 'kb-auto',
+            apiKey: newKey,
+            disabled: false,
+          }
+        }
+      }
+    } catch {
+      // Abaikan jika gagal resolve household AI context
+    }
+  }
+
   if (!trimmedKey || config.disabled) return null
   const isGatekeeperKey = trimmedKey.startsWith('sk-kb-')
   const provider = isGatekeeperKey ? 'gatekeeper' : config.provider

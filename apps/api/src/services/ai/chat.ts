@@ -11,36 +11,12 @@ import { listGoals } from '../goals'
 import { listInvestments } from '../investments'
 import { TOOLS, toolByName } from '../../tools/registry'
 import { formatToolResult } from './format-tool-result'
+import { getAiConfig, type AiConfig } from './provider'
 import { getHouseholdFeatures } from '../features'
 import type { HouseholdFeatures } from '@karaya/shared/schemas'
 
 const APP_AI_NAME = 'Keluarga Berkembang AI'
 const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
-
-interface AiConfig {
-  provider?: string
-  model?: string
-  apiKey?: string
-  disabled?: boolean
-}
-
-/**
- * ai_config disimpan per user_id (bukan per household — BYOK, kunci API milik orangnya),
- * sama seperti user_settings lain (lihat routes/me.ts). Tidak pernah diterima dari request body:
- * kalau diterima dari client, siapa pun bisa memakai kunci API anggota lain lewat actor spoofing.
- */
-async function getAiConfig(actor: Actor): Promise<AiConfig> {
-  const config = await withUserClaims(actor.userId, async (tx) => {
-    const [row] = await tx<{ ai_config: AiConfig }[]>`select ai_config from user_settings where user_id = ${actor.userId}`
-    return row?.ai_config ?? {}
-  })
-  const trimmedKey = config.apiKey?.trim()
-  if (!trimmedKey || config.disabled) throw ApiError.fromCode('ai_not_configured')
-  const isGatekeeperKey = trimmedKey.startsWith('sk-kb-')
-  const provider = isGatekeeperKey ? 'gatekeeper' : config.provider
-  const model = config.model || (provider === 'gatekeeper' ? 'kb-auto' : 'gpt-4o-mini')
-  return { ...config, apiKey: trimmedKey, provider, model }
-}
 
 async function getUserName(actor: Actor): Promise<string> {
   return withActor(actor, async (tx) => {

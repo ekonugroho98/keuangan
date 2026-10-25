@@ -4,8 +4,7 @@ import { AI_PROVIDERS, PROVIDER_ORDER } from "../../../services/aiService";
 import { APP_AI_NAME } from "../../../config/app";
 
 // ── Setup screen ketika belum ada AI config ───────────────────────────────
-function AiSetupScreen({ onOpenSettings }) {
-    const byokProviders = PROVIDER_ORDER.filter(id => id !== "gatekeeper");
+function AiSetupScreen() {
     return (
         <div style={{ animation: "fadeIn .4s", maxWidth: 960 }}>
             <div style={{
@@ -20,20 +19,19 @@ function AiSetupScreen({ onOpenSettings }) {
                 <div style={{ textAlign: "center", marginBottom: 22 }}>
                     <div style={{ fontSize: 38, marginBottom: 10 }}>🤖</div>
                     <h2 style={{ fontSize: "clamp(20px, 3vw, 26px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px", letterSpacing: "-.025em" }}>
-                        Aktifkan Asisten AI Keluarga
+                        Aktifkan Asisten AI Keluarga Berkembang
                     </h2>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "0 auto", maxWidth: "56ch", lineHeight: 1.6 }}>
                         Tanya sisa anggaran harian, cek pengeluaran terbesar, dan baca foto struk belanja otomatis dalam 5 detik.
                     </p>
                 </div>
 
-                {/* Primary Recommended Card: Kuota Resmi Keluarga Berkembang */}
+                {/* Primary Recommended Card: Paket Resmi Keluarga Berkembang */}
                 <div style={{
                     background: "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 16%, transparent), color-mix(in srgb, var(--color-primary) 6%, transparent))",
                     border: "1.5px solid var(--color-primary)",
                     borderRadius: 18,
                     padding: "clamp(18px, 3vw, 24px)",
-                    marginBottom: 24,
                     textAlign: "left",
                 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
@@ -42,7 +40,7 @@ function AiSetupScreen({ onOpenSettings }) {
                             padding: "4px 10px", borderRadius: 99,
                             background: "var(--color-primary)", color: "var(--color-on-primary)",
                         }}>
-                            Paling Praktis · Rekomendasi Keluarga
+                            Resmi · Siap Pakai
                         </span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)", fontFamily: "var(--font-mono, monospace)" }}>
                             Paket Sachet Mulai Rp 9.000
@@ -50,21 +48,22 @@ function AiSetupScreen({ onOpenSettings }) {
                     </div>
 
                     <h3 style={{ fontSize: "clamp(16px, 2.2vw, 19px)", fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>
-                        💎 Pakai Kuota Resmi Keluarga Berkembang (Mulai Rp 9.000)
+                        💎 Paket Asisten AI Keluarga Berkembang (Mulai Rp 9.000)
                     </h3>
                     <p style={{ fontSize: 13, color: "var(--color-muted)", margin: "0 0 16px", lineHeight: 1.6 }}>
-                        Tidak perlu pusing mendaftar API key teknis di situs luar. Cukup masukkan Kode Key <code style={{ fontWeight: 700, color: "var(--color-text)" }}>sk-kb-...</code> dari <strong>@KelolaKeluargaBot</strong> untuk langsung mengaktifkan tanya-jawab AI dan baca foto struk belanja otomatis.
+                        Aktifkan tanya-jawab asisten keuangan 24 jam, catat pengeluaran lewat chat, dan baca foto struk belanja otomatis di Web, Telegram, maupun Grup WhatsApp Suami-Istri.
                     </p>
 
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-                        <button
-                            type="button"
-                            onClick={onOpenSettings}
+                        <a
+                            href="https://keluargaberkembang.com/#paket"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="btn-primary"
-                            style={{ minHeight: 44, padding: "10px 18px", fontSize: 13, fontWeight: 700 }}
+                            style={{ minHeight: 44, padding: "10px 18px", fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
                         >
-                            🔑 Masukkan Key / Klaim Voucher di Pengaturan
-                        </button>
+                            💎 Ambil Paket Asisten AI (Mulai Rp 9.000)
+                        </a>
                         <a
                             href="https://t.me/KelolaKeluargaBot"
                             target="_blank"
@@ -78,46 +77,8 @@ function AiSetupScreen({ onOpenSettings }) {
                                 textDecoration: "none",
                             }}
                         >
-                            🛒 Beli Paket Sachet Rp 9.000 via @KelolaKeluargaBot
+                            ✈️ Aktifkan via @KelolaKeluargaBot
                         </a>
-                    </div>
-                </div>
-
-                {/* Secondary Section: BYOK */}
-                <div style={{ textAlign: "left", borderTop: "1px solid var(--color-border-soft)", paddingTop: 20 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "var(--color-text)", marginBottom: 4 }}>
-                        Opsi Lanjutan: Pakai API Key Pribadi (BYOK)
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 14, lineHeight: 1.5 }}>
-                        Sudah punya akun developer sendiri? Anda tetap bebas menghubungkan API key pribadi dari penyedia berikut:
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 10, marginBottom: 16 }}>
-                        {byokProviders.map(id => {
-                            const p = AI_PROVIDERS[id];
-                            return (
-                                <div key={id} style={{
-                                    background: "var(--glass-2)",
-                                    backdropFilter: "var(--glass-blur)",
-                                    WebkitBackdropFilter: "var(--glass-blur)",
-                                    border: "1px solid var(--glass-border)",
-                                    borderRadius: 14, padding: "12px 10px", textAlign: "center",
-                                }}>
-                                    <div style={{ fontSize: 20, marginBottom: 4 }}>{p.icon}</div>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text)" }}>{p.label}</div>
-                                    {p.badge && (
-                                        <span className="chip chip-mint" style={{ fontSize: 9, marginTop: 4, display: "inline-block" }}>{p.badge}</span>
-                                    )}
-                                    <div style={{ fontSize: 10, color: "var(--color-subtle)", marginTop: 4 }}>
-                                        {p.models.length} model
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    <div style={{ background: "var(--color-primary-soft)", border: "1px solid var(--glass-border)", borderRadius: 12, padding: "10px 14px", fontSize: 12, color: "var(--color-muted)" }}>
-                        💡 <strong>Groq</strong> menyediakan API key <strong>gratis</strong> dengan model Llama 3 & Mixtral, cocok untuk pengguna teknis yang ingin mencoba sendiri.
                     </div>
                 </div>
             </div>
@@ -126,7 +87,7 @@ function AiSetupScreen({ onOpenSettings }) {
 }
 
 // ── Main AiView ───────────────────────────────────────────────────────────
-const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onOpenAiSettings }) => {
+const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig }) => {
     const { t } = useLanguage();
     const chatEndRef = useRef(null);
 
@@ -136,11 +97,10 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
 
     // Belum setup → tampil setup screen
     if (!aiConfig?.apiKey) {
-        return <AiSetupScreen onOpenSettings={onOpenAiSettings} />;
+        return <AiSetupScreen />;
     }
 
-    const provider = AI_PROVIDERS[aiConfig.provider];
-    const modelLabel = provider?.models.find(m => m.id === aiConfig.model)?.label || aiConfig.model;
+    const provider = AI_PROVIDERS[aiConfig.provider] || AI_PROVIDERS.gatekeeper;
 
     // t() returns the key itself when translation not found → fallback ke string default
     const tq = (key, fallback) => { const v = t(key); return v === key ? fallback : v; };
@@ -175,14 +135,10 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig, onO
                         <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)", letterSpacing: "-.01em", fontFamily: "var(--font-display)" }}>{APP_AI_NAME} · Asisten Keluarga & Keuangan</div>
                             <div style={{ fontSize: 11, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 4 }}>
-                                ● {provider?.label} · {modelLabel}
+                                ● Asisten AI Resmi Keluarga Berkembang · Aktif
                             </div>
                         </div>
                     </div>
-                    <button onClick={onOpenAiSettings} className="btn-ghost" aria-label="Ganti provider AI"
-                        style={{ fontSize: 11, minHeight: 36, padding: "6px 12px" }}>
-                        ⚙️ Ganti
-                    </button>
                 </div>
 
                 {/* Chat */}

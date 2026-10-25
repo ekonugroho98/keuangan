@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useHousehold } from "../../auth/HouseholdProvider";
-import { api } from "../../api/client";
+import { useHouseholdInfo } from "../../hooks/useHouseholdInfo";
+import { useApiKeys } from "../../hooks/useApiKeys";
 
 const DIRECT_WA_BASE = "https://9router.cortex-ai.my.id";
 const DIRECT_WA_TOKEN = "kb-wa-bridge-internal-2026-v1";
@@ -53,6 +54,8 @@ const inputSt = {
 
 export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiSettings }) {
     const { activeHouseholdId, activeMember } = useHousehold();
+    const { household } = useHouseholdInfo();
+    const { createApiKey } = useApiKeys();
     const isOwner = activeMember?.role === "owner";
 
     const [target, setTarget] = useState("");
@@ -63,6 +66,9 @@ export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiS
     const [pairingBusy, setPairingBusy] = useState(false);
     const [savingGroups, setSavingGroups] = useState(false);
     const [disconnectBusy, setDisconnectBusy] = useState(false);
+    const [proxyInput, setProxyInput] = useState("");
+    const [savingProxy, setSavingProxy] = useState(false);
+    const [showProxyBox, setShowProxyBox] = useState(false);
 
     const [selectedGroups, setSelectedGroups] = useState([]);
     const [requireMention, setRequireMention] = useState(false);
@@ -174,13 +180,46 @@ export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiS
         setPairingBusy(true);
         setError("");
         try {
-            const res = await callWaEndpoint("/v1/whatsapp/pair/start", "POST", {});
+            let karayaKey = "";
+            try {
+                const { secret } = await createApiKey({
+                    name: `WhatsApp Bot (${new Date().toLocaleDateString("id-ID")})`,
+                    scope: "write",
+                    member: "me",
+                });
+                karayaKey = secret || "";
+            } catch {
+                // ignore if key creation fails
+            }
+            const res = await callWaEndpoint("/v1/whatsapp/pair/start", "POST", {
+                household_name: household?.name || "Keluarga",
+                ...(karayaKey ? { karaya_api_key: karayaKey } : {}),
+                ...(proxyInput.trim() ? { proxy_url: proxyInput.trim() } : {}),
+            });
             setStatusData((prev) => (prev ? { ...prev, pairing: res.pairing } : prev));
             await fetchStatus(true);
         } catch (err) {
             toast(err.message || "Gagal memulai sesi QR WhatsApp", "error");
         } finally {
             setPairingBusy(false);
+        }
+    };
+
+    const handleSaveProxy = async (clear = false) => {
+        if (savingProxy || !isOwner) return;
+        setSavingProxy(true);
+        try {
+            const val = clear ? "" : proxyInput.trim();
+            const data = await callWaEndpoint("/v1/whatsapp/proxy", "POST", {
+                proxy_url: val,
+            });
+            setStatusData(data);
+            if (clear) setProxyInput("");
+            toast(val ? "✅ Proxy WhatsApp berhasil disimpan & diaktifkan" : "Proxy WhatsApp dinonaktifkan (Direct IP)");
+        } catch (err) {
+            toast(err.message || "Gagal menyimpan proxy WhatsApp", "error");
+        } finally {
+            setSavingProxy(false);
         }
     };
 
@@ -403,26 +442,6 @@ export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiS
                         >
                             🛒 Beli / Upgrade Paket Lengkap WA (Rp 29.000)
                         </a>
-                        {onOpenAiSettings && (
-                            <button
-                                type="button"
-                                onClick={onOpenAiSettings}
-                                style={{
-                                    width: "100%",
-                                    padding: "10px 12px",
-                                    borderRadius: 10,
-                                    border: "1px solid var(--color-border)",
-                                    background: "var(--bg-surface)",
-                                    color: "var(--color-text)",
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    fontFamily: "inherit",
-                                }}
-                            >
-                                🔑 Sudah Punya Kode Key / Voucher Paket WA? Masukkan di Sini
-                            </button>
-                        )}
                     </div>
                 </div>
             ) : (
@@ -523,7 +542,7 @@ export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiS
                     </div>
                 </div>
 
-                {/* DM Protection Badge */}
+                {/* DM Protection Badge + Optional Per-Connection Proxy Config */}
                 <div style={{
                     marginTop: 10,
                     paddingTop: 10,
@@ -532,14 +551,105 @@ export default function WhatsAppPanel({ onBack, showToast, aiKey = "", onOpenAiS
                     color: "var(--color-muted)",
                     display: "flex",
                     alignItems: "center",
-                    gap: 6,
+                    justifyContent: "space-between",
+                    gap: 8,
+                    flexWrap: "wrap",
                     lineHeight: 1.45,
                 }}>
-                    <span>🛡️</span>
-                    <span>
-                        <strong style={{ color: "var(--color-text)" }}>Proteksi Japri Pribadi Aktif:</strong> Bot hanya membalas di Grup WA keluarga yang Anda centang di bawah. Chat pribadi (japri teman/kantor) 100% diabaikan.
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                        <span>🛡️</span>
+                        <span>
+                            <strong style={{ color: "var(--color-text)" }}>Proteksi Japri Aktif:</strong> Hanya balas di Grup WA keluarga yang dicentang.
+                            {statusData?.proxy_masked ? (
+                                <span style={{ marginLeft: 6, color: "var(--color-primary)", fontWeight: 700 }}>
+                                    · 🌐 Proxy: {statusData.proxy_masked}
+                                </span>
+                            ) : null}
+                        </span>
+                    </div>
+                    {isOwner && (
+                        <button
+                            type="button"
+                            onClick={() => setShowProxyBox((v) => !v)}
+                            style={{
+                                padding: "4px 9px",
+                                borderRadius: 8,
+                                border: "1px solid var(--glass-border)",
+                                background: "var(--bg-surface)",
+                                color: "var(--color-text)",
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                            }}
+                        >
+                            🌐 {statusData?.proxy_masked ? "Ubah Proxy" : "Atur Proxy (Opsional)"}
+                        </button>
+                    )}
                 </div>
+
+                {showProxyBox && isOwner && (
+                    <div style={{
+                        marginTop: 10,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        background: "var(--bg-surface)",
+                        border: "1px solid var(--glass-border)",
+                    }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: "var(--color-text)", marginBottom: 4 }}>
+                            🌐 Proxy Dedicated per Nomor WhatsApp (HTTP / SOCKS5)
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "var(--color-muted)", marginBottom: 8, lineHeight: 1.45 }}>
+                            Gunakan proxy residensial Indonesia agar koneksi WhatsApp memiliki IP tersendiri. Kosongkan jika ingin memakai koneksi langsung server.
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <input
+                                value={proxyInput}
+                                onChange={(e) => setProxyInput(e.target.value)}
+                                placeholder={statusData?.proxy_masked || "http://user:pass@ip:port atau socks5://user:pass@ip:port"}
+                                style={{ ...inputSt, flex: 1, minWidth: 210, fontSize: 11.5 }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => handleSaveProxy(false)}
+                                disabled={savingProxy}
+                                style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 9,
+                                    border: "none",
+                                    background: "var(--color-primary)",
+                                    color: "var(--color-on-primary)",
+                                    fontSize: 11.5,
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                {savingProxy ? "..." : "Simpan Proxy"}
+                            </button>
+                            {statusData?.proxy_masked && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSaveProxy(true)}
+                                    disabled={savingProxy}
+                                    style={{
+                                        padding: "8px 10px",
+                                        borderRadius: 9,
+                                        border: "1px solid rgba(255,113,108,.3)",
+                                        background: "rgba(255,113,108,.08)",
+                                        color: "#ff716c",
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        fontFamily: "inherit",
+                                    }}
+                                >
+                                    Hapus
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Live QR Code Modal/Card when pairing is active */}

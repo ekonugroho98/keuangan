@@ -197,8 +197,8 @@ export default function AiFloatingChat({
                   />
                   <span>
                     {hasKey
-                      ? `${provider?.label?.split(" ")[0] || "AI"} · ${modelLabel} · ⚡ Bisa Catat`
-                      : "Belum aktif · Pasang Token / API Key"}
+                      ? "Asisten AI Resmi · ⚡ Siap Catat & Analisis"
+                      : "Khusus Paket Asisten AI"}
                   </span>
                 </div>
               </div>
@@ -229,31 +229,6 @@ export default function AiFloatingChat({
                   ↺
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenAiSettings?.();
-                }}
-                title="Pengaturan AI Coach"
-                aria-label="Pengaturan AI Coach"
-                style={{
-                  width: 32,
-                  height: 32,
-                  minHeight: 32,
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  background: "rgba(255,255,255,0.1)",
-                  color: "#fff",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ⚙️
-              </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -307,23 +282,20 @@ export default function AiFloatingChat({
                   fontSize: 28,
                 }}
               >
-                💎
+                🤖
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
-                  💎 Pakai Kuota Resmi Keluarga Berkembang (Mulai Rp 9.000)
+                  Aktifkan Asisten AI Keluarga Berkembang
                 </div>
                 <div style={{ fontSize: 12.5, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                  Tidak perlu mendaftar API key teknis. Cukup masukkan Kode Key <code>sk-kb-...</code> dari{" "}
-                  <strong>@KelolaKeluargaBot</strong> untuk mengaktifkan tanya-jawab AI &amp; scan struk belanja.
+                  Tanya-jawab keuangan rumah tangga 24 jam, catat pengeluaran otomatis lewat chat, dan baca foto struk belanja dalam 5 detik menggunakan Asisten AI resmi Keluarga Berkembang.
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenAiSettings?.();
-                }}
+              <a
+                href="https://keluargaberkembang.com/#paket"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   width: "100%",
                   padding: "12px 16px",
@@ -335,11 +307,13 @@ export default function AiFloatingChat({
                   fontWeight: 700,
                   cursor: "pointer",
                   fontFamily: "inherit",
+                  textDecoration: "none",
+                  boxSizing: "border-box",
                   boxShadow: "0 6px 18px rgba(63,81,66,0.28)",
                 }}
               >
-                🔑 Masukkan Key / Klaim Voucher di Pengaturan
-              </button>
+                💎 Ambil Paket Asisten AI (Mulai Rp 9.000)
+              </a>
               <a
                 href="https://t.me/KelolaKeluargaBot"
                 target="_blank"
@@ -357,11 +331,8 @@ export default function AiFloatingChat({
                   boxSizing: "border-box",
                 }}
               >
-                🛒 Beli Paket Sachet Rp 9.000 via @KelolaKeluargaBot
+                ✈️ Aktifkan Instan via @KelolaKeluargaBot
               </a>
-              <div style={{ fontSize: 11, color: "var(--color-subtle)" }}>
-                Atau gunakan API Key pribadi (Groq, Gemini, OpenAI, DeepSeek) di menu Pengaturan.
-              </div>
             </div>
           ) : (
             <>

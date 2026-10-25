@@ -1048,7 +1048,7 @@ const AddTransactionModal = ({
                     textAlign: "center",
                   }}
                 >
-                  Mode OCR · set API key di AI Coach untuk akurasi lebih tinggi
+                  Mode OCR Standar · Aktifkan Paket Asisten AI untuk baca struk otomatis
                 </div>
               )}
               {scanError && (

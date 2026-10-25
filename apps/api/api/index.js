@@ -14072,13 +14072,22 @@ async function updateAdminHouseholdPlan(actor, householdId, body) {
     return row.result;
   });
   invalidateEntitlementsCache(householdId);
+  const computedPlan = computeHouseholdPlanStatus({
+    plan_tier: updated.plan_tier,
+    plan_expires_at: updated.plan_expires_at,
+    entitlements: updated.entitlements_override
+  });
+  if (computedPlan.is_active && env.GATEKEEPER_ADMIN_TOKEN.trim()) {
+    await provisionHouseholdTokens(actor, householdId, {
+      delta_tokens: 0,
+      auto_inject_key: true,
+      force_new_key: false,
+      model: "kb-auto"
+    }).catch(() => null);
+  }
   return {
     ...updated,
-    plan: computeHouseholdPlanStatus({
-      plan_tier: updated.plan_tier,
-      plan_expires_at: updated.plan_expires_at,
-      entitlements: updated.entitlements_override
-    })
+    plan: computedPlan
   };
 }
 async function cleanupExpiredIdempotency(actor, olderThanDays = 7) {
@@ -14558,6 +14567,70 @@ async function tryGetAiConfig(actor) {
     return row?.ai_config ?? {};
   });
   const trimmedKey = config.apiKey?.trim();
+  if (trimmedKey && trimmedKey.startsWith("sk-kb-") && !config.disabled) {
+    return {
+      ...config,
+      apiKey: trimmedKey,
+      provider: "gatekeeper",
+      model: config.model && config.model.startsWith("kb-") ? config.model : "kb-auto"
+    };
+  }
+  if (actor.householdId) {
+    try {
+      const hhCtx = await withUserClaims(actor.userId, async (tx) => {
+        const [row] = await tx`select public.admin_get_household_ai_context(${actor.householdId}) as result`;
+        return row?.result ?? null;
+      });
+      if (hhCtx?.existing_gatekeeper_key?.startsWith("sk-kb-")) {
+        const sharedKey = hhCtx.existing_gatekeeper_key.trim();
+        await withUserClaims(actor.userId, async (tx) => {
+          await tx`select public.admin_set_household_ai_key(${actor.householdId}, ${sharedKey}, ${"gatekeeper"}, ${"kb-auto"})`;
+        }).catch(() => null);
+        return {
+          provider: "gatekeeper",
+          model: "kb-auto",
+          apiKey: sharedKey,
+          disabled: false
+        };
+      }
+      const adminToken = env.GATEKEEPER_ADMIN_TOKEN.trim();
+      if (adminToken && hhCtx && (hhCtx.plan_tier === "pro" || hhCtx.plan_tier === "lifetime")) {
+        const aliases = [`hh:${actor.householdId}`, actor.householdId, ...hhCtx.member_emails ?? []];
+        const res = await fetch(`${env.GATEKEEPER_BASE_URL}/gatekeeper/api/wallets/provision`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken
+          },
+          body: JSON.stringify({
+            owner_id: `hh:${actor.householdId}`,
+            display_name: hhCtx.name || "Keluarga",
+            aliases,
+            delta_tokens: 25e5,
+            create_key_if_missing: true,
+            force_new_key: true,
+            key_name: `Keluarga ${hhCtx.name || ""}`.trim(),
+            reference_id: `auto_plan:${hhCtx.plan_tier}`
+          }),
+          signal: AbortSignal.timeout(4500)
+        });
+        const gkData = await res.json().catch(() => ({}));
+        const newKey = gkData?.created_api_key?.trim();
+        if (newKey && newKey.startsWith("sk-kb-")) {
+          await withUserClaims(actor.userId, async (tx) => {
+            await tx`select public.admin_set_household_ai_key(${actor.householdId}, ${newKey}, ${"gatekeeper"}, ${"kb-auto"})`;
+          }).catch(() => null);
+          return {
+            provider: "gatekeeper",
+            model: "kb-auto",
+            apiKey: newKey,
+            disabled: false
+          };
+        }
+      }
+    } catch {
+    }
+  }
   if (!trimmedKey || config.disabled) return null;
   const isGatekeeperKey = trimmedKey.startsWith("sk-kb-");
   const provider = isGatekeeperKey ? "gatekeeper" : config.provider;
@@ -19549,18 +19622,6 @@ function formatGenericWriteResult(result) {
 // src/services/ai/chat.ts
 var APP_AI_NAME = "Keluarga Berkembang AI";
 var fmtRp3 = (n) => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
-async function getAiConfig2(actor) {
-  const config = await withUserClaims(actor.userId, async (tx) => {
-    const [row] = await tx`select ai_config from user_settings where user_id = ${actor.userId}`;
-    return row?.ai_config ?? {};
-  });
-  const trimmedKey = config.apiKey?.trim();
-  if (!trimmedKey || config.disabled) throw ApiError.fromCode("ai_not_configured");
-  const isGatekeeperKey = trimmedKey.startsWith("sk-kb-");
-  const provider = isGatekeeperKey ? "gatekeeper" : config.provider;
-  const model = config.model || (provider === "gatekeeper" ? "kb-auto" : "gpt-4o-mini");
-  return { ...config, apiKey: trimmedKey, provider, model };
-}
 async function getUserName(actor) {
   return withActor(actor, async (tx) => {
     const [row] = await tx`select display_name from household_members where id = ${actor.memberId}`;
@@ -19783,7 +19844,7 @@ async function callGoogle(apiKey, model, messages2, systemPrompt, tools) {
 }
 async function chatWithAi(actor, messages2, allowWrite = false) {
   const [config, userName, features, liveSnapshot] = await Promise.all([
-    getAiConfig2(actor),
+    getAiConfig(actor),
     getUserName(actor),
     getHouseholdFeatures(actor),
     buildLiveSnapshot(actor)

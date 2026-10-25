@@ -475,13 +475,25 @@ export async function updateAdminHouseholdPlan(
 
   invalidateEntitlementsCache(householdId)
 
+  const computedPlan = computeHouseholdPlanStatus({
+    plan_tier: updated.plan_tier,
+    plan_expires_at: updated.plan_expires_at,
+    entitlements: updated.entitlements_override,
+  })
+
+  // Otomatis provision & inject key AI Keluarga Berkembang saat paket di-upgrade ke Pro / Lifetime
+  if (computedPlan.is_active && env.GATEKEEPER_ADMIN_TOKEN.trim()) {
+    await provisionHouseholdTokens(actor, householdId, {
+      delta_tokens: 0,
+      auto_inject_key: true,
+      force_new_key: false,
+      model: 'kb-auto',
+    }).catch(() => null)
+  }
+
   return {
     ...updated,
-    plan: computeHouseholdPlanStatus({
-      plan_tier: updated.plan_tier,
-      plan_expires_at: updated.plan_expires_at,
-      entitlements: updated.entitlements_override,
-    }),
+    plan: computedPlan,
   }
 }
 

@@ -2,6 +2,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   lazy,
   Suspense,
 } from "react";
@@ -194,6 +195,23 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const beneficiaryEnabled =
     !!household?.features?.beneficiary?.enabled &&
     household?.plan?.entitlements?.beneficiary !== false;
+
+  // Selalu gunakan Asisten AI resmi Keluarga Berkembang (Gatekeeper).
+  // Aktif otomatis bila user punya key sk-kb- ATAU paket keluarga berstatus Pro / Lifetime.
+  const isPlanAiActive =
+    Boolean(household?.plan?.is_active) ||
+    household?.plan_tier === "pro" ||
+    household?.plan_tier === "lifetime";
+  const effectiveAiConfig = useMemo(() => {
+    const rawKey = (aiConfig?.apiKey || "").trim();
+    const hasKbKey = rawKey.startsWith("sk-kb-");
+    return {
+      provider: "gatekeeper",
+      model: "kb-auto",
+      apiKey: hasKbKey ? rawKey : isPlanAiActive ? "sk-kb-managed" : "",
+      disabled: false,
+    };
+  }, [aiConfig?.apiKey, isPlanAiActive]);
 
   const loading = accountsLoading || transactionsLoading;
 
@@ -562,10 +580,10 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     const rawMsg = typeof overridePrompt === "string" ? overridePrompt : aiInput;
     const userMsg = rawMsg.trim();
     if (!userMsg || aiTyping) return;
-    if (!aiConfig?.apiKey || aiConfig?.disabled) {
+    if (!effectiveAiConfig?.apiKey || effectiveAiConfig?.disabled) {
       setAiChat((p) => [
         ...p,
-        { role: "error", text: "API key belum diatur atau AI dinonaktifkan. Buka Pengaturan > AI Coach." },
+        { role: "error", text: "Paket Asisten AI belum aktif. Silakan aktifkan Paket Asisten AI Keluarga Berkembang terlebih dahulu." },
       ]);
       return;
     }
@@ -637,7 +655,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             accounts={accounts}
             customCategories={customCategories}
             isSaving={isSavingTx}
-            aiConfig={aiConfig}
+            aiConfig={effectiveAiConfig}
             onSubmitMultiple={addMultipleTx_}
             autoSelectAccount
             beneficiaryEnabled={beneficiaryEnabled}
@@ -659,7 +677,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
             editMode={true}
             onUpdate={editTx_}
             isSaving={isSavingTx}
-            aiConfig={aiConfig}
+            aiConfig={effectiveAiConfig}
             beneficiaryEnabled={beneficiaryEnabled}
           />
         )}
@@ -1010,11 +1028,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 aiInput={aiInput}
                 setAiInput={setAiInput}
                 handleAi={handleAi}
-                aiConfig={aiConfig}
-                onOpenAiSettings={() => {
-                  setSidebarOpen(true);
-                  setAiSettingsTrigger((p) => p + 1);
-                }}
+                aiConfig={effectiveAiConfig}
               />
             )}
             {activeMenu === "splitbill" && (
@@ -1057,11 +1071,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         setAiInput={setAiInput}
         handleAi={handleAi}
         onResetChat={() => setAiChat(makeGreeting())}
-        aiConfig={aiConfig}
-        onOpenAiSettings={() => {
-          setSidebarOpen(true);
-          setAiSettingsTrigger((p) => p + 1);
-        }}
+        aiConfig={effectiveAiConfig}
         activeMenu={activeMenu}
       />
     </div>
