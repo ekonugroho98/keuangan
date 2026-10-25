@@ -888,16 +888,6 @@ const Sidebar = ({
                 action: () => setProfileView("household"),
             },
             {
-                id: "apikeys",
-                label: "API Key",
-                sub: "Agent & Hermes",
-                grad: "linear-gradient(135deg, #D49D3F, #B58129)",
-                tint: "rgba(212,157,63,.14)",
-                iconColor: "#FFFDF8",
-                icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5 19 4M17 6l2 2M14 9l2 2"/></svg>),
-                action: () => setProfileView("apikeys"),
-            },
-            {
                 id: "name",
                 label: "Ganti Nama",
                 sub: user.name,
