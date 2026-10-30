@@ -527,6 +527,10 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
         if (showToast) {
             showToast(`Ringkasan pesanan ${invoiceId} berhasil dibuat`, "success");
         }
+        if (paymentUrl) {
+            // Langsung buka link checkout Sandbox Duitku di tab baru
+            window.open(paymentUrl, "_blank");
+        }
     };
 
     const handleSignup = async () => {
@@ -2488,12 +2492,24 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             </ul>
                         </div>
 
-                        {/* Col 4: Kontak & Layanan Pelanggan Resmi */}
+                        {/* Col 4: Kontak & Layanan Pelanggan Resmi (Duitku KYC) */}
                         <div>
                             <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-                                Layanan Pelanggan Resmi
+                                Layanan Pelanggan & Alamat Usaha
                             </div>
                             <div style={{ display: "grid", gap: 8, fontSize: 14, color: "#4A584D" }}>
+                                <div>
+                                    <strong style={{ color: "#1F2922" }}>WhatsApp / Telepon Support:</strong><br />
+                                    <a href="https://wa.me/6287877344766" target="_blank" rel="noopener noreferrer" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
+                                        0878-7734-4766
+                                    </a>
+                                </div>
+                                <div>
+                                    <strong style={{ color: "#1F2922" }}>Alamat Lokasi Usaha:</strong><br />
+                                    <span style={{ color: "#2E3D30", lineHeight: 1.4, display: "inline-block" }}>
+                                        Kp. Gandoang RT. 002/002, Ds. Gandoang, Kec. Cileungsi, Kab. Bogor, Jawa Barat 16820
+                                    </span>
+                                </div>
                                 <div>
                                     <strong style={{ color: "#1F2922" }}>Email Resmi:</strong><br />
                                     <a href="mailto:halo@keluargaberkembang.com" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
@@ -2501,7 +2517,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     </a>
                                 </div>
                                 <div>
-                                    <strong style={{ color: "#1F2922" }}>Bantuan Teknis & Klaim Refund:</strong><br />
+                                    <strong style={{ color: "#1F2922" }}>Bantuan Teknis & Refund:</strong><br />
                                     <a href="mailto:support@keluargaberkembang.com" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
                                         support@keluargaberkembang.com
                                     </a>
@@ -2517,7 +2533,7 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     </a>
                                 </div>
                                 <div style={{ fontSize: 12, color: "#4A584D", marginTop: 4 }}>
-                                    Jam Dukungan Admin: Senin s/d Minggu, 08.00 - 21.00 WIB
+                                    Jam Operasional: Senin s/d Minggu, 08.00 - 21.00 WIB
                                 </div>
                             </div>
                         </div>
@@ -2877,7 +2893,10 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     color: "#4A584D",
                                     marginBottom: 18,
                                 }}>
-                                    Dengan melanjutkan pemesanan, Anda menyetujui{" "}
+                                    <div style={{ fontWeight: 700, color: "#1F2922", marginBottom: 4 }}>
+                                        🔒 Pembayaran Aman via Payment Gateway Duitku (Sandbox Active)
+                                    </div>
+                                    Dengan melanjutkan pemesanan, Anda akan dialihkan ke halaman instruksi pembayaran Duitku dan menyetujui{" "}
                                     <a href="/tos" onClick={(e) => { closeOrderModal(); handleLegalLink(e, "/tos"); }} style={{ color: "#3F5142", fontWeight: 700 }}>Syarat Layanan</a>{" "}
                                     dan{" "}
                                     <a href="/refund" onClick={(e) => { closeOrderModal(); handleLegalLink(e, "/refund"); }} style={{ color: "#3F5142", fontWeight: 700 }}>Kebijakan Pengembalian Dana</a>.
@@ -2887,9 +2906,9 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                                     type="submit"
                                     disabled={orderSubmitting}
                                     className="kb-btn-primary"
-                                    style={{ width: "100%" }}
+                                    style={{ width: "100%", fontSize: 15 }}
                                 >
-                                    {orderSubmitting ? "Membuat Ringkasan Pesanan..." : "Buat Ringkasan Pesanan & Instruksi Bayar"}
+                                    {orderSubmitting ? "Menghubungkan ke Duitku..." : "Lanjut ke Pembayaran Duitku →"}
                                 </button>
                             </form>
                         ) : (
