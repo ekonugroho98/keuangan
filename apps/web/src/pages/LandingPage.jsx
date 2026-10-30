@@ -2500,8 +2500,8 @@ const LandingPage = ({ showToast, onNavigate, isRootDomain }) => {
                             <div style={{ display: "grid", gap: 8, fontSize: 14, color: "#4A584D" }}>
                                 <div>
                                     <strong style={{ color: "#1F2922" }}>WhatsApp / Telepon Support:</strong><br />
-                                    <a href="https://wa.me/6287877344766" target="_blank" rel="noopener noreferrer" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
-                                        0878-7734-4766
+                                    <a href="https://wa.me/6281519624321" target="_blank" rel="noopener noreferrer" style={{ color: "#3F5142", fontWeight: 700, textDecoration: "underline" }}>
+                                        0815-1962-4321
                                     </a>
                                 </div>
                                 <div>
