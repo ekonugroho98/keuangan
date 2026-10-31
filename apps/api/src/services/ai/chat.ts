@@ -5,11 +5,16 @@ import { env } from '../../env'
 import { getSummary } from '../summary'
 import { listAccounts } from '../accounts'
 import { listCategories } from '../categories'
-import { listMembers } from '../households'
-import { getBudgetStatus } from '../budgets'
-import { listDebts } from '../debts'
-import { listGoals } from '../goals'
-import { listInvestments } from '../investments'
+import { listMembers, getHouseholdTimezone } from '../households'
+import { getBudgetStatus, createBudget, updateBudget, listBudgets } from '../budgets'
+import { listDebts, createDebt } from '../debts'
+import { listGoals, createGoal } from '../goals'
+import { listInvestments, createInvestment } from '../investments'
+import { createPiutang } from '../piutang'
+import { createRecurring } from '../recurrings'
+import { listSplitBills, createSplitBill } from '../split-bills'
+import { createPantryItem } from '../pantry'
+import { listStatementImports } from '../reconciliation'
 import { TOOLS, toolByName } from '../../tools/registry'
 import { formatToolResult } from './format-tool-result'
 import { getAiConfig, type AiConfig } from './provider'
@@ -135,6 +140,146 @@ function isToolsUnreliable(provider?: string, model?: string): boolean {
 // tapi sudah jadi fitur AI chat sejak Fase 4 — dipertahankan sebagai tool tambahan HANYA untuk
 // jalur internal ini supaya tidak jadi regresi fitur.
 const INVESTMENTS_TOOL_DEF = { name: 'get_investments', description: 'Ambil semua aset investasi (emas, saham, reksa dana, dll.) beserta modal, nilai sekarang, dan gain/loss.', parameters: { type: 'object', properties: {} } }
+const CREATE_INVESTMENT_TOOL_DEF = {
+  name: 'create_investment',
+  description: 'Tambah aset investasi baru (emas, saham, reksa dana, deposito, properti, dll).',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Nama aset investasi, mis. "Emas Antam", "BBCA"' },
+      type: { type: 'string', enum: ['reksa_dana', 'saham', 'emas', 'crypto', 'deposito', 'properti', 'obligasi', 'lainnya'] },
+      buy_price: { type: 'number', description: 'Modal beli total dalam Rupiah' },
+      current_value: { type: 'number', description: 'Nilai pasar saat ini dalam Rupiah' },
+      quantity: { type: 'number', description: 'Jumlah unit/gram/lot (opsional)' },
+      unit: { type: 'string', description: 'Satuan, mis. "gram", "lot", "unit"' },
+    },
+    required: ['name', 'type', 'buy_price'],
+  },
+}
+const SET_BUDGET_TOOL_DEF = {
+  name: 'set_budget',
+  description: 'Pasang atau ubah batas anggaran bulanan untuk satu kategori pengeluaran (mis. "pasang budget Makanan 3 juta bulan ini").',
+  parameters: {
+    type: 'object',
+    properties: {
+      category: { type: 'string', description: 'Nama kategori pengeluaran dari list_categories' },
+      amount: { type: 'number', description: 'Batas anggaran bulanan dalam Rupiah' },
+      month: { type: 'string', description: 'Bulan format YYYY-MM (opsional, default bulan berjalan)' },
+    },
+    required: ['category', 'amount'],
+  },
+}
+const CREATE_GOAL_TOOL_DEF = {
+  name: 'create_goal',
+  description: 'Buat target finansial / tabungan baru (mis. "buat target Dana Darurat 30 juta").',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Nama target tabungan' },
+      target: { type: 'number', description: 'Nominal target dalam Rupiah' },
+      opening_amount: { type: 'number', description: 'Saldo awal yang sudah terkumpul (opsional, default 0)' },
+      deadline: { type: 'string', description: 'Target tanggal tercapai YYYY-MM-DD (opsional)' },
+    },
+    required: ['name', 'target'],
+  },
+}
+const CREATE_DEBT_TOOL_DEF = {
+  name: 'create_debt',
+  description: 'Catat hutang atau cicilan baru keluarga (mis. KPR, cicilan motor, pinjaman).',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Nama hutang/cicilan' },
+      total: { type: 'number', description: 'Total pokok hutang dalam Rupiah' },
+      monthly: { type: 'number', description: 'Cicilan per bulan dalam Rupiah (opsional, default 0)' },
+      due_date: { type: 'string', description: 'Jatuh tempo YYYY-MM-DD (opsional)' },
+      notes: { type: 'string', description: 'Catatan tambahan (opsional)' },
+    },
+    required: ['name', 'total'],
+  },
+}
+const CREATE_PIUTANG_TOOL_DEF = {
+  name: 'create_piutang',
+  description: 'Catat piutang baru (uang yang dipinjamkan ke orang lain atau talangan/titipan).',
+  parameters: {
+    type: 'object',
+    properties: {
+      borrower_name: { type: 'string', description: 'Nama peminjam / orang yang berhutang ke kita' },
+      total: { type: 'number', description: 'Nominal piutang dalam Rupiah' },
+      from_account: { type: 'string', description: 'Nama akun sumber dana jika memotong saldo akun (opsional)' },
+      due_date: { type: 'string', description: 'Jatuh tempo janji bayar YYYY-MM-DD (opsional)' },
+      notes: { type: 'string', description: 'Keterangan piutang (opsional)' },
+    },
+    required: ['borrower_name', 'total'],
+  },
+}
+const CREATE_RECURRING_TOOL_DEF = {
+  name: 'create_recurring',
+  description: 'Buat jadwal transaksi berulang / tagihan rutin otomatis (listrik, internet, SPP, gaji).',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Nama tagihan/transaksi rutin' },
+      type: { type: 'string', enum: ['expense', 'income'], description: 'Tipe transaksi (default expense)' },
+      amount: { type: 'number', description: 'Nominal dalam Rupiah' },
+      category: { type: 'string', description: 'Nama kategori' },
+      account: { type: 'string', description: 'Nama akun pembayar/penerima' },
+      frequency: { type: 'string', enum: ['daily', 'weekly', 'monthly', 'yearly'], description: 'Frekuensi (default monthly)' },
+      next_date: { type: 'string', description: 'Tanggal eksekusi berikutnya YYYY-MM-DD' },
+    },
+    required: ['name', 'amount', 'category', 'account'],
+  },
+}
+const LIST_SPLIT_BILLS_TOOL_DEF = {
+  name: 'list_split_bills',
+  description: 'Lihat daftar Split Bill (patungan) beserta status bayar tiap peserta.',
+  parameters: { type: 'object', properties: {} },
+}
+const CREATE_SPLIT_BILL_TOOL_DEF = {
+  name: 'create_split_bill',
+  description: 'Buat catatan Split Bill (patungan makan/acara bersama teman atau keluarga).',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'Judul patungan, mis. "Makan Malam Keluarga"' },
+      total_amount: { type: 'number', description: 'Total tagihan dalam Rupiah' },
+      date: { type: 'string', description: 'Tanggal YYYY-MM-DD (opsional)' },
+      members: {
+        type: 'array',
+        description: 'Daftar peserta patungan dan porsi bayarnya',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Nama peserta' },
+            amount: { type: 'number', description: 'Nominal bagian peserta dalam Rupiah' },
+          },
+          required: ['name', 'amount'],
+        },
+      },
+    },
+    required: ['title', 'total_amount', 'members'],
+  },
+}
+const ADD_PANTRY_ITEM_TOOL_DEF = {
+  name: 'add_pantry_item',
+  description: 'Tambah barang baru ke Stok Kulkas & Rumah (pantry).',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Nama barang, mis. "Telur Ayam", "Beras"' },
+      qty: { type: 'number', description: 'Jumlah stok saat ini' },
+      unit: { type: 'string', description: 'Satuan, mis. "butir", "kg", "pcs", "botol"' },
+      location: { type: 'string', description: 'Lokasi simpan: kulkas / freezer / rak / lainnya' },
+      min_qty: { type: 'number', description: 'Batas minimum stok untuk pengingat belanja (opsional)' },
+    },
+    required: ['name', 'qty', 'unit'],
+  },
+}
+const LIST_RECONCILIATION_TOOL_DEF = {
+  name: 'list_bank_statement_imports',
+  description: 'Lihat daftar riwayat impor Cek Mutasi Bank (rekonsiliasi rekening koran CSV/foto mutasi).',
+  parameters: { type: 'object', properties: {} },
+}
 const MEMORY_TOOL_DEF = {
   name: 'memory',
   description: 'Simpan, ubah, hapus ingatan jangka panjang keluarga (MEMORY.md/USER.md lintas Web, WA & Telegram) atau cari riwayat obrolan lama (action=search_history).',
@@ -160,7 +305,20 @@ export function buildToolDefs(allowWrite: boolean, features: HouseholdFeatures) 
     .filter((t) => t.scope === 'read' || allowWrite)
     .filter((t) => !t.feature || features[t.feature].enabled)
     .map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
-  return [...fromRegistry, INVESTMENTS_TOOL_DEF, MEMORY_TOOL_DEF]
+  const extraRead = [INVESTMENTS_TOOL_DEF, LIST_SPLIT_BILLS_TOOL_DEF, LIST_RECONCILIATION_TOOL_DEF, MEMORY_TOOL_DEF]
+  const extraWrite = allowWrite
+    ? [
+        CREATE_INVESTMENT_TOOL_DEF,
+        SET_BUDGET_TOOL_DEF,
+        CREATE_GOAL_TOOL_DEF,
+        CREATE_DEBT_TOOL_DEF,
+        CREATE_PIUTANG_TOOL_DEF,
+        CREATE_RECURRING_TOOL_DEF,
+        CREATE_SPLIT_BILL_TOOL_DEF,
+        ...(features.shopping_stock.enabled ? [ADD_PANTRY_ITEM_TOOL_DEF] : []),
+      ]
+    : []
+  return [...fromRegistry, ...extraRead, ...extraWrite]
 }
 
 // ── Tool executor: panggil handler registry langsung (household-scoped lewat actor) ─────────
@@ -216,6 +374,127 @@ async function executeTool(
       output: `Investasi (${invs.length} aset):\nModal: ${fmtRp(totalModal)} | Nilai: ${fmtRp(totalNilai)}\n${rows}`,
       isWrite: false,
     }
+  }
+  if (name === 'create_investment') {
+    const buyPrice = Number(args.buy_price ?? 0)
+    const inv = await createInvestment(actor, {
+      name: String(args.name ?? 'Investasi'),
+      type: String(args.type ?? 'lainnya'),
+      owner: 'me',
+      buy_price: buyPrice,
+      current_value: Number(args.current_value ?? buyPrice),
+      quantity: args.quantity != null ? Number(args.quantity) : undefined,
+      unit: args.unit ? String(args.unit) : 'unit',
+    })
+    return { output: `Aset investasi "${String(args.name ?? 'Investasi')}" berhasil ditambahkan (${fmtRp(Number(inv.current_value))}).`, isWrite: true }
+  }
+  if (name === 'set_budget') {
+    const month = String(args.month ?? new Date().toISOString().slice(0, 7))
+    const amount = Number(args.amount ?? 0)
+    const cat = String(args.category ?? '')
+    try {
+      const res = await createBudget(actor, { category: cat, amount, month })
+      return { output: `Anggaran kategori "${cat}" untuk ${month} berhasil dipasang: ${fmtRp(res.amount)}.`, isWrite: true }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'duplicate_budget') {
+        const existing = await listBudgets(actor, month, 'household')
+        const found = existing.find((b) => b.category.name.toLowerCase() === cat.toLowerCase())
+        if (found) {
+          await updateBudget(actor, found.id, amount)
+          return { output: `Anggaran kategori "${found.category.name}" untuk ${month} berhasil diperbarui menjadi ${fmtRp(amount)}.`, isWrite: true }
+        }
+      }
+      throw err
+    }
+  }
+  if (name === 'create_goal') {
+    const g = await createGoal(actor, {
+      name: String(args.name ?? 'Target Tabungan'),
+      target: Number(args.target ?? 0),
+      opening_amount: Number(args.opening_amount ?? 0),
+      deadline: args.deadline ? String(args.deadline) : undefined,
+      owner: 'me',
+    })
+    return { output: `Target finansial "${g.name}" (${fmtRp(g.target)}) berhasil dibuat.`, isWrite: true }
+  }
+  if (name === 'create_debt') {
+    const d = await createDebt(actor, {
+      name: String(args.name ?? 'Hutang / Cicilan'),
+      total: Number(args.total ?? 0),
+      monthly: Number(args.monthly ?? 0),
+      due_date: args.due_date ? String(args.due_date) : undefined,
+      owner: 'me',
+      opening_paid: 0,
+      aliases: [],
+      notes: String(args.notes ?? ''),
+    })
+    return { output: `Catatan hutang/cicilan "${d.name}" (${fmtRp(d.total)}) berhasil dibuat.`, isWrite: true }
+  }
+  if (name === 'create_piutang') {
+    const tz = await getHouseholdTimezone(actor)
+    const p = await createPiutang(
+      actor,
+      {
+        borrower_name: String(args.borrower_name ?? 'Peminjam'),
+        total: Number(args.total ?? 0),
+        from_account: args.from_account ? String(args.from_account) : undefined,
+        owner: 'me',
+        due_date: args.due_date ? String(args.due_date) : undefined,
+        notes: String(args.notes ?? ''),
+      },
+      tz,
+    )
+    return { output: `Catatan piutang dibuat: ${JSON.stringify(p)}`, isWrite: true }
+  }
+  if (name === 'create_recurring') {
+    const r = await createRecurring(actor, {
+      name: String(args.name ?? 'Tagihan Rutin'),
+      type: args.type === 'income' ? 'income' : 'expense',
+      amount: Number(args.amount ?? 0),
+      category: String(args.category ?? 'Utilitas'),
+      account: String(args.account ?? ''),
+      frequency: String(args.frequency ?? 'monthly'),
+      next_date: String(args.next_date ?? new Date().toISOString().slice(0, 10)),
+      notes: '',
+    })
+    return { output: `Transaksi berulang "${r.name}" (${fmtRp(r.amount)} / ${r.frequency}) berhasil dijadwalkan.`, isWrite: true }
+  }
+  if (name === 'list_split_bills') {
+    const bills = await listSplitBills(actor)
+    if (!bills.length) return { output: 'Belum ada catatan Split Bill.', isWrite: false }
+    return {
+      output: bills.map((b) => `- ${b.title} (${b.date}): Total ${fmtRp(b.total_amount)} | Peserta: ${b.members.map((m) => `${m.name} ${fmtRp(m.amount)} (${m.paid ? 'Lunas' : 'Belum'})`).join(', ')}`).join('\n'),
+      isWrite: false,
+    }
+  }
+  if (name === 'create_split_bill') {
+    const members = Array.isArray(args.members)
+      ? (args.members as Array<{ name: string; amount: number }>).map((m) => ({ name: String(m.name), amount: Number(m.amount) }))
+      : []
+    const sb = await createSplitBill(actor, {
+      title: String(args.title ?? 'Patungan'),
+      total_amount: Number(args.total_amount ?? 0),
+      date: String(args.date ?? new Date().toISOString().slice(0, 10)),
+      members,
+    })
+    return { output: `Split Bill "${sb.title}" (${fmtRp(sb.total_amount)}) dengan ${sb.members.length} peserta berhasil dibuat.`, isWrite: true }
+  }
+  if (name === 'add_pantry_item') {
+    const item = await createPantryItem(actor, {
+      name: String(args.name ?? 'Item'),
+      qty: Number(args.qty ?? 1),
+      unit: String(args.unit ?? 'pcs'),
+      location: args.location ? String(args.location) : 'kulkas',
+      min_qty: args.min_qty != null ? Number(args.min_qty) : undefined,
+      expires_estimated: false,
+      aliases: [],
+    })
+    return { output: `Stok "${item.name}" (${item.qty} ${item.unit} di ${item.location}) berhasil ditambahkan.`, isWrite: true }
+  }
+  if (name === 'list_bank_statement_imports') {
+    const imps = await listStatementImports(actor)
+    if (!imps.data.length) return { output: 'Belum ada riwayat impor Cek Mutasi Bank.', isWrite: false }
+    return { output: JSON.stringify(imps.data), isWrite: false }
   }
 
   const tool = toolByName(name)

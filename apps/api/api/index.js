@@ -18271,6 +18271,815 @@ var streamSSE = (c, cb, onError) => {
   return c.newResponse(stream2.responseReadable);
 };
 
+// src/services/reconciliation.ts
+import { createHash as createHash3 } from "node:crypto";
+function normDesc(text) {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function computeFingerprint(accountId, line, seq) {
+  const payload = [
+    accountId,
+    line.date,
+    String(Math.round(line.amount)),
+    line.direction,
+    (line.ref_no ?? "").trim().toLowerCase(),
+    normDesc(line.description),
+    String(seq)
+  ].join("|");
+  return createHash3("sha256").update(payload).digest("hex");
+}
+function parseMoneyCell(raw2) {
+  if (!raw2) return { amount: 0, sign: null };
+  const upper = raw2.toUpperCase().trim();
+  let sign3 = null;
+  if (/\bDB\b|\bDEBET\b|\bDEBIT\b|\bKELUAR\b|\bOUT\b/.test(upper) || upper.startsWith("-") || upper.startsWith("(") && upper.endsWith(")")) {
+    sign3 = "out";
+  } else if (/\bCR\b|\bKREDIT\b|\bCREDIT\b|\bMASUK\b|\bIN\b/.test(upper) || upper.startsWith("+")) {
+    sign3 = "in";
+  }
+  let cleaned = upper.replace(/IDR|RP/g, "").replace(/\b(DB|CR|DEBET|DEBIT|KREDIT|CREDIT|MASUK|KELUAR|IN|OUT|D|K)\b/g, "").replace(/[()+-]/g, "").trim();
+  if (!cleaned) return { amount: 0, sign: sign3 };
+  if (/,\d{1,2}$/.test(cleaned) && cleaned.includes(".")) {
+    cleaned = cleaned.replace(/\./g, "").replace(/,\d{1,2}$/, "");
+  } else if (/\.\d{1,2}$/.test(cleaned) && cleaned.includes(",")) {
+    cleaned = cleaned.replace(/,/g, "").replace(/\.\d{1,2}$/, "");
+  } else if (/,\d{2}$/.test(cleaned) && !cleaned.includes(".")) {
+    cleaned = cleaned.replace(/,\d{2}$/, "");
+  } else if (/\.\d{2}$/.test(cleaned) && !cleaned.includes(",")) {
+    cleaned = cleaned.replace(/\.\d{2}$/, "");
+  } else {
+    cleaned = cleaned.replace(/[.,\s]/g, "");
+  }
+  const num2 = Number(cleaned.replace(/[^0-9]/g, ""));
+  return { amount: Number.isFinite(num2) ? Math.round(num2) : 0, sign: sign3 };
+}
+var MONTH_MAP = {
+  jan: "01",
+  januari: "01",
+  january: "01",
+  feb: "02",
+  februari: "02",
+  february: "02",
+  mar: "03",
+  maret: "03",
+  march: "03",
+  apr: "04",
+  april: "04",
+  mei: "05",
+  may: "05",
+  jun: "06",
+  juni: "06",
+  june: "06",
+  jul: "07",
+  juli: "07",
+  july: "07",
+  agu: "08",
+  agustus: "08",
+  aug: "08",
+  august: "08",
+  sep: "09",
+  sept: "09",
+  september: "09",
+  okt: "10",
+  oktober: "10",
+  oct: "10",
+  october: "10",
+  nov: "11",
+  november: "11",
+  des: "12",
+  desember: "12",
+  dec: "12",
+  december: "12"
+};
+function parseDateCell(raw2, fallbackYear) {
+  const s = raw2.trim().replace(/^["']|["']$/g, "");
+  if (!s || /^pend/i.test(s)) {
+    return null;
+  }
+  const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (iso) {
+    return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  }
+  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+  if (dmy) {
+    const yr = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+    return `${yr}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  }
+  const dm = s.match(/^(\d{1,2})[-/](\d{1,2})$/);
+  if (dm) {
+    const d = Number(dm[1]);
+    const m = Number(dm[2]);
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+      return `${fallbackYear}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+  }
+  const named = s.match(/^(\d{1,2})\s+([a-zA-Z]+)(?:\s+(\d{2,4}))?/);
+  if (named) {
+    const mon = MONTH_MAP[named[2].toLowerCase()];
+    if (mon) {
+      const yr = named[3] ? named[3].length === 2 ? `20${named[3]}` : named[3] : String(fallbackYear);
+      return `${yr}-${mon}-${named[1].padStart(2, "0")}`;
+    }
+  }
+  return null;
+}
+function splitCsvRow(line, delimiter) {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === delimiter && !inQuotes) {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
+function detectDelimiter(lines) {
+  for (const l of lines.slice(0, 15)) {
+    if (!l.trim()) continue;
+    const commas = (l.match(/,/g) || []).length;
+    const semis = (l.match(/;/g) || []).length;
+    const tabs = (l.match(/\t/g) || []).length;
+    if (tabs >= 2 && tabs >= commas && tabs >= semis) return "	";
+    if (semis >= 2 && semis > commas) return ";";
+    if (commas >= 2) return ",";
+  }
+  return ",";
+}
+function parseStatementCsv(csvText, filename, fallbackDate) {
+  const rawLines = csvText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  if (rawLines.length === 0) {
+    throw new ApiError("statement_parse_error", "File mutasi kosong.");
+  }
+  const delimiter = detectDelimiter(rawLines);
+  let fallbackYear = fallbackDate ? Number(fallbackDate.slice(0, 4)) : (/* @__PURE__ */ new Date()).getFullYear();
+  const todayIso = fallbackDate || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  for (const l of rawLines.slice(0, 10)) {
+    const m = l.match(/\b(20\d{2})\b/);
+    if (m) {
+      fallbackYear = Number(m[1]);
+      break;
+    }
+  }
+  const fname = (filename || "").toLowerCase();
+  let detectedSource = fname.includes("bca") ? "bca_csv" : fname.includes("bri") ? "bri_csv" : fname.includes("mandiri") || fname.includes("livin") ? "mandiri_csv" : fname.includes("gopay") ? "gopay_csv" : "bca_csv";
+  let headerIdx = -1;
+  let colMap = { date: 0, desc: 1, amount: -1, debit: -1, credit: -1, dir: -1, balance: -1, ref: -1 };
+  for (let i = 0; i < Math.min(rawLines.length, 20); i++) {
+    const cells = splitCsvRow(rawLines[i], delimiter).map((c) => c.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim());
+    const hasDate = cells.some((c) => /^(tanggal|tgl|date|posting date|waktu)/.test(c));
+    const hasDesc = cells.some((c) => /(keterangan|uraian|deskripsi|description|remark|catatan|detail|merchant)/.test(c));
+    const hasAmt = cells.some((c) => /(jumlah|mutasi|nominal|amount|debet|debit|kredit|credit|masuk|keluar)/.test(c));
+    if (hasDate && (hasDesc || hasAmt)) {
+      headerIdx = i;
+      colMap = {
+        date: cells.findIndex((c) => /^(tanggal|tgl|date|posting date|waktu)/.test(c)),
+        desc: cells.findIndex((c) => /(keterangan|uraian|deskripsi|description|remark|catatan|detail|merchant)/.test(c)),
+        amount: cells.findIndex((c) => /^(jumlah|mutasi|nominal|amount|nilai)$/.test(c) || c.startsWith("jumlah") || c.startsWith("mutasi")),
+        debit: cells.findIndex((c) => /(debet|debit|keluar|out)/.test(c)),
+        credit: cells.findIndex((c) => /(kredit|credit|masuk|in)/.test(c)),
+        dir: cells.findIndex((c) => /^(status|tipe|type|arus|direction|dbcr|dk)$/.test(c)),
+        balance: cells.findIndex((c) => /(saldo|balance)/.test(c)),
+        ref: cells.findIndex((c) => /(ref|referensi|no ref|rrn|id transaksi)/.test(c))
+      };
+      const headerJoined = cells.join(" ");
+      if (headerJoined.includes("cabang") && headerJoined.includes("jumlah")) detectedSource = "bca_csv";
+      else if (headerJoined.includes("uraian") || headerJoined.includes("debet")) detectedSource = "bri_csv";
+      else if (headerJoined.includes("posting date") || headerJoined.includes("remark")) detectedSource = "mandiri_csv";
+      else if (headerJoined.includes("gopay")) detectedSource = "gopay_csv";
+      break;
+    }
+  }
+  const parsed = [];
+  const startRow = headerIdx >= 0 ? headerIdx + 1 : 0;
+  for (let i = startRow; i < rawLines.length; i++) {
+    const rawLine = rawLines[i];
+    if (/^(saldo awal|mutasi debet|mutasi kredit|saldo akhir|total mutasi|catatan\s*:)/i.test(rawLine.replace(/^["']+/, ""))) {
+      continue;
+    }
+    const cells = splitCsvRow(rawLine, delimiter);
+    if (cells.length < 2) continue;
+    let dateStr = null;
+    let description = "";
+    let amount = 0;
+    let direction = "out";
+    let balanceAfter = null;
+    let refNo = null;
+    if (headerIdx >= 0) {
+      const rawDate = cells[colMap.date] ?? "";
+      dateStr = /^pend/i.test(rawDate.trim()) ? todayIso : parseDateCell(rawDate, fallbackYear);
+      if (!dateStr) continue;
+      description = (cells[colMap.desc] ?? "").trim();
+      if (colMap.ref >= 0 && cells[colMap.ref]) {
+        refNo = cells[colMap.ref].trim() || null;
+      }
+      if (colMap.balance >= 0 && cells[colMap.balance]) {
+        const bal = parseMoneyCell(cells[colMap.balance]).amount;
+        if (bal > 0) balanceAfter = bal;
+      }
+      if (colMap.debit >= 0 && colMap.credit >= 0) {
+        const dVal = parseMoneyCell(cells[colMap.debit] ?? "").amount;
+        const cVal = parseMoneyCell(cells[colMap.credit] ?? "").amount;
+        if (dVal > 0) {
+          amount = dVal;
+          direction = "out";
+        } else if (cVal > 0) {
+          amount = cVal;
+          direction = "in";
+        }
+      } else if (colMap.amount >= 0) {
+        const parsedAmt = parseMoneyCell(cells[colMap.amount] ?? "");
+        amount = parsedAmt.amount;
+        if (colMap.dir >= 0 && cells[colMap.dir]) {
+          const dirCell = parseMoneyCell(cells[colMap.dir]).sign;
+          direction = dirCell ?? parsedAmt.sign ?? "out";
+        } else if (parsedAmt.sign) {
+          direction = parsedAmt.sign;
+        } else {
+          const nextCell = cells[colMap.amount + 1] ?? "";
+          const nextSign = parseMoneyCell(nextCell).sign;
+          direction = nextSign ?? (/(\bcr\b|\bkredit\b|\bmasuk\b|\bgaji\b|\bbunga\b)/i.test(description) ? "in" : "out");
+        }
+      }
+    } else {
+      const firstCell = cells[0] ?? "";
+      dateStr = /^pend/i.test(firstCell.trim()) ? todayIso : parseDateCell(firstCell, fallbackYear);
+      if (!dateStr) continue;
+      description = (cells[1] ?? "").trim();
+      for (let c = 2; c < cells.length; c++) {
+        const cell = cells[c] ?? "";
+        const p = parseMoneyCell(cell);
+        if (p.amount > 0 && amount === 0) {
+          amount = p.amount;
+          const nextSign = cells[c + 1] ? parseMoneyCell(cells[c + 1]).sign : null;
+          direction = p.sign ?? nextSign ?? "out";
+        } else if (p.amount > 0 && amount > 0 && balanceAfter === null) {
+          balanceAfter = p.amount;
+        }
+      }
+    }
+    if (!dateStr || amount <= 0) continue;
+    if (!refNo && description) {
+      const refMatch = description.match(/\b([A-Z0-9]{4,}\/[A-Z0-9/]{4,}|\d{10,16})\b/);
+      if (refMatch) refNo = refMatch[1];
+    }
+    parsed.push({
+      date: dateStr,
+      amount,
+      direction,
+      description: description || (direction === "in" ? "Mutasi Masuk" : "Mutasi Keluar"),
+      ref_no: refNo,
+      balance_after: balanceAfter
+    });
+  }
+  if (parsed.length === 0) {
+    throw new ApiError(
+      "statement_parse_error",
+      "Tidak ditemukan baris transaksi yang valid. Pastikan file memiliki kolom Tanggal, Keterangan, dan Jumlah/Mutasi."
+    );
+  }
+  return { source: detectedSource, lines: parsed };
+}
+async function scanStatementImage(actor, input) {
+  await requireFeature(actor, "reconciliation");
+  const config = await getAiConfig(actor);
+  const provider = config.provider;
+  const apiKey = config.apiKey;
+  if (!VISION_PROVIDERS.includes(provider)) {
+    throw ApiError.fromCode("provider_no_vision");
+  }
+  const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+  const prompt = `Kamu adalah asisten keuangan keluarga Indonesia. Baca gambar screenshot mutasi rekening bank / e-wallet (m-BCA, myBCA, BRImo, Livin Mandiri, BNI, GoPay, OVO, ShopeePay, SeaBank, Jago) ini dan ekstrak semua baris mutasi transaksi.
+
+Kembalikan HANYA JSON dengan format:
+{
+  "bank_name": "BCA / BRI / Mandiri / GoPay / dll",
+  "lines": [
+    {
+      "date": "YYYY-MM-DD",
+      "description": "Keterangan mutasi / nama merchant / transfer",
+      "amount": 50000,
+      "direction": "out",
+      "ref_no": null,
+      "balance_after": null
+    }
+  ]
+}
+Aturan:
+- date: format YYYY-MM-DD (jika di layar hanya tertulis tanggal & bulan seperti "15 Okt" atau "15/10", gunakan tahun ${currentYear}).
+- amount: angka bulat positif dalam Rupiah tanpa titik/koma.
+- direction: "out" untuk uang keluar (DB / Debet / tanda minus / warna merah) atau "in" untuk uang masuk (CR / Kredit / tanda plus / warna hijau).
+- balance_after: saldo setelah transaksi bila tertulis di baris itu (angka bulat), atau null.
+- Jangan lewatkan satu baris pun yang terlihat jelas.`;
+  const raw2 = await callProviderJson(
+    buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, prompt),
+    provider
+  );
+  const rawLines = Array.isArray(raw2.lines) ? raw2.lines : [];
+  const lines = [];
+  for (const item of rawLines) {
+    if (!item || typeof item !== "object") continue;
+    const r = item;
+    const date = parseDateCell(String(r.date ?? ""), currentYear) ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const amount = Math.round(Number(r.amount ?? 0));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const dirRaw = String(r.direction ?? "out").toLowerCase();
+    const direction = dirRaw === "in" || dirRaw === "cr" || dirRaw === "credit" ? "in" : "out";
+    const description = String(r.description ?? "").trim() || (direction === "in" ? "Mutasi Masuk" : "Mutasi Keluar");
+    const balanceAfter = r.balance_after != null && Number(r.balance_after) > 0 ? Math.round(Number(r.balance_after)) : null;
+    const refNo = r.ref_no ? String(r.ref_no).trim() : null;
+    lines.push({ date, amount, direction, description, ref_no: refNo, balance_after: balanceAfter });
+  }
+  if (lines.length === 0) {
+    throw new ApiError("statement_parse_error", "Tidak dapat menemukan baris mutasi dari gambar ini.");
+  }
+  return {
+    bank_name: typeof raw2.bank_name === "string" ? raw2.bank_name : null,
+    lines
+  };
+}
+function daysBetween(d1, d2) {
+  const t1 = (/* @__PURE__ */ new Date(`${d1}T00:00:00Z`)).getTime();
+  const t2 = (/* @__PURE__ */ new Date(`${d2}T00:00:00Z`)).getTime();
+  return Math.round(Math.abs(t1 - t2) / 864e5);
+}
+function shiftDate(isoDate, deltaDays) {
+  const d = /* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+function jaccardSimilarity(a, b2) {
+  const stopWords = /* @__PURE__ */ new Set(["trsf", "ebanking", "db", "cr", "pembayaran", "transfer", "qris", "ke", "dari", "pt", "tbk", "id", "idr"]);
+  const tokensA = new Set(
+    normDesc(a).split(" ").filter((w) => w.length >= 2 && !stopWords.has(w))
+  );
+  const tokensB = new Set(
+    normDesc(b2).split(" ").filter((w) => w.length >= 2 && !stopWords.has(w))
+  );
+  if (tokensA.size === 0 || tokensB.size === 0) return 0;
+  let inter = 0;
+  for (const t of tokensA) {
+    if (tokensB.has(t)) inter++;
+  }
+  const union = tokensA.size + tokensB.size - inter;
+  return union > 0 ? inter / union : 0;
+}
+function scorePair(line, tx) {
+  const diff = daysBetween(line.date, tx.date);
+  if (diff > 3) return -1;
+  let score = diff === 0 ? 50 : diff === 1 ? 35 : diff === 2 ? 20 : 5;
+  const noteLow = (tx.note || "").toLowerCase();
+  const descLow = normDesc(line.description);
+  if (line.ref_no && line.ref_no.length >= 4 && noteLow.includes(line.ref_no.toLowerCase())) {
+    score += 40;
+  }
+  const jacc = jaccardSimilarity(line.description, `${tx.note} ${tx.category_name}`);
+  score += Math.round(jacc * 20);
+  const txWords = normDesc(tx.note).split(" ").filter((w) => w.length >= 4 && !["rekon", "transfer", "belanja", "makan"].includes(w));
+  if (txWords.some((w) => descLow.includes(w))) {
+    score += 15;
+  }
+  return Math.min(100, score);
+}
+async function importStatement(actor, input) {
+  assertScope(actor, "write");
+  await requireFeature(actor, "reconciliation");
+  let parsedSource = input.source ?? "manual";
+  let parsedLines = [];
+  if (input.csv_text && input.csv_text.trim()) {
+    const res = parseStatementCsv(input.csv_text, input.filename);
+    parsedSource = input.source ?? res.source;
+    parsedLines = res.lines;
+  } else if (Array.isArray(input.lines) && input.lines.length > 0) {
+    parsedLines = input.lines.map((l, idx) => {
+      const amt = Math.round(Number(l.amount));
+      if (!l.date || !/^\d{4}-\d{2}-\d{2}$/.test(l.date) || !Number.isFinite(amt) || amt <= 0) {
+        throw new ApiError("statement_parse_error", `Baris ke-${idx + 1} tidak valid.`, {
+          details: { line: idx + 1 }
+        });
+      }
+      return {
+        date: l.date,
+        amount: amt,
+        direction: l.direction === "in" ? "in" : "out",
+        description: (l.description || "").trim() || (l.direction === "in" ? "Mutasi Masuk" : "Mutasi Keluar"),
+        ref_no: l.ref_no ?? null,
+        balance_after: l.balance_after != null ? Math.round(Number(l.balance_after)) : null
+      };
+    });
+  } else {
+    throw new ApiError("statement_parse_error", "Kirimkan file CSV (csv_text) atau daftar baris mutasi (lines).");
+  }
+  return withActor(actor, async (tx) => {
+    const accountId = await resolveAccountRef(tx, actor, input, "account");
+    const dates = parsedLines.map((l) => l.date).sort();
+    const periodFrom = dates[0];
+    const periodTo = dates[dates.length - 1];
+    const [imp] = await tx`
+      insert into statement_imports (
+        household_id, account_id, source, filename, imported_by_member_id, period_from, period_to, line_count
+      ) values (
+        ${actor.householdId}, ${accountId}, ${parsedSource}, ${input.filename ?? null},
+        ${actor.memberId}, ${periodFrom}, ${periodTo}, ${parsedLines.length}
+      )
+      returning id, created_at::text
+    `;
+    const seqCounter = /* @__PURE__ */ new Map();
+    const lineIds = [];
+    for (const line of parsedLines) {
+      const baseKey = [
+        line.date,
+        String(line.amount),
+        line.direction,
+        (line.ref_no ?? "").trim().toLowerCase(),
+        normDesc(line.description)
+      ].join("|");
+      const seq = (seqCounter.get(baseKey) ?? 0) + 1;
+      seqCounter.set(baseKey, seq);
+      const fp = computeFingerprint(accountId, line, seq);
+      const [upserted] = await tx`
+        insert into statement_lines (
+          import_id, household_id, account_id, date, amount, direction,
+          description, ref_no, balance_after, seq, fingerprint
+        ) values (
+          ${imp.id}, ${actor.householdId}, ${accountId}, ${line.date}, ${line.amount}, ${line.direction},
+          ${line.description}, ${line.ref_no ?? null}, ${line.balance_after ?? null}, ${seq}, ${fp}
+        )
+        on conflict (account_id, fingerprint) do update set
+          import_id = excluded.import_id,
+          balance_after = coalesce(excluded.balance_after, statement_lines.balance_after)
+        returning id
+      `;
+      lineIds.push(upserted.id);
+    }
+    await runMatchingForImport(tx, actor.householdId, accountId, imp.id, periodFrom, periodTo);
+    return getStatementImportDetailInTx(tx, actor, imp.id);
+  });
+}
+async function runMatchingForImport(tx, householdId, accountId, importId, periodFrom, periodTo) {
+  const lines = await tx`
+    select id, date::text, amount::text, direction, description, ref_no, match_status, matched_transaction_id
+    from statement_lines
+    where import_id = ${importId} and household_id = ${householdId}
+    order by date asc, seq asc
+  `;
+  const lockedRows = await tx`
+    select matched_transaction_id
+    from statement_lines
+    where household_id = ${householdId}
+      and account_id = ${accountId}
+      and matched_transaction_id is not null
+      and match_status in ('matched', 'created')
+      and import_id <> ${importId}
+  `;
+  const usedTxIds = new Set(lockedRows.map((r) => r.matched_transaction_id));
+  for (const l of lines) {
+    if ((l.match_status === "matched" || l.match_status === "created") && l.matched_transaction_id) {
+      usedTxIds.add(l.matched_transaction_id);
+    }
+  }
+  const searchFrom = shiftDate(periodFrom, -3);
+  const searchTo = shiftDate(periodTo, 3);
+  const candidates = await tx`
+    select
+      t.id, t.type, t.amount::text, t.date::text, t.note,
+      coalesce(c.name, 'Transfer') as category_name,
+      t.account_id, t.to_account_id
+    from transactions t
+    left join categories c on c.id = t.category_id
+    where t.household_id = ${householdId}
+      and t.deleted_at is null
+      and (t.account_id = ${accountId} or t.to_account_id = ${accountId})
+      and t.date between ${searchFrom} and ${searchTo}
+  `;
+  const candidateList = candidates.map((c) => ({
+    ...c,
+    amount: Number(c.amount)
+  }));
+  const unresolvedLines = lines.filter((l) => l.match_status === "unmatched" || l.match_status === "suggested");
+  const pairs = [];
+  for (const l of unresolvedLines) {
+    const lAmt = Number(l.amount);
+    for (const c of candidateList) {
+      if (usedTxIds.has(c.id)) continue;
+      if (c.amount !== lAmt) continue;
+      const cDir = c.type === "income" || c.type === "transfer" && c.to_account_id === accountId ? "in" : "out";
+      if (cDir !== l.direction) continue;
+      const sc = scorePair(
+        {
+          date: l.date,
+          amount: lAmt,
+          direction: l.direction,
+          description: l.description,
+          ref_no: l.ref_no
+        },
+        c
+      );
+      if (sc >= 40) {
+        pairs.push({
+          lineId: l.id,
+          txId: c.id,
+          score: sc,
+          dateDiff: daysBetween(l.date, c.date)
+        });
+      }
+    }
+  }
+  pairs.sort((a, b2) => b2.score - a.score || a.dateDiff - b2.dateDiff);
+  const assignedLines = /* @__PURE__ */ new Set();
+  for (const p of pairs) {
+    if (assignedLines.has(p.lineId) || usedTxIds.has(p.txId)) continue;
+    assignedLines.add(p.lineId);
+    usedTxIds.add(p.txId);
+    const status = p.score >= 60 ? "matched" : "suggested";
+    await tx`
+      update statement_lines
+      set match_status = ${status},
+          matched_transaction_id = ${p.txId},
+          match_confidence = ${p.score}
+      where id = ${p.lineId}
+    `;
+  }
+  for (const l of unresolvedLines) {
+    if (!assignedLines.has(l.id)) {
+      await tx`
+        update statement_lines
+        set match_status = 'unmatched',
+            matched_transaction_id = null,
+            match_confidence = null
+        where id = ${l.id}
+      `;
+    }
+  }
+}
+async function listStatementImports(actor, accountId) {
+  await requireFeature(actor, "reconciliation");
+  return withActor(actor, async (tx) => {
+    const rows = await tx`
+      select
+        si.id,
+        si.account_id,
+        a.name as account_name,
+        si.source,
+        si.filename,
+        si.period_from::text,
+        si.period_to::text,
+        si.line_count,
+        si.created_at::text,
+        count(*) filter (where sl.match_status = 'matched')::text as matched_count,
+        count(*) filter (where sl.match_status = 'suggested')::text as suggested_count,
+        count(*) filter (where sl.match_status = 'unmatched')::text as unmatched_count,
+        count(*) filter (where sl.match_status = 'created')::text as created_count,
+        count(*) filter (where sl.match_status = 'ignored')::text as ignored_count
+      from statement_imports si
+      join accounts a on a.id = si.account_id
+      left join statement_lines sl on sl.import_id = si.id
+      where si.household_id = ${actor.householdId}
+        and (${accountId ?? null}::uuid is null or si.account_id = ${accountId ?? null}::uuid)
+      group by si.id, a.name
+      order by si.created_at desc
+      limit 30
+    `;
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        account: { id: r.account_id, name: r.account_name },
+        source: r.source,
+        filename: r.filename,
+        period_from: r.period_from,
+        period_to: r.period_to,
+        line_count: Number(r.line_count),
+        created_at: r.created_at,
+        summary: {
+          matched: Number(r.matched_count),
+          suggested: Number(r.suggested_count),
+          unmatched: Number(r.unmatched_count),
+          created: Number(r.created_count),
+          ignored: Number(r.ignored_count)
+        }
+      }))
+    };
+  });
+}
+async function getStatementImportDetailInTx(tx, actor, importId) {
+  const [imp] = await tx`
+    select
+      si.id, si.account_id, a.name as account_name, si.source, si.filename,
+      si.period_from::text, si.period_to::text, si.line_count, si.created_at::text
+    from statement_imports si
+    join accounts a on a.id = si.account_id
+    where si.id = ${importId} and si.household_id = ${actor.householdId}
+  `;
+  if (!imp) throw ApiError.fromCode("not_found");
+  const lines = await tx`
+    select
+      sl.id, sl.date::text, sl.amount::text, sl.direction, sl.description,
+      sl.ref_no, sl.balance_after::text, sl.seq, sl.match_status,
+      sl.matched_transaction_id, sl.match_confidence,
+      t.note as tx_note, t.date::text as tx_date, t.amount::text as tx_amount,
+      coalesce(c.name, 'Transfer') as tx_category_name
+    from statement_lines sl
+    left join transactions t on t.id = sl.matched_transaction_id and t.deleted_at is null
+    left join categories c on c.id = t.category_id
+    where sl.import_id = ${importId} and sl.household_id = ${actor.householdId}
+    order by sl.date desc, sl.seq asc
+  `;
+  const unmatchedKaraya = imp.period_from && imp.period_to ? await tx`
+          select
+            t.id, t.date::text, t.type, t.amount::text, t.note,
+            coalesce(c.name, 'Transfer') as category_name
+          from transactions t
+          left join categories c on c.id = t.category_id
+          where t.household_id = ${actor.householdId}
+            and t.deleted_at is null
+            and (t.account_id = ${imp.account_id} or t.to_account_id = ${imp.account_id})
+            and t.date between ${imp.period_from} and ${imp.period_to}
+            and not exists (
+              select 1 from statement_lines sl
+              where sl.household_id = ${actor.householdId}
+                and sl.account_id = ${imp.account_id}
+                and sl.matched_transaction_id = t.id
+                and sl.match_status in ('matched', 'created', 'suggested')
+            )
+          order by t.date desc
+        ` : [];
+  const [balRow] = await tx`
+    select coalesce(balance, 0)::text as balance
+    from v_account_balances
+    where account_id = ${imp.account_id}
+  `;
+  const karayaBalance = Number(balRow?.balance ?? 0);
+  const lineWithBalance = lines.find((l) => l.balance_after != null);
+  const statementEndingBalance = lineWithBalance?.balance_after != null ? Number(lineWithBalance.balance_after) : null;
+  const mappedLines = lines.map((l) => ({
+    id: l.id,
+    date: l.date,
+    amount: Number(l.amount),
+    direction: l.direction,
+    description: l.description,
+    ref_no: l.ref_no,
+    balance_after: l.balance_after != null ? Number(l.balance_after) : null,
+    seq: l.seq,
+    match_status: l.match_status,
+    match_confidence: l.match_confidence,
+    matched_transaction: l.matched_transaction_id ? {
+      id: l.matched_transaction_id,
+      date: l.tx_date,
+      amount: l.tx_amount != null ? Number(l.tx_amount) : Number(l.amount),
+      note: l.tx_note,
+      category_name: l.tx_category_name
+    } : null
+  }));
+  const counts = {
+    matched: mappedLines.filter((l) => l.match_status === "matched").length,
+    suggested: mappedLines.filter((l) => l.match_status === "suggested").length,
+    unmatched_statement: mappedLines.filter((l) => l.match_status === "unmatched").length,
+    created: mappedLines.filter((l) => l.match_status === "created").length,
+    ignored: mappedLines.filter((l) => l.match_status === "ignored").length,
+    unmatched_karaya: unmatchedKaraya.length
+  };
+  return {
+    import: {
+      id: imp.id,
+      account: { id: imp.account_id, name: imp.account_name },
+      source: imp.source,
+      filename: imp.filename,
+      period_from: imp.period_from,
+      period_to: imp.period_to,
+      line_count: Number(imp.line_count),
+      created_at: imp.created_at
+    },
+    summary: counts,
+    balance_comparison: {
+      karaya_balance: karayaBalance,
+      statement_ending_balance: statementEndingBalance,
+      diff: statementEndingBalance != null ? statementEndingBalance - karayaBalance : null
+    },
+    lines: mappedLines,
+    unmatched_karaya: unmatchedKaraya.map((t) => ({
+      id: t.id,
+      date: t.date,
+      type: t.type,
+      amount: Number(t.amount),
+      note: t.note,
+      category_name: t.category_name
+    }))
+  };
+}
+async function getStatementImportDetail(actor, importId) {
+  await requireFeature(actor, "reconciliation");
+  return withActor(actor, (tx) => getStatementImportDetailInTx(tx, actor, importId));
+}
+async function confirmStatementLine(actor, lineId, transactionId) {
+  assertScope(actor, "write");
+  await requireFeature(actor, "reconciliation");
+  return withActor(actor, async (tx) => {
+    const [line] = await tx`
+      select id, match_status from statement_lines
+      where id = ${lineId} and household_id = ${actor.householdId}
+      for update
+    `;
+    if (!line) throw ApiError.fromCode("statement_line_not_found");
+    if (line.match_status === "created") {
+      throw ApiError.fromCode("statement_line_already_resolved");
+    }
+    const [targetTx] = await tx`
+      select id from transactions
+      where id = ${transactionId} and household_id = ${actor.householdId} and deleted_at is null
+    `;
+    if (!targetTx) throw ApiError.fromCode("transaction_not_found");
+    await tx`
+      update statement_lines
+      set match_status = 'matched',
+          matched_transaction_id = ${transactionId},
+          match_confidence = 100
+      where id = ${lineId}
+    `;
+    return { id: lineId, match_status: "matched", matched_transaction_id: transactionId };
+  });
+}
+async function ignoreStatementLine(actor, lineId) {
+  assertScope(actor, "write");
+  await requireFeature(actor, "reconciliation");
+  return withActor(actor, async (tx) => {
+    const [line] = await tx`
+      select id, match_status from statement_lines
+      where id = ${lineId} and household_id = ${actor.householdId}
+      for update
+    `;
+    if (!line) throw ApiError.fromCode("statement_line_not_found");
+    await tx`
+      update statement_lines
+      set match_status = 'ignored',
+          matched_transaction_id = null
+      where id = ${lineId}
+    `;
+    return { id: lineId, match_status: "ignored" };
+  });
+}
+async function acceptStatementLine(actor, lineId, input, timezone) {
+  assertScope(actor, "write");
+  await requireFeature(actor, "reconciliation");
+  const lineInfo = await withActor(actor, async (tx) => {
+    const [line] = await tx`
+      select id, account_id, date::text, amount::text, direction, description, match_status
+      from statement_lines
+      where id = ${lineId} and household_id = ${actor.householdId}
+      for update
+    `;
+    if (!line) throw ApiError.fromCode("statement_line_not_found");
+    if (line.match_status === "created" || line.match_status === "matched") {
+      throw ApiError.fromCode("statement_line_already_resolved");
+    }
+    return line;
+  });
+  const txType = lineInfo.direction === "in" ? "income" : "expense";
+  const noteText = input.note?.trim() ? input.note.trim() : `[REKON] ${lineInfo.description}`;
+  const created = await createTransaction(
+    actor,
+    {
+      type: txType,
+      account_id: lineInfo.account_id,
+      amount: Number(lineInfo.amount),
+      date: lineInfo.date,
+      note: noteText,
+      category_id: input.category_id,
+      category: input.category ?? "Lainnya",
+      beneficiary_id: input.beneficiary_id,
+      beneficiary: input.beneficiary,
+      source: "import"
+    },
+    timezone
+  );
+  await withActor(actor, async (tx) => {
+    await tx`
+      update statement_lines
+      set match_status = 'created',
+          matched_transaction_id = ${created.transaction.id},
+          match_confidence = 100
+      where id = ${lineId} and household_id = ${actor.householdId}
+    `;
+  });
+  return {
+    id: lineId,
+    match_status: "created",
+    transaction: created.transaction,
+    account: created.account
+  };
+}
+
 // src/services/beneficiaries.ts
 function assertNotReservedName(name) {
   if (isNoBeneficiarySentinel(name)) {
@@ -18634,7 +19443,7 @@ async function ingestReceipt(actor, input) {
 // src/services/insights.ts
 var WEEKDAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 var MAX_TX_LIST = 80;
-function daysBetween(from, to) {
+function daysBetween2(from, to) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 864e5) + 1;
 }
 function weekday(date) {
@@ -18685,8 +19494,8 @@ function buildInsights(input) {
   const totalDiscount = rows.reduce((s, r) => s + Math.max(0, Number(r.discount ?? 0)), 0);
   const discountedCount = rows.filter((r) => Number(r.discount ?? 0) > 0).length;
   const effectiveTo = today < period.to && today >= period.from ? today : period.to;
-  const daysElapsed = Math.max(1, daysBetween(period.from, effectiveTo));
-  const daysInPeriod = daysBetween(period.from, period.to);
+  const daysElapsed = Math.max(1, daysBetween2(period.from, effectiveTo));
+  const daysInPeriod = daysBetween2(period.from, period.to);
   const perDay = Math.round(total / daysElapsed);
   const ongoing = effectiveTo !== period.to;
   const projected = ongoing ? Math.round(total / daysElapsed * daysInPeriod) : total;
@@ -18886,7 +19695,7 @@ async function analyzeSpending(actor, input) {
     let previous = null;
     if (input.compare !== false) {
       const effectiveTo = today < period.to && today >= period.from ? today : period.to;
-      const len = daysBetween(period.from, effectiveTo);
+      const len = daysBetween2(period.from, effectiveTo);
       const isMonth = /^\d{4}-\d{2}-01$/.test(period.from);
       let pFrom;
       let pTo;
@@ -19956,6 +20765,146 @@ function isToolsUnreliable(provider, model) {
   return UNRELIABLE_PROVIDERS.includes(provider ?? "") || UNRELIABLE_MODELS.includes(model ?? "");
 }
 var INVESTMENTS_TOOL_DEF = { name: "get_investments", description: "Ambil semua aset investasi (emas, saham, reksa dana, dll.) beserta modal, nilai sekarang, dan gain/loss.", parameters: { type: "object", properties: {} } };
+var CREATE_INVESTMENT_TOOL_DEF = {
+  name: "create_investment",
+  description: "Tambah aset investasi baru (emas, saham, reksa dana, deposito, properti, dll).",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: 'Nama aset investasi, mis. "Emas Antam", "BBCA"' },
+      type: { type: "string", enum: ["reksa_dana", "saham", "emas", "crypto", "deposito", "properti", "obligasi", "lainnya"] },
+      buy_price: { type: "number", description: "Modal beli total dalam Rupiah" },
+      current_value: { type: "number", description: "Nilai pasar saat ini dalam Rupiah" },
+      quantity: { type: "number", description: "Jumlah unit/gram/lot (opsional)" },
+      unit: { type: "string", description: 'Satuan, mis. "gram", "lot", "unit"' }
+    },
+    required: ["name", "type", "buy_price"]
+  }
+};
+var SET_BUDGET_TOOL_DEF = {
+  name: "set_budget",
+  description: 'Pasang atau ubah batas anggaran bulanan untuk satu kategori pengeluaran (mis. "pasang budget Makanan 3 juta bulan ini").',
+  parameters: {
+    type: "object",
+    properties: {
+      category: { type: "string", description: "Nama kategori pengeluaran dari list_categories" },
+      amount: { type: "number", description: "Batas anggaran bulanan dalam Rupiah" },
+      month: { type: "string", description: "Bulan format YYYY-MM (opsional, default bulan berjalan)" }
+    },
+    required: ["category", "amount"]
+  }
+};
+var CREATE_GOAL_TOOL_DEF = {
+  name: "create_goal",
+  description: 'Buat target finansial / tabungan baru (mis. "buat target Dana Darurat 30 juta").',
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Nama target tabungan" },
+      target: { type: "number", description: "Nominal target dalam Rupiah" },
+      opening_amount: { type: "number", description: "Saldo awal yang sudah terkumpul (opsional, default 0)" },
+      deadline: { type: "string", description: "Target tanggal tercapai YYYY-MM-DD (opsional)" }
+    },
+    required: ["name", "target"]
+  }
+};
+var CREATE_DEBT_TOOL_DEF = {
+  name: "create_debt",
+  description: "Catat hutang atau cicilan baru keluarga (mis. KPR, cicilan motor, pinjaman).",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Nama hutang/cicilan" },
+      total: { type: "number", description: "Total pokok hutang dalam Rupiah" },
+      monthly: { type: "number", description: "Cicilan per bulan dalam Rupiah (opsional, default 0)" },
+      due_date: { type: "string", description: "Jatuh tempo YYYY-MM-DD (opsional)" },
+      notes: { type: "string", description: "Catatan tambahan (opsional)" }
+    },
+    required: ["name", "total"]
+  }
+};
+var CREATE_PIUTANG_TOOL_DEF = {
+  name: "create_piutang",
+  description: "Catat piutang baru (uang yang dipinjamkan ke orang lain atau talangan/titipan).",
+  parameters: {
+    type: "object",
+    properties: {
+      borrower_name: { type: "string", description: "Nama peminjam / orang yang berhutang ke kita" },
+      total: { type: "number", description: "Nominal piutang dalam Rupiah" },
+      from_account: { type: "string", description: "Nama akun sumber dana jika memotong saldo akun (opsional)" },
+      due_date: { type: "string", description: "Jatuh tempo janji bayar YYYY-MM-DD (opsional)" },
+      notes: { type: "string", description: "Keterangan piutang (opsional)" }
+    },
+    required: ["borrower_name", "total"]
+  }
+};
+var CREATE_RECURRING_TOOL_DEF = {
+  name: "create_recurring",
+  description: "Buat jadwal transaksi berulang / tagihan rutin otomatis (listrik, internet, SPP, gaji).",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Nama tagihan/transaksi rutin" },
+      type: { type: "string", enum: ["expense", "income"], description: "Tipe transaksi (default expense)" },
+      amount: { type: "number", description: "Nominal dalam Rupiah" },
+      category: { type: "string", description: "Nama kategori" },
+      account: { type: "string", description: "Nama akun pembayar/penerima" },
+      frequency: { type: "string", enum: ["daily", "weekly", "monthly", "yearly"], description: "Frekuensi (default monthly)" },
+      next_date: { type: "string", description: "Tanggal eksekusi berikutnya YYYY-MM-DD" }
+    },
+    required: ["name", "amount", "category", "account"]
+  }
+};
+var LIST_SPLIT_BILLS_TOOL_DEF = {
+  name: "list_split_bills",
+  description: "Lihat daftar Split Bill (patungan) beserta status bayar tiap peserta.",
+  parameters: { type: "object", properties: {} }
+};
+var CREATE_SPLIT_BILL_TOOL_DEF = {
+  name: "create_split_bill",
+  description: "Buat catatan Split Bill (patungan makan/acara bersama teman atau keluarga).",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: 'Judul patungan, mis. "Makan Malam Keluarga"' },
+      total_amount: { type: "number", description: "Total tagihan dalam Rupiah" },
+      date: { type: "string", description: "Tanggal YYYY-MM-DD (opsional)" },
+      members: {
+        type: "array",
+        description: "Daftar peserta patungan dan porsi bayarnya",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Nama peserta" },
+            amount: { type: "number", description: "Nominal bagian peserta dalam Rupiah" }
+          },
+          required: ["name", "amount"]
+        }
+      }
+    },
+    required: ["title", "total_amount", "members"]
+  }
+};
+var ADD_PANTRY_ITEM_TOOL_DEF = {
+  name: "add_pantry_item",
+  description: "Tambah barang baru ke Stok Kulkas & Rumah (pantry).",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: 'Nama barang, mis. "Telur Ayam", "Beras"' },
+      qty: { type: "number", description: "Jumlah stok saat ini" },
+      unit: { type: "string", description: 'Satuan, mis. "butir", "kg", "pcs", "botol"' },
+      location: { type: "string", description: "Lokasi simpan: kulkas / freezer / rak / lainnya" },
+      min_qty: { type: "number", description: "Batas minimum stok untuk pengingat belanja (opsional)" }
+    },
+    required: ["name", "qty", "unit"]
+  }
+};
+var LIST_RECONCILIATION_TOOL_DEF = {
+  name: "list_bank_statement_imports",
+  description: "Lihat daftar riwayat impor Cek Mutasi Bank (rekonsiliasi rekening koran CSV/foto mutasi).",
+  parameters: { type: "object", properties: {} }
+};
 var MEMORY_TOOL_DEF = {
   name: "memory",
   description: "Simpan, ubah, hapus ingatan jangka panjang keluarga (MEMORY.md/USER.md lintas Web, WA & Telegram) atau cari riwayat obrolan lama (action=search_history).",
@@ -19973,7 +20922,18 @@ var MEMORY_TOOL_DEF = {
 };
 function buildToolDefs(allowWrite, features) {
   const fromRegistry = TOOLS.filter((t) => t.scope === "read" || allowWrite).filter((t) => !t.feature || features[t.feature].enabled).map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-  return [...fromRegistry, INVESTMENTS_TOOL_DEF, MEMORY_TOOL_DEF];
+  const extraRead = [INVESTMENTS_TOOL_DEF, LIST_SPLIT_BILLS_TOOL_DEF, LIST_RECONCILIATION_TOOL_DEF, MEMORY_TOOL_DEF];
+  const extraWrite = allowWrite ? [
+    CREATE_INVESTMENT_TOOL_DEF,
+    SET_BUDGET_TOOL_DEF,
+    CREATE_GOAL_TOOL_DEF,
+    CREATE_DEBT_TOOL_DEF,
+    CREATE_PIUTANG_TOOL_DEF,
+    CREATE_RECURRING_TOOL_DEF,
+    CREATE_SPLIT_BILL_TOOL_DEF,
+    ...features.shopping_stock.enabled ? [ADD_PANTRY_ITEM_TOOL_DEF] : []
+  ] : [];
+  return [...fromRegistry, ...extraRead, ...extraWrite];
 }
 async function executeTool(actor, name, args, gatekeeperKey) {
   if (name === "memory") {
@@ -20022,6 +20982,125 @@ Modal: ${fmtRp3(totalModal)} | Nilai: ${fmtRp3(totalNilai)}
 ${rows}`,
       isWrite: false
     };
+  }
+  if (name === "create_investment") {
+    const buyPrice = Number(args.buy_price ?? 0);
+    const inv = await createInvestment(actor, {
+      name: String(args.name ?? "Investasi"),
+      type: String(args.type ?? "lainnya"),
+      owner: "me",
+      buy_price: buyPrice,
+      current_value: Number(args.current_value ?? buyPrice),
+      quantity: args.quantity != null ? Number(args.quantity) : void 0,
+      unit: args.unit ? String(args.unit) : "unit"
+    });
+    return { output: `Aset investasi "${String(args.name ?? "Investasi")}" berhasil ditambahkan (${fmtRp3(Number(inv.current_value))}).`, isWrite: true };
+  }
+  if (name === "set_budget") {
+    const month = String(args.month ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 7));
+    const amount = Number(args.amount ?? 0);
+    const cat = String(args.category ?? "");
+    try {
+      const res = await createBudget(actor, { category: cat, amount, month });
+      return { output: `Anggaran kategori "${cat}" untuk ${month} berhasil dipasang: ${fmtRp3(res.amount)}.`, isWrite: true };
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "duplicate_budget") {
+        const existing = await listBudgets(actor, month, "household");
+        const found = existing.find((b2) => b2.category.name.toLowerCase() === cat.toLowerCase());
+        if (found) {
+          await updateBudget(actor, found.id, amount);
+          return { output: `Anggaran kategori "${found.category.name}" untuk ${month} berhasil diperbarui menjadi ${fmtRp3(amount)}.`, isWrite: true };
+        }
+      }
+      throw err;
+    }
+  }
+  if (name === "create_goal") {
+    const g = await createGoal(actor, {
+      name: String(args.name ?? "Target Tabungan"),
+      target: Number(args.target ?? 0),
+      opening_amount: Number(args.opening_amount ?? 0),
+      deadline: args.deadline ? String(args.deadline) : void 0,
+      owner: "me"
+    });
+    return { output: `Target finansial "${g.name}" (${fmtRp3(g.target)}) berhasil dibuat.`, isWrite: true };
+  }
+  if (name === "create_debt") {
+    const d = await createDebt(actor, {
+      name: String(args.name ?? "Hutang / Cicilan"),
+      total: Number(args.total ?? 0),
+      monthly: Number(args.monthly ?? 0),
+      due_date: args.due_date ? String(args.due_date) : void 0,
+      owner: "me",
+      opening_paid: 0,
+      aliases: [],
+      notes: String(args.notes ?? "")
+    });
+    return { output: `Catatan hutang/cicilan "${d.name}" (${fmtRp3(d.total)}) berhasil dibuat.`, isWrite: true };
+  }
+  if (name === "create_piutang") {
+    const tz = await getHouseholdTimezone(actor);
+    const p = await createPiutang(
+      actor,
+      {
+        borrower_name: String(args.borrower_name ?? "Peminjam"),
+        total: Number(args.total ?? 0),
+        from_account: args.from_account ? String(args.from_account) : void 0,
+        owner: "me",
+        due_date: args.due_date ? String(args.due_date) : void 0,
+        notes: String(args.notes ?? "")
+      },
+      tz
+    );
+    return { output: `Catatan piutang dibuat: ${JSON.stringify(p)}`, isWrite: true };
+  }
+  if (name === "create_recurring") {
+    const r = await createRecurring(actor, {
+      name: String(args.name ?? "Tagihan Rutin"),
+      type: args.type === "income" ? "income" : "expense",
+      amount: Number(args.amount ?? 0),
+      category: String(args.category ?? "Utilitas"),
+      account: String(args.account ?? ""),
+      frequency: String(args.frequency ?? "monthly"),
+      next_date: String(args.next_date ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)),
+      notes: ""
+    });
+    return { output: `Transaksi berulang "${r.name}" (${fmtRp3(r.amount)} / ${r.frequency}) berhasil dijadwalkan.`, isWrite: true };
+  }
+  if (name === "list_split_bills") {
+    const bills = await listSplitBills(actor);
+    if (!bills.length) return { output: "Belum ada catatan Split Bill.", isWrite: false };
+    return {
+      output: bills.map((b2) => `- ${b2.title} (${b2.date}): Total ${fmtRp3(b2.total_amount)} | Peserta: ${b2.members.map((m) => `${m.name} ${fmtRp3(m.amount)} (${m.paid ? "Lunas" : "Belum"})`).join(", ")}`).join("\n"),
+      isWrite: false
+    };
+  }
+  if (name === "create_split_bill") {
+    const members = Array.isArray(args.members) ? args.members.map((m) => ({ name: String(m.name), amount: Number(m.amount) })) : [];
+    const sb = await createSplitBill(actor, {
+      title: String(args.title ?? "Patungan"),
+      total_amount: Number(args.total_amount ?? 0),
+      date: String(args.date ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)),
+      members
+    });
+    return { output: `Split Bill "${sb.title}" (${fmtRp3(sb.total_amount)}) dengan ${sb.members.length} peserta berhasil dibuat.`, isWrite: true };
+  }
+  if (name === "add_pantry_item") {
+    const item = await createPantryItem(actor, {
+      name: String(args.name ?? "Item"),
+      qty: Number(args.qty ?? 1),
+      unit: String(args.unit ?? "pcs"),
+      location: args.location ? String(args.location) : "kulkas",
+      min_qty: args.min_qty != null ? Number(args.min_qty) : void 0,
+      expires_estimated: false,
+      aliases: []
+    });
+    return { output: `Stok "${item.name}" (${item.qty} ${item.unit} di ${item.location}) berhasil ditambahkan.`, isWrite: true };
+  }
+  if (name === "list_bank_statement_imports") {
+    const imps = await listStatementImports(actor);
+    if (!imps.data.length) return { output: "Belum ada riwayat impor Cek Mutasi Bank.", isWrite: false };
+    return { output: JSON.stringify(imps.data), isWrite: false };
   }
   const tool = toolByName(name);
   if (!tool) return { output: `Tool "${name}" tidak dikenal.`, isWrite: false };
@@ -23051,815 +24130,6 @@ whatsappApp.openapi(
     return c.json(data, 200);
   }
 );
-
-// src/services/reconciliation.ts
-import { createHash as createHash3 } from "node:crypto";
-function normDesc(text) {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-function computeFingerprint(accountId, line, seq) {
-  const payload = [
-    accountId,
-    line.date,
-    String(Math.round(line.amount)),
-    line.direction,
-    (line.ref_no ?? "").trim().toLowerCase(),
-    normDesc(line.description),
-    String(seq)
-  ].join("|");
-  return createHash3("sha256").update(payload).digest("hex");
-}
-function parseMoneyCell(raw2) {
-  if (!raw2) return { amount: 0, sign: null };
-  const upper = raw2.toUpperCase().trim();
-  let sign3 = null;
-  if (/\bDB\b|\bDEBET\b|\bDEBIT\b|\bKELUAR\b|\bOUT\b/.test(upper) || upper.startsWith("-") || upper.startsWith("(") && upper.endsWith(")")) {
-    sign3 = "out";
-  } else if (/\bCR\b|\bKREDIT\b|\bCREDIT\b|\bMASUK\b|\bIN\b/.test(upper) || upper.startsWith("+")) {
-    sign3 = "in";
-  }
-  let cleaned = upper.replace(/IDR|RP/g, "").replace(/\b(DB|CR|DEBET|DEBIT|KREDIT|CREDIT|MASUK|KELUAR|IN|OUT|D|K)\b/g, "").replace(/[()+-]/g, "").trim();
-  if (!cleaned) return { amount: 0, sign: sign3 };
-  if (/,\d{1,2}$/.test(cleaned) && cleaned.includes(".")) {
-    cleaned = cleaned.replace(/\./g, "").replace(/,\d{1,2}$/, "");
-  } else if (/\.\d{1,2}$/.test(cleaned) && cleaned.includes(",")) {
-    cleaned = cleaned.replace(/,/g, "").replace(/\.\d{1,2}$/, "");
-  } else if (/,\d{2}$/.test(cleaned) && !cleaned.includes(".")) {
-    cleaned = cleaned.replace(/,\d{2}$/, "");
-  } else if (/\.\d{2}$/.test(cleaned) && !cleaned.includes(",")) {
-    cleaned = cleaned.replace(/\.\d{2}$/, "");
-  } else {
-    cleaned = cleaned.replace(/[.,\s]/g, "");
-  }
-  const num2 = Number(cleaned.replace(/[^0-9]/g, ""));
-  return { amount: Number.isFinite(num2) ? Math.round(num2) : 0, sign: sign3 };
-}
-var MONTH_MAP = {
-  jan: "01",
-  januari: "01",
-  january: "01",
-  feb: "02",
-  februari: "02",
-  february: "02",
-  mar: "03",
-  maret: "03",
-  march: "03",
-  apr: "04",
-  april: "04",
-  mei: "05",
-  may: "05",
-  jun: "06",
-  juni: "06",
-  june: "06",
-  jul: "07",
-  juli: "07",
-  july: "07",
-  agu: "08",
-  agustus: "08",
-  aug: "08",
-  august: "08",
-  sep: "09",
-  sept: "09",
-  september: "09",
-  okt: "10",
-  oktober: "10",
-  oct: "10",
-  october: "10",
-  nov: "11",
-  november: "11",
-  des: "12",
-  desember: "12",
-  dec: "12",
-  december: "12"
-};
-function parseDateCell(raw2, fallbackYear) {
-  const s = raw2.trim().replace(/^["']|["']$/g, "");
-  if (!s || /^pend/i.test(s)) {
-    return null;
-  }
-  const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (iso) {
-    return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
-  }
-  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
-  if (dmy) {
-    const yr = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
-    return `${yr}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
-  }
-  const dm = s.match(/^(\d{1,2})[-/](\d{1,2})$/);
-  if (dm) {
-    const d = Number(dm[1]);
-    const m = Number(dm[2]);
-    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
-      return `${fallbackYear}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-  }
-  const named = s.match(/^(\d{1,2})\s+([a-zA-Z]+)(?:\s+(\d{2,4}))?/);
-  if (named) {
-    const mon = MONTH_MAP[named[2].toLowerCase()];
-    if (mon) {
-      const yr = named[3] ? named[3].length === 2 ? `20${named[3]}` : named[3] : String(fallbackYear);
-      return `${yr}-${mon}-${named[1].padStart(2, "0")}`;
-    }
-  }
-  return null;
-}
-function splitCsvRow(line, delimiter) {
-  const out = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === delimiter && !inQuotes) {
-      out.push(cur.trim());
-      cur = "";
-    } else {
-      cur += ch;
-    }
-  }
-  out.push(cur.trim());
-  return out;
-}
-function detectDelimiter(lines) {
-  for (const l of lines.slice(0, 15)) {
-    if (!l.trim()) continue;
-    const commas = (l.match(/,/g) || []).length;
-    const semis = (l.match(/;/g) || []).length;
-    const tabs = (l.match(/\t/g) || []).length;
-    if (tabs >= 2 && tabs >= commas && tabs >= semis) return "	";
-    if (semis >= 2 && semis > commas) return ";";
-    if (commas >= 2) return ",";
-  }
-  return ",";
-}
-function parseStatementCsv(csvText, filename, fallbackDate) {
-  const rawLines = csvText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-  if (rawLines.length === 0) {
-    throw new ApiError("statement_parse_error", "File mutasi kosong.");
-  }
-  const delimiter = detectDelimiter(rawLines);
-  let fallbackYear = fallbackDate ? Number(fallbackDate.slice(0, 4)) : (/* @__PURE__ */ new Date()).getFullYear();
-  const todayIso = fallbackDate || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  for (const l of rawLines.slice(0, 10)) {
-    const m = l.match(/\b(20\d{2})\b/);
-    if (m) {
-      fallbackYear = Number(m[1]);
-      break;
-    }
-  }
-  const fname = (filename || "").toLowerCase();
-  let detectedSource = fname.includes("bca") ? "bca_csv" : fname.includes("bri") ? "bri_csv" : fname.includes("mandiri") || fname.includes("livin") ? "mandiri_csv" : fname.includes("gopay") ? "gopay_csv" : "bca_csv";
-  let headerIdx = -1;
-  let colMap = { date: 0, desc: 1, amount: -1, debit: -1, credit: -1, dir: -1, balance: -1, ref: -1 };
-  for (let i = 0; i < Math.min(rawLines.length, 20); i++) {
-    const cells = splitCsvRow(rawLines[i], delimiter).map((c) => c.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim());
-    const hasDate = cells.some((c) => /^(tanggal|tgl|date|posting date|waktu)/.test(c));
-    const hasDesc = cells.some((c) => /(keterangan|uraian|deskripsi|description|remark|catatan|detail|merchant)/.test(c));
-    const hasAmt = cells.some((c) => /(jumlah|mutasi|nominal|amount|debet|debit|kredit|credit|masuk|keluar)/.test(c));
-    if (hasDate && (hasDesc || hasAmt)) {
-      headerIdx = i;
-      colMap = {
-        date: cells.findIndex((c) => /^(tanggal|tgl|date|posting date|waktu)/.test(c)),
-        desc: cells.findIndex((c) => /(keterangan|uraian|deskripsi|description|remark|catatan|detail|merchant)/.test(c)),
-        amount: cells.findIndex((c) => /^(jumlah|mutasi|nominal|amount|nilai)$/.test(c) || c.startsWith("jumlah") || c.startsWith("mutasi")),
-        debit: cells.findIndex((c) => /(debet|debit|keluar|out)/.test(c)),
-        credit: cells.findIndex((c) => /(kredit|credit|masuk|in)/.test(c)),
-        dir: cells.findIndex((c) => /^(status|tipe|type|arus|direction|dbcr|dk)$/.test(c)),
-        balance: cells.findIndex((c) => /(saldo|balance)/.test(c)),
-        ref: cells.findIndex((c) => /(ref|referensi|no ref|rrn|id transaksi)/.test(c))
-      };
-      const headerJoined = cells.join(" ");
-      if (headerJoined.includes("cabang") && headerJoined.includes("jumlah")) detectedSource = "bca_csv";
-      else if (headerJoined.includes("uraian") || headerJoined.includes("debet")) detectedSource = "bri_csv";
-      else if (headerJoined.includes("posting date") || headerJoined.includes("remark")) detectedSource = "mandiri_csv";
-      else if (headerJoined.includes("gopay")) detectedSource = "gopay_csv";
-      break;
-    }
-  }
-  const parsed = [];
-  const startRow = headerIdx >= 0 ? headerIdx + 1 : 0;
-  for (let i = startRow; i < rawLines.length; i++) {
-    const rawLine = rawLines[i];
-    if (/^(saldo awal|mutasi debet|mutasi kredit|saldo akhir|total mutasi|catatan\s*:)/i.test(rawLine.replace(/^["']+/, ""))) {
-      continue;
-    }
-    const cells = splitCsvRow(rawLine, delimiter);
-    if (cells.length < 2) continue;
-    let dateStr = null;
-    let description = "";
-    let amount = 0;
-    let direction = "out";
-    let balanceAfter = null;
-    let refNo = null;
-    if (headerIdx >= 0) {
-      const rawDate = cells[colMap.date] ?? "";
-      dateStr = /^pend/i.test(rawDate.trim()) ? todayIso : parseDateCell(rawDate, fallbackYear);
-      if (!dateStr) continue;
-      description = (cells[colMap.desc] ?? "").trim();
-      if (colMap.ref >= 0 && cells[colMap.ref]) {
-        refNo = cells[colMap.ref].trim() || null;
-      }
-      if (colMap.balance >= 0 && cells[colMap.balance]) {
-        const bal = parseMoneyCell(cells[colMap.balance]).amount;
-        if (bal > 0) balanceAfter = bal;
-      }
-      if (colMap.debit >= 0 && colMap.credit >= 0) {
-        const dVal = parseMoneyCell(cells[colMap.debit] ?? "").amount;
-        const cVal = parseMoneyCell(cells[colMap.credit] ?? "").amount;
-        if (dVal > 0) {
-          amount = dVal;
-          direction = "out";
-        } else if (cVal > 0) {
-          amount = cVal;
-          direction = "in";
-        }
-      } else if (colMap.amount >= 0) {
-        const parsedAmt = parseMoneyCell(cells[colMap.amount] ?? "");
-        amount = parsedAmt.amount;
-        if (colMap.dir >= 0 && cells[colMap.dir]) {
-          const dirCell = parseMoneyCell(cells[colMap.dir]).sign;
-          direction = dirCell ?? parsedAmt.sign ?? "out";
-        } else if (parsedAmt.sign) {
-          direction = parsedAmt.sign;
-        } else {
-          const nextCell = cells[colMap.amount + 1] ?? "";
-          const nextSign = parseMoneyCell(nextCell).sign;
-          direction = nextSign ?? (/(\bcr\b|\bkredit\b|\bmasuk\b|\bgaji\b|\bbunga\b)/i.test(description) ? "in" : "out");
-        }
-      }
-    } else {
-      const firstCell = cells[0] ?? "";
-      dateStr = /^pend/i.test(firstCell.trim()) ? todayIso : parseDateCell(firstCell, fallbackYear);
-      if (!dateStr) continue;
-      description = (cells[1] ?? "").trim();
-      for (let c = 2; c < cells.length; c++) {
-        const cell = cells[c] ?? "";
-        const p = parseMoneyCell(cell);
-        if (p.amount > 0 && amount === 0) {
-          amount = p.amount;
-          const nextSign = cells[c + 1] ? parseMoneyCell(cells[c + 1]).sign : null;
-          direction = p.sign ?? nextSign ?? "out";
-        } else if (p.amount > 0 && amount > 0 && balanceAfter === null) {
-          balanceAfter = p.amount;
-        }
-      }
-    }
-    if (!dateStr || amount <= 0) continue;
-    if (!refNo && description) {
-      const refMatch = description.match(/\b([A-Z0-9]{4,}\/[A-Z0-9/]{4,}|\d{10,16})\b/);
-      if (refMatch) refNo = refMatch[1];
-    }
-    parsed.push({
-      date: dateStr,
-      amount,
-      direction,
-      description: description || (direction === "in" ? "Mutasi Masuk" : "Mutasi Keluar"),
-      ref_no: refNo,
-      balance_after: balanceAfter
-    });
-  }
-  if (parsed.length === 0) {
-    throw new ApiError(
-      "statement_parse_error",
-      "Tidak ditemukan baris transaksi yang valid. Pastikan file memiliki kolom Tanggal, Keterangan, dan Jumlah/Mutasi."
-    );
-  }
-  return { source: detectedSource, lines: parsed };
-}
-async function scanStatementImage(actor, input) {
-  await requireFeature(actor, "reconciliation");
-  const config = await getAiConfig(actor);
-  const provider = config.provider;
-  const apiKey = config.apiKey;
-  if (!VISION_PROVIDERS.includes(provider)) {
-    throw ApiError.fromCode("provider_no_vision");
-  }
-  const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const prompt = `Kamu adalah asisten keuangan keluarga Indonesia. Baca gambar screenshot mutasi rekening bank / e-wallet (m-BCA, myBCA, BRImo, Livin Mandiri, BNI, GoPay, OVO, ShopeePay, SeaBank, Jago) ini dan ekstrak semua baris mutasi transaksi.
-
-Kembalikan HANYA JSON dengan format:
-{
-  "bank_name": "BCA / BRI / Mandiri / GoPay / dll",
-  "lines": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "Keterangan mutasi / nama merchant / transfer",
-      "amount": 50000,
-      "direction": "out",
-      "ref_no": null,
-      "balance_after": null
-    }
-  ]
-}
-Aturan:
-- date: format YYYY-MM-DD (jika di layar hanya tertulis tanggal & bulan seperti "15 Okt" atau "15/10", gunakan tahun ${currentYear}).
-- amount: angka bulat positif dalam Rupiah tanpa titik/koma.
-- direction: "out" untuk uang keluar (DB / Debet / tanda minus / warna merah) atau "in" untuk uang masuk (CR / Kredit / tanda plus / warna hijau).
-- balance_after: saldo setelah transaksi bila tertulis di baris itu (angka bulat), atau null.
-- Jangan lewatkan satu baris pun yang terlihat jelas.`;
-  const raw2 = await callProviderJson(
-    buildVisionRequest(provider, apiKey, input.image_base64, input.mime_type, prompt),
-    provider
-  );
-  const rawLines = Array.isArray(raw2.lines) ? raw2.lines : [];
-  const lines = [];
-  for (const item of rawLines) {
-    if (!item || typeof item !== "object") continue;
-    const r = item;
-    const date = parseDateCell(String(r.date ?? ""), currentYear) ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    const amount = Math.round(Number(r.amount ?? 0));
-    if (!Number.isFinite(amount) || amount <= 0) continue;
-    const dirRaw = String(r.direction ?? "out").toLowerCase();
-    const direction = dirRaw === "in" || dirRaw === "cr" || dirRaw === "credit" ? "in" : "out";
-    const description = String(r.description ?? "").trim() || (direction === "in" ? "Mutasi Masuk" : "Mutasi Keluar");
-    const balanceAfter = r.balance_after != null && Number(r.balance_after) > 0 ? Math.round(Number(r.balance_after)) : null;
-    const refNo = r.ref_no ? String(r.ref_no).trim() : null;
-    lines.push({ date, amount, direction, description, ref_no: refNo, balance_after: balanceAfter });
-  }
-  if (lines.length === 0) {
-    throw new ApiError("statement_parse_error", "Tidak dapat menemukan baris mutasi dari gambar ini.");
-  }
-  return {
-    bank_name: typeof raw2.bank_name === "string" ? raw2.bank_name : null,
-    lines
-  };
-}
-function daysBetween2(d1, d2) {
-  const t1 = (/* @__PURE__ */ new Date(`${d1}T00:00:00Z`)).getTime();
-  const t2 = (/* @__PURE__ */ new Date(`${d2}T00:00:00Z`)).getTime();
-  return Math.round(Math.abs(t1 - t2) / 864e5);
-}
-function shiftDate(isoDate, deltaDays) {
-  const d = /* @__PURE__ */ new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + deltaDays);
-  return d.toISOString().slice(0, 10);
-}
-function jaccardSimilarity(a, b2) {
-  const stopWords = /* @__PURE__ */ new Set(["trsf", "ebanking", "db", "cr", "pembayaran", "transfer", "qris", "ke", "dari", "pt", "tbk", "id", "idr"]);
-  const tokensA = new Set(
-    normDesc(a).split(" ").filter((w) => w.length >= 2 && !stopWords.has(w))
-  );
-  const tokensB = new Set(
-    normDesc(b2).split(" ").filter((w) => w.length >= 2 && !stopWords.has(w))
-  );
-  if (tokensA.size === 0 || tokensB.size === 0) return 0;
-  let inter = 0;
-  for (const t of tokensA) {
-    if (tokensB.has(t)) inter++;
-  }
-  const union = tokensA.size + tokensB.size - inter;
-  return union > 0 ? inter / union : 0;
-}
-function scorePair(line, tx) {
-  const diff = daysBetween2(line.date, tx.date);
-  if (diff > 3) return -1;
-  let score = diff === 0 ? 50 : diff === 1 ? 35 : diff === 2 ? 20 : 5;
-  const noteLow = (tx.note || "").toLowerCase();
-  const descLow = normDesc(line.description);
-  if (line.ref_no && line.ref_no.length >= 4 && noteLow.includes(line.ref_no.toLowerCase())) {
-    score += 40;
-  }
-  const jacc = jaccardSimilarity(line.description, `${tx.note} ${tx.category_name}`);
-  score += Math.round(jacc * 20);
-  const txWords = normDesc(tx.note).split(" ").filter((w) => w.length >= 4 && !["rekon", "transfer", "belanja", "makan"].includes(w));
-  if (txWords.some((w) => descLow.includes(w))) {
-    score += 15;
-  }
-  return Math.min(100, score);
-}
-async function importStatement(actor, input) {
-  assertScope(actor, "write");
-  await requireFeature(actor, "reconciliation");
-  let parsedSource = input.source ?? "manual";
-  let parsedLines = [];
-  if (input.csv_text && input.csv_text.trim()) {
-    const res = parseStatementCsv(input.csv_text, input.filename);
-    parsedSource = input.source ?? res.source;
-    parsedLines = res.lines;
-  } else if (Array.isArray(input.lines) && input.lines.length > 0) {
-    parsedLines = input.lines.map((l, idx) => {
-      const amt = Math.round(Number(l.amount));
-      if (!l.date || !/^\d{4}-\d{2}-\d{2}$/.test(l.date) || !Number.isFinite(amt) || amt <= 0) {
-        throw new ApiError("statement_parse_error", `Baris ke-${idx + 1} tidak valid.`, {
-          details: { line: idx + 1 }
-        });
-      }
-      return {
-        date: l.date,
-        amount: amt,
-        direction: l.direction === "in" ? "in" : "out",
-        description: (l.description || "").trim() || (l.direction === "in" ? "Mutasi Masuk" : "Mutasi Keluar"),
-        ref_no: l.ref_no ?? null,
-        balance_after: l.balance_after != null ? Math.round(Number(l.balance_after)) : null
-      };
-    });
-  } else {
-    throw new ApiError("statement_parse_error", "Kirimkan file CSV (csv_text) atau daftar baris mutasi (lines).");
-  }
-  return withActor(actor, async (tx) => {
-    const accountId = await resolveAccountRef(tx, actor, input, "account");
-    const dates = parsedLines.map((l) => l.date).sort();
-    const periodFrom = dates[0];
-    const periodTo = dates[dates.length - 1];
-    const [imp] = await tx`
-      insert into statement_imports (
-        household_id, account_id, source, filename, imported_by_member_id, period_from, period_to, line_count
-      ) values (
-        ${actor.householdId}, ${accountId}, ${parsedSource}, ${input.filename ?? null},
-        ${actor.memberId}, ${periodFrom}, ${periodTo}, ${parsedLines.length}
-      )
-      returning id, created_at::text
-    `;
-    const seqCounter = /* @__PURE__ */ new Map();
-    const lineIds = [];
-    for (const line of parsedLines) {
-      const baseKey = [
-        line.date,
-        String(line.amount),
-        line.direction,
-        (line.ref_no ?? "").trim().toLowerCase(),
-        normDesc(line.description)
-      ].join("|");
-      const seq = (seqCounter.get(baseKey) ?? 0) + 1;
-      seqCounter.set(baseKey, seq);
-      const fp = computeFingerprint(accountId, line, seq);
-      const [upserted] = await tx`
-        insert into statement_lines (
-          import_id, household_id, account_id, date, amount, direction,
-          description, ref_no, balance_after, seq, fingerprint
-        ) values (
-          ${imp.id}, ${actor.householdId}, ${accountId}, ${line.date}, ${line.amount}, ${line.direction},
-          ${line.description}, ${line.ref_no ?? null}, ${line.balance_after ?? null}, ${seq}, ${fp}
-        )
-        on conflict (account_id, fingerprint) do update set
-          import_id = excluded.import_id,
-          balance_after = coalesce(excluded.balance_after, statement_lines.balance_after)
-        returning id
-      `;
-      lineIds.push(upserted.id);
-    }
-    await runMatchingForImport(tx, actor.householdId, accountId, imp.id, periodFrom, periodTo);
-    return getStatementImportDetailInTx(tx, actor, imp.id);
-  });
-}
-async function runMatchingForImport(tx, householdId, accountId, importId, periodFrom, periodTo) {
-  const lines = await tx`
-    select id, date::text, amount::text, direction, description, ref_no, match_status, matched_transaction_id
-    from statement_lines
-    where import_id = ${importId} and household_id = ${householdId}
-    order by date asc, seq asc
-  `;
-  const lockedRows = await tx`
-    select matched_transaction_id
-    from statement_lines
-    where household_id = ${householdId}
-      and account_id = ${accountId}
-      and matched_transaction_id is not null
-      and match_status in ('matched', 'created')
-      and import_id <> ${importId}
-  `;
-  const usedTxIds = new Set(lockedRows.map((r) => r.matched_transaction_id));
-  for (const l of lines) {
-    if ((l.match_status === "matched" || l.match_status === "created") && l.matched_transaction_id) {
-      usedTxIds.add(l.matched_transaction_id);
-    }
-  }
-  const searchFrom = shiftDate(periodFrom, -3);
-  const searchTo = shiftDate(periodTo, 3);
-  const candidates = await tx`
-    select
-      t.id, t.type, t.amount::text, t.date::text, t.note,
-      coalesce(c.name, 'Transfer') as category_name,
-      t.account_id, t.to_account_id
-    from transactions t
-    left join categories c on c.id = t.category_id
-    where t.household_id = ${householdId}
-      and t.deleted_at is null
-      and (t.account_id = ${accountId} or t.to_account_id = ${accountId})
-      and t.date between ${searchFrom} and ${searchTo}
-  `;
-  const candidateList = candidates.map((c) => ({
-    ...c,
-    amount: Number(c.amount)
-  }));
-  const unresolvedLines = lines.filter((l) => l.match_status === "unmatched" || l.match_status === "suggested");
-  const pairs = [];
-  for (const l of unresolvedLines) {
-    const lAmt = Number(l.amount);
-    for (const c of candidateList) {
-      if (usedTxIds.has(c.id)) continue;
-      if (c.amount !== lAmt) continue;
-      const cDir = c.type === "income" || c.type === "transfer" && c.to_account_id === accountId ? "in" : "out";
-      if (cDir !== l.direction) continue;
-      const sc = scorePair(
-        {
-          date: l.date,
-          amount: lAmt,
-          direction: l.direction,
-          description: l.description,
-          ref_no: l.ref_no
-        },
-        c
-      );
-      if (sc >= 40) {
-        pairs.push({
-          lineId: l.id,
-          txId: c.id,
-          score: sc,
-          dateDiff: daysBetween2(l.date, c.date)
-        });
-      }
-    }
-  }
-  pairs.sort((a, b2) => b2.score - a.score || a.dateDiff - b2.dateDiff);
-  const assignedLines = /* @__PURE__ */ new Set();
-  for (const p of pairs) {
-    if (assignedLines.has(p.lineId) || usedTxIds.has(p.txId)) continue;
-    assignedLines.add(p.lineId);
-    usedTxIds.add(p.txId);
-    const status = p.score >= 60 ? "matched" : "suggested";
-    await tx`
-      update statement_lines
-      set match_status = ${status},
-          matched_transaction_id = ${p.txId},
-          match_confidence = ${p.score}
-      where id = ${p.lineId}
-    `;
-  }
-  for (const l of unresolvedLines) {
-    if (!assignedLines.has(l.id)) {
-      await tx`
-        update statement_lines
-        set match_status = 'unmatched',
-            matched_transaction_id = null,
-            match_confidence = null
-        where id = ${l.id}
-      `;
-    }
-  }
-}
-async function listStatementImports(actor, accountId) {
-  await requireFeature(actor, "reconciliation");
-  return withActor(actor, async (tx) => {
-    const rows = await tx`
-      select
-        si.id,
-        si.account_id,
-        a.name as account_name,
-        si.source,
-        si.filename,
-        si.period_from::text,
-        si.period_to::text,
-        si.line_count,
-        si.created_at::text,
-        count(*) filter (where sl.match_status = 'matched')::text as matched_count,
-        count(*) filter (where sl.match_status = 'suggested')::text as suggested_count,
-        count(*) filter (where sl.match_status = 'unmatched')::text as unmatched_count,
-        count(*) filter (where sl.match_status = 'created')::text as created_count,
-        count(*) filter (where sl.match_status = 'ignored')::text as ignored_count
-      from statement_imports si
-      join accounts a on a.id = si.account_id
-      left join statement_lines sl on sl.import_id = si.id
-      where si.household_id = ${actor.householdId}
-        and (${accountId ?? null}::uuid is null or si.account_id = ${accountId ?? null}::uuid)
-      group by si.id, a.name
-      order by si.created_at desc
-      limit 30
-    `;
-    return {
-      data: rows.map((r) => ({
-        id: r.id,
-        account: { id: r.account_id, name: r.account_name },
-        source: r.source,
-        filename: r.filename,
-        period_from: r.period_from,
-        period_to: r.period_to,
-        line_count: Number(r.line_count),
-        created_at: r.created_at,
-        summary: {
-          matched: Number(r.matched_count),
-          suggested: Number(r.suggested_count),
-          unmatched: Number(r.unmatched_count),
-          created: Number(r.created_count),
-          ignored: Number(r.ignored_count)
-        }
-      }))
-    };
-  });
-}
-async function getStatementImportDetailInTx(tx, actor, importId) {
-  const [imp] = await tx`
-    select
-      si.id, si.account_id, a.name as account_name, si.source, si.filename,
-      si.period_from::text, si.period_to::text, si.line_count, si.created_at::text
-    from statement_imports si
-    join accounts a on a.id = si.account_id
-    where si.id = ${importId} and si.household_id = ${actor.householdId}
-  `;
-  if (!imp) throw ApiError.fromCode("not_found");
-  const lines = await tx`
-    select
-      sl.id, sl.date::text, sl.amount::text, sl.direction, sl.description,
-      sl.ref_no, sl.balance_after::text, sl.seq, sl.match_status,
-      sl.matched_transaction_id, sl.match_confidence,
-      t.note as tx_note, t.date::text as tx_date, t.amount::text as tx_amount,
-      coalesce(c.name, 'Transfer') as tx_category_name
-    from statement_lines sl
-    left join transactions t on t.id = sl.matched_transaction_id and t.deleted_at is null
-    left join categories c on c.id = t.category_id
-    where sl.import_id = ${importId} and sl.household_id = ${actor.householdId}
-    order by sl.date desc, sl.seq asc
-  `;
-  const unmatchedKaraya = imp.period_from && imp.period_to ? await tx`
-          select
-            t.id, t.date::text, t.type, t.amount::text, t.note,
-            coalesce(c.name, 'Transfer') as category_name
-          from transactions t
-          left join categories c on c.id = t.category_id
-          where t.household_id = ${actor.householdId}
-            and t.deleted_at is null
-            and (t.account_id = ${imp.account_id} or t.to_account_id = ${imp.account_id})
-            and t.date between ${imp.period_from} and ${imp.period_to}
-            and not exists (
-              select 1 from statement_lines sl
-              where sl.household_id = ${actor.householdId}
-                and sl.account_id = ${imp.account_id}
-                and sl.matched_transaction_id = t.id
-                and sl.match_status in ('matched', 'created', 'suggested')
-            )
-          order by t.date desc
-        ` : [];
-  const [balRow] = await tx`
-    select coalesce(balance, 0)::text as balance
-    from v_account_balances
-    where account_id = ${imp.account_id}
-  `;
-  const karayaBalance = Number(balRow?.balance ?? 0);
-  const lineWithBalance = lines.find((l) => l.balance_after != null);
-  const statementEndingBalance = lineWithBalance?.balance_after != null ? Number(lineWithBalance.balance_after) : null;
-  const mappedLines = lines.map((l) => ({
-    id: l.id,
-    date: l.date,
-    amount: Number(l.amount),
-    direction: l.direction,
-    description: l.description,
-    ref_no: l.ref_no,
-    balance_after: l.balance_after != null ? Number(l.balance_after) : null,
-    seq: l.seq,
-    match_status: l.match_status,
-    match_confidence: l.match_confidence,
-    matched_transaction: l.matched_transaction_id ? {
-      id: l.matched_transaction_id,
-      date: l.tx_date,
-      amount: l.tx_amount != null ? Number(l.tx_amount) : Number(l.amount),
-      note: l.tx_note,
-      category_name: l.tx_category_name
-    } : null
-  }));
-  const counts = {
-    matched: mappedLines.filter((l) => l.match_status === "matched").length,
-    suggested: mappedLines.filter((l) => l.match_status === "suggested").length,
-    unmatched_statement: mappedLines.filter((l) => l.match_status === "unmatched").length,
-    created: mappedLines.filter((l) => l.match_status === "created").length,
-    ignored: mappedLines.filter((l) => l.match_status === "ignored").length,
-    unmatched_karaya: unmatchedKaraya.length
-  };
-  return {
-    import: {
-      id: imp.id,
-      account: { id: imp.account_id, name: imp.account_name },
-      source: imp.source,
-      filename: imp.filename,
-      period_from: imp.period_from,
-      period_to: imp.period_to,
-      line_count: Number(imp.line_count),
-      created_at: imp.created_at
-    },
-    summary: counts,
-    balance_comparison: {
-      karaya_balance: karayaBalance,
-      statement_ending_balance: statementEndingBalance,
-      diff: statementEndingBalance != null ? statementEndingBalance - karayaBalance : null
-    },
-    lines: mappedLines,
-    unmatched_karaya: unmatchedKaraya.map((t) => ({
-      id: t.id,
-      date: t.date,
-      type: t.type,
-      amount: Number(t.amount),
-      note: t.note,
-      category_name: t.category_name
-    }))
-  };
-}
-async function getStatementImportDetail(actor, importId) {
-  await requireFeature(actor, "reconciliation");
-  return withActor(actor, (tx) => getStatementImportDetailInTx(tx, actor, importId));
-}
-async function confirmStatementLine(actor, lineId, transactionId) {
-  assertScope(actor, "write");
-  await requireFeature(actor, "reconciliation");
-  return withActor(actor, async (tx) => {
-    const [line] = await tx`
-      select id, match_status from statement_lines
-      where id = ${lineId} and household_id = ${actor.householdId}
-      for update
-    `;
-    if (!line) throw ApiError.fromCode("statement_line_not_found");
-    if (line.match_status === "created") {
-      throw ApiError.fromCode("statement_line_already_resolved");
-    }
-    const [targetTx] = await tx`
-      select id from transactions
-      where id = ${transactionId} and household_id = ${actor.householdId} and deleted_at is null
-    `;
-    if (!targetTx) throw ApiError.fromCode("transaction_not_found");
-    await tx`
-      update statement_lines
-      set match_status = 'matched',
-          matched_transaction_id = ${transactionId},
-          match_confidence = 100
-      where id = ${lineId}
-    `;
-    return { id: lineId, match_status: "matched", matched_transaction_id: transactionId };
-  });
-}
-async function ignoreStatementLine(actor, lineId) {
-  assertScope(actor, "write");
-  await requireFeature(actor, "reconciliation");
-  return withActor(actor, async (tx) => {
-    const [line] = await tx`
-      select id, match_status from statement_lines
-      where id = ${lineId} and household_id = ${actor.householdId}
-      for update
-    `;
-    if (!line) throw ApiError.fromCode("statement_line_not_found");
-    await tx`
-      update statement_lines
-      set match_status = 'ignored',
-          matched_transaction_id = null
-      where id = ${lineId}
-    `;
-    return { id: lineId, match_status: "ignored" };
-  });
-}
-async function acceptStatementLine(actor, lineId, input, timezone) {
-  assertScope(actor, "write");
-  await requireFeature(actor, "reconciliation");
-  const lineInfo = await withActor(actor, async (tx) => {
-    const [line] = await tx`
-      select id, account_id, date::text, amount::text, direction, description, match_status
-      from statement_lines
-      where id = ${lineId} and household_id = ${actor.householdId}
-      for update
-    `;
-    if (!line) throw ApiError.fromCode("statement_line_not_found");
-    if (line.match_status === "created" || line.match_status === "matched") {
-      throw ApiError.fromCode("statement_line_already_resolved");
-    }
-    return line;
-  });
-  const txType = lineInfo.direction === "in" ? "income" : "expense";
-  const noteText = input.note?.trim() ? input.note.trim() : `[REKON] ${lineInfo.description}`;
-  const created = await createTransaction(
-    actor,
-    {
-      type: txType,
-      account_id: lineInfo.account_id,
-      amount: Number(lineInfo.amount),
-      date: lineInfo.date,
-      note: noteText,
-      category_id: input.category_id,
-      category: input.category ?? "Lainnya",
-      beneficiary_id: input.beneficiary_id,
-      beneficiary: input.beneficiary,
-      source: "import"
-    },
-    timezone
-  );
-  await withActor(actor, async (tx) => {
-    await tx`
-      update statement_lines
-      set match_status = 'created',
-          matched_transaction_id = ${created.transaction.id},
-          match_confidence = 100
-      where id = ${lineId} and household_id = ${actor.householdId}
-    `;
-  });
-  return {
-    id: lineId,
-    match_status: "created",
-    transaction: created.transaction,
-    account: created.account
-  };
-}
 
 // src/routes/reconciliation.ts
 var reconciliationApp = new OpenAPIHono();
