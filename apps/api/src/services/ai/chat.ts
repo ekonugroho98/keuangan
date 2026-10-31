@@ -6,6 +6,7 @@ import { getSummary } from '../summary'
 import { listAccounts } from '../accounts'
 import { listCategories } from '../categories'
 import { listMembers } from '../households'
+import { getBudgetStatus } from '../budgets'
 import { listDebts } from '../debts'
 import { listGoals } from '../goals'
 import { listInvestments } from '../investments'
@@ -112,13 +113,15 @@ async function executeTool(
 
 async function buildLiveSnapshot(actor: Actor): Promise<string> {
   try {
-    const [thisMonth, { data: accounts, totals: accountTotals }, categories, members] = await Promise.all([
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const [thisMonth, { data: accounts, totals: accountTotals }, categories, members, budgetStatus] = await Promise.all([
       getSummary(actor, { period: 'this_month', scope: 'household', attribution: 'owner', compare: false }),
       listAccounts(actor),
       listCategories(actor, 'all'),
       listMembers(actor),
+      getBudgetStatus(actor, currentMonth, 'household').catch(() => null),
     ])
-    const now = new Date()
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
     const remainingDays = Math.max(1, daysInMonth - now.getDate() + 1)
     const sisaKas = thisMonth.totals.income - thisMonth.totals.expense
@@ -137,16 +140,23 @@ async function buildLiveSnapshot(actor: Actor): Promise<string> {
         .slice(0, 6)
         .map((c) => `${c.category}: ${fmtRp(c.spent)} (${c.pct}%)`)
         .join(', ') || '(belum ada pengeluaran)'
+    const budgetLine =
+      budgetStatus?.items?.length
+        ? budgetStatus.items
+            .map((b) => `${b.category.name}: terpakai ${fmtRp(b.spent)} / pagu ${fmtRp(b.amount)} (${b.pct}%, sisa ${fmtRp(b.remaining)})`)
+            .join(' | ')
+        : '(belum ada anggaran kategori)'
     const expCats = categories.filter((c) => c.type === 'expense').map((c) => c.name).join(', ')
     const incCats = categories.filter((c) => c.type === 'income').map((c) => c.name).join(', ')
 
     return [
-      `DATA LIVE KELUARGA SAAT INI (sudah diambil dari DB — JANGAN panggil tool get_summary/list_accounts/list_categories/list_members lagi untuk informasi di bawah ini):`,
+      `DATA LIVE KELUARGA SAAT INI (sudah diambil dari DB — JANGAN panggil tool get_summary/get_budget_status/list_accounts/list_categories/list_members lagi untuk informasi di bawah ini):`,
       `- Anggota Keluarga: ${memberLine}`,
       `- Total Saldo Bersih: ${fmtRp(accountTotals.visible_balance)} (${accounts.length} akun: ${accLine})`,
       `- Bulan Ini (${thisMonth.period.label}): Pemasukan ${fmtRp(thisMonth.totals.income)} | Pengeluaran ${fmtRp(thisMonth.totals.expense)} | Sisa Kas Bulan Ini ${sisaKas >= 0 ? '+' : ''}${fmtRp(sisaKas)} (Rasio sisa/tabungan: ${thisMonth.totals.saving_rate_pct}%)`,
       `- Jatah Aman Harian Sisa Bulan (${remainingDays} hari tersisa): ~${fmtRp(jatahHarian)}/hari`,
       `- Kategori Pengeluaran Terbesar Bulan Ini: ${topCatLine}`,
+      `- Anggaran (Budget) Rumah Tangga Bulan Ini (${currentMonth}): ${budgetLine}`,
       `- Daftar Nama Kategori Valid (gunakan nama persis ini saat filter/catat): Pengeluaran=[${expCats}] | Pemasukan=[${incCats}]`,
     ].join('\n')
   } catch {
@@ -159,8 +169,8 @@ function buildSystemPrompt(userName: string, liveSnapshot = ''): string {
   return `Kamu adalah ${APP_AI_NAME}, asisten keuangan & rumah tangga hangat untuk ${userName}. Hari ini: ${today}.
 
 ATURAN:
-1. Untuk pertanyaan tentang saldo akun, sisa kas bulan ini, jatah aman harian, atau analisis ringkasan pengeluaran bulan ini, JAWAB LANGSUNG menggunakan DATA LIVE di bawah TANPA memanggil tool lagi.
-2. Gunakan tool HANYA jika butuh data spesifik yang belum ada di DATA LIVE (mis. search_transactions untuk rincian daftar transaksi, anggaran, daftar belanja, stok kulkas/rumah, hutang, piutang, goals, investasi) atau saat diminta mencatat/mengubah data.
+1. Untuk pertanyaan tentang saldo akun, sisa kas bulan ini, jatah aman harian, anggaran/budget bulan ini, atau analisis ringkasan pengeluaran bulan ini, JAWAB LANGSUNG menggunakan DATA LIVE di bawah TANPA memanggil tool lagi.
+2. Gunakan tool HANYA jika butuh data spesifik yang belum ada di DATA LIVE (mis. search_transactions untuk rincian daftar transaksi, daftar belanja, stok kulkas/rumah, hutang, piutang, goals, investasi) atau saat diminta mencatat/mengubah data. Jangan panggil tool berulang kali jika 1 panggilan sudah cukup.
 3. Saat memanggil search_transactions, gunakan nama kategori PERSIS dari "Daftar Nama Kategori Valid" di bawah (misal "Makan Beli & Jajan", bukan "Makanan"), atau kosongkan filter category jika ingin melihat semua kategori milik member tersebut. Hasil search_transactions sudah memuat Hari (Senin-Minggu), Tanggal, dan Jam WIB pencatatan — saring langsung di jawabanmu jika user meminta hari kerja (weekdays) atau jam tertentu.
 4. JANGAN mengarang angka. Bahasa Indonesia hangat, ramah, singkat, mudah dipahami keluarga.
 5. Jika bulan belum berakhir, sebut selisih pemasukan-pengeluaran sebagai "Sisa Kas Bulan Ini" (bukan surplus akhir bulan).
@@ -270,7 +280,12 @@ type ToolDef = ReturnType<typeof buildToolDefs>[number]
 async function callOpenAiCompatible(apiKey: string, model: string, messages: ChatMsg[], systemPrompt: string, baseUrl: string, tools: ToolDef[]) {
   const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: systemPrompt }, ...messages], temperature: 0.3, max_tokens: 1024 }
   if (tools.length) body.tools = tools.map((t) => ({ type: 'function', function: t }))
-  const res = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: JSON.stringify(body) })
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(22_000),
+  })
   const data = (await res.json()) as { choices?: { message: ChatMsg & { content?: string } }[]; error?: { message?: string } }
   if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `API error ${res.status}` })
   return data.choices![0]!.message
@@ -282,6 +297,7 @@ async function callAnthropic(apiKey: string, model: string, messages: unknown[],
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model, system: systemPrompt, messages, max_tokens: 1024, ...(anthropicTools.length ? { tools: anthropicTools } : {}) }),
+    signal: AbortSignal.timeout(22_000),
   })
   const data = (await res.json()) as { error?: { message?: string } } & Record<string, unknown>
   if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `Anthropic error ${res.status}` })
@@ -294,6 +310,7 @@ async function callGoogle(apiKey: string, model: string, messages: Array<{ role:
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ system_instruction: { parts: [{ text: systemPrompt }] }, contents: messages, generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }, ...(googleTools.length ? { tools: googleTools } : {}) }),
+    signal: AbortSignal.timeout(22_000),
   })
   const data = (await res.json()) as { error?: { message?: string } } & Record<string, unknown>
   if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `Gemini error ${res.status}` })
@@ -301,6 +318,7 @@ async function callGoogle(apiKey: string, model: string, messages: Array<{ role:
 }
 
 export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 'ai'; text: string }>, allowWrite = false) {
+  const startMs = Date.now()
   // Query independen dijalankan paralel di jalur panas tiap pesan
   const [config, userName, features, liveSnapshot] = await Promise.all([
     getAiConfig(actor),
@@ -308,7 +326,9 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
     getHouseholdFeatures(actor),
     buildLiveSnapshot(actor),
   ])
-  const { provider, model, apiKey } = config as Required<AiConfig>
+  const { provider, model: configuredModel, apiKey } = config as Required<AiConfig>
+  // Di jalur chat interaktif, kb-auto (thinking high ~10s/turn) dialihkan ke kb-fast (thinking low ~2.8s/turn) agar multi-tool call tidak terkena Vercel 60s timeout
+  const model = provider === 'gatekeeper' && configuredModel === 'kb-auto' ? 'kb-fast' : configuredModel
   const allToolDefs = buildToolDefs(allowWrite, features)
   const toolDefs = selectContextualTools(allToolDefs, messages)
 
@@ -323,13 +343,15 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
   }
 
   const systemPrompt = buildSystemPrompt(userName, liveSnapshot)
-  const MAX_ITER = 6
+  const MAX_ITER = 3
+  const TIME_BUDGET_MS = 32_000
   let mutated = false
   const toolsUsed: string[] = []
 
   if (provider === 'anthropic') {
     const msgs: unknown[] = [...apiMessages]
     for (let i = 0; i < MAX_ITER; i++) {
+      if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
       const resp = await callAnthropic(apiKey, model, msgs, systemPrompt, toolDefs)
       if (resp.stop_reason === 'tool_use') {
         msgs.push({ role: 'assistant', content: resp.content })
@@ -356,6 +378,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
   if (provider === 'google') {
     const msgs: Array<{ role: string; parts: unknown }> = apiMessages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] }))
     for (let i = 0; i < MAX_ITER; i++) {
+      if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
       const resp = await callGoogle(apiKey, model, msgs, systemPrompt, toolDefs)
       const parts = resp.candidates?.[0]?.content?.parts ?? []
       const fnCalls = parts.filter((p) => p.functionCall)
@@ -384,6 +407,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
   const msgs: ChatMsg[] = [...apiMessages]
   const tools = toolDefs
   for (let i = 0; i < MAX_ITER; i++) {
+    if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
     const msg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools)) as ChatMsg & { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }
     if (msg.tool_calls?.length) {
       msgs.push({ role: 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls })
