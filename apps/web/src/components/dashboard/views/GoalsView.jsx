@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { fmtRp } from "../../../utils/formatters";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import AmountInput from "../../ui/AmountInput";
@@ -53,13 +53,27 @@ function DeadlineBadge({ deadline, done }) {
     );
 }
 
-const GoalsView = ({ goals, accounts = [], onAdd, onEdit, onDelete, onTopup }) => {
+const GoalsView = ({ goals, accounts = [], onAdd, onEdit, onDelete, onTopup, initialDraft, onClearInitialDraft }) => {
     const { t } = useLanguage();
     const { members } = useMembers();
     const [showModal,    setShowModal]    = useState(false);
     const [editTarget,   setEditTarget]   = useState(null);
     const [form,         setForm]         = useState(emptyForm());
     const [confirmDelete, setConfirmDelete] = useState(null);
+
+    useEffect(() => {
+        if (initialDraft) {
+            setEditTarget(null);
+            setForm({
+                ...emptyForm(),
+                name: initialDraft.name || "",
+                target: initialDraft.target ? String(initialDraft.target) : "",
+                deadline: initialDraft.deadline || "",
+            });
+            setShowModal(true);
+            onClearInitialDraft?.();
+        }
+    }, [initialDraft, onClearInitialDraft]);
 
     // Topup state
     const [topupTarget,  setTopupTarget]  = useState(null);   // goal yg sedang di-topup

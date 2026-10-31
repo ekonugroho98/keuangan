@@ -91,6 +91,8 @@ aiApp.post('/v1/ai/chat/stream', async (c) => {
             mutated: result.mutated,
             tools_used: result.tools_used,
             elapsed_ms: Date.now() - startMs,
+            ...(result.actions?.length ? { actions: result.actions } : {}),
+            ...(result.suggestions?.length ? { suggestions: result.suggestions } : {}),
           }),
         })
       }

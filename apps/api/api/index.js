@@ -12708,10 +12708,68 @@ var AiChatBodySchema = external_exports.object({
     description: "Izinkan AI memanggil tool TULIS (catat transaksi, dst.) lewat chat, bukan cuma baca. Default false (06-agent-integration.md \xA72, Fase 6 F6-T5) \u2014 belum ada toggle UI untuk ini di web, disediakan untuk klien lain (mis. Hermes/MCP) yang eksplisit mengaktifkannya."
   })
 }).openapi("AiChatBody");
+var ApplyBudgetActionSchema = external_exports.object({
+  type: external_exports.literal("apply_budget"),
+  label: external_exports.string().min(1).max(120),
+  payload: external_exports.object({
+    month: external_exports.string().regex(/^\d{4}-\d{2}$/),
+    items: external_exports.array(
+      external_exports.object({
+        category: external_exports.string().min(1),
+        amount: external_exports.number().int().positive()
+      })
+    ).min(1)
+  })
+});
+var RecordExpenseActionSchema = external_exports.object({
+  type: external_exports.literal("record_expense"),
+  label: external_exports.string().min(1).max(120),
+  payload: external_exports.object({
+    account: external_exports.string().min(1).optional(),
+    category: external_exports.string().min(1),
+    amount: external_exports.number().int().positive(),
+    date: external_exports.string().optional(),
+    note: external_exports.string().optional()
+  })
+});
+var AddShoppingActionSchema = external_exports.object({
+  type: external_exports.literal("add_shopping"),
+  label: external_exports.string().min(1).max(120),
+  payload: external_exports.object({
+    items: external_exports.array(
+      external_exports.object({
+        name: external_exports.string().min(1),
+        qty: external_exports.number().positive().optional(),
+        unit: external_exports.string().optional()
+      })
+    ).min(1)
+  })
+});
+var SetGoalActionSchema = external_exports.object({
+  type: external_exports.literal("set_goal"),
+  label: external_exports.string().min(1).max(120),
+  payload: external_exports.object({
+    name: external_exports.string().min(1),
+    target: external_exports.number().int().positive(),
+    deadline: external_exports.string().optional()
+  })
+});
+var AiActionSchema = external_exports.discriminatedUnion("type", [
+  ApplyBudgetActionSchema,
+  RecordExpenseActionSchema,
+  AddShoppingActionSchema,
+  SetGoalActionSchema
+]);
+var AiActionsBlockSchema = external_exports.object({
+  suggestions: external_exports.array(external_exports.unknown()).optional(),
+  actions: external_exports.array(external_exports.unknown()).optional()
+});
 var AiChatResponseSchema = external_exports.object({
   reply: external_exports.string(),
   mutated: external_exports.boolean().optional(),
-  tools_used: external_exports.array(external_exports.string()).optional()
+  tools_used: external_exports.array(external_exports.string()).optional(),
+  actions: external_exports.array(AiActionSchema).optional(),
+  suggestions: external_exports.array(external_exports.string()).optional()
 }).openapi("AiChatResponse");
 var ScanReceiptBodySchema = external_exports.object({
   image_base64: external_exports.string().optional(),
@@ -19816,6 +19874,67 @@ function getToolLabel(toolName) {
 // src/services/ai/chat.ts
 var APP_AI_NAME = "Keluarga Berkembang AI";
 var fmtRp3 = (n) => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
+var KB_ACTIONS_BLOCK_RE = /```kb-actions\s*([\s\S]*?)```/gi;
+var KB_ACTIONS_STRIP_RE = /```kb-actions[\s\S]*?(?:```|$)/gi;
+function extractActions(rawReply, validCategories) {
+  const matches = Array.from(rawReply.matchAll(KB_ACTIONS_BLOCK_RE));
+  const cleanedReply = rawReply.replace(KB_ACTIONS_STRIP_RE, "").trim();
+  if (matches.length === 0) {
+    return { reply: cleanedReply || "(Tidak ada jawaban)", actions: [], suggestions: [] };
+  }
+  const lastJsonText = matches[matches.length - 1][1].trim();
+  let parsedJson;
+  try {
+    parsedJson = JSON.parse(lastJsonText);
+  } catch {
+    return { reply: cleanedReply || "(Tidak ada jawaban)", actions: [], suggestions: [] };
+  }
+  const blockParsed = AiActionsBlockSchema.safeParse(parsedJson);
+  if (!blockParsed.success) {
+    return { reply: cleanedReply || "(Tidak ada jawaban)", actions: [], suggestions: [] };
+  }
+  const catLookup = /* @__PURE__ */ new Map();
+  if (validCategories) {
+    for (const c of validCategories) {
+      catLookup.set(c.trim().toLowerCase(), c.trim());
+    }
+  }
+  const hasCatWhitelist = catLookup.size > 0;
+  const suggestions = (blockParsed.data.suggestions ?? []).filter((s) => typeof s === "string").map((s) => s.trim()).filter((s) => s.length > 0 && s.length <= 40).slice(0, 3);
+  const actions = [];
+  for (const rawAct of blockParsed.data.actions ?? []) {
+    const actRes = AiActionSchema.safeParse(rawAct);
+    if (!actRes.success) continue;
+    const act = actRes.data;
+    if (act.type === "apply_budget") {
+      if (hasCatWhitelist) {
+        const validItems = act.payload.items.map((item) => {
+          const canonical = catLookup.get(item.category.trim().toLowerCase());
+          return canonical ? { category: canonical, amount: item.amount } : null;
+        }).filter((x) => x !== null);
+        if (validItems.length === 0) continue;
+        actions.push({ ...act, payload: { ...act.payload, items: validItems } });
+      } else {
+        actions.push(act);
+      }
+    } else if (act.type === "record_expense") {
+      if (hasCatWhitelist) {
+        const canonical = catLookup.get(act.payload.category.trim().toLowerCase());
+        if (!canonical) continue;
+        actions.push({ ...act, payload: { ...act.payload, category: canonical } });
+      } else {
+        actions.push(act);
+      }
+    } else {
+      actions.push(act);
+    }
+  }
+  return {
+    reply: cleanedReply || "(Tidak ada jawaban)",
+    actions,
+    suggestions
+  };
+}
 async function getUserName(actor) {
   return withActor(actor, async (tx) => {
     const [row] = await tx`select display_name from household_members where id = ${actor.memberId}`;
@@ -19944,18 +20063,21 @@ async function buildLiveSnapshot(actor) {
     const budgetLine = budgetStatus?.items?.length ? budgetStatus.items.map((b2) => `${b2.category.name}: terpakai ${fmtRp3(b2.spent)} / pagu ${fmtRp3(b2.amount)} (${b2.pct}%, sisa ${fmtRp3(b2.remaining)})`).join(" | ") : "(belum ada anggaran kategori)";
     const expCats = categories.filter((c) => c.type === "expense").map((c) => c.name).join(", ");
     const incCats = categories.filter((c) => c.type === "income").map((c) => c.name).join(", ");
-    return [
-      `DATA LIVE KELUARGA SAAT INI (sudah diambil dari DB \u2014 JANGAN panggil tool get_summary/get_budget_status/list_accounts/list_categories/list_members lagi untuk informasi di bawah ini):`,
-      `- Anggota Keluarga: ${memberLine}`,
-      `- Total Saldo Bersih: ${fmtRp3(accountTotals.visible_balance)} (${accounts.length} akun: ${accLine})`,
-      `- Bulan Ini (${thisMonth.period.label}): Pemasukan ${fmtRp3(thisMonth.totals.income)} | Pengeluaran ${fmtRp3(thisMonth.totals.expense)} | Sisa Kas Bulan Ini ${sisaKas >= 0 ? "+" : ""}${fmtRp3(sisaKas)} (Rasio sisa/tabungan: ${thisMonth.totals.saving_rate_pct}%)`,
-      `- Jatah Aman Harian Sisa Bulan (${remainingDays} hari tersisa): ~${fmtRp3(jatahHarian)}/hari`,
-      `- Kategori Pengeluaran Terbesar Bulan Ini: ${topCatLine}`,
-      `- Anggaran (Budget) Rumah Tangga Bulan Ini (${currentMonth2}): ${budgetLine}`,
-      `- Daftar Nama Kategori Valid (gunakan nama persis ini saat filter/catat): Pengeluaran=[${expCats}] | Pemasukan=[${incCats}]`
-    ].join("\n");
+    return {
+      snapshotText: [
+        `DATA LIVE KELUARGA SAAT INI (sudah diambil dari DB \u2014 JANGAN panggil tool get_summary/get_budget_status/list_accounts/list_categories/list_members lagi untuk informasi di bawah ini):`,
+        `- Anggota Keluarga: ${memberLine}`,
+        `- Total Saldo Bersih: ${fmtRp3(accountTotals.visible_balance)} (${accounts.length} akun: ${accLine})`,
+        `- Bulan Ini (${thisMonth.period.label}): Pemasukan ${fmtRp3(thisMonth.totals.income)} | Pengeluaran ${fmtRp3(thisMonth.totals.expense)} | Sisa Kas Bulan Ini ${sisaKas >= 0 ? "+" : ""}${fmtRp3(sisaKas)} (Rasio sisa/tabungan: ${thisMonth.totals.saving_rate_pct}%)`,
+        `- Jatah Aman Harian Sisa Bulan (${remainingDays} hari tersisa): ~${fmtRp3(jatahHarian)}/hari`,
+        `- Kategori Pengeluaran Terbesar Bulan Ini: ${topCatLine}`,
+        `- Anggaran (Budget) Rumah Tangga Bulan Ini (${currentMonth2}): ${budgetLine}`,
+        `- Daftar Nama Kategori Valid (gunakan nama persis ini saat filter/catat): Pengeluaran=[${expCats}] | Pemasukan=[${incCats}]`
+      ].join("\n"),
+      validCategories: categories.map((c) => c.name)
+    };
   } catch {
-    return "";
+    return { snapshotText: "", validCategories: [] };
   }
 }
 function buildSystemPrompt(userName, liveSnapshot = "") {
@@ -19975,7 +20097,19 @@ ATURAN:
    - Boleh heading "###" maksimal 1 per jawaban. Jangan pakai "---".
    - Rincian pakai bullet pendek; angka rupiah ditulis tebal, format Rp 1.500.000.
    - Tabel hanya kalau perlu membandingkan, maksimal 2 kolom (misal "Pos | Nominal") dan maksimal 8 baris; lebih dari itu pakai bullet berkelompok.
-   - Emoji maksimal 3 per jawaban. Panjang jawaban maksimal \xB11.500 karakter kecuali user minta rinci.${liveSnapshot ? `
+   - Emoji maksimal 3 per jawaban. Panjang jawaban maksimal \xB11.500 karakter kecuali user minta rinci.
+9. SARAN LANJUTAN & KARTU AKSI:
+   Tutup setiap jawaban dengan tepat satu blok kode \`\`\`kb-actions berisi JSON valid:
+   \`\`\`kb-actions
+   {"suggestions":["Pertanyaan lanjutan 1?","Pertanyaan lanjutan 2?"],"actions":[]}
+   \`\`\`
+   - "suggestions": 1\u20133 pertanyaan lanjutan relevan, maksimal 40 karakter per butir.
+   - "actions": isi HANYA jika jawaban berisi rencana/tindakan konkret yang belum dicatat tool tulis, menggunakan salah satu format:
+     * {"type":"apply_budget","label":"Terapkan ke Anggaran YYYY-MM","payload":{"month":"YYYY-MM","items":[{"category":"Nama Kategori Valid","amount":1500000}]}}
+     * {"type":"record_expense","label":"Catat Pengeluaran","payload":{"account":"Nama Akun","category":"Nama Kategori Valid","amount":50000,"date":"YYYY-MM-DD","note":"Catatan"}}
+     * {"type":"add_shopping","label":"Tambah ke Daftar Belanja","payload":{"items":[{"name":"Beras","qty":1,"unit":"sak"}]}}
+     * {"type":"set_goal","label":"Buat Target Tabungan","payload":{"name":"Dana Darurat","target":10000000,"deadline":"YYYY-MM-DD"}}
+   - Semua "category" di dalam "actions" WAJIB persis dari Daftar Nama Kategori Valid dan "amount"/"target" berupa bilangan bulat rupiah.${liveSnapshot ? `
 
 ${liveSnapshot}` : ""}`;
 }
@@ -20240,12 +20374,25 @@ async function chatWithAi(actor, messages2, allowWrite = false, onEvent, clientS
     if (onEvent) {
       await onEvent({ type: "status", step: "thinking", label: "Menyusun jawaban\u2026" });
     }
-    const [config, userName, features, liveSnapshot] = await Promise.all([
+    const [config, userName, features, { snapshotText: liveSnapshot, validCategories }] = await Promise.all([
       getAiConfig(actor),
       getUserName(actor),
       getHouseholdFeatures(actor),
       buildLiveSnapshot(actor)
     ]);
+    const finalize = (rawReply, mutatedFlag, toolsUsedList) => {
+      const extracted = extractActions(rawReply, validCategories);
+      const filteredActions = extracted.actions.filter(
+        (a) => a.type !== "add_shopping" || features.shopping_stock.enabled
+      );
+      return {
+        reply: extracted.reply,
+        mutated: mutatedFlag,
+        tools_used: toolsUsedList,
+        actions: filteredActions,
+        suggestions: extracted.suggestions
+      };
+    };
     const { provider, model: configuredModel, apiKey } = config;
     const model = provider === "gatekeeper" && configuredModel === "kb-auto" ? "kb-fast" : configuredModel;
     const allToolDefs = buildToolDefs(allowWrite, features);
@@ -20256,10 +20403,10 @@ async function chatWithAi(actor, messages2, allowWrite = false, onEvent, clientS
       const baseUrl2 = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq;
       if (onEvent) {
         const msg2 = await callOpenAiCompatibleStream(apiKey, model, apiMessages, prompt, baseUrl2, [], onEvent, actor.householdId, signal);
-        return { reply: msg2.content || "(Tidak ada jawaban)", mutated: false, tools_used: [] };
+        return finalize(msg2.content || "(Tidak ada jawaban)", false, []);
       }
       const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl2, [], actor.householdId, signal);
-      return { reply: msg.content || "(Tidak ada jawaban)", mutated: false, tools_used: [] };
+      return finalize(msg.content || "(Tidak ada jawaban)", false, []);
     }
     const systemPrompt = buildSystemPrompt(userName, liveSnapshot);
     const MAX_ITER = 3;
@@ -20295,21 +20442,21 @@ async function chatWithAi(actor, messages2, allowWrite = false, onEvent, clientS
           continue;
         }
         const text = resp.content.find((b2) => b2.type === "text");
-        const reply2 = text?.text || "(Tidak ada jawaban)";
+        const out2 = finalize(text?.text || "(Tidak ada jawaban)", mutated, toolsUsed);
         if (onEvent) {
           await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
-          await onEvent({ type: "token", text: reply2 });
+          await onEvent({ type: "token", text: out2.reply });
         }
-        return { reply: reply2, mutated, tools_used: toolsUsed };
+        return out2;
       }
       const finalResp = await callAnthropic(apiKey, model, msgs2, systemPrompt, [], signal);
       const finalText = finalResp.content.find((b2) => b2.type === "text");
-      const reply = finalText?.text || "(Tidak ada jawaban)";
+      const out = finalize(finalText?.text || "(Tidak ada jawaban)", mutated, toolsUsed);
       if (onEvent) {
         await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
-        await onEvent({ type: "token", text: reply });
+        await onEvent({ type: "token", text: out.reply });
       }
-      return { reply, mutated, tools_used: toolsUsed };
+      return out;
     }
     if (provider === "google") {
       const msgs2 = apiMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content) }] }));
@@ -20340,21 +20487,21 @@ async function chatWithAi(actor, messages2, allowWrite = false, onEvent, clientS
           }
           continue;
         }
-        const reply2 = parts2.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)";
+        const out2 = finalize(parts2.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)", mutated, toolsUsed);
         if (onEvent) {
           await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
-          await onEvent({ type: "token", text: reply2 });
+          await onEvent({ type: "token", text: out2.reply });
         }
-        return { reply: reply2, mutated, tools_used: toolsUsed };
+        return out2;
       }
       const finalResp = await callGoogle(apiKey, model, msgs2, systemPrompt, [], signal);
       const finalParts = finalResp.candidates?.[0]?.content?.parts ?? [];
-      const reply = finalParts.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)";
+      const out = finalize(finalParts.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)", mutated, toolsUsed);
       if (onEvent) {
         await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
-        await onEvent({ type: "token", text: reply });
+        await onEvent({ type: "token", text: out.reply });
       }
-      return { reply, mutated, tools_used: toolsUsed };
+      return out;
     }
     const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.openai;
     const msgs = [...apiMessages];
@@ -20394,11 +20541,11 @@ async function chatWithAi(actor, messages2, allowWrite = false, onEvent, clientS
         continue;
       }
       const fullReply2 = (streamedPrefix + (msg.content || "")).trim() || "(Tidak ada jawaban)";
-      return { reply: fullReply2, mutated, tools_used: toolsUsed };
+      return finalize(fullReply2, mutated, toolsUsed);
     }
     const finalMsg = onEvent ? await callOpenAiCompatibleStream(apiKey, model, msgs, systemPrompt, baseUrl, [], onEvent, actor.householdId, signal) : await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId, signal);
     const fullReply = (streamedPrefix + (finalMsg.content || "")).trim() || "(Tidak ada jawaban)";
-    return { reply: fullReply, mutated, tools_used: toolsUsed };
+    return finalize(fullReply, mutated, toolsUsed);
   } catch (err) {
     if (timedOutTotal && !clientSignal?.aborted) {
       throw ApiError.fromCode("upstream_ai_error", { message: "Waktu habis, coba pertanyaan yang lebih spesifik" });
@@ -20581,7 +20728,9 @@ aiApp.post("/v1/ai/chat/stream", async (c) => {
             reply: result.reply,
             mutated: result.mutated,
             tools_used: result.tools_used,
-            elapsed_ms: Date.now() - startMs
+            elapsed_ms: Date.now() - startMs,
+            ...result.actions?.length ? { actions: result.actions } : {},
+            ...result.suggestions?.length ? { suggestions: result.suggestions } : {}
           })
         });
       }

@@ -15,10 +15,92 @@ import { formatToolResult } from './format-tool-result'
 import { getAiConfig, type AiConfig } from './provider'
 import { getToolLabel } from './tool-labels'
 import { getHouseholdFeatures } from '../features'
-import type { HouseholdFeatures } from '@karaya/shared/schemas'
+import { AiActionSchema, AiActionsBlockSchema, type AiAction, type HouseholdFeatures } from '@karaya/shared/schemas'
 
 const APP_AI_NAME = 'Keluarga Berkembang AI'
 const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
+const KB_ACTIONS_BLOCK_RE = /```kb-actions\s*([\s\S]*?)```/gi
+const KB_ACTIONS_STRIP_RE = /```kb-actions[\s\S]*?(?:```|$)/gi
+
+/**
+ * Ekstrak blok ```kb-actions terakhir dari balasan model, validasi dengan AiActionsBlockSchema
+ * + whitelist kategori, dan selalu hapus blok dari teks balasan (12-ai-chat-ux.md §5.1–5.2).
+ */
+export function extractActions(
+  rawReply: string,
+  validCategories?: Iterable<string>,
+): { reply: string; actions: AiAction[]; suggestions: string[] } {
+  const matches = Array.from(rawReply.matchAll(KB_ACTIONS_BLOCK_RE))
+  const cleanedReply = rawReply.replace(KB_ACTIONS_STRIP_RE, '').trim()
+
+  if (matches.length === 0) {
+    return { reply: cleanedReply || '(Tidak ada jawaban)', actions: [], suggestions: [] }
+  }
+
+  const lastJsonText = matches[matches.length - 1]![1]!.trim()
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(lastJsonText)
+  } catch {
+    return { reply: cleanedReply || '(Tidak ada jawaban)', actions: [], suggestions: [] }
+  }
+
+  const blockParsed = AiActionsBlockSchema.safeParse(parsedJson)
+  if (!blockParsed.success) {
+    return { reply: cleanedReply || '(Tidak ada jawaban)', actions: [], suggestions: [] }
+  }
+
+  const catLookup = new Map<string, string>()
+  if (validCategories) {
+    for (const c of validCategories) {
+      catLookup.set(c.trim().toLowerCase(), c.trim())
+    }
+  }
+  const hasCatWhitelist = catLookup.size > 0
+
+  const suggestions = (blockParsed.data.suggestions ?? [])
+    .filter((s): s is string => typeof s === 'string')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s.length <= 40)
+    .slice(0, 3)
+
+  const actions: AiAction[] = []
+  for (const rawAct of blockParsed.data.actions ?? []) {
+    const actRes = AiActionSchema.safeParse(rawAct)
+    if (!actRes.success) continue
+    const act = actRes.data
+    if (act.type === 'apply_budget') {
+      if (hasCatWhitelist) {
+        const validItems = act.payload.items
+          .map((item) => {
+            const canonical = catLookup.get(item.category.trim().toLowerCase())
+            return canonical ? { category: canonical, amount: item.amount } : null
+          })
+          .filter((x): x is { category: string; amount: number } => x !== null)
+        if (validItems.length === 0) continue
+        actions.push({ ...act, payload: { ...act.payload, items: validItems } })
+      } else {
+        actions.push(act)
+      }
+    } else if (act.type === 'record_expense') {
+      if (hasCatWhitelist) {
+        const canonical = catLookup.get(act.payload.category.trim().toLowerCase())
+        if (!canonical) continue
+        actions.push({ ...act, payload: { ...act.payload, category: canonical } })
+      } else {
+        actions.push(act)
+      }
+    } else {
+      actions.push(act)
+    }
+  }
+
+  return {
+    reply: cleanedReply || '(Tidak ada jawaban)',
+    actions,
+    suggestions,
+  }
+}
 
 async function getUserName(actor: Actor): Promise<string> {
   return withActor(actor, async (tx) => {
@@ -158,7 +240,7 @@ async function executeTool(
   }
 }
 
-async function buildLiveSnapshot(actor: Actor): Promise<string> {
+async function buildLiveSnapshot(actor: Actor): Promise<{ snapshotText: string; validCategories: string[] }> {
   try {
     const now = new Date()
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -196,18 +278,21 @@ async function buildLiveSnapshot(actor: Actor): Promise<string> {
     const expCats = categories.filter((c) => c.type === 'expense').map((c) => c.name).join(', ')
     const incCats = categories.filter((c) => c.type === 'income').map((c) => c.name).join(', ')
 
-    return [
-      `DATA LIVE KELUARGA SAAT INI (sudah diambil dari DB — JANGAN panggil tool get_summary/get_budget_status/list_accounts/list_categories/list_members lagi untuk informasi di bawah ini):`,
-      `- Anggota Keluarga: ${memberLine}`,
-      `- Total Saldo Bersih: ${fmtRp(accountTotals.visible_balance)} (${accounts.length} akun: ${accLine})`,
-      `- Bulan Ini (${thisMonth.period.label}): Pemasukan ${fmtRp(thisMonth.totals.income)} | Pengeluaran ${fmtRp(thisMonth.totals.expense)} | Sisa Kas Bulan Ini ${sisaKas >= 0 ? '+' : ''}${fmtRp(sisaKas)} (Rasio sisa/tabungan: ${thisMonth.totals.saving_rate_pct}%)`,
-      `- Jatah Aman Harian Sisa Bulan (${remainingDays} hari tersisa): ~${fmtRp(jatahHarian)}/hari`,
-      `- Kategori Pengeluaran Terbesar Bulan Ini: ${topCatLine}`,
-      `- Anggaran (Budget) Rumah Tangga Bulan Ini (${currentMonth}): ${budgetLine}`,
-      `- Daftar Nama Kategori Valid (gunakan nama persis ini saat filter/catat): Pengeluaran=[${expCats}] | Pemasukan=[${incCats}]`,
-    ].join('\n')
+    return {
+      snapshotText: [
+        `DATA LIVE KELUARGA SAAT INI (sudah diambil dari DB — JANGAN panggil tool get_summary/get_budget_status/list_accounts/list_categories/list_members lagi untuk informasi di bawah ini):`,
+        `- Anggota Keluarga: ${memberLine}`,
+        `- Total Saldo Bersih: ${fmtRp(accountTotals.visible_balance)} (${accounts.length} akun: ${accLine})`,
+        `- Bulan Ini (${thisMonth.period.label}): Pemasukan ${fmtRp(thisMonth.totals.income)} | Pengeluaran ${fmtRp(thisMonth.totals.expense)} | Sisa Kas Bulan Ini ${sisaKas >= 0 ? '+' : ''}${fmtRp(sisaKas)} (Rasio sisa/tabungan: ${thisMonth.totals.saving_rate_pct}%)`,
+        `- Jatah Aman Harian Sisa Bulan (${remainingDays} hari tersisa): ~${fmtRp(jatahHarian)}/hari`,
+        `- Kategori Pengeluaran Terbesar Bulan Ini: ${topCatLine}`,
+        `- Anggaran (Budget) Rumah Tangga Bulan Ini (${currentMonth}): ${budgetLine}`,
+        `- Daftar Nama Kategori Valid (gunakan nama persis ini saat filter/catat): Pengeluaran=[${expCats}] | Pemasukan=[${incCats}]`,
+      ].join('\n'),
+      validCategories: categories.map((c) => c.name),
+    }
   } catch {
-    return ''
+    return { snapshotText: '', validCategories: [] }
   }
 }
 
@@ -228,7 +313,19 @@ ATURAN:
    - Boleh heading "###" maksimal 1 per jawaban. Jangan pakai "---".
    - Rincian pakai bullet pendek; angka rupiah ditulis tebal, format Rp 1.500.000.
    - Tabel hanya kalau perlu membandingkan, maksimal 2 kolom (misal "Pos | Nominal") dan maksimal 8 baris; lebih dari itu pakai bullet berkelompok.
-   - Emoji maksimal 3 per jawaban. Panjang jawaban maksimal ±1.500 karakter kecuali user minta rinci.${liveSnapshot ? `\n\n${liveSnapshot}` : ''}`
+   - Emoji maksimal 3 per jawaban. Panjang jawaban maksimal ±1.500 karakter kecuali user minta rinci.
+9. SARAN LANJUTAN & KARTU AKSI:
+   Tutup setiap jawaban dengan tepat satu blok kode \`\`\`kb-actions berisi JSON valid:
+   \`\`\`kb-actions
+   {"suggestions":["Pertanyaan lanjutan 1?","Pertanyaan lanjutan 2?"],"actions":[]}
+   \`\`\`
+   - "suggestions": 1–3 pertanyaan lanjutan relevan, maksimal 40 karakter per butir.
+   - "actions": isi HANYA jika jawaban berisi rencana/tindakan konkret yang belum dicatat tool tulis, menggunakan salah satu format:
+     * {"type":"apply_budget","label":"Terapkan ke Anggaran YYYY-MM","payload":{"month":"YYYY-MM","items":[{"category":"Nama Kategori Valid","amount":1500000}]}}
+     * {"type":"record_expense","label":"Catat Pengeluaran","payload":{"account":"Nama Akun","category":"Nama Kategori Valid","amount":50000,"date":"YYYY-MM-DD","note":"Catatan"}}
+     * {"type":"add_shopping","label":"Tambah ke Daftar Belanja","payload":{"items":[{"name":"Beras","qty":1,"unit":"sak"}]}}
+     * {"type":"set_goal","label":"Buat Target Tabungan","payload":{"name":"Dana Darurat","target":10000000,"deadline":"YYYY-MM-DD"}}
+   - Semua "category" di dalam "actions" WAJIB persis dari Daftar Nama Kategori Valid dan "amount"/"target" berupa bilangan bulat rupiah.${liveSnapshot ? `\n\n${liveSnapshot}` : ''}`
 }
 
 /**
@@ -582,12 +679,25 @@ export async function chatWithAi(
     }
 
     // Query independen dijalankan paralel di jalur panas tiap pesan
-    const [config, userName, features, liveSnapshot] = await Promise.all([
+    const [config, userName, features, { snapshotText: liveSnapshot, validCategories }] = await Promise.all([
       getAiConfig(actor),
       getUserName(actor),
       getHouseholdFeatures(actor),
       buildLiveSnapshot(actor),
     ])
+    const finalize = (rawReply: string, mutatedFlag: boolean, toolsUsedList: string[]) => {
+      const extracted = extractActions(rawReply, validCategories)
+      const filteredActions = extracted.actions.filter(
+        (a) => a.type !== 'add_shopping' || features.shopping_stock.enabled,
+      )
+      return {
+        reply: extracted.reply,
+        mutated: mutatedFlag,
+        tools_used: toolsUsedList,
+        actions: filteredActions,
+        suggestions: extracted.suggestions,
+      }
+    }
     const { provider, model: configuredModel, apiKey } = config as Required<AiConfig>
     // Di jalur chat interaktif, kb-auto (thinking high ~10s/turn) dialihkan ke kb-fast (thinking low ~2.8s/turn) agar multi-tool call tidak terkena Vercel 60s timeout
     const model = provider === 'gatekeeper' && configuredModel === 'kb-auto' ? 'kb-fast' : configuredModel
@@ -602,10 +712,10 @@ export async function chatWithAi(
       const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq!
       if (onEvent) {
         const msg = await callOpenAiCompatibleStream(apiKey, model, apiMessages, prompt, baseUrl, [], onEvent, actor.householdId, signal)
-        return { reply: msg.content || '(Tidak ada jawaban)', mutated: false, tools_used: [] }
+        return finalize(msg.content || '(Tidak ada jawaban)', false, [])
       }
       const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl, [], actor.householdId, signal)
-      return { reply: (msg as { content?: string }).content || '(Tidak ada jawaban)', mutated: false, tools_used: [] }
+      return finalize((msg as { content?: string }).content || '(Tidak ada jawaban)', false, [])
     }
 
     const systemPrompt = buildSystemPrompt(userName, liveSnapshot)
@@ -643,21 +753,21 @@ export async function chatWithAi(
           continue
         }
         const text = resp.content.find((b) => b.type === 'text')
-        const reply = text?.text || '(Tidak ada jawaban)'
+        const out = finalize(text?.text || '(Tidak ada jawaban)', mutated, toolsUsed)
         if (onEvent) {
           await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
-          await onEvent({ type: 'token', text: reply })
+          await onEvent({ type: 'token', text: out.reply })
         }
-        return { reply, mutated, tools_used: toolsUsed }
+        return out
       }
       const finalResp = await callAnthropic(apiKey, model, msgs, systemPrompt, [], signal)
       const finalText = finalResp.content.find((b) => b.type === 'text')
-      const reply = finalText?.text || '(Tidak ada jawaban)'
+      const out = finalize(finalText?.text || '(Tidak ada jawaban)', mutated, toolsUsed)
       if (onEvent) {
         await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
-        await onEvent({ type: 'token', text: reply })
+        await onEvent({ type: 'token', text: out.reply })
       }
-      return { reply, mutated, tools_used: toolsUsed }
+      return out
     }
 
     if (provider === 'google') {
@@ -689,21 +799,21 @@ export async function chatWithAi(
           }
           continue
         }
-        const reply = parts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)'
+        const out = finalize(parts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)', mutated, toolsUsed)
         if (onEvent) {
           await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
-          await onEvent({ type: 'token', text: reply })
+          await onEvent({ type: 'token', text: out.reply })
         }
-        return { reply, mutated, tools_used: toolsUsed }
+        return out
       }
       const finalResp = await callGoogle(apiKey, model, msgs, systemPrompt, [], signal)
       const finalParts = finalResp.candidates?.[0]?.content?.parts ?? []
-      const reply = finalParts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)'
+      const out = finalize(finalParts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)', mutated, toolsUsed)
       if (onEvent) {
         await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
-        await onEvent({ type: 'token', text: reply })
+        await onEvent({ type: 'token', text: out.reply })
       }
-      return { reply, mutated, tools_used: toolsUsed }
+      return out
     }
 
     // OpenAI-compatible (Gatekeeper, OpenAI, Mistral, xAI, DeepSeek, Kimi)
@@ -747,14 +857,14 @@ export async function chatWithAi(
         continue
       }
       const fullReply = (streamedPrefix + (msg.content || '')).trim() || '(Tidak ada jawaban)'
-      return { reply: fullReply, mutated, tools_used: toolsUsed }
+      return finalize(fullReply, mutated, toolsUsed)
     }
     // Jika sudah mencapai batas iterasi tool-call, paksa 1 panggilan akhir tanpa tools untuk merangkum jawaban dari data yang sudah terkumpul
     const finalMsg = onEvent
       ? await callOpenAiCompatibleStream(apiKey, model, msgs, systemPrompt, baseUrl, [], onEvent, actor.householdId, signal)
       : ((await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId, signal)) as ChatMsg & { content?: string })
     const fullReply = (streamedPrefix + (finalMsg.content || '')).trim() || '(Tidak ada jawaban)'
-    return { reply: fullReply, mutated, tools_used: toolsUsed }
+    return finalize(fullReply, mutated, toolsUsed)
   } catch (err) {
     if (timedOutTotal && !clientSignal?.aborted) {
       throw ApiError.fromCode('upstream_ai_error', { message: 'Waktu habis, coba pertanyaan yang lebih spesifik' })

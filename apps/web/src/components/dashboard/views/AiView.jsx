@@ -1,8 +1,10 @@
-import { useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "../../../i18n/LanguageContext";
-import { AI_PROVIDERS, PROVIDER_ORDER } from "../../../services/aiService";
+import { useIsMobile } from "../../../hooks/useIsMobile";
+import { AI_PROVIDERS } from "../../../services/aiService";
 import { APP_AI_NAME } from "../../../config/app";
-import { AiMessage } from "../../ai/AiMessage";
+import { AiMessage, stripKbActions } from "../../ai/AiMessage";
+import { AiActionCard } from "../../ai/AiActionCard";
 
 // ── Setup screen ketika belum ada AI config ───────────────────────────────
 function AiSetupScreen() {
@@ -88,11 +90,28 @@ function AiSetupScreen() {
 }
 
 // ── Main AiView ───────────────────────────────────────────────────────────
-const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiConfig }) => {
+const AiView = ({
+    aiChat,
+    aiTyping,
+    aiInput,
+    setAiInput,
+    handleAi,
+    stopAi,
+    aiConfig,
+    onMarkActionApplied,
+    onInvalidate,
+    onShowToast,
+    onOpenExpenseModal,
+    onOpenGoalModal,
+}) => {
     const { t } = useLanguage();
+    const isMobile = useIsMobile();
     const chatEndRef = useRef(null);
     const chatContainerRef = useRef(null);
     const isNearBottomRef = useRef(true);
+    const inputRef = useRef(null);
+    const [copiedIdx, setCopiedIdx] = useState(null);
+    const [hoveredIdx, setHoveredIdx] = useState(null);
 
     const handleChatScroll = () => {
         const el = chatContainerRef.current;
@@ -106,6 +125,31 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiCon
         }
     }, [aiChat, aiTyping]);
 
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight || 42, 96)}px`;
+    }, [aiInput]);
+
+    const handleCopy = (idx, text) => {
+        const rawMarkdown = stripKbActions(text || "");
+        navigator.clipboard?.writeText(rawMarkdown).catch(() => {});
+        setCopiedIdx(idx);
+        setTimeout(() => {
+            setCopiedIdx((cur) => (cur === idx ? null : cur));
+        }, 1800);
+    };
+
+    const findPrecedingUserPrompt = (idx) => {
+        for (let j = idx - 1; j >= 0; j--) {
+            if (aiChat[j]?.role === "user" && aiChat[j]?.text?.trim()) {
+                return aiChat[j].text;
+            }
+        }
+        return null;
+    };
+
     // Belum setup → tampil setup screen
     if (!aiConfig?.apiKey) {
         return <AiSetupScreen />;
@@ -115,7 +159,12 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiCon
 
     // t() returns the key itself when translation not found → fallback ke string default
     const tq = (key, fallback) => { const v = t(key); return v === key ? fallback : v; };
-    const quickQuestions = [
+    const lastMsg = aiChat[aiChat.length - 1];
+    const activeSuggestions =
+        lastMsg && lastMsg.role === "ai" && !lastMsg.streaming && Array.isArray(lastMsg.suggestions) && lastMsg.suggestions.length > 0
+            ? lastMsg.suggestions.slice(0, 3)
+            : null;
+    const quickQuestions = activeSuggestions || [
         tq("ai.q1", "Analisis pengeluaran rumah tangga bulan ini"),
         tq("ai.q2", "Berapa jatah harian aman sisa bulan ini?"),
         "Cek daftar belanja & stok kulkas yang menipis",
@@ -158,8 +207,15 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiCon
                     onScroll={handleChatScroll}
                     style={{ height: "min(60vh, 500px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}
                 >
-                    {aiChat.map((m, i) => (
-                        <div key={i} style={{
+                    {aiChat.map((m, i) => {
+                        const prevUserPrompt = m.role === "ai" && i > 0 ? findPrecedingUserPrompt(i) : null;
+                        const showBubbleTools =
+                            m.role === "ai" && !m.streaming && m.text && (isMobile || hoveredIdx === i || copiedIdx === i);
+                        return (
+                        <div key={i}
+                            onMouseEnter={() => setHoveredIdx(i)}
+                            onMouseLeave={() => setHoveredIdx((cur) => (cur === i ? null : cur))}
+                            style={{
                             alignSelf: m.role === "user" ? "flex-end" : "flex-start",
                             maxWidth: "min(85%, 560px)",
                             display: "flex",
@@ -225,30 +281,118 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiCon
                                     </>
                                 ) : m.text}
                             </div>
+
+                            {/* Kartu Aksi Terstruktur (12-ai-chat-ux.md §5.2–5.3) */}
+                            {m.role === "ai" &&
+                                !m.streaming &&
+                                Array.isArray(m.actions) &&
+                                m.actions.map((act, actIdx) => (
+                                    <AiActionCard
+                                        key={actIdx}
+                                        action={act}
+                                        onMarkApplied={(sysNote) => onMarkActionApplied?.(i, actIdx, sysNote)}
+                                        onInvalidate={() => onInvalidate?.()}
+                                        onShowToast={onShowToast}
+                                        onOpenExpenseModal={onOpenExpenseModal}
+                                        onOpenGoalModal={onOpenGoalModal}
+                                    />
+                                ))}
+
+                            {/* Tombol Salin & Ulangi per bubble AI (§5.5) */}
+                            {m.role === "ai" && !m.streaming && m.text && (
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    paddingLeft: 4,
+                                    minHeight: 18,
+                                    opacity: showBubbleTools ? 1 : 0,
+                                    transition: "opacity .15s",
+                                }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopy(i, m.text)}
+                                        style={{
+                                            border: "none",
+                                            background: "transparent",
+                                            padding: 0,
+                                            fontSize: 11,
+                                            color: "var(--color-muted)",
+                                            cursor: "pointer",
+                                            fontFamily: "inherit",
+                                        }}
+                                    >
+                                        {copiedIdx === i ? `✓ ${t("ai.copied")}` : `📋 ${t("ai.copy")}`}
+                                    </button>
+                                    {prevUserPrompt && (
+                                        <button
+                                            type="button"
+                                            disabled={aiTyping}
+                                            onClick={() => handleAi(prevUserPrompt)}
+                                            style={{
+                                                border: "none",
+                                                background: "transparent",
+                                                padding: 0,
+                                                fontSize: 11,
+                                                color: "var(--color-muted)",
+                                                cursor: aiTyping ? "not-allowed" : "pointer",
+                                                fontFamily: "inherit",
+                                            }}
+                                        >
+                                            ↻ {t("ai.retry")}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ))}
+                        );
+                    })}
                     <div ref={chatEndRef} />
                 </div>
 
                 {/* Input — elevated glass pill */}
                 <div style={{
                     position: "sticky", bottom: 0,
-                    display: "flex", gap: 8, alignItems: "center",
-                    padding: 6, borderRadius: 999,
+                    display: "flex", gap: 8, alignItems: "flex-end",
+                    padding: 6, borderRadius: 24,
                     background: "var(--glass-2)",
                     backdropFilter: "var(--glass-blur)",
                     WebkitBackdropFilter: "var(--glass-blur)",
                     border: "1px solid var(--glass-border)",
                     boxShadow: "var(--glass-highlight), 0 4px 14px rgba(0,0,0,.08)",
                 }}>
-                    <input
+                    <textarea
+                        ref={inputRef}
+                        rows={1}
                         value={aiInput}
                         onChange={e => setAiInput(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleAi()}
+                        onKeyDown={e => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAi();
+                            }
+                        }}
                         placeholder={t("ai.placeholder")}
                         disabled={aiTyping}
                         aria-label="Ketik pesan ke AI"
-                        style={{ flex: 1, background: "transparent", border: "none", borderRadius: 999, padding: "10px 16px", color: "var(--color-text)", fontSize: 14, outline: "none", fontFamily: "inherit", opacity: aiTyping ? 0.6 : 1, minWidth: 0, minHeight: 42 }}
+                        style={{
+                            flex: 1,
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: 18,
+                            padding: "10px 16px",
+                            color: "var(--color-text)",
+                            fontSize: 14,
+                            lineHeight: 1.45,
+                            outline: "none",
+                            fontFamily: "inherit",
+                            opacity: aiTyping ? 0.6 : 1,
+                            minWidth: 0,
+                            minHeight: 42,
+                            maxHeight: 96,
+                            resize: "none",
+                            overflowY: "auto",
+                        }}
                     />
                     {aiTyping ? (
                         <button
@@ -279,10 +423,10 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiCon
                     WebkitMaskImage: "linear-gradient(to right, black calc(100% - 30px), transparent)",
                 }}>
                     {quickQuestions.map((q, i) => (
-                        <button key={i} onClick={() => setAiInput(q)} disabled={aiTyping}
+                        <button key={i} onClick={() => activeSuggestions ? handleAi(q) : setAiInput(q)} disabled={aiTyping}
                             className="chip chip-mint"
                             style={{ cursor: aiTyping ? "not-allowed" : "pointer", opacity: aiTyping ? 0.5 : 1, border: "1px solid var(--glass-border)", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>
-                            {q}
+                            {activeSuggestions ? `💬 ${q}` : q}
                         </button>
                     ))}
                 </div>

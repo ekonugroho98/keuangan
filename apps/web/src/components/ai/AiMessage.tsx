@@ -9,6 +9,12 @@ export type AiMessageProps = {
 
 const NUMERIC_CELL_RE = /^[Rp\s\d.,%+-]+$/
 const UNSAFE_HREF_RE = /^\s*(javascript|data|vbscript):/i
+const KB_ACTIONS_FENCE_RE = /```kb-actions[\s\S]*?(?:```|$)/gi
+
+/** Hapus blok ```kb-actions (termasuk saat masih parsial/streaming) agar tidak pernah tampil di bubble. */
+export function stripKbActions(text: string): string {
+  return String(text ?? '').replace(KB_ACTIONS_FENCE_RE, '').trim()
+}
 
 /** Ekstrak teks polos dari ReactNode untuk deteksi kolom angka dan baris TOTAL. */
 function extractPlainText(node: React.ReactNode): string {
@@ -369,6 +375,8 @@ export function AiMessage({ text, variant }: AiMessageProps) {
     table: ({ children }) => <AiTable variant={variant}>{children}</AiTable>,
   }
 
+  const cleanText = stripKbActions(text)
+
   return (
     <div style={{ fontSize, lineHeight: 1.6, wordBreak: 'break-word' }}>
       <ReactMarkdown
@@ -377,7 +385,7 @@ export function AiMessage({ text, variant }: AiMessageProps) {
         components={components}
         urlTransform={(url) => (UNSAFE_HREF_RE.test(url) ? '' : url)}
       >
-        {text}
+        {cleanText}
       </ReactMarkdown>
     </div>
   )

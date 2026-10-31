@@ -52,6 +52,8 @@ describe('POST /v1/ai/chat/stream', () => {
         reply: 'Sisa jatah aman Rp 150.000',
         mutated: false,
         tools_used: ['search_transactions'],
+        actions: [],
+        suggestions: ['Rincian pengeluaran minggu ini'],
       }
     })
 
@@ -78,6 +80,7 @@ describe('POST /v1/ai/chat/stream', () => {
       expect(text).toContain('"text":"Sisa jatah "')
       expect(text).toContain('event: done')
       expect(text).toContain('"reply":"Sisa jatah aman Rp 150.000"')
+      expect(text).toContain('"suggestions":["Rincian pengeluaran minggu ini"]')
     } finally {
       spy.mockRestore()
     }
@@ -128,5 +131,72 @@ describe('POST /v1/ai/chat/stream', () => {
     expect(forbiddenRes.status).toBe(403)
     const forbiddenBody = await forbiddenRes.json()
     expect(forbiddenBody.error.code).toBe('jwt_required')
+  })
+})
+
+describe('extractActions (12-ai-chat-ux.md §5.1–5.6)', () => {
+  const validCategories = ['Kos/Sewa', 'Makan Beli & Jajan', 'Belanja Dapur']
+
+  it('mengekstrak apply_budget + suggestions valid dan menghapus blok kb-actions dari reply', () => {
+    const raw = `Berikut rencana anggaran November:\n- **Kos/Sewa**: **Rp 7.045.000**\n\n\`\`\`kb-actions\n{"suggestions":["Bandingkan dengan Oktober","Mana pos yang bisa dipangkas?"],"actions":[{"type":"apply_budget","label":"Terapkan ke Anggaran November","payload":{"month":"2026-11","items":[{"category":"Kos/Sewa","amount":7045000},{"category":"Belanja Dapur","amount":3000000}]}}]}\n\`\`\``
+    const res = chatService.extractActions(raw, validCategories)
+    expect(res.reply).toBe('Berikut rencana anggaran November:\n- **Kos/Sewa**: **Rp 7.045.000**')
+    expect(res.reply).not.toContain('kb-actions')
+    expect(res.suggestions).toEqual(['Bandingkan dengan Oktober', 'Mana pos yang bisa dipangkas?'])
+    expect(res.actions).toHaveLength(1)
+    expect(res.actions[0]).toEqual({
+      type: 'apply_budget',
+      label: 'Terapkan ke Anggaran November',
+      payload: {
+        month: '2026-11',
+        items: [
+          { category: 'Kos/Sewa', amount: 7045000 },
+          { category: 'Belanja Dapur', amount: 3000000 },
+        ],
+      },
+    })
+  })
+
+  it('tetap menghapus blok kb-actions dari reply meskipun JSON-nya rusak/terpotong', () => {
+    const broken = `Jawaban normal.\n\`\`\`kb-actions\n{"suggestions": ["Belum tutup`
+    const res = chatService.extractActions(broken, validCategories)
+    expect(res.reply).toBe('Jawaban normal.')
+    expect(res.reply).not.toContain('kb-actions')
+    expect(res.actions).toEqual([])
+    expect(res.suggestions).toEqual([])
+  })
+
+  it('membuang aksi dengan type asing atau category tidak valid serta membatasi suggestions maks 3 (<=40 karakter)', () => {
+    const raw = `Ringkasan.\n\`\`\`kb-actions
+{
+  "suggestions": [
+    "Satu",
+    "Dua",
+    "Tiga",
+    "Empat lebih dari tiga",
+    "Saran yang panjangnya lebih dari empat puluh karakter sehingga harus dibuang"
+  ],
+  "actions": [
+    { "type": "delete_household", "label": "Bahaya", "payload": {} },
+    { "type": "record_expense", "label": "Catat", "payload": { "account": "BCA", "category": "Kategori Karangan", "amount": 50000, "date": "2026-11-01" } },
+    { "type": "apply_budget", "label": "Anggaran", "payload": { "month": "2026-11", "items": [
+      { "category": "Kategori Palsu", "amount": 100000 },
+      { "category": "makan beli & jajan", "amount": 1500000 }
+    ] } }
+  ]
+}
+\`\`\``
+    const res = chatService.extractActions(raw, validCategories)
+    expect(res.reply).toBe('Ringkasan.')
+    expect(res.suggestions).toEqual(['Satu', 'Dua', 'Tiga'])
+    expect(res.actions).toHaveLength(1)
+    expect(res.actions[0]).toEqual({
+      type: 'apply_budget',
+      label: 'Anggaran',
+      payload: {
+        month: '2026-11',
+        items: [{ category: 'Makan Beli & Jajan', amount: 1500000 }],
+      },
+    })
   })
 })

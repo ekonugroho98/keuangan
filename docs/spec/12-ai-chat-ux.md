@@ -1,5 +1,5 @@
-Status: in-progress (Fase A & B selesai; Fase C belum)
-Terakhir diubah: 2026-10-31 (rev. 3)
+Status: done (Fase A, B, dan C selesai)
+Terakhir diubah: 2026-10-31 (rev. 4)
 Bergantung pada: 05-api.md (§3.3 jwt-only `/v1/ai/*`, §7 error code), 06-agent-integration.md (registry tool), 07-frontend.md (AiView, Sidebar AI settings), 10-fitur-opsional-keluarga.md (gate tool per fitur)
 
 > **Riwayat perubahan**

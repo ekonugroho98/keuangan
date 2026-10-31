@@ -1,9 +1,10 @@
-import { useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AI_PROVIDERS } from "../../services/aiService";
 import { APP_AI_NAME } from "../../config/app";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { AiMessage } from "../ai/AiMessage";
+import { AiMessage, stripKbActions } from "../ai/AiMessage";
+import { AiActionCard } from "../ai/AiActionCard";
 
 const CONTEXT_PROMPTS = {
   dasbor: [
@@ -62,6 +63,11 @@ export default function AiFloatingChat({
   aiConfig,
   onOpenAiSettings,
   activeMenu,
+  onMarkActionApplied,
+  onInvalidate,
+  onShowToast,
+  onOpenExpenseModal,
+  onOpenGoalModal,
 }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -69,6 +75,8 @@ export default function AiFloatingChat({
   const chatContainerRef = useRef(null);
   const isNearBottomRef = useRef(true);
   const inputRef = useRef(null);
+  const [copiedIdx, setCopiedIdx] = useState(null);
+  const [hoveredIdx, setHoveredIdx] = useState(null);
 
   const hasKey = Boolean(aiConfig?.apiKey?.trim());
   const isAiDisabled = Boolean(aiConfig?.disabled);
@@ -91,6 +99,14 @@ export default function AiFloatingChat({
     }
   }, [open, hasKey, isMobile]);
 
+  // Auto-grow textarea 1-4 baris
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight || 38, 96)}px`;
+  }, [aiInput, open]);
+
   // Sembunyikan hanya jika user secara eksplisit menonaktifkan fitur AI di pengaturan
   if (isAiDisabled) return null;
 
@@ -103,7 +119,15 @@ export default function AiFloatingChat({
     aiConfig?.model ||
     (isGatekeeper ? "KB Auto" : "AI Model");
 
-  const prompts = CONTEXT_PROMPTS[activeMenu] || CONTEXT_PROMPTS.dasbor;
+  const lastMsg = aiChat[aiChat.length - 1];
+  const activeSuggestions =
+    lastMsg && lastMsg.role === "ai" && !lastMsg.streaming && Array.isArray(lastMsg.suggestions) && lastMsg.suggestions.length > 0
+      ? lastMsg.suggestions.slice(0, 3)
+      : null;
+
+  const prompts = activeSuggestions
+    ? activeSuggestions.map((s) => ({ label: `💬 ${s}`, text: s, fillOnly: false }))
+    : CONTEXT_PROMPTS[activeMenu] || CONTEXT_PROMPTS.dasbor;
 
   const handleChipClick = (chip) => {
     if (aiTyping) return;
@@ -113,6 +137,24 @@ export default function AiFloatingChat({
     } else {
       handleAi(chip.text);
     }
+  };
+
+  const handleCopy = (idx, text) => {
+    const rawMarkdown = stripKbActions(text || "");
+    navigator.clipboard?.writeText(rawMarkdown).catch(() => {});
+    setCopiedIdx(idx);
+    setTimeout(() => {
+      setCopiedIdx((cur) => (cur === idx ? null : cur));
+    }, 1800);
+  };
+
+  const findPrecedingUserPrompt = (idx) => {
+    for (let j = idx - 1; j >= 0; j--) {
+      if (aiChat[j]?.role === "user" && aiChat[j]?.text?.trim()) {
+        return aiChat[j].text;
+      }
+    }
+    return null;
   };
 
   return (
@@ -220,7 +262,12 @@ export default function AiFloatingChat({
               {hasKey && onResetChat && aiChat.length > 1 && (
                 <button
                   type="button"
-                  onClick={onResetChat}
+                  onClick={() => {
+                    onResetChat();
+                    if (!isMobile) {
+                      setTimeout(() => inputRef.current?.focus(), 80);
+                    }
+                  }}
                   title="Bersihkan percakapan"
                   aria-label="Bersihkan percakapan"
                   style={{
@@ -362,9 +409,15 @@ export default function AiFloatingChat({
                   background: "var(--bg-app)",
                 }}
               >
-            {aiChat.map((m, i) => (
+            {aiChat.map((m, i) => {
+              const prevUserPrompt = m.role === "ai" && i > 0 ? findPrecedingUserPrompt(i) : null;
+              const showBubbleTools =
+                m.role === "ai" && !m.streaming && m.text && (isMobile || hoveredIdx === i || copiedIdx === i);
+              return (
               <div
                 key={i}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx((cur) => (cur === i ? null : cur))}
                 style={{
                   alignSelf: m.role === "user" ? "flex-end" : "flex-start",
                   maxWidth: "86%",
@@ -454,8 +507,74 @@ export default function AiFloatingChat({
                     m.text
                   )}
                 </div>
+
+                {/* Kartu Aksi Terstruktur (12-ai-chat-ux.md §5.2–5.3) */}
+                {m.role === "ai" &&
+                  !m.streaming &&
+                  Array.isArray(m.actions) &&
+                  m.actions.map((act, actIdx) => (
+                    <AiActionCard
+                      key={actIdx}
+                      action={act}
+                      onMarkApplied={(sysNote) => onMarkActionApplied?.(i, actIdx, sysNote)}
+                      onInvalidate={() => onInvalidate?.()}
+                      onShowToast={onShowToast}
+                      onOpenExpenseModal={onOpenExpenseModal}
+                      onOpenGoalModal={onOpenGoalModal}
+                    />
+                  ))}
+
+                {/* Tombol Salin & Ulangi per bubble AI (§5.5) */}
+                {m.role === "ai" && !m.streaming && m.text && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      paddingLeft: 4,
+                      minHeight: 18,
+                      opacity: showBubbleTools ? 1 : 0,
+                      transition: "opacity .15s",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(i, m.text)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        fontSize: 11,
+                        color: "var(--color-muted)",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {copiedIdx === i ? `✓ ${t("ai.copied")}` : `📋 ${t("ai.copy")}`}
+                    </button>
+                    {prevUserPrompt && (
+                      <button
+                        type="button"
+                        disabled={aiTyping}
+                        onClick={() => handleAi(prevUserPrompt)}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          padding: 0,
+                          fontSize: 11,
+                          color: "var(--color-muted)",
+                          cursor: aiTyping ? "not-allowed" : "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        ↻ {t("ai.retry")}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
             <div ref={chatEndRef} />
           </div>
 
@@ -500,13 +619,14 @@ export default function AiFloatingChat({
               padding: "8px 12px 12px",
               background: "var(--bg-surface)",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-end",
               gap: 8,
               flexShrink: 0,
             }}
           >
-            <input
+            <textarea
               ref={inputRef}
+              rows={1}
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
               onKeyDown={(e) => {
@@ -521,14 +641,18 @@ export default function AiFloatingChat({
               style={{
                 flex: 1,
                 minWidth: 0,
-                padding: "10px 14px",
-                borderRadius: 999,
+                padding: "9px 14px",
+                borderRadius: 18,
                 border: "1px solid var(--color-border)",
                 background: "var(--bg-surface-low)",
                 color: "var(--color-text)",
                 fontSize: 13,
+                lineHeight: 1.45,
                 fontFamily: "inherit",
                 outline: "none",
+                resize: "none",
+                maxHeight: 96,
+                overflowY: "auto",
               }}
             />
             {aiTyping ? (

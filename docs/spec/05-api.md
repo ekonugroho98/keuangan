@@ -283,8 +283,8 @@ Resolusi `debt`/`goal`/`piutang` by name: endpoint `payments`/`contributions`/`r
 
 | Method | Path | Auth | Deskripsi |
 |---|---|---|---|
-| POST | `/v1/ai/chat` | jwt | `{messages:[{role:"user"|"ai", text}], allow_write?:boolean}` → `{reply, mutated?, tools_used?}`. Provider/model/key dari `user_settings.ai_config` (BYOK, tidak pernah dari body). Tool-calling atas data household (`TOOLS` registry + `get_investments` + `memory`). `400 ai_not_configured`, `502 upstream_ai_error` |
-| POST | `/v1/ai/chat/stream` | jwt | Body sama dengan `/v1/ai/chat`. Respons `text/event-stream` (non-OpenAPI, lihat `12-ai-chat-ux.md` §4): event `status` (`step`, `tool?`, `label`), `token` (`text`), `done` (`reply`, `mutated`, `tools_used`, `elapsed_ms`), dan `error` (`code`, `message`), dengan heartbeat `: ping` tiap 10 detik. |
+| POST | `/v1/ai/chat` | jwt | `{messages:[{role:"user"|"ai", text}], allow_write?:boolean}` → `{reply, mutated?, tools_used?, actions?, suggestions?}`. Provider/model/key dari `user_settings.ai_config` (BYOK, tidak pernah dari body). Tool-calling atas data household (`TOOLS` registry + `get_investments` + `memory`). `400 ai_not_configured`, `502 upstream_ai_error` |
+| POST | `/v1/ai/chat/stream` | jwt | Body sama dengan `/v1/ai/chat`. Respons `text/event-stream` (non-OpenAPI, lihat `12-ai-chat-ux.md` §4–5): event `status` (`step`, `tool?`, `label`), `token` (`text`), `done` (`reply`, `mutated`, `tools_used`, `elapsed_ms`, `actions?`, `suggestions?`), dan `error` (`code`, `message`), dengan heartbeat `: ping` tiap 10 detik. |
 | POST | `/v1/ai/scan-receipt` | jwt | JSON `{image_base64, mime_type}` (mode vision) atau `{ocr_text}` (mode teks, untuk hasil OCR client-side) → `{merchant?, date?, subtotal?, items?:[{note, amount, category}]}` atau `{error:"bukan struk"}`. Provider vision/teks dari `ai_config`; `400 ai_not_configured`, `422 provider_no_vision`, `502 upstream_ai_error` |
 
 ### 4.14 Perbandingan harga antar toko (2026-10-13)

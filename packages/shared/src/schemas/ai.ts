@@ -14,11 +14,81 @@ export const AiChatBodySchema = z
   })
   .openapi('AiChatBody')
 
+export const ApplyBudgetActionSchema = z.object({
+  type: z.literal('apply_budget'),
+  label: z.string().min(1).max(120),
+  payload: z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+    items: z
+      .array(
+        z.object({
+          category: z.string().min(1),
+          amount: z.number().int().positive(),
+        }),
+      )
+      .min(1),
+  }),
+})
+
+export const RecordExpenseActionSchema = z.object({
+  type: z.literal('record_expense'),
+  label: z.string().min(1).max(120),
+  payload: z.object({
+    account: z.string().min(1).optional(),
+    category: z.string().min(1),
+    amount: z.number().int().positive(),
+    date: z.string().optional(),
+    note: z.string().optional(),
+  }),
+})
+
+export const AddShoppingActionSchema = z.object({
+  type: z.literal('add_shopping'),
+  label: z.string().min(1).max(120),
+  payload: z.object({
+    items: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          qty: z.number().positive().optional(),
+          unit: z.string().optional(),
+        }),
+      )
+      .min(1),
+  }),
+})
+
+export const SetGoalActionSchema = z.object({
+  type: z.literal('set_goal'),
+  label: z.string().min(1).max(120),
+  payload: z.object({
+    name: z.string().min(1),
+    target: z.number().int().positive(),
+    deadline: z.string().optional(),
+  }),
+})
+
+export const AiActionSchema = z.discriminatedUnion('type', [
+  ApplyBudgetActionSchema,
+  RecordExpenseActionSchema,
+  AddShoppingActionSchema,
+  SetGoalActionSchema,
+])
+
+export type AiAction = z.infer<typeof AiActionSchema>
+
+export const AiActionsBlockSchema = z.object({
+  suggestions: z.array(z.unknown()).optional(),
+  actions: z.array(z.unknown()).optional(),
+})
+
 export const AiChatResponseSchema = z
   .object({
     reply: z.string(),
     mutated: z.boolean().optional(),
     tools_used: z.array(z.string()).optional(),
+    actions: z.array(AiActionSchema).optional(),
+    suggestions: z.array(z.string()).optional(),
   })
   .openapi('AiChatResponse')
 

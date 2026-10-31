@@ -305,7 +305,59 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const [aiChat, setAiChat] = useState(makeGreeting);
   const [aiInput, setAiInput] = useState("");
   const [aiTyping, setAiTyping] = useState(false);
+  const [initialGoalDraft, setInitialGoalDraft] = useState(null);
   const aiAbortRef = useRef(null);
+
+  // Hapus chip saran lanjutan saat menu berubah agar kembali ke chip kontekstual (12-ai-chat-ux.md §5.4)
+  useEffect(() => {
+    setAiChat((prev) => {
+      const lastIdx = prev.length - 1;
+      if (lastIdx < 0 || !prev[lastIdx]?.suggestions?.length) return prev;
+      const next = [...prev];
+      next[lastIdx] = { ...next[lastIdx], suggestions: [] };
+      return next;
+    });
+  }, [activeMenu]);
+
+  const handleOpenExpenseFromAi = useCallback(
+    (draft) => {
+      setTxForm({
+        type: "expense",
+        amount: draft?.amount ? String(draft.amount) : "",
+        category: draft?.category || defaultExpenseCat,
+        note: draft?.note || "",
+        account: draft?.account || accounts[0]?.name || "",
+        toAccount: "",
+        date: draft?.date || toLocalDateStr(),
+        beneficiary: "",
+        receipt_url: "",
+      });
+      setShowAddTx(true);
+    },
+    [accounts, defaultExpenseCat],
+  );
+
+  const handleOpenGoalFromAi = useCallback((draft) => {
+    setInitialGoalDraft(draft || {});
+    setActiveMenu("goals");
+  }, []);
+
+  const handleMarkActionApplied = useCallback((msgIndex, actIndex, systemNote) => {
+    setAiChat((prev) => {
+      const next = [...prev];
+      const target = next[msgIndex];
+      if (target && Array.isArray(target.actions)) {
+        const updatedActions = target.actions.map((a, idx) =>
+          idx === actIndex ? { ...a, applied: true } : a,
+        );
+        next[msgIndex] = { ...target, actions: updatedActions };
+      }
+      if (systemNote) {
+        next.push({ role: "ai", text: systemNote });
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     setAiChat((prev) => {
@@ -1064,6 +1116,8 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 onEdit={editGoal}
                 onDelete={deleteGoal}
                 onTopup={topupGoal}
+                initialDraft={initialGoalDraft}
+                onClearInitialDraft={() => setInitialGoalDraft(null)}
               />
             )}
             {activeMenu === "hutang" && (
@@ -1123,6 +1177,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 handleAi={handleAi}
                 stopAi={stopAi}
                 aiConfig={effectiveAiConfig}
+                onMarkActionApplied={handleMarkActionApplied}
+                onInvalidate={() => queryClient.invalidateQueries()}
+                onShowToast={showToast}
+                onOpenExpenseModal={handleOpenExpenseFromAi}
+                onOpenGoalModal={handleOpenGoalFromAi}
               />
             )}
             {activeMenu === "splitbill" && (
@@ -1171,6 +1230,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         }}
         aiConfig={effectiveAiConfig}
         activeMenu={activeMenu}
+        onMarkActionApplied={handleMarkActionApplied}
+        onInvalidate={() => queryClient.invalidateQueries()}
+        onShowToast={showToast}
+        onOpenExpenseModal={handleOpenExpenseFromAi}
+        onOpenGoalModal={handleOpenGoalFromAi}
       />
     </div>
   );

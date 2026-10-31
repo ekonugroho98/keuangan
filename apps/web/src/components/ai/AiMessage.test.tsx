@@ -74,4 +74,12 @@ describe('AiMessage', () => {
     expect(html).not.toContain('<img')
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
   })
+
+  it('menyembunyikan blok kb-actions baik yang utuh maupun saat masih streaming/rusak (§5.6 #2)', () => {
+    const partial = 'Saran anggaran siap.\n```kb-actions\n{"suggestions":["Bandingkan'
+    const html = renderToStaticMarkup(<AiMessage text={partial} variant="floating" />)
+    expect(html).toContain('Saran anggaran siap.')
+    expect(html).not.toContain('kb-actions')
+    expect(html).not.toContain('suggestions')
+  })
 })
