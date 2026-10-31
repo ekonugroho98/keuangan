@@ -2,6 +2,7 @@ import type { Actor } from '../auth/actor'
 import { withActor } from '../db/tx'
 import { resolveAccountRef } from '../services/resolver'
 import { getHouseholdTimezone } from '../services/households'
+import { resolvePeriod } from '../services/period'
 import * as households from '../services/households'
 import * as accountsSvc from '../services/accounts'
 import * as categoriesSvc from '../services/categories'
@@ -162,7 +163,14 @@ export const TOOLS: ToolDefinition[] = [
     scope: 'read',
     idempotent: true,
     handler: async (actor, args) => {
-      const month = String(args.month ?? new Date().toISOString().slice(0, 7))
+      let month = String(args.month ?? args.period ?? new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 7)).trim()
+      if (!/^\d{4}-\d{2}$/.test(month)) {
+        try {
+          month = resolvePeriod(month, 'Asia/Jakarta').from.slice(0, 7)
+        } catch {
+          month = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 7)
+        }
+      }
       return budgetsSvc.getBudgetStatus(actor, month, (args.scope as 'household' | 'member' | undefined) ?? 'household')
     },
   },
@@ -318,9 +326,19 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
+      const amtText = (args.amount_text ?? (args.amount != null ? String(args.amount) : undefined)) as string
       return transfersSvc.createTransfer(
         actor,
-        { amount_text: args.amount_text as string, from_account: args.from_account as string, to_account: args.to_account as string, note: args.note as string | undefined, date: args.date as string | undefined, recorded_by: optStr(args.recorded_by), receipt_url: optStr(args.receipt_url) },
+        {
+          amount: args.amount != null ? Number(args.amount) : undefined,
+          amount_text: amtText,
+          from_account: (args.from_account ?? args.from_account_id ?? args.account) as string,
+          to_account: (args.to_account ?? args.to_account_id) as string,
+          note: (args.note ?? args.description) as string | undefined,
+          date: args.date as string | undefined,
+          recorded_by: optStr(args.recorded_by),
+          receipt_url: optStr(args.receipt_url),
+        },
         timezone,
       )
     },
@@ -331,7 +349,7 @@ export const TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        transaction_id: str('UUID transaksi yang mau diubah, dari respons tool sebelumnya'),
+        transaction_id: str('UUID transaksi yang mau diubah, dari respons tool sebelumnya (atau kata kunci catatan transaksi)'),
         amount_text: str('Nominal baru (opsional)'),
         category: str('Kategori baru (opsional)'),
         note: str('Catatan baru (opsional)'),
@@ -347,27 +365,35 @@ export const TOOLS: ToolDefinition[] = [
     endpoint: { method: 'PATCH', path: '/v1/transactions/{transaction_id}' },
     scope: 'write',
     idempotent: false,
-    handler: async (actor, args) =>
-      transactionsSvc.updateTransaction(actor, String(args.transaction_id), {
-        amount_text: args.amount_text as string | undefined,
+    handler: async (actor, args) => {
+      const txId = await resolveTxIdOrQuery(actor, String(args.transaction_id ?? args.id ?? args.q ?? ''))
+      const amtText = (args.amount_text ?? (args.amount != null ? String(args.amount) : undefined)) as string | undefined
+      return transactionsSvc.updateTransaction(actor, txId, {
+        amount: args.amount != null ? Number(args.amount) : undefined,
+        amount_text: amtText,
+        account: optStr(args.account),
         category: args.category as string | undefined,
-        note: args.note as string | undefined,
+        note: (args.note ?? args.description) as string | undefined,
         date: args.date as string | undefined,
         qty: args.qty != null ? Number(args.qty) : undefined,
         discount: args.discount != null ? Math.round(Number(args.discount)) : undefined,
         beneficiary: optStr(args.beneficiary),
         recorded_by: optStr(args.recorded_by),
         receipt_url: args.receipt_url === null || args.receipt_url === 'none' || args.receipt_url === 'hapus' ? null : optStr(args.receipt_url),
-      }),
+      })
+    },
   },
   {
     name: 'delete_transaction',
     description: 'Hapus (soft-delete) satu transaksi. Perlu transaction_id. Pakai untuk "hapus transaksi terakhir", "batalkan yang tadi" (gabungkan dengan search_transactions dulu kalau id belum diketahui).',
-    parameters: { type: 'object', properties: { transaction_id: str('UUID transaksi yang mau dihapus') }, required: ['transaction_id'] },
+    parameters: { type: 'object', properties: { transaction_id: str('UUID transaksi yang mau dihapus (atau kata kunci catatan transaksi)') }, required: ['transaction_id'] },
     endpoint: { method: 'DELETE', path: '/v1/transactions/{transaction_id}' },
     scope: 'write',
     idempotent: false,
-    handler: async (actor, args) => transactionsSvc.deleteTransaction(actor, String(args.transaction_id)),
+    handler: async (actor, args) => {
+      const txId = await resolveTxIdOrQuery(actor, String(args.transaction_id ?? args.id ?? args.q ?? ''))
+      return transactionsSvc.deleteTransaction(actor, txId)
+    },
   },
   {
     name: 'adjust_balance',
@@ -416,7 +442,9 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return debtsSvc.payDebt(actor, String(args.debt_id), { amount_text: args.amount_text as string, account: args.account as string, date: args.date as string | undefined, allow_overpay: false }, timezone)
+      const debtId = await resolveEntityIdOrName(actor, 'debt', String(args.debt_id ?? args.id ?? args.name ?? ''))
+      const amtText = (args.amount_text ?? (args.amount != null ? String(args.amount) : undefined)) as string
+      return debtsSvc.payDebt(actor, debtId, { amount_text: amtText, account: args.account as string, date: args.date as string | undefined, allow_overpay: false }, timezone)
     },
   },
   {
@@ -434,7 +462,7 @@ export const TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        goal_id: str('UUID goal, dari resolve_name kind=goal'),
+        goal_id: str('UUID atau nama goal, dari resolve_name kind=goal'),
         amount_text: str('Nominal setoran'),
         account: str('Nama akun atau UUID sumber dana (opsional — kosongkan kalau cuma mencatat progres tanpa potong saldo)'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
@@ -446,7 +474,9 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return goalsSvc.contributeGoal(actor, String(args.goal_id), { amount_text: args.amount_text as string, account: (args.account as string | undefined) ?? null, date: args.date as string | undefined }, timezone)
+      const goalId = await resolveEntityIdOrName(actor, 'goal', String(args.goal_id ?? args.id ?? args.name ?? ''))
+      const amtText = (args.amount_text ?? (args.amount != null ? String(args.amount) : undefined)) as string
+      return goalsSvc.contributeGoal(actor, goalId, { amount_text: amtText, account: (args.account as string | undefined) ?? null, date: args.date as string | undefined }, timezone)
     },
   },
   {
@@ -464,7 +494,7 @@ export const TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        piutang_id: str('UUID piutang, dari resolve_name kind=piutang'),
+        piutang_id: str('UUID atau nama peminjam piutang, dari resolve_name kind=piutang'),
         amount_text: str('Nominal yang diterima'),
         account: str('Nama akun atau UUID tujuan dana'),
         date: str('YYYY-MM-DD; default hari ini', { format: 'date' }),
@@ -476,7 +506,9 @@ export const TOOLS: ToolDefinition[] = [
     idempotent: true,
     handler: async (actor, args) => {
       const timezone = await getHouseholdTimezone(actor)
-      return piutangSvc.receivePiutang(actor, String(args.piutang_id), { amount_text: args.amount_text as string, account: args.account as string, date: args.date as string | undefined, allow_overpay: false }, timezone)
+      const piutangId = await resolveEntityIdOrName(actor, 'piutang', String(args.piutang_id ?? args.id ?? args.borrower_name ?? args.name ?? ''))
+      const amtText = (args.amount_text ?? (args.amount != null ? String(args.amount) : undefined)) as string
+      return piutangSvc.receivePiutang(actor, piutangId, { amount_text: amtText, account: args.account as string, date: args.date as string | undefined, allow_overpay: false }, timezone)
     },
   },
   {
@@ -692,12 +724,20 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'mark_bought',
     description: 'Tandai item di daftar belanja sudah dibeli (TANPA ikut mencatat transaksi uangnya — kalau user juga sebut harga dan belum dicatat, pakai ingest_receipt/record_expense dulu). Perlu shopping_item_id dari list_shopping.',
-    parameters: { type: 'object', properties: { shopping_item_id: str('UUID item, dari list_shopping') }, required: ['shopping_item_id'] },
+    parameters: { type: 'object', properties: { shopping_item_id: str('UUID atau nama item, dari list_shopping') }, required: ['shopping_item_id'] },
     endpoint: { method: 'PATCH', path: '/v1/shopping/{shopping_item_id}', body: { status: 'bought' } },
     scope: 'write',
     idempotent: false,
     feature: 'shopping_stock',
-    handler: async (actor, args) => shoppingSvc.updateShoppingItem(actor, String(args.shopping_item_id), { status: 'bought' }),
+    handler: async (actor, args) => {
+      let itemId = String(args.shopping_item_id ?? args.id ?? args.name ?? '').trim()
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(itemId)) {
+        const list = await shoppingSvc.listShopping(actor, 'needed')
+        const found = list.find((i) => i.name.toLowerCase() === itemId.toLowerCase() || i.name.toLowerCase().includes(itemId.toLowerCase()))
+        if (found) itemId = found.id
+      }
+      return shoppingSvc.updateShoppingItem(actor, itemId, { status: 'bought' })
+    },
   },
   {
     name: 'shopping_suggestions',
@@ -725,7 +765,7 @@ export const TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        pantry_item_id: str('UUID item, dari list_pantry'),
+        pantry_item_id: str('UUID atau nama item, dari list_pantry'),
         delta: num('Perubahan jumlah: negatif kalau berkurang (dipakai/dibuang), positif kalau bertambah'),
         reason: str('Alasan perubahan', { enum: ['consume', 'expired', 'adjust', 'purchase'] }),
       },
@@ -735,18 +775,49 @@ export const TOOLS: ToolDefinition[] = [
     scope: 'write',
     idempotent: false,
     feature: 'shopping_stock',
-    handler: async (actor, args) =>
-      pantrySvc.addPantryMovement(actor, String(args.pantry_item_id), { delta: Number(args.delta), reason: args.reason as 'consume' | 'expired' | 'adjust' | 'purchase', note: '' }),
+    handler: async (actor, args) => {
+      let itemId = String(args.pantry_item_id ?? args.id ?? args.name ?? '').trim()
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(itemId)) {
+        const list = await pantrySvc.listPantry(actor)
+        const found = list.find((i) => i.name.toLowerCase() === itemId.toLowerCase() || i.name.toLowerCase().includes(itemId.toLowerCase()))
+        if (found) itemId = found.id
+      }
+      return pantrySvc.addPantryMovement(actor, itemId, { delta: Number(args.delta), reason: (args.reason as 'consume' | 'expired' | 'adjust' | 'purchase') ?? 'consume', note: '' })
+    },
   },
 ]
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function resolveEntityIdOrName(actor: Actor, kind: 'debt' | 'goal' | 'piutang', ref: string): Promise<string> {
+  const val = ref.trim()
+  if (UUID_RE.test(val)) return val
+  const res = (await resolveName(actor, { kind, query: val })) as { status?: string; match?: { id?: string }; candidates?: Array<{ id?: string }> }
+  if (res.status === 'ok' && res.match?.id) return res.match.id
+  if (res.candidates?.length === 1 && res.candidates[0]?.id) return res.candidates[0].id
+  return val
+}
+
+async function resolveTxIdOrQuery(actor: Actor, ref: string): Promise<string> {
+  const val = ref.trim()
+  if (UUID_RE.test(val)) return val
+  const list = await transactionsSvc.listTransactions(
+    actor,
+    { q: val || undefined, attribution: 'owner', include_deleted: false, limit: 5 },
+    'Asia/Jakarta',
+  )
+  if (list.data.length > 0 && list.data[0]?.id) return list.data[0].id
+  return val
+}
+
 function pickAmountAccountCategory(args: Record<string, unknown>) {
+  const amtText = (args.amount_text ?? (args.amount != null ? String(args.amount) : undefined)) as string | undefined
   return {
-    amount_text: args.amount_text as string | undefined,
-    amount: args.amount as number | undefined,
+    amount_text: amtText,
+    amount: args.amount != null ? Number(args.amount) : undefined,
     account: args.account as string | undefined,
     category: args.category as string | undefined,
-    note: args.note as string | undefined,
+    note: (args.note ?? args.description) as string | undefined,
     date: args.date as string | undefined,
   }
 }
