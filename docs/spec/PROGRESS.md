@@ -857,3 +857,16 @@ dari `search_transactions` (≤200 baris) tanpa resep. Solusi: angka dihitung se
   per jenis, saran tidak berangka, menawarkan banding bulan lalu yang kosong): `top_items` dikelompokkan per item+tempat
   (`label`), `by_kind` untuk kategori makan/jajan, `budget.cut_per_day_needed`, `comparison.available`; resep skill
   diperketat. 10 test insights.
+
+### Spec baru: AI chat web — render, streaming, kartu aksi (2026-10-31)
+- `docs/spec/12-ai-chat-ux.md`. Pemicu: balasan AI di widget tampil sebagai Markdown
+  mentah dan terasa pasif. Tiga fase: A render Markdown + aturan format (prioritas), B `POST /v1/ai/chat/stream` SSE +
+  status per tool, C kartu aksi (`kb-actions`) + chip lanjutan. Kerjakan berurutan, commit per fase, update bagian ini.
+- Catatan untuk yang mengerjakan: web SUDAH mengirim `allow_write: true` (komentar di `chat.ts` sudah diperbaiki di Fase A); jalankan uji
+  curl Q-12-2 (stream + tool_calls lewat Gatekeeper) sebelum mulai Fase B.
+- **Fase A SELESAI (2026-10-31)**:
+  - `apps/web/package.json`: tambah `react-markdown` (`10.1.0`) + `remark-gfm` (`4.0.1`) exact pin.
+  - `apps/web/src/components/ai/AiMessage.tsx` (baru): renderer Markdown aman (tanpa `rehype-raw`, tolak skema `javascript:`/`data:`/`vbscript:`, tautan eksternal `rel="noopener noreferrer"`, `hr` & `img` tidak dirender) + `AiTable` (tabel ≤2 kolom di `floating` / ≤3 kolom di `page` dirender sebagai tabel dengan perataan kanan untuk kolom angka/rupiah; selebihnya diubah jadi daftar kartu vertikal dengan highlight `var(--color-primary-soft)` untuk baris `TOTAL`).
+  - `apps/web/src/components/dashboard/AiFloatingChat.jsx` & `apps/web/src/components/dashboard/views/AiView.jsx`: bubble `role === 'ai'` dirender lewat `<AiMessage>` (`variant="floating"` & `variant="page"`).
+  - `apps/api/src/services/ai/chat.ts`: tambah aturan 8 format jawaban di `buildSystemPrompt()` + kalimat setara di `buildEnrichedPrompt()`, naikkan `max_tokens` 1024 → 2048 di ketiga caller provider, perbaiki komentar basi `allow_write`, dan rebuild bundle `apps/api/api/index.js`.
+  - Verifikasi: `AiMessage.test.tsx` **5/5 lulus** (tabel 3 kolom → 5 kartu + highlight TOTAL, tabel 2 kolom → `<table` + `text-align:right`, `hr`/`img` tidak dirender, `rel="noopener noreferrer"` + tolak `javascript:`, escape `<script>`/`<img onerror>`), `pnpm typecheck` bersih, `pnpm lint` 0 error, `pnpm build` (`apps/api` + `apps/web`) hijau.

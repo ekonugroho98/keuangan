@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { AI_PROVIDERS, PROVIDER_ORDER } from "../../../services/aiService";
 import { APP_AI_NAME } from "../../../config/app";
+import { AiMessage } from "../../ai/AiMessage";
 
 // ── Setup screen ketika belum ada AI config ───────────────────────────────
 function AiSetupScreen() {
@@ -181,8 +182,8 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig }) =
                                 : m.role === "error" ? "var(--color-expense)"
                                 : "var(--color-text)",
                             fontSize: 14, lineHeight: 1.7, animation: "slideUp .3s",
-                            whiteSpace: "pre-wrap", wordBreak: "break-word",
-                        }}>{m.text}</div>
+                            whiteSpace: m.role === "ai" ? "normal" : "pre-wrap", wordBreak: "break-word",
+                        }}>{m.role === "ai" ? <AiMessage text={m.text} variant="page" /> : m.text}</div>
                         );
                     })}
                     {aiTyping && (

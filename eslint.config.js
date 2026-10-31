@@ -15,6 +15,7 @@ export default [
       '**/node_modules/**',
       '**/.vercel/**',
       'apps/web/public/**',
+      'apps/web/android/**',
       'packages/shared/src/api-client/schema.d.ts',
       'apps/api/tools/hermes-tools.json',
       // Bundle hasil esbuild (scripts/build-function.mjs), bukan kode sumber — lihat src/vercel-handler.ts.
@@ -38,6 +39,7 @@ export default [
       ...tseslint.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-unused-vars': 'off',
+      'no-undef': 'off',
     },
   },
   // JS/JSX lama di apps/web (belum dikonversi TSX, ADR-14: "dibiarkan sampai disentuh").

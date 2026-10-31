@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { AI_PROVIDERS } from "../../services/aiService";
 import { APP_AI_NAME } from "../../config/app";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { AiMessage } from "../ai/AiMessage";
 
 const CONTEXT_PROMPTS = {
   dasbor: [
@@ -383,11 +384,11 @@ export default function AiFloatingChat({
                         : "var(--color-text)",
                   fontSize: 13,
                   lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
+                  whiteSpace: m.role === "ai" ? "normal" : "pre-wrap",
                   wordBreak: "break-word",
                 }}
               >
-                {m.text}
+                {m.role === "ai" ? <AiMessage text={m.text} variant="floating" /> : m.text}
               </div>
             ))}
 
