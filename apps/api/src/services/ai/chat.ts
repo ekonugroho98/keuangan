@@ -52,6 +52,21 @@ function isToolsUnreliable(provider?: string, model?: string): boolean {
 // tapi sudah jadi fitur AI chat sejak Fase 4 — dipertahankan sebagai tool tambahan HANYA untuk
 // jalur internal ini supaya tidak jadi regresi fitur.
 const INVESTMENTS_TOOL_DEF = { name: 'get_investments', description: 'Ambil semua aset investasi (emas, saham, reksa dana, dll.) beserta modal, nilai sekarang, dan gain/loss.', parameters: { type: 'object', properties: {} } }
+const MEMORY_TOOL_DEF = {
+  name: 'memory',
+  description: 'Simpan, ubah, hapus ingatan jangka panjang keluarga (MEMORY.md/USER.md lintas Web, WA & Telegram) atau cari riwayat obrolan lama (action=search_history).',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['add', 'replace', 'remove', 'list', 'search_history'] },
+      target: { type: 'string', enum: ['memory', 'user'] },
+      content: { type: 'string', description: 'Isi fakta baru yang ringkas & jelas (untuk add/replace)' },
+      old_text: { type: 'string', description: 'Teks lama yang ingin diganti/dihapus (untuk replace/remove)' },
+      query: { type: 'string', description: 'Kata kunci pencarian obrolan WA/Telegram lama (untuk search_history)' },
+    },
+    required: ['action'],
+  },
+}
 
 // `features` (10-fitur-opsional-keluarga.md §2.4): tool yang di-gate fitur opsional (`t.feature`)
 // hanya ditawarkan ke model kalau flag household-nya aktif — SAMA dengan aturan yang dipakai skill
@@ -62,7 +77,7 @@ export function buildToolDefs(allowWrite: boolean, features: HouseholdFeatures) 
     .filter((t) => t.scope === 'read' || allowWrite)
     .filter((t) => !t.feature || features[t.feature].enabled)
     .map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }))
-  return [...fromRegistry, INVESTMENTS_TOOL_DEF]
+  return [...fromRegistry, INVESTMENTS_TOOL_DEF, MEMORY_TOOL_DEF]
 }
 
 // ── Tool executor: panggil handler registry langsung (household-scoped lewat actor) ─────────
@@ -70,7 +85,38 @@ async function executeTool(
   actor: Actor,
   name: string,
   args: Record<string, unknown>,
+  gatekeeperKey?: string,
 ): Promise<{ output: string; isWrite: boolean }> {
+  if (name === 'memory') {
+    if (!gatekeeperKey) return { output: 'Fitur memori lintas kanal membutuhkan koneksi Gatekeeper aktif.', isWrite: false }
+    try {
+      const res = await fetch(`${env.GATEKEEPER_BASE_URL}/v1/household-memory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${gatekeeperKey}`,
+          'X-Household-Id': actor.householdId,
+        },
+        body: JSON.stringify({ ...args, household_id: actor.householdId }),
+        signal: AbortSignal.timeout(8_000),
+      })
+      const data = (await res.json()) as Record<string, unknown>
+      if (!res.ok || data.ok === false) {
+        return { output: `Gagal mengakses memori keluarga: ${String(data.error ?? res.status)}`, isWrite: false }
+      }
+      if (args.action === 'search_history') {
+        const matches = (data.matches as Array<Record<string, unknown>>) ?? []
+        if (!matches.length) return { output: 'Tidak ditemukan riwayat obrolan WA/Telegram yang cocok.', isWrite: false }
+        return {
+          output: matches.map((m) => `[${String(m.platform ?? 'chat').toUpperCase()} | ${String(m.created_at ?? '')}] ${String(m.role)}: ${String(m.content)}`).join('\n'),
+          isWrite: false,
+        }
+      }
+      return { output: `Memori keluarga diperbarui: ${JSON.stringify(data.entries ?? data)}`, isWrite: false }
+    } catch (e) {
+      return { output: `Gagal menghubungi server memori: ${(e as Error).message}`, isWrite: false }
+    }
+  }
   if (name === 'get_investments') {
     const invs = (await listInvestments(actor)) as unknown as Array<{ name: string; type: string; buy_price: number; current_value: number }>
     if (!invs.length) return { output: 'Belum ada aset investasi.', isWrite: false }
@@ -169,8 +215,8 @@ function buildSystemPrompt(userName: string, liveSnapshot = ''): string {
   return `Kamu adalah ${APP_AI_NAME}, asisten keuangan & rumah tangga hangat untuk ${userName}. Hari ini: ${today}.
 
 ATURAN:
-1. Untuk pertanyaan tentang saldo akun, sisa kas bulan ini, jatah aman harian, anggaran/budget bulan ini, atau analisis ringkasan pengeluaran bulan ini, JAWAB LANGSUNG menggunakan DATA LIVE di bawah TANPA memanggil tool lagi.
-2. Gunakan tool HANYA jika butuh data spesifik yang belum ada di DATA LIVE (mis. search_transactions untuk rincian daftar transaksi, daftar belanja, stok kulkas/rumah, hutang, piutang, goals, investasi) atau saat diminta mencatat/mengubah data. Jangan panggil tool berulang kali jika 1 panggilan sudah cukup.
+1. Untuk pertanyaan tentang saldo akun, sisa kas bulan ini, jatah aman harian, anggaran/budget bulan ini, analisis ringkasan pengeluaran bulan ini, atau komitmen/fakta keluarga yang sudah tertulis di INGATAN PERMANEN KELUARGA INI (seperti cicilan KPR, sewa kos, SPP, profil keluarga), JAWAB LANGSUNG menggunakan DATA LIVE dan INGATAN PERMANEN di bawah TANPA memanggil tool lagi.
+2. Gunakan tool HANYA jika butuh data spesifik yang belum ada di DATA LIVE / INGATAN PERMANEN (mis. search_transactions untuk rincian daftar transaksi, daftar belanja, stok kulkas/rumah, hutang, piutang, goals, investasi), saat user memberi tahu fakta/komitmen baru yang perlu diingat lintas WA/Telegram/Web (gunakan tool memory action=add/replace), atau saat diminta mencatat/mengubah transaksi. Jangan panggil tool berulang kali jika 1 panggilan sudah cukup.
 3. Saat memanggil search_transactions, gunakan nama kategori PERSIS dari "Daftar Nama Kategori Valid" di bawah (misal "Makan Beli & Jajan", bukan "Makanan"), atau kosongkan filter category jika ingin melihat semua kategori milik member tersebut. Hasil search_transactions sudah memuat Hari (Senin-Minggu), Tanggal, dan Jam WIB pencatatan — saring langsung di jawabanmu jika user meminta hari kerja (weekdays) atau jam tertentu.
 4. JANGAN mengarang angka. Bahasa Indonesia hangat, ramah, singkat, mudah dipahami keluarga.
 5. Jika bulan belum berakhir, sebut selisih pemasukan-pengeluaran sebagai "Sisa Kas Bulan Ini" (bukan surplus akhir bulan).
@@ -201,6 +247,7 @@ function selectContextualTools(
     'update_transaction',
     'list_shopping',
     'list_pantry',
+    'memory',
   ])
 
   if (/lalu|kemarin|minggu|tahun|banding|istri|suami|ayah|ibu|bunda|anak|member|orang|laporan|evaluasi|anomali/i.test(recentText)) {
@@ -277,12 +324,14 @@ ${sections.join('\n\n')}`
 interface ChatMsg { role: string; content: unknown; tool_calls?: unknown; tool_call_id?: string }
 type ToolDef = ReturnType<typeof buildToolDefs>[number]
 
-async function callOpenAiCompatible(apiKey: string, model: string, messages: ChatMsg[], systemPrompt: string, baseUrl: string, tools: ToolDef[]) {
+async function callOpenAiCompatible(apiKey: string, model: string, messages: ChatMsg[], systemPrompt: string, baseUrl: string, tools: ToolDef[], householdId?: string) {
   const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: systemPrompt }, ...messages], temperature: 0.3, max_tokens: 1024 }
   if (tools.length) body.tools = tools.map((t) => ({ type: 'function', function: t }))
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }
+  if (householdId) headers['X-Household-Id'] = householdId
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(22_000),
   })
@@ -338,7 +387,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
   if (isToolsUnreliable(provider, model)) {
     const prompt = await buildEnrichedPrompt(actor, userName)
     const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq!
-    const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl, [])
+    const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl, [], actor.householdId)
     return { reply: (msg as { content?: string }).content || '(Tidak ada jawaban)', mutated: false, tools_used: [] }
   }
 
@@ -347,6 +396,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
   const TIME_BUDGET_MS = 32_000
   let mutated = false
   const toolsUsed: string[] = []
+  const gkKey = provider === 'gatekeeper' ? apiKey : undefined
 
   if (provider === 'anthropic') {
     const msgs: unknown[] = [...apiMessages]
@@ -359,7 +409,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
         const results = await Promise.all(
           toolBlocks.map(async (block) => {
             toolsUsed.push(block.name!)
-            const { output, isWrite } = await executeTool(actor, block.name!, (block.input as Record<string, unknown>) ?? {})
+            const { output, isWrite } = await executeTool(actor, block.name!, (block.input as Record<string, unknown>) ?? {}, gkKey)
             if (isWrite) mutated = true
             return { type: 'tool_result', tool_use_id: block.id, content: output }
           }),
@@ -387,7 +437,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
         const fnResponses = await Promise.all(
           fnCalls.map(async (p) => {
             toolsUsed.push(p.functionCall!.name)
-            const { output, isWrite } = await executeTool(actor, p.functionCall!.name, (p.functionCall!.args as Record<string, unknown>) ?? {})
+            const { output, isWrite } = await executeTool(actor, p.functionCall!.name, (p.functionCall!.args as Record<string, unknown>) ?? {}, gkKey)
             if (isWrite) mutated = true
             return { functionResponse: { name: p.functionCall!.name, response: { result: output } } }
           }),
@@ -408,7 +458,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
   const tools = toolDefs
   for (let i = 0; i < MAX_ITER; i++) {
     if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
-    const msg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools)) as ChatMsg & { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }
+    const msg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools, actor.householdId)) as ChatMsg & { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }
     if (msg.tool_calls?.length) {
       msgs.push({ role: 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls })
       const toolMsgs = await Promise.all(
@@ -416,7 +466,7 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
           let args: Record<string, unknown> = {}
           try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { /* arguments kosong/rusak -> panggil tool tanpa filter */ }
           toolsUsed.push(toolCall.function.name)
-          const { output, isWrite } = await executeTool(actor, toolCall.function.name, args)
+          const { output, isWrite } = await executeTool(actor, toolCall.function.name, args, gkKey)
           if (isWrite) mutated = true
           return { role: 'tool' as const, tool_call_id: toolCall.id, content: output }
         }),
@@ -427,6 +477,6 @@ export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 
     return { reply: msg.content || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
   }
   // Jika sudah mencapai batas iterasi tool-call, paksa 1 panggilan akhir tanpa tools untuk merangkum jawaban dari data yang sudah terkumpul
-  const finalMsg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [])) as ChatMsg & { content?: string }
+  const finalMsg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId)) as ChatMsg & { content?: string }
   return { reply: finalMsg.content || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
 }
