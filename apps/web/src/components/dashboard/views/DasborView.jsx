@@ -4,6 +4,7 @@ import { categoryColors } from "../../../constants/categories";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import ScopeSwitcher from "../../household/ScopeSwitcher";
 import FreeTierAdBanner from "../../ui/FreeTierAdBanner";
+import PromoRadarWidget from "../widgets/PromoRadarWidget";
 
 /* ═══════════════════════════════════════════════════════════════
  * ASYMMETRIC BENTO DESIGN
@@ -412,6 +413,7 @@ const DasborView = ({
                 .b-cats       { grid-column: span 5; }
                 .b-goals      { grid-column: span 4; }
                 .b-debts      { grid-column: span 3; }
+                .b-promo      { grid-column: span 12; }
                 .b-health     { grid-column: span 12; }
 
                 @media (max-width: 1100px) {
@@ -434,6 +436,7 @@ const DasborView = ({
                     .b-chart      { grid-column: span 6 !important; grid-row: auto !important; min-height: 300px; }
                     .b-tx         { grid-column: span 6 !important; grid-row: auto !important; }
                     .b-cats, .b-goals, .b-debts { grid-column: span 6 !important; grid-row: auto !important; }
+                    .b-promo      { grid-column: span 6 !important; grid-row: auto !important; }
                     .b-health     { grid-column: span 6 !important; grid-row: auto !important; }
                     .hero-number  { font-size: clamp(34px, 11vw, 52px) !important; }
                 }
@@ -969,6 +972,11 @@ const DasborView = ({
                         </div>
                     )}
                 </div>
+
+                {/* ═══════════════════════════════════════════════════════
+                 * 12b. RADAR PROMO SWALAYAN — deal recommendations
+                 * ═══════════════════════════════════════════════════════ */}
+                <PromoRadarWidget onOpenShopping={() => setActiveMenu && setActiveMenu("belanja")} />
 
                 {/* ═══════════════════════════════════════════════════════
                  * 13. FINANCIAL HEALTH — full-width tiles
