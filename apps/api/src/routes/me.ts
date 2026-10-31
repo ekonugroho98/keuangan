@@ -100,7 +100,7 @@ householdApp.openapi(
     responses: OkAny,
   }),
   async (c) => {
-    assertScope(c.get('actor'), 'admin')
+    assertScope(c.get('actor'), 'write')
     return c.json(await households.updateHousehold(c.get('actor'), c.req.valid('json')))
   },
 )
