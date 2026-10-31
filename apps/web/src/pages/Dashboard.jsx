@@ -3,6 +3,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   lazy,
   Suspense,
 } from "react";
@@ -10,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { fetchGoldPrices } from "../services/goldPrice";
 import { APP_AI_NAME } from "../config/app";
 import { api, unwrap } from "../api/client";
+import { streamAiChat } from "../services/aiChatStream";
 import Sidebar from "../components/dashboard/Sidebar";
 import AiFloatingChat from "../components/dashboard/AiFloatingChat";
 import { exportTransactionsCSV, exportTransactionsExcel } from "../utils/exportData";
@@ -303,6 +305,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
   const [aiChat, setAiChat] = useState(makeGreeting);
   const [aiInput, setAiInput] = useState("");
   const [aiTyping, setAiTyping] = useState(false);
+  const aiAbortRef = useRef(null);
 
   useEffect(() => {
     setAiChat((prev) => {
@@ -575,7 +578,28 @@ const Dashboard = ({ session, onLogout, showToast }) => {
     }
   };
 
-  // ── AI CHAT (POST /v1/ai/chat — API key dibaca server-side, 05-api.md) ───
+  // ── AI CHAT (SSE /v1/ai/chat/stream + fallback JSON /v1/ai/chat, 12-ai-chat-ux.md §4) ───
+  const stopAi = useCallback(() => {
+    if (aiAbortRef.current) {
+      aiAbortRef.current.abort();
+      aiAbortRef.current = null;
+    }
+    setAiTyping(false);
+    setAiChat((prev) => {
+      const next = [...prev];
+      const lastIdx = next.length - 1;
+      if (lastIdx >= 0 && next[lastIdx]?.streaming) {
+        next[lastIdx] = {
+          ...next[lastIdx],
+          streaming: false,
+          status: undefined,
+          stopped: true,
+        };
+      }
+      return next;
+    });
+  }, []);
+
   const handleAi = async (overridePrompt) => {
     const rawMsg = typeof overridePrompt === "string" ? overridePrompt : aiInput;
     const userMsg = rawMsg.trim();
@@ -587,32 +611,101 @@ const Dashboard = ({ session, onLogout, showToast }) => {
       ]);
       return;
     }
-    const updatedChat = [...aiChat, { role: "user", text: userMsg }];
-    setAiChat(updatedChat);
+
+    const historyMessages = [...aiChat, { role: "user", text: userMsg }]
+      .filter((m) => (m.role === "user" || m.role === "ai") && m.text?.trim())
+      .map((m) => ({ role: m.role, text: m.text }));
+
+    const initialStatus = t("ai.status.processing") === "ai.status.processing" ? "Memproses…" : t("ai.status.processing");
+    setAiChat((p) => [
+      ...p,
+      { role: "user", text: userMsg },
+      { role: "ai", text: "", streaming: true, status: initialStatus },
+    ]);
     if (typeof overridePrompt !== "string") setAiInput("");
     setAiTyping(true);
+
+    const ctrl = new AbortController();
+    aiAbortRef.current = ctrl;
+
     try {
-      const result = await unwrap(
-        await api.POST("/v1/ai/chat", {
-          body: {
-            messages: updatedChat.filter((m) => m.role === "user" || m.role === "ai"),
-            allow_write: true,
+      await streamAiChat(
+        { messages: historyMessages, allow_write: true },
+        {
+          onStatus: (s) => {
+            setAiChat((prev) => {
+              const next = [...prev];
+              const lastIdx = next.length - 1;
+              if (lastIdx >= 0 && next[lastIdx]?.streaming) {
+                next[lastIdx] = { ...next[lastIdx], status: s.label };
+              }
+              return next;
+            });
           },
-        }),
-      );
-      setAiChat((p) =>
-        p.filter((m) => m.role !== "thinking").concat({ role: "ai", text: result.reply }),
-      );
-      // Hanya segarkan data dasbor bila AI benar-benar mengeksekusi tool tulis (catat transaksi, belanja, stok kulkas, dll.)
-      if (result?.mutated) {
-        queryClient.invalidateQueries();
-      }
-    } catch (err) {
-      setAiChat((p) =>
-        p.filter((m) => m.role !== "thinking").concat({ role: "error", text: err.message }),
+          onToken: (chunk) => {
+            setAiChat((prev) => {
+              const next = [...prev];
+              const lastIdx = next.length - 1;
+              if (lastIdx >= 0 && next[lastIdx]?.streaming) {
+                next[lastIdx] = {
+                  ...next[lastIdx],
+                  text: (next[lastIdx].text || "") + chunk,
+                };
+              }
+              return next;
+            });
+          },
+          onDone: (result) => {
+            setAiChat((prev) => {
+              const next = [...prev];
+              const lastIdx = next.length - 1;
+              if (lastIdx >= 0 && next[lastIdx]?.role === "ai") {
+                next[lastIdx] = {
+                  ...next[lastIdx],
+                  text: result.reply || next[lastIdx].text || "(Tidak ada jawaban)",
+                  streaming: false,
+                  status: undefined,
+                  tools_used: result.tools_used,
+                  actions: result.actions,
+                  suggestions: result.suggestions,
+                };
+              }
+              return next;
+            });
+            if (result?.mutated) {
+              queryClient.invalidateQueries();
+            }
+          },
+          onError: (err) => {
+            setAiChat((prev) => {
+              const next = [...prev];
+              const lastIdx = next.length - 1;
+              if (lastIdx >= 0 && next[lastIdx]?.streaming) {
+                if (next[lastIdx].text) {
+                  // Jika token sudah sempat diterima, pertahankan teks dan tampilkan catatan error di bawahnya
+                  next[lastIdx] = {
+                    ...next[lastIdx],
+                    streaming: false,
+                    status: undefined,
+                    streamError: err.message,
+                  };
+                } else {
+                  next[lastIdx] = { role: "error", text: err.message };
+                }
+              } else {
+                next.push({ role: "error", text: err.message });
+              }
+              return next;
+            });
+          },
+        },
+        ctrl.signal,
       );
     } finally {
-      setAiTyping(false);
+      if (aiAbortRef.current === ctrl) {
+        aiAbortRef.current = null;
+        setAiTyping(false);
+      }
     }
   };
 
@@ -1028,6 +1121,7 @@ const Dashboard = ({ session, onLogout, showToast }) => {
                 aiInput={aiInput}
                 setAiInput={setAiInput}
                 handleAi={handleAi}
+                stopAi={stopAi}
                 aiConfig={effectiveAiConfig}
               />
             )}
@@ -1070,7 +1164,11 @@ const Dashboard = ({ session, onLogout, showToast }) => {
         aiInput={aiInput}
         setAiInput={setAiInput}
         handleAi={handleAi}
-        onResetChat={() => setAiChat(makeGreeting())}
+        stopAi={stopAi}
+        onResetChat={() => {
+          stopAi();
+          setAiChat(makeGreeting());
+        }}
         aiConfig={effectiveAiConfig}
         activeMenu={activeMenu}
       />

@@ -1,0 +1,45 @@
+export const DEFAULT_TOOL_LABEL = 'Mengambil data…'
+
+export const TOOL_LABELS: Record<string, string> = {
+  search_transactions: 'Mencari transaksi…',
+  get_summary: 'Menghitung ringkasan…',
+  get_monthly_report: 'Menghitung ringkasan…',
+  analyze_spending: 'Menghitung ringkasan…',
+  get_budget_status: 'Mengecek anggaran…',
+  record_expense: 'Mencatat pengeluaran…',
+  record_expense_batch: 'Mencatat pengeluaran…',
+  record_income: 'Mencatat pemasukan…',
+  record_transfer: 'Mencatat transfer…',
+  update_transaction: 'Memperbarui catatan…',
+  delete_transaction: 'Memperbarui catatan…',
+  adjust_balance: 'Memperbarui catatan…',
+  list_debts: 'Mengecek hutang & cicilan…',
+  pay_debt: 'Mengecek hutang & cicilan…',
+  list_piutang: 'Mengecek piutang…',
+  receive_piutang: 'Mengecek piutang…',
+  list_goals: 'Mengecek target tabungan…',
+  contribute_goal: 'Mengecek target tabungan…',
+  get_investments: 'Mengecek investasi…',
+  list_shopping: 'Mengecek daftar belanja…',
+  add_shopping_item: 'Mengecek daftar belanja…',
+  mark_bought: 'Mengecek daftar belanja…',
+  shopping_suggestions: 'Mengecek daftar belanja…',
+  list_pantry: 'Mengecek stok rumah…',
+  adjust_pantry: 'Mengecek stok rumah…',
+  compare_prices: 'Membandingkan harga…',
+  merge_products: 'Membandingkan harga…',
+  ingest_receipt: 'Membaca struk…',
+  list_recurrings: 'Mengecek transaksi rutin…',
+  run_recurrings: 'Mengecek transaksi rutin…',
+  list_beneficiaries: 'Mengecek penerima…',
+  add_beneficiary: 'Mengecek penerima…',
+  memory: 'Menyimpan ingatan keluarga…',
+  list_accounts: 'Mengecek data keluarga…',
+  list_members: 'Mengecek data keluarga…',
+  list_categories: 'Mengecek data keluarga…',
+  resolve_name: 'Mengecek data keluarga…',
+}
+
+export function getToolLabel(toolName: string): string {
+  return TOOL_LABELS[toolName] ?? DEFAULT_TOOL_LABEL
+}

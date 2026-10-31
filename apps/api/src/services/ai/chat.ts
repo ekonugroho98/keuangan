@@ -13,6 +13,7 @@ import { listInvestments } from '../investments'
 import { TOOLS, toolByName } from '../../tools/registry'
 import { formatToolResult } from './format-tool-result'
 import { getAiConfig, type AiConfig } from './provider'
+import { getToolLabel } from './tool-labels'
 import { getHouseholdFeatures } from '../features'
 import type { HouseholdFeatures } from '@karaya/shared/schemas'
 
@@ -329,8 +330,27 @@ ${sections.join('\n\n')}`
 // ── API callers per provider ─────────────────────────────────────────────
 interface ChatMsg { role: string; content: unknown; tool_calls?: unknown; tool_call_id?: string }
 type ToolDef = ReturnType<typeof buildToolDefs>[number]
+type ToolCallItem = { id: string; type?: string; function: { name: string; arguments: string } }
 
-async function callOpenAiCompatible(apiKey: string, model: string, messages: ChatMsg[], systemPrompt: string, baseUrl: string, tools: ToolDef[], householdId?: string) {
+export type AiStreamEvent =
+  | { type: 'status'; step: 'tool' | 'thinking' | 'writing'; tool?: string; label: string }
+  | { type: 'token'; text: string }
+
+function combineSignalWithTimeout(clientSignal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeoutSig = AbortSignal.timeout(timeoutMs)
+  return clientSignal ? AbortSignal.any([clientSignal, timeoutSig]) : timeoutSig
+}
+
+async function callOpenAiCompatible(
+  apiKey: string,
+  model: string,
+  messages: ChatMsg[],
+  systemPrompt: string,
+  baseUrl: string,
+  tools: ToolDef[],
+  householdId?: string,
+  signal?: AbortSignal,
+) {
   const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: systemPrompt }, ...messages], temperature: 0.3, max_tokens: 2048 }
   if (tools.length) body.tools = tools.map((t) => ({ type: 'function', function: t }))
   const headers: Record<string, string> = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }
@@ -339,150 +359,408 @@ async function callOpenAiCompatible(apiKey: string, model: string, messages: Cha
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(22_000),
+    signal: combineSignalWithTimeout(signal, 22_000),
   })
   const data = (await res.json()) as { choices?: { message: ChatMsg & { content?: string } }[]; error?: { message?: string } }
   if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `API error ${res.status}` })
   return data.choices![0]!.message
 }
 
-async function callAnthropic(apiKey: string, model: string, messages: unknown[], systemPrompt: string, tools: ToolDef[]) {
+/**
+ * Panggilan upstream OpenAI-compatible dengan `stream: true`.
+ * Timeout 22 detik berlaku sampai chunk pertama diterima; selanjutnya dibatasi `signal` (termasuk batas total 50 detik).
+ */
+async function callOpenAiCompatibleStream(
+  apiKey: string,
+  model: string,
+  messages: ChatMsg[],
+  systemPrompt: string,
+  baseUrl: string,
+  tools: ToolDef[],
+  onEvent: (ev: AiStreamEvent) => void | Promise<void>,
+  householdId?: string,
+  signal?: AbortSignal,
+): Promise<{ content: string; tool_calls?: ToolCallItem[] }> {
+  const body: Record<string, unknown> = {
+    model,
+    stream: true,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: 0.3,
+    max_tokens: 2048,
+  }
+  if (tools.length) body.tools = tools.map((t) => ({ type: 'function', function: t }))
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }
+  if (householdId) headers['X-Household-Id'] = householdId
+
+  const firstChunkCtrl = new AbortController()
+  const firstChunkTimer = setTimeout(() => firstChunkCtrl.abort(), 22_000)
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, firstChunkCtrl.signal])
+    : firstChunkCtrl.signal
+
+  let res: Response
+  try {
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: combinedSignal,
+    })
+  } catch (err) {
+    clearTimeout(firstChunkTimer)
+    if (signal?.aborted) throw err
+    throw ApiError.fromCode('upstream_ai_error', { message: (err as Error).message || 'Gagal menghubungi penyedia AI' })
+  }
+
+  if (!res.ok) {
+    clearTimeout(firstChunkTimer)
+    let errMsg = `API error ${res.status}`
+    try {
+      const errData = (await res.json()) as { error?: { message?: string } }
+      if (errData?.error?.message) errMsg = errData.error.message
+    } catch {
+      // abaikan gagal parse body error
+    }
+    throw ApiError.fromCode('upstream_ai_error', { message: errMsg })
+  }
+
+  const contentType = res.headers.get('content-type') ?? ''
+  // Jika upstream mengembalikan JSON biasa (mis. di test mock yang tidak mengirim SSE), tangani secara transparan
+  if (!contentType.includes('text/event-stream') || !res.body) {
+    clearTimeout(firstChunkTimer)
+    const data = (await res.json()) as { choices?: { message: { content?: string; tool_calls?: ToolCallItem[] } }[]; error?: { message?: string } }
+    const msg = data.choices?.[0]?.message
+    const text = msg?.content ?? ''
+    if (text && !msg?.tool_calls?.length) {
+      await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
+      await onEvent({ type: 'token', text })
+    }
+    return { content: text, tool_calls: msg?.tool_calls }
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let contentAcc = ''
+  let writingSent = false
+  let gotFirstChunk = false
+  const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>()
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (!gotFirstChunk) {
+        gotFirstChunk = true
+        clearTimeout(firstChunkTimer)
+      }
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim()
+        if (!line || line.startsWith(':')) continue
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trim()
+        if (payload === '[DONE]') {
+          await reader.cancel().catch(() => {})
+          break
+        }
+        let parsed: {
+          choices?: Array<{
+            delta?: {
+              content?: string | null
+              tool_calls?: Array<{
+                index?: number
+                id?: string
+                function?: { name?: string; arguments?: string }
+              }>
+            }
+          }>
+          error?: { message?: string }
+        }
+        try {
+          parsed = JSON.parse(payload)
+        } catch {
+          continue
+        }
+        if (parsed.error?.message) {
+          throw ApiError.fromCode('upstream_ai_error', { message: parsed.error.message })
+        }
+        const delta = parsed.choices?.[0]?.delta
+        if (!delta) continue
+
+        if (typeof delta.content === 'string' && delta.content.length > 0) {
+          if (!writingSent) {
+            writingSent = true
+            await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
+          }
+          contentAcc += delta.content
+          await onEvent({ type: 'token', text: delta.content })
+        }
+
+        if (Array.isArray(delta.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0
+            const prev = toolCallsMap.get(idx) ?? { id: `call_${idx}`, name: '', arguments: '' }
+            if (tc.id) prev.id = tc.id
+            if (tc.function?.name) prev.name += tc.function.name
+            if (tc.function?.arguments) prev.arguments += tc.function.arguments
+            toolCallsMap.set(idx, prev)
+          }
+        }
+      }
+    }
+  } finally {
+    clearTimeout(firstChunkTimer)
+  }
+
+  const toolCalls: ToolCallItem[] = Array.from(toolCallsMap.entries())
+    .sort(([a], [b]) => a - b)
+    .filter(([, tc]) => tc.name.length > 0)
+    .map(([, tc]) => ({
+      id: tc.id,
+      type: 'function',
+      function: { name: tc.name, arguments: tc.arguments || '{}' },
+    }))
+
+  return {
+    content: contentAcc,
+    ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+  }
+}
+
+async function callAnthropic(apiKey: string, model: string, messages: unknown[], systemPrompt: string, tools: ToolDef[], signal?: AbortSignal) {
   const anthropicTools = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }))
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model, system: systemPrompt, messages, max_tokens: 2048, ...(anthropicTools.length ? { tools: anthropicTools } : {}) }),
-    signal: AbortSignal.timeout(22_000),
+    signal: combineSignalWithTimeout(signal, 22_000),
   })
   const data = (await res.json()) as { error?: { message?: string } } & Record<string, unknown>
   if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `Anthropic error ${res.status}` })
   return data as { stop_reason: string; content: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }> }
 }
 
-async function callGoogle(apiKey: string, model: string, messages: Array<{ role: string; parts: unknown }>, systemPrompt: string, tools: ToolDef[]) {
+async function callGoogle(apiKey: string, model: string, messages: Array<{ role: string; parts: unknown }>, systemPrompt: string, tools: ToolDef[], signal?: AbortSignal) {
   const googleTools = tools.length ? [{ function_declarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }] : []
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ system_instruction: { parts: [{ text: systemPrompt }] }, contents: messages, generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }, ...(googleTools.length ? { tools: googleTools } : {}) }),
-    signal: AbortSignal.timeout(22_000),
+    signal: combineSignalWithTimeout(signal, 22_000),
   })
   const data = (await res.json()) as { error?: { message?: string } } & Record<string, unknown>
   if (!res.ok) throw ApiError.fromCode('upstream_ai_error', { message: data.error?.message ?? `Gemini error ${res.status}` })
   return data as { candidates?: Array<{ content: { parts: Array<{ text?: string; functionCall?: { name: string; args: unknown } }> } }> }
 }
 
-export async function chatWithAi(actor: Actor, messages: Array<{ role: 'user' | 'ai'; text: string }>, allowWrite = false) {
+export async function chatWithAi(
+  actor: Actor,
+  messages: Array<{ role: 'user' | 'ai'; text: string }>,
+  allowWrite = false,
+  onEvent?: (ev: AiStreamEvent) => void | Promise<void>,
+  clientSignal?: AbortSignal,
+) {
   const startMs = Date.now()
-  // Query independen dijalankan paralel di jalur panas tiap pesan
-  const [config, userName, features, liveSnapshot] = await Promise.all([
-    getAiConfig(actor),
-    getUserName(actor),
-    getHouseholdFeatures(actor),
-    buildLiveSnapshot(actor),
-  ])
-  const { provider, model: configuredModel, apiKey } = config as Required<AiConfig>
-  // Di jalur chat interaktif, kb-auto (thinking high ~10s/turn) dialihkan ke kb-fast (thinking low ~2.8s/turn) agar multi-tool call tidak terkena Vercel 60s timeout
-  const model = provider === 'gatekeeper' && configuredModel === 'kb-auto' ? 'kb-fast' : configuredModel
-  const allToolDefs = buildToolDefs(allowWrite, features)
-  const toolDefs = selectContextualTools(allToolDefs, messages)
+  const TOTAL_TIMEOUT_MS = 50_000
+  const totalCtrl = new AbortController()
+  let timedOutTotal = false
+  const totalTimer = setTimeout(() => {
+    timedOutTotal = true
+    totalCtrl.abort()
+  }, TOTAL_TIMEOUT_MS)
+  const signal = clientSignal
+    ? AbortSignal.any([clientSignal, totalCtrl.signal])
+    : totalCtrl.signal
 
-  const apiMessages: ChatMsg[] = messages.slice(-20).map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }))
+  try {
+    if (onEvent) {
+      await onEvent({ type: 'status', step: 'thinking', label: 'Menyusun jawaban…' })
+    }
 
-  // ── 2-pass: provider/model dengan tool-calling tidak reliabel ──
-  if (isToolsUnreliable(provider, model)) {
-    const prompt = await buildEnrichedPrompt(actor, userName)
-    const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq!
-    const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl, [], actor.householdId)
-    return { reply: (msg as { content?: string }).content || '(Tidak ada jawaban)', mutated: false, tools_used: [] }
-  }
+    // Query independen dijalankan paralel di jalur panas tiap pesan
+    const [config, userName, features, liveSnapshot] = await Promise.all([
+      getAiConfig(actor),
+      getUserName(actor),
+      getHouseholdFeatures(actor),
+      buildLiveSnapshot(actor),
+    ])
+    const { provider, model: configuredModel, apiKey } = config as Required<AiConfig>
+    // Di jalur chat interaktif, kb-auto (thinking high ~10s/turn) dialihkan ke kb-fast (thinking low ~2.8s/turn) agar multi-tool call tidak terkena Vercel 60s timeout
+    const model = provider === 'gatekeeper' && configuredModel === 'kb-auto' ? 'kb-fast' : configuredModel
+    const allToolDefs = buildToolDefs(allowWrite, features)
+    const toolDefs = selectContextualTools(allToolDefs, messages)
 
-  const systemPrompt = buildSystemPrompt(userName, liveSnapshot)
-  const MAX_ITER = 3
-  const TIME_BUDGET_MS = 32_000
-  let mutated = false
-  const toolsUsed: string[] = []
-  const gkKey = provider === 'gatekeeper' ? apiKey : undefined
+    const apiMessages: ChatMsg[] = messages.slice(-20).map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }))
 
-  if (provider === 'anthropic') {
-    const msgs: unknown[] = [...apiMessages]
+    // ── 2-pass: provider/model dengan tool-calling tidak reliabel ──
+    if (isToolsUnreliable(provider, model)) {
+      const prompt = await buildEnrichedPrompt(actor, userName)
+      const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq!
+      if (onEvent) {
+        const msg = await callOpenAiCompatibleStream(apiKey, model, apiMessages, prompt, baseUrl, [], onEvent, actor.householdId, signal)
+        return { reply: msg.content || '(Tidak ada jawaban)', mutated: false, tools_used: [] }
+      }
+      const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl, [], actor.householdId, signal)
+      return { reply: (msg as { content?: string }).content || '(Tidak ada jawaban)', mutated: false, tools_used: [] }
+    }
+
+    const systemPrompt = buildSystemPrompt(userName, liveSnapshot)
+    const MAX_ITER = 3
+    const TIME_BUDGET_MS = 32_000
+    let mutated = false
+    const toolsUsed: string[] = []
+    const gkKey = provider === 'gatekeeper' ? apiKey : undefined
+
+    if (provider === 'anthropic') {
+      const msgs: unknown[] = [...apiMessages]
+      for (let i = 0; i < MAX_ITER; i++) {
+        if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
+        const resp = await callAnthropic(apiKey, model, msgs, systemPrompt, toolDefs, signal)
+        if (resp.stop_reason === 'tool_use') {
+          msgs.push({ role: 'assistant', content: resp.content })
+          const toolBlocks = resp.content.filter((b) => b.type === 'tool_use')
+          if (onEvent) {
+            for (const block of toolBlocks) {
+              await onEvent({ type: 'status', step: 'tool', tool: block.name!, label: getToolLabel(block.name!) })
+            }
+          }
+          const results = await Promise.all(
+            toolBlocks.map(async (block) => {
+              toolsUsed.push(block.name!)
+              const { output, isWrite } = await executeTool(actor, block.name!, (block.input as Record<string, unknown>) ?? {}, gkKey)
+              if (isWrite) mutated = true
+              return { type: 'tool_result', tool_use_id: block.id, content: output }
+            }),
+          )
+          msgs.push({ role: 'user', content: results })
+          if (onEvent) {
+            await onEvent({ type: 'status', step: 'thinking', label: 'Menyusun jawaban…' })
+          }
+          continue
+        }
+        const text = resp.content.find((b) => b.type === 'text')
+        const reply = text?.text || '(Tidak ada jawaban)'
+        if (onEvent) {
+          await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
+          await onEvent({ type: 'token', text: reply })
+        }
+        return { reply, mutated, tools_used: toolsUsed }
+      }
+      const finalResp = await callAnthropic(apiKey, model, msgs, systemPrompt, [], signal)
+      const finalText = finalResp.content.find((b) => b.type === 'text')
+      const reply = finalText?.text || '(Tidak ada jawaban)'
+      if (onEvent) {
+        await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
+        await onEvent({ type: 'token', text: reply })
+      }
+      return { reply, mutated, tools_used: toolsUsed }
+    }
+
+    if (provider === 'google') {
+      const msgs: Array<{ role: string; parts: unknown }> = apiMessages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] }))
+      for (let i = 0; i < MAX_ITER; i++) {
+        if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
+        const resp = await callGoogle(apiKey, model, msgs, systemPrompt, toolDefs, signal)
+        const parts = resp.candidates?.[0]?.content?.parts ?? []
+        const fnCalls = parts.filter((p) => p.functionCall)
+        if (fnCalls.length) {
+          msgs.push({ role: 'model', parts })
+          if (onEvent) {
+            for (const p of fnCalls) {
+              const name = p.functionCall!.name
+              await onEvent({ type: 'status', step: 'tool', tool: name, label: getToolLabel(name) })
+            }
+          }
+          const fnResponses = await Promise.all(
+            fnCalls.map(async (p) => {
+              toolsUsed.push(p.functionCall!.name)
+              const { output, isWrite } = await executeTool(actor, p.functionCall!.name, (p.functionCall!.args as Record<string, unknown>) ?? {}, gkKey)
+              if (isWrite) mutated = true
+              return { functionResponse: { name: p.functionCall!.name, response: { result: output } } }
+            }),
+          )
+          msgs.push({ role: 'user', parts: fnResponses })
+          if (onEvent) {
+            await onEvent({ type: 'status', step: 'thinking', label: 'Menyusun jawaban…' })
+          }
+          continue
+        }
+        const reply = parts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)'
+        if (onEvent) {
+          await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
+          await onEvent({ type: 'token', text: reply })
+        }
+        return { reply, mutated, tools_used: toolsUsed }
+      }
+      const finalResp = await callGoogle(apiKey, model, msgs, systemPrompt, [], signal)
+      const finalParts = finalResp.candidates?.[0]?.content?.parts ?? []
+      const reply = finalParts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)'
+      if (onEvent) {
+        await onEvent({ type: 'status', step: 'writing', label: 'Menulis jawaban…' })
+        await onEvent({ type: 'token', text: reply })
+      }
+      return { reply, mutated, tools_used: toolsUsed }
+    }
+
+    // OpenAI-compatible (Gatekeeper, OpenAI, Mistral, xAI, DeepSeek, Kimi)
+    const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.openai!
+    const msgs: ChatMsg[] = [...apiMessages]
+    const tools = toolDefs
+    let streamedPrefix = ''
     for (let i = 0; i < MAX_ITER; i++) {
       if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
-      const resp = await callAnthropic(apiKey, model, msgs, systemPrompt, toolDefs)
-      if (resp.stop_reason === 'tool_use') {
-        msgs.push({ role: 'assistant', content: resp.content })
-        const toolBlocks = resp.content.filter((b) => b.type === 'tool_use')
-        const results = await Promise.all(
-          toolBlocks.map(async (block) => {
-            toolsUsed.push(block.name!)
-            const { output, isWrite } = await executeTool(actor, block.name!, (block.input as Record<string, unknown>) ?? {}, gkKey)
+      const msg = onEvent
+        ? await callOpenAiCompatibleStream(apiKey, model, msgs, systemPrompt, baseUrl, tools, onEvent, actor.householdId, signal)
+        : ((await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools, actor.householdId, signal)) as ChatMsg & {
+            content?: string
+            tool_calls?: ToolCallItem[]
+          })
+      if (msg.tool_calls?.length) {
+        if (onEvent && msg.content) {
+          streamedPrefix += msg.content
+        }
+        msgs.push({ role: 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls })
+        if (onEvent) {
+          for (const toolCall of msg.tool_calls) {
+            const name = toolCall.function.name
+            await onEvent({ type: 'status', step: 'tool', tool: name, label: getToolLabel(name) })
+          }
+        }
+        const toolMsgs = await Promise.all(
+          msg.tool_calls.map(async (toolCall) => {
+            let args: Record<string, unknown> = {}
+            try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { /* arguments kosong/rusak -> panggil tool tanpa filter */ }
+            toolsUsed.push(toolCall.function.name)
+            const { output, isWrite } = await executeTool(actor, toolCall.function.name, args, gkKey)
             if (isWrite) mutated = true
-            return { type: 'tool_result', tool_use_id: block.id, content: output }
+            return { role: 'tool' as const, tool_call_id: toolCall.id, content: output }
           }),
         )
-        msgs.push({ role: 'user', content: results })
+        msgs.push(...toolMsgs)
+        if (onEvent) {
+          await onEvent({ type: 'status', step: 'thinking', label: 'Menyusun jawaban…' })
+        }
         continue
       }
-      const text = resp.content.find((b) => b.type === 'text')
-      return { reply: text?.text || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
+      const fullReply = (streamedPrefix + (msg.content || '')).trim() || '(Tidak ada jawaban)'
+      return { reply: fullReply, mutated, tools_used: toolsUsed }
     }
-    const finalResp = await callAnthropic(apiKey, model, msgs, systemPrompt, [])
-    const finalText = finalResp.content.find((b) => b.type === 'text')
-    return { reply: finalText?.text || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
-  }
-
-  if (provider === 'google') {
-    const msgs: Array<{ role: string; parts: unknown }> = apiMessages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] }))
-    for (let i = 0; i < MAX_ITER; i++) {
-      if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
-      const resp = await callGoogle(apiKey, model, msgs, systemPrompt, toolDefs)
-      const parts = resp.candidates?.[0]?.content?.parts ?? []
-      const fnCalls = parts.filter((p) => p.functionCall)
-      if (fnCalls.length) {
-        msgs.push({ role: 'model', parts })
-        const fnResponses = await Promise.all(
-          fnCalls.map(async (p) => {
-            toolsUsed.push(p.functionCall!.name)
-            const { output, isWrite } = await executeTool(actor, p.functionCall!.name, (p.functionCall!.args as Record<string, unknown>) ?? {}, gkKey)
-            if (isWrite) mutated = true
-            return { functionResponse: { name: p.functionCall!.name, response: { result: output } } }
-          }),
-        )
-        msgs.push({ role: 'user', parts: fnResponses })
-        continue
-      }
-      return { reply: parts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
+    // Jika sudah mencapai batas iterasi tool-call, paksa 1 panggilan akhir tanpa tools untuk merangkum jawaban dari data yang sudah terkumpul
+    const finalMsg = onEvent
+      ? await callOpenAiCompatibleStream(apiKey, model, msgs, systemPrompt, baseUrl, [], onEvent, actor.householdId, signal)
+      : ((await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId, signal)) as ChatMsg & { content?: string })
+    const fullReply = (streamedPrefix + (finalMsg.content || '')).trim() || '(Tidak ada jawaban)'
+    return { reply: fullReply, mutated, tools_used: toolsUsed }
+  } catch (err) {
+    if (timedOutTotal && !clientSignal?.aborted) {
+      throw ApiError.fromCode('upstream_ai_error', { message: 'Waktu habis, coba pertanyaan yang lebih spesifik' })
     }
-    const finalResp = await callGoogle(apiKey, model, msgs, systemPrompt, [])
-    const finalParts = finalResp.candidates?.[0]?.content?.parts ?? []
-    return { reply: finalParts.map((p) => p.text ?? '').join('') || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
+    throw err
+  } finally {
+    clearTimeout(totalTimer)
   }
-
-  // OpenAI-compatible (Gatekeeper, OpenAI, Mistral, xAI, DeepSeek, Kimi)
-  const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.openai!
-  const msgs: ChatMsg[] = [...apiMessages]
-  const tools = toolDefs
-  for (let i = 0; i < MAX_ITER; i++) {
-    if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break
-    const msg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools, actor.householdId)) as ChatMsg & { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }
-    if (msg.tool_calls?.length) {
-      msgs.push({ role: 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls })
-      const toolMsgs = await Promise.all(
-        msg.tool_calls.map(async (toolCall) => {
-          let args: Record<string, unknown> = {}
-          try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { /* arguments kosong/rusak -> panggil tool tanpa filter */ }
-          toolsUsed.push(toolCall.function.name)
-          const { output, isWrite } = await executeTool(actor, toolCall.function.name, args, gkKey)
-          if (isWrite) mutated = true
-          return { role: 'tool' as const, tool_call_id: toolCall.id, content: output }
-        }),
-      )
-      msgs.push(...toolMsgs)
-      continue
-    }
-    return { reply: msg.content || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
-  }
-  // Jika sudah mencapai batas iterasi tool-call, paksa 1 panggilan akhir tanpa tools untuk merangkum jawaban dari data yang sudah terkumpul
-  const finalMsg = (await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId)) as ChatMsg & { content?: string }
-  return { reply: finalMsg.content || '(Tidak ada jawaban)', mutated, tools_used: toolsUsed }
 }

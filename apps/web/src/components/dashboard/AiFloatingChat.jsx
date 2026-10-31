@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { AI_PROVIDERS } from "../../services/aiService";
 import { APP_AI_NAME } from "../../config/app";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useLanguage } from "../../i18n/LanguageContext";
 import { AiMessage } from "../ai/AiMessage";
 
 const CONTEXT_PROMPTS = {
@@ -56,20 +57,30 @@ export default function AiFloatingChat({
   aiInput,
   setAiInput,
   handleAi,
+  stopAi,
   onResetChat,
   aiConfig,
   onOpenAiSettings,
   activeMenu,
 }) {
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const isNearBottomRef = useRef(true);
   const inputRef = useRef(null);
 
   const hasKey = Boolean(aiConfig?.apiKey?.trim());
   const isAiDisabled = Boolean(aiConfig?.disabled);
 
+  const handleChatScroll = () => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+  };
+
   useEffect(() => {
-    if (open) {
+    if (open && isNearBottomRef.current) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [open, aiChat, aiTyping]);
@@ -339,6 +350,8 @@ export default function AiFloatingChat({
             <>
               {/* Daftar Pesan */}
               <div
+                ref={chatContainerRef}
+                onScroll={handleChatScroll}
                 style={{
                   flex: 1,
                   overflowY: "auto",
@@ -355,76 +368,94 @@ export default function AiFloatingChat({
                 style={{
                   alignSelf: m.role === "user" ? "flex-end" : "flex-start",
                   maxWidth: "86%",
-                  padding: "10px 14px",
-                  borderRadius:
-                    m.role === "user"
-                      ? "16px 16px 4px 16px"
-                      : "16px 16px 16px 4px",
-                  background:
-                    m.role === "user"
-                      ? "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep, #2D3B30))"
-                      : m.role === "error"
-                        ? "var(--color-expense-soft)"
-                        : "var(--bg-surface)",
-                  border:
-                    m.role === "user"
-                      ? "none"
-                      : m.role === "error"
-                        ? "1px solid rgba(255,113,108,0.35)"
-                        : "1px solid var(--color-border-soft)",
-                  boxShadow:
-                    m.role === "user"
-                      ? "0 2px 8px rgba(63,81,66,0.2)"
-                      : "var(--shadow-sm)",
-                  color:
-                    m.role === "user"
-                      ? "var(--color-on-primary, #fff)"
-                      : m.role === "error"
-                        ? "var(--color-expense)"
-                        : "var(--color-text)",
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  whiteSpace: m.role === "ai" ? "normal" : "pre-wrap",
-                  wordBreak: "break-word",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
                 }}
               >
-                {m.role === "ai" ? <AiMessage text={m.text} variant="floating" /> : m.text}
+                {m.role === "ai" && m.streaming && m.status && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--color-muted)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      paddingLeft: 4,
+                    }}
+                  >
+                    <span style={{ display: "inline-block", animation: "pulse 1.1s ease-in-out infinite" }}>⚙️</span>
+                    <span>{m.status}</span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius:
+                      m.role === "user"
+                        ? "16px 16px 4px 16px"
+                        : "16px 16px 16px 4px",
+                    background:
+                      m.role === "user"
+                        ? "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep, #2D3B30))"
+                        : m.role === "error"
+                          ? "var(--color-expense-soft)"
+                          : "var(--bg-surface)",
+                    border:
+                      m.role === "user"
+                        ? "none"
+                        : m.role === "error"
+                          ? "1px solid rgba(255,113,108,0.35)"
+                          : "1px solid var(--color-border-soft)",
+                    boxShadow:
+                      m.role === "user"
+                        ? "0 2px 8px rgba(63,81,66,0.2)"
+                        : "var(--shadow-sm)",
+                    color:
+                      m.role === "user"
+                        ? "var(--color-on-primary, #fff)"
+                        : m.role === "error"
+                          ? "var(--color-expense)"
+                          : "var(--color-text)",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    whiteSpace: m.role === "ai" ? "normal" : "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {m.role === "ai" ? (
+                    <>
+                      {m.text ? <AiMessage text={m.text} variant="floating" /> : null}
+                      {m.streaming && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            marginLeft: m.text ? 2 : 0,
+                            color: "var(--color-primary)",
+                            animation: "pulse 0.8s ease-in-out infinite",
+                            fontWeight: 700,
+                          }}
+                        >
+                          ▍
+                        </span>
+                      )}
+                      {m.stopped && (
+                        <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 4, fontStyle: "italic" }}>
+                          {t("ai.stopped")}
+                        </div>
+                      )}
+                      {m.streamError && (
+                        <div style={{ fontSize: 11, color: "var(--color-expense)", marginTop: 4 }}>
+                          {m.streamError}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    m.text
+                  )}
+                </div>
               </div>
             ))}
-
-            {aiTyping && (
-              <div
-                style={{
-                  alignSelf: "flex-start",
-                  padding: "10px 14px",
-                  borderRadius: "16px 16px 16px 4px",
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--color-border-soft)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: 12,
-                  color: "var(--color-muted)",
-                }}
-              >
-                <span style={{ display: "inline-flex", gap: 4 }}>
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: "var(--color-primary)",
-                        display: "inline-block",
-                        animation: `pulse 1s ${i * 0.18}s ease-in-out infinite`,
-                      }}
-                    />
-                  ))}
-                </span>
-                <span>Memproses data keluarga...</span>
-              </div>
-            )}
             <div ref={chatEndRef} />
           </div>
 
@@ -500,37 +531,63 @@ export default function AiFloatingChat({
                 outline: "none",
               }}
             />
-            <button
-              type="button"
-              onClick={() => handleAi()}
-              disabled={!aiInput.trim() || aiTyping}
-              aria-label="Kirim pesan"
-              style={{
-                width: 40,
-                height: 40,
-                minHeight: 40,
-                borderRadius: "50%",
-                border: "none",
-                background:
-                  aiInput.trim() && !aiTyping
+            {aiTyping ? (
+              <button
+                type="button"
+                onClick={() => stopAi?.()}
+                aria-label={t("ai.stop")}
+                title={t("ai.stop")}
+                style={{
+                  width: 40,
+                  height: 40,
+                  minHeight: 40,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: "var(--color-expense)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "all .15s",
+                }}
+              >
+                ■
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleAi()}
+                disabled={!aiInput.trim()}
+                aria-label="Kirim pesan"
+                style={{
+                  width: 40,
+                  height: 40,
+                  minHeight: 40,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: aiInput.trim()
                     ? "linear-gradient(135deg, var(--color-primary), var(--color-primary-deep, #2D3B30))"
                     : "var(--color-border-soft)",
-                color:
-                  aiInput.trim() && !aiTyping
+                  color: aiInput.trim()
                     ? "var(--color-on-primary, #fff)"
                     : "var(--color-muted)",
-                fontSize: 18,
-                fontWeight: 700,
-                cursor: aiInput.trim() && !aiTyping ? "pointer" : "not-allowed",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                transition: "all .15s",
-              }}
-            >
-              ↑
-            </button>
+                  fontSize: 18,
+                  fontWeight: 700,
+                  cursor: aiInput.trim() ? "pointer" : "not-allowed",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "all .15s",
+                }}
+              >
+                ↑
+              </button>
+            )}
           </div>
             </>
           )}

@@ -21,6 +21,18 @@ const resolvedBaseUrl =
     ? 'https://karaya-api-v1.vercel.app'
     : rawBaseUrl
 
+export const API_BASE_URL = (resolvedBaseUrl ?? '').replace(/\/$/, '')
+
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const token = await getToken()
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (activeHouseholdId) headers['X-Household-Id'] = activeHouseholdId
+  return headers
+}
+
 export const api = createKaryaClient({
   baseUrl: resolvedBaseUrl,
   getToken,

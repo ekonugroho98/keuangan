@@ -88,12 +88,22 @@ function AiSetupScreen() {
 }
 
 // ── Main AiView ───────────────────────────────────────────────────────────
-const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig }) => {
+const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, stopAi, aiConfig }) => {
     const { t } = useLanguage();
     const chatEndRef = useRef(null);
+    const chatContainerRef = useRef(null);
+    const isNearBottomRef = useRef(true);
+
+    const handleChatScroll = () => {
+        const el = chatContainerRef.current;
+        if (!el) return;
+        isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+    };
 
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (isNearBottomRef.current) {
+            chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
     }, [aiChat, aiTyping]);
 
     // Belum setup → tampil setup screen
@@ -143,65 +153,80 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig }) =
                 </div>
 
                 {/* Chat */}
-                <div style={{ height: "min(60vh, 500px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                    {aiChat.map((m, i) => {
-                        if (m.role === "thinking") return (
-                            <div key={i} style={{
-                                alignSelf: "flex-start", maxWidth: "min(85%, 560px)",
-                                padding: "8px 14px", borderRadius: "14px 14px 14px 4px",
-                                background: "var(--color-primary-soft)",
-                                border: "1px dashed var(--glass-border)",
-                                color: "var(--color-primary)", fontSize: 12, lineHeight: 1.5,
-                                animation: "slideUp .3s", display: "flex", alignItems: "center", gap: 8,
-                            }}>
-                                <span style={{ display: "inline-flex", gap: 3 }}>
-                                    {[0,1,2].map(j => (
-                                        <span key={j} style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--color-primary)", display: "inline-block", animation: `bounce .9s ${j * 0.15}s ease-in-out infinite` }} />
-                                    ))}
-                                </span>
-                                <span style={{ opacity: 0.8 }}>{m.text}</span>
-                            </div>
-                        );
-                        return (
+                <div
+                    ref={chatContainerRef}
+                    onScroll={handleChatScroll}
+                    style={{ height: "min(60vh, 500px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}
+                >
+                    {aiChat.map((m, i) => (
                         <div key={i} style={{
                             alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                            maxWidth: "min(85%, 560px)", padding: "12px 16px",
-                            borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                            background: m.role === "user"
-                                ? "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))"
-                                : m.role === "error"
-                                    ? "var(--color-expense-soft)"
-                                    : "var(--glass-2)",
-                            backdropFilter: m.role === "user" ? "none" : "var(--glass-blur)",
-                            WebkitBackdropFilter: m.role === "user" ? "none" : "var(--glass-blur)",
-                            border: m.role === "user" ? "none"
-                                : m.role === "error" ? "1px solid var(--color-expense-soft)"
-                                : "1px solid var(--glass-border)",
-                            boxShadow: m.role === "user" ? "0 2px 8px rgba(0,0,0,.1)" : "var(--glass-highlight)",
-                            color: m.role === "user" ? "var(--color-on-primary)"
-                                : m.role === "error" ? "var(--color-expense)"
-                                : "var(--color-text)",
-                            fontSize: 14, lineHeight: 1.7, animation: "slideUp .3s",
-                            whiteSpace: m.role === "ai" ? "normal" : "pre-wrap", wordBreak: "break-word",
-                        }}>{m.role === "ai" ? <AiMessage text={m.text} variant="page" /> : m.text}</div>
-                        );
-                    })}
-                    {aiTyping && (
-                        <div style={{
-                            alignSelf: "flex-start", padding: "12px 16px",
-                            borderRadius: "18px 18px 18px 4px",
-                            background: "var(--glass-2)",
-                            backdropFilter: "var(--glass-blur)",
-                            WebkitBackdropFilter: "var(--glass-blur)",
-                            border: "1px solid var(--glass-border)",
+                            maxWidth: "min(85%, 560px)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                            animation: "slideUp .3s",
                         }}>
-                            <span style={{ display: "inline-flex", gap: 4 }}>
-                                {[0,1,2].map(i => (
-                                    <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-primary)", display: "inline-block", animation: `bounce .9s ${i * 0.15}s ease-in-out infinite` }} />
-                                ))}
-                            </span>
+                            {m.role === "ai" && m.streaming && m.status && (
+                                <div style={{
+                                    fontSize: 11,
+                                    color: "var(--color-muted)",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                    paddingLeft: 4,
+                                }}>
+                                    <span style={{ display: "inline-block", animation: "bounce 1.1s ease-in-out infinite" }}>⚙️</span>
+                                    <span>{m.status}</span>
+                                </div>
+                            )}
+                            <div style={{
+                                padding: "12px 16px",
+                                borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                                background: m.role === "user"
+                                    ? "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))"
+                                    : m.role === "error"
+                                        ? "var(--color-expense-soft)"
+                                        : "var(--glass-2)",
+                                backdropFilter: m.role === "user" ? "none" : "var(--glass-blur)",
+                                WebkitBackdropFilter: m.role === "user" ? "none" : "var(--glass-blur)",
+                                border: m.role === "user" ? "none"
+                                    : m.role === "error" ? "1px solid var(--color-expense-soft)"
+                                    : "1px solid var(--glass-border)",
+                                boxShadow: m.role === "user" ? "0 2px 8px rgba(0,0,0,.1)" : "var(--glass-highlight)",
+                                color: m.role === "user" ? "var(--color-on-primary)"
+                                    : m.role === "error" ? "var(--color-expense)"
+                                    : "var(--color-text)",
+                                fontSize: 14, lineHeight: 1.7,
+                                whiteSpace: m.role === "ai" ? "normal" : "pre-wrap", wordBreak: "break-word",
+                            }}>
+                                {m.role === "ai" ? (
+                                    <>
+                                        {m.text ? <AiMessage text={m.text} variant="page" /> : null}
+                                        {m.streaming && (
+                                            <span style={{
+                                                display: "inline-block",
+                                                marginLeft: m.text ? 2 : 0,
+                                                color: "var(--color-primary)",
+                                                animation: "bounce 0.8s ease-in-out infinite",
+                                                fontWeight: 700,
+                                            }}>▍</span>
+                                        )}
+                                        {m.stopped && (
+                                            <div style={{ fontSize: 11, color: "var(--color-muted)", marginTop: 4, fontStyle: "italic" }}>
+                                                {t("ai.stopped")}
+                                            </div>
+                                        )}
+                                        {m.streamError && (
+                                            <div style={{ fontSize: 11, color: "var(--color-expense)", marginTop: 4 }}>
+                                                {m.streamError}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : m.text}
+                            </div>
                         </div>
-                    )}
+                    ))}
                     <div ref={chatEndRef} />
                 </div>
 
@@ -225,13 +250,24 @@ const AiView = ({ aiChat, aiTyping, aiInput, setAiInput, handleAi, aiConfig }) =
                         aria-label="Ketik pesan ke AI"
                         style={{ flex: 1, background: "transparent", border: "none", borderRadius: 999, padding: "10px 16px", color: "var(--color-text)", fontSize: 14, outline: "none", fontFamily: "inherit", opacity: aiTyping ? 0.6 : 1, minWidth: 0, minHeight: 42 }}
                     />
-                    <button
-                        onClick={handleAi}
-                        disabled={!aiInput.trim() || aiTyping}
-                        aria-label="Kirim pesan"
-                        style={{ width: 42, height: 42, borderRadius: "50%", background: aiInput.trim() && !aiTyping ? "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))" : "var(--bg-surface-low)", border: "none", color: aiInput.trim() && !aiTyping ? "var(--color-on-primary)" : "var(--color-muted)", fontSize: 20, cursor: aiInput.trim() && !aiTyping ? "pointer" : "not-allowed", transition: "all .2s", flexShrink: 0, boxShadow: aiInput.trim() && !aiTyping ? "0 2px 8px rgba(0,0,0,.15)" : "none" }}>
-                        ↑
-                    </button>
+                    {aiTyping ? (
+                        <button
+                            type="button"
+                            onClick={() => stopAi?.()}
+                            aria-label={t("ai.stop")}
+                            title={t("ai.stop")}
+                            style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--color-expense)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "all .2s", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            ■
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => handleAi()}
+                            disabled={!aiInput.trim()}
+                            aria-label="Kirim pesan"
+                            style={{ width: 42, height: 42, borderRadius: "50%", background: aiInput.trim() ? "linear-gradient(135deg,var(--color-primary),var(--color-primary-deep))" : "var(--bg-surface-low)", border: "none", color: aiInput.trim() ? "var(--color-on-primary)" : "var(--color-muted)", fontSize: 20, cursor: aiInput.trim() ? "pointer" : "not-allowed", transition: "all .2s", flexShrink: 0, boxShadow: aiInput.trim() ? "0 2px 8px rgba(0,0,0,.15)" : "none" }}>
+                            ↑
+                        </button>
+                    )}
                 </div>
 
                 {/* Quick questions — chip style (scrollable on narrow screens) */}

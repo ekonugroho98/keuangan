@@ -10511,7 +10511,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     target_session_attrs
   } = options;
   const sent = queue_default(), id = uid++, backend = { pid: null, secret: null }, idleTimer = timer(end, options.idle_timeout), lifeTimer = timer(end, options.max_lifetime), connectTimer = timer(connectTimedOut, options.connect_timeout);
-  let socket = null, cancelMessage, errorResponse = null, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedTime = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
+  let socket = null, cancelMessage, errorResponse = null, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedTime = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream2 = null, chunk = null, ended = null, nonce = null, query = null, final = null;
   const connection2 = {
     queue: queues.closed,
     idleTimer,
@@ -10554,7 +10554,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function execute(q) {
     if (terminated)
       return queryError(q, Errors.connection("CONNECTION_DESTROYED", options));
-    if (stream)
+    if (stream2)
       return queryError(q, Errors.generic("COPY_IN_PROGRESS", "You cannot execute queries during copy"));
     if (q.cancelled)
       return;
@@ -10721,7 +10721,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       queryError(sent.shift(), err);
   }
   function errored(err) {
-    stream && (stream.destroy(err), stream = null);
+    stream2 && (stream2.destroy(err), stream2 = null);
     query && queryError(query, err);
     initial && (queryError(initial, err), initial = null);
   }
@@ -10744,7 +10744,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
   function terminate() {
     terminated = true;
-    if (stream || query || initial || sent.length)
+    if (stream2 || query || initial || sent.length)
       error(Errors.connection("CONNECTION_DESTROYED", options));
     clearImmediate(nextWriteTimer);
     if (socket) {
@@ -11112,7 +11112,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     query.resolve(result);
   }
   function CopyInResponse() {
-    stream = new Stream.Writable({
+    stream2 = new Stream.Writable({
       autoDestroy: true,
       write(chunk2, encoding, callback) {
         socket.write(bytes_default().d().raw(chunk2).end(), callback);
@@ -11120,26 +11120,26 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       destroy(error2, callback) {
         callback(error2);
         socket.write(bytes_default().f().str(error2 + bytes_default.N).end());
-        stream = null;
+        stream2 = null;
       },
       final(callback) {
         socket.write(bytes_default().c().end());
         final = callback;
-        stream = null;
+        stream2 = null;
       }
     });
-    query.resolve(stream);
+    query.resolve(stream2);
   }
   function CopyOutResponse() {
-    stream = new Stream.Readable({
+    stream2 = new Stream.Readable({
       read() {
         socket.resume();
       }
     });
-    query.resolve(stream);
+    query.resolve(stream2);
   }
   function CopyBothResponse() {
-    stream = new Stream.Duplex({
+    stream2 = new Stream.Duplex({
       autoDestroy: true,
       read() {
         socket.resume();
@@ -11151,21 +11151,21 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       destroy(error2, callback) {
         callback(error2);
         socket.write(bytes_default().f().str(error2 + bytes_default.N).end());
-        stream = null;
+        stream2 = null;
       },
       final(callback) {
         socket.write(bytes_default().c().end());
         final = callback;
       }
     });
-    query.resolve(stream);
+    query.resolve(stream2);
   }
   function CopyData(x) {
-    stream && (stream.push(x.subarray(5)) || socket.pause());
+    stream2 && (stream2.push(x.subarray(5)) || socket.pause());
   }
   function CopyDone() {
-    stream && stream.push(null);
-    stream = null;
+    stream2 && stream2.push(null);
+    stream2 = null;
   }
   function NoticeResponse(x) {
     onnotice ? onnotice(parseError(x)) : console.log(parseError(x));
@@ -11283,7 +11283,7 @@ var noop2 = () => {
 };
 function Subscribe(postgres2, options) {
   const subscribers = /* @__PURE__ */ new Map(), slot = "postgresjs_" + Math.random().toString(36).slice(2), state = {};
-  let connection2, stream, ended = false;
+  let connection2, stream2, ended = false;
   const sql2 = subscribe.sql = postgres2({
     ...options,
     transform: { column: {}, value: {}, row: {} },
@@ -11298,7 +11298,7 @@ function Subscribe(postgres2, options) {
     onclose: async function() {
       if (ended)
         return;
-      stream = null;
+      stream2 = null;
       state.pid = state.secret = void 0;
       connected(await init(sql2, slot, options.publications));
       subscribers.forEach((event) => event.forEach(({ onsubscribe }) => onsubscribe()));
@@ -11308,11 +11308,11 @@ function Subscribe(postgres2, options) {
   const end = sql2.end, close = sql2.close;
   sql2.end = async () => {
     ended = true;
-    stream && await new Promise((r) => (stream.once("close", r), stream.end()));
+    stream2 && await new Promise((r) => (stream2.once("close", r), stream2.end()));
     return end();
   };
   sql2.close = async () => {
-    stream && await new Promise((r) => (stream.once("close", r), stream.end()));
+    stream2 && await new Promise((r) => (stream2.once("close", r), stream2.end()));
     return close();
   };
   return subscribe;
@@ -11329,12 +11329,12 @@ function Subscribe(postgres2, options) {
     return connection2.then((x) => {
       connected(x);
       onsubscribe();
-      stream && stream.on("error", onerror);
+      stream2 && stream2.on("error", onerror);
       return { unsubscribe, state, sql: sql2 };
     });
   }
   function connected(x) {
-    stream = x.stream;
+    stream2 = x.stream;
     state.pid = x.state.pid;
     state.secret = x.state.secret;
   }
@@ -11345,16 +11345,16 @@ function Subscribe(postgres2, options) {
       `CREATE_REPLICATION_SLOT ${slot2} TEMPORARY LOGICAL pgoutput NOEXPORT_SNAPSHOT`
     );
     const [x] = xs;
-    const stream2 = await sql3.unsafe(
+    const stream3 = await sql3.unsafe(
       `START_REPLICATION SLOT ${slot2} LOGICAL ${x.consistent_point} (proto_version '1', publication_names '${publications}')`
     ).writable();
     const state2 = {
       lsn: Buffer.concat(x.consistent_point.split("/").map((x2) => Buffer.from(("00000000" + x2).slice(-8), "hex")))
     };
-    stream2.on("data", data);
-    stream2.on("error", error);
-    stream2.on("close", sql3.close);
-    return { stream: stream2, state: xs.state };
+    stream3.on("data", data);
+    stream3.on("error", error);
+    stream3.on("close", sql3.close);
+    return { stream: stream3, state: xs.state };
     function error(e) {
       console.error("Unexpected error during logical streaming - reconnecting", e);
     }
@@ -11380,7 +11380,7 @@ function Subscribe(postgres2, options) {
       x2[0] = "r".charCodeAt(0);
       x2.fill(state2.lsn, 1);
       x2.writeBigInt64BE(BigInt(Date.now() - Date.UTC(2e3, 0, 1)) * BigInt(1e3), 25);
-      stream2.write(x2);
+      stream3.write(x2);
     }
   }
   function call(x, a, b2) {
@@ -18064,6 +18064,155 @@ splitBillsApp.openapi(
   }
 );
 
+// ../../node_modules/.pnpm/hono@4.13.13/node_modules/hono/dist/utils/stream.js
+var StreamingApi = class {
+  writer;
+  encoder;
+  writable;
+  abortSubscribers = [];
+  responseReadable;
+  /**
+  * Whether the stream has been aborted.
+  */
+  aborted = false;
+  /**
+  * Whether the stream has been closed normally.
+  */
+  closed = false;
+  constructor(writable, _readable) {
+    this.writable = writable;
+    this.writer = writable.getWriter();
+    this.encoder = new TextEncoder();
+    const reader = _readable.getReader();
+    this.abortSubscribers.push(async () => {
+      await reader.cancel();
+    });
+    this.responseReadable = new ReadableStream({
+      async pull(controller) {
+        const { done, value } = await reader.read();
+        done ? controller.close() : controller.enqueue(value);
+      },
+      cancel: () => {
+        if (!this.closed) this.abort();
+      }
+    });
+  }
+  async write(input) {
+    try {
+      if (typeof input === "string") input = this.encoder.encode(input);
+      await this.writer.write(input);
+    } catch {
+    }
+    return this;
+  }
+  async writeln(input) {
+    await this.write(input + "\n");
+    return this;
+  }
+  sleep(ms) {
+    return new Promise((res) => setTimeout(res, ms));
+  }
+  async close() {
+    this.closed = true;
+    try {
+      await this.writer.close();
+    } catch {
+    }
+  }
+  async pipe(body) {
+    this.writer.releaseLock();
+    try {
+      await body.pipeTo(this.writable, {
+        preventClose: true,
+        preventAbort: true
+      });
+    } finally {
+      this.writer = this.writable.getWriter();
+    }
+  }
+  onAbort(listener) {
+    this.abortSubscribers.push(listener);
+  }
+  /**
+  * Abort the stream.
+  * You can call this method when stream is aborted by external event.
+  */
+  abort() {
+    if (!this.aborted) {
+      this.aborted = true;
+      this.abortSubscribers.forEach((subscriber) => {
+        try {
+          Promise.resolve(subscriber()).catch(() => {
+          });
+        } catch {
+        }
+      });
+    }
+  }
+};
+
+// ../../node_modules/.pnpm/hono@4.13.13/node_modules/hono/dist/helper/streaming/utils.js
+var isOldBunVersion = () => {
+  const version = typeof Bun !== "undefined" ? Bun.version : void 0;
+  if (version === void 0) return false;
+  const result = version.startsWith("1.1") || version.startsWith("1.0") || version.startsWith("0.");
+  isOldBunVersion = () => result;
+  return result;
+};
+
+// ../../node_modules/.pnpm/hono@4.13.13/node_modules/hono/dist/helper/streaming/sse.js
+var SSEStreamingApi = class extends StreamingApi {
+  constructor(writable, readable) {
+    super(writable, readable);
+  }
+  async writeSSE(message2) {
+    const dataLines = (await resolveCallback(message2.data, HtmlEscapedCallbackPhase.Stringify, false, {})).split(/\r\n|\r|\n/).map((line) => {
+      return `data: ${line}`;
+    }).join("\n");
+    for (const key of ["event", "id"]) {
+      const value = message2[key];
+      if (value && /[\r\n]/.test(value)) throw new Error(`${key} must not contain "\\r" or "\\n"`);
+    }
+    const sseData = [
+      message2.event && `event: ${message2.event}`,
+      dataLines,
+      message2.id !== void 0 && `id: ${message2.id}`,
+      message2.retry !== void 0 && `retry: ${message2.retry}`
+    ].filter(Boolean).join("\n") + "\n\n";
+    await this.write(sseData);
+  }
+};
+var run = async (stream2, cb, onError) => {
+  try {
+    await cb(stream2);
+  } catch (e) {
+    if (e instanceof Error && onError) {
+      await onError(e, stream2);
+      await stream2.writeSSE({
+        event: "error",
+        data: e.message
+      });
+    } else console.error(e);
+  } finally {
+    stream2.close();
+  }
+};
+var contextStash = /* @__PURE__ */ new WeakMap();
+var streamSSE = (c, cb, onError) => {
+  const { readable, writable } = new TransformStream();
+  const stream2 = new SSEStreamingApi(writable, readable);
+  if (isOldBunVersion()) c.req.raw.signal.addEventListener("abort", () => {
+    if (!stream2.closed) stream2.abort();
+  });
+  contextStash.set(stream2.responseReadable, c);
+  c.header("Transfer-Encoding", "chunked");
+  c.header("Content-Type", "text/event-stream");
+  c.header("Cache-Control", "no-cache");
+  c.header("Connection", "keep-alive");
+  run(stream2, cb, onError);
+  return c.newResponse(stream2.responseReadable);
+};
+
 // src/services/beneficiaries.ts
 function assertNotReservedName(name) {
   if (isNoBeneficiarySentinel(name)) {
@@ -19619,6 +19768,51 @@ function formatGenericWriteResult(result) {
   return parts2.length ? `Berhasil. ${parts2.join("; ")}.` : "Berhasil.";
 }
 
+// src/services/ai/tool-labels.ts
+var DEFAULT_TOOL_LABEL = "Mengambil data\u2026";
+var TOOL_LABELS = {
+  search_transactions: "Mencari transaksi\u2026",
+  get_summary: "Menghitung ringkasan\u2026",
+  get_monthly_report: "Menghitung ringkasan\u2026",
+  analyze_spending: "Menghitung ringkasan\u2026",
+  get_budget_status: "Mengecek anggaran\u2026",
+  record_expense: "Mencatat pengeluaran\u2026",
+  record_expense_batch: "Mencatat pengeluaran\u2026",
+  record_income: "Mencatat pemasukan\u2026",
+  record_transfer: "Mencatat transfer\u2026",
+  update_transaction: "Memperbarui catatan\u2026",
+  delete_transaction: "Memperbarui catatan\u2026",
+  adjust_balance: "Memperbarui catatan\u2026",
+  list_debts: "Mengecek hutang & cicilan\u2026",
+  pay_debt: "Mengecek hutang & cicilan\u2026",
+  list_piutang: "Mengecek piutang\u2026",
+  receive_piutang: "Mengecek piutang\u2026",
+  list_goals: "Mengecek target tabungan\u2026",
+  contribute_goal: "Mengecek target tabungan\u2026",
+  get_investments: "Mengecek investasi\u2026",
+  list_shopping: "Mengecek daftar belanja\u2026",
+  add_shopping_item: "Mengecek daftar belanja\u2026",
+  mark_bought: "Mengecek daftar belanja\u2026",
+  shopping_suggestions: "Mengecek daftar belanja\u2026",
+  list_pantry: "Mengecek stok rumah\u2026",
+  adjust_pantry: "Mengecek stok rumah\u2026",
+  compare_prices: "Membandingkan harga\u2026",
+  merge_products: "Membandingkan harga\u2026",
+  ingest_receipt: "Membaca struk\u2026",
+  list_recurrings: "Mengecek transaksi rutin\u2026",
+  run_recurrings: "Mengecek transaksi rutin\u2026",
+  list_beneficiaries: "Mengecek penerima\u2026",
+  add_beneficiary: "Mengecek penerima\u2026",
+  memory: "Menyimpan ingatan keluarga\u2026",
+  list_accounts: "Mengecek data keluarga\u2026",
+  list_members: "Mengecek data keluarga\u2026",
+  list_categories: "Mengecek data keluarga\u2026",
+  resolve_name: "Mengecek data keluarga\u2026"
+};
+function getToolLabel(toolName) {
+  return TOOL_LABELS[toolName] ?? DEFAULT_TOOL_LABEL;
+}
+
 // src/services/ai/chat.ts
 var APP_AI_NAME = "Keluarga Berkembang AI";
 var fmtRp3 = (n) => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
@@ -19868,7 +20062,11 @@ ATURAN: Jawab Indonesia, ramah, singkat. HANYA gunakan angka dari data. JANGAN m
 
 ${sections.join("\n\n")}`;
 }
-async function callOpenAiCompatible(apiKey, model, messages2, systemPrompt, baseUrl, tools, householdId) {
+function combineSignalWithTimeout(clientSignal, timeoutMs) {
+  const timeoutSig = AbortSignal.timeout(timeoutMs);
+  return clientSignal ? AbortSignal.any([clientSignal, timeoutSig]) : timeoutSig;
+}
+async function callOpenAiCompatible(apiKey, model, messages2, systemPrompt, baseUrl, tools, householdId, signal) {
   const body = { model, messages: [{ role: "system", content: systemPrompt }, ...messages2], temperature: 0.3, max_tokens: 2048 };
   if (tools.length) body.tools = tools.map((t) => ({ type: "function", function: t }));
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
@@ -19877,141 +20075,338 @@ async function callOpenAiCompatible(apiKey, model, messages2, systemPrompt, base
     method: "POST",
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(22e3)
+    signal: combineSignalWithTimeout(signal, 22e3)
   });
   const data = await res.json();
   if (!res.ok) throw ApiError.fromCode("upstream_ai_error", { message: data.error?.message ?? `API error ${res.status}` });
   return data.choices[0].message;
 }
-async function callAnthropic(apiKey, model, messages2, systemPrompt, tools) {
+async function callOpenAiCompatibleStream(apiKey, model, messages2, systemPrompt, baseUrl, tools, onEvent, householdId, signal) {
+  const body = {
+    model,
+    stream: true,
+    messages: [{ role: "system", content: systemPrompt }, ...messages2],
+    temperature: 0.3,
+    max_tokens: 2048
+  };
+  if (tools.length) body.tools = tools.map((t) => ({ type: "function", function: t }));
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+  if (householdId) headers["X-Household-Id"] = householdId;
+  const firstChunkCtrl = new AbortController();
+  const firstChunkTimer = setTimeout(() => firstChunkCtrl.abort(), 22e3);
+  const combinedSignal = signal ? AbortSignal.any([signal, firstChunkCtrl.signal]) : firstChunkCtrl.signal;
+  let res;
+  try {
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: combinedSignal
+    });
+  } catch (err) {
+    clearTimeout(firstChunkTimer);
+    if (signal?.aborted) throw err;
+    throw ApiError.fromCode("upstream_ai_error", { message: err.message || "Gagal menghubungi penyedia AI" });
+  }
+  if (!res.ok) {
+    clearTimeout(firstChunkTimer);
+    let errMsg = `API error ${res.status}`;
+    try {
+      const errData = await res.json();
+      if (errData?.error?.message) errMsg = errData.error.message;
+    } catch {
+    }
+    throw ApiError.fromCode("upstream_ai_error", { message: errMsg });
+  }
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/event-stream") || !res.body) {
+    clearTimeout(firstChunkTimer);
+    const data = await res.json();
+    const msg = data.choices?.[0]?.message;
+    const text = msg?.content ?? "";
+    if (text && !msg?.tool_calls?.length) {
+      await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
+      await onEvent({ type: "token", text });
+    }
+    return { content: text, tool_calls: msg?.tool_calls };
+  }
+  const reader = res.body.getReader();
+  const decoder2 = new TextDecoder();
+  let buffer2 = "";
+  let contentAcc = "";
+  let writingSent = false;
+  let gotFirstChunk = false;
+  const toolCallsMap = /* @__PURE__ */ new Map();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (!gotFirstChunk) {
+        gotFirstChunk = true;
+        clearTimeout(firstChunkTimer);
+      }
+      if (done) break;
+      buffer2 += decoder2.decode(value, { stream: true });
+      const lines = buffer2.split("\n");
+      buffer2 = lines.pop() ?? "";
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith(":")) continue;
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload === "[DONE]") {
+          await reader.cancel().catch(() => {
+          });
+          break;
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+        if (parsed.error?.message) {
+          throw ApiError.fromCode("upstream_ai_error", { message: parsed.error.message });
+        }
+        const delta = parsed.choices?.[0]?.delta;
+        if (!delta) continue;
+        if (typeof delta.content === "string" && delta.content.length > 0) {
+          if (!writingSent) {
+            writingSent = true;
+            await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
+          }
+          contentAcc += delta.content;
+          await onEvent({ type: "token", text: delta.content });
+        }
+        if (Array.isArray(delta.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            const prev = toolCallsMap.get(idx) ?? { id: `call_${idx}`, name: "", arguments: "" };
+            if (tc.id) prev.id = tc.id;
+            if (tc.function?.name) prev.name += tc.function.name;
+            if (tc.function?.arguments) prev.arguments += tc.function.arguments;
+            toolCallsMap.set(idx, prev);
+          }
+        }
+      }
+    }
+  } finally {
+    clearTimeout(firstChunkTimer);
+  }
+  const toolCalls = Array.from(toolCallsMap.entries()).sort(([a], [b2]) => a - b2).filter(([, tc]) => tc.name.length > 0).map(([, tc]) => ({
+    id: tc.id,
+    type: "function",
+    function: { name: tc.name, arguments: tc.arguments || "{}" }
+  }));
+  return {
+    content: contentAcc,
+    ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {}
+  };
+}
+async function callAnthropic(apiKey, model, messages2, systemPrompt, tools, signal) {
   const anthropicTools = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({ model, system: systemPrompt, messages: messages2, max_tokens: 2048, ...anthropicTools.length ? { tools: anthropicTools } : {} }),
-    signal: AbortSignal.timeout(22e3)
+    signal: combineSignalWithTimeout(signal, 22e3)
   });
   const data = await res.json();
   if (!res.ok) throw ApiError.fromCode("upstream_ai_error", { message: data.error?.message ?? `Anthropic error ${res.status}` });
   return data;
 }
-async function callGoogle(apiKey, model, messages2, systemPrompt, tools) {
+async function callGoogle(apiKey, model, messages2, systemPrompt, tools, signal) {
   const googleTools = tools.length ? [{ function_declarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }] : [];
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ system_instruction: { parts: [{ text: systemPrompt }] }, contents: messages2, generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }, ...googleTools.length ? { tools: googleTools } : {} }),
-    signal: AbortSignal.timeout(22e3)
+    signal: combineSignalWithTimeout(signal, 22e3)
   });
   const data = await res.json();
   if (!res.ok) throw ApiError.fromCode("upstream_ai_error", { message: data.error?.message ?? `Gemini error ${res.status}` });
   return data;
 }
-async function chatWithAi(actor, messages2, allowWrite = false) {
+async function chatWithAi(actor, messages2, allowWrite = false, onEvent, clientSignal) {
   const startMs = Date.now();
-  const [config, userName, features, liveSnapshot] = await Promise.all([
-    getAiConfig(actor),
-    getUserName(actor),
-    getHouseholdFeatures(actor),
-    buildLiveSnapshot(actor)
-  ]);
-  const { provider, model: configuredModel, apiKey } = config;
-  const model = provider === "gatekeeper" && configuredModel === "kb-auto" ? "kb-fast" : configuredModel;
-  const allToolDefs = buildToolDefs(allowWrite, features);
-  const toolDefs = selectContextualTools(allToolDefs, messages2);
-  const apiMessages = messages2.slice(-20).map((m) => ({ role: m.role === "ai" ? "assistant" : "user", content: m.text }));
-  if (isToolsUnreliable(provider, model)) {
-    const prompt = await buildEnrichedPrompt(actor, userName);
-    const baseUrl2 = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq;
-    const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl2, [], actor.householdId);
-    return { reply: msg.content || "(Tidak ada jawaban)", mutated: false, tools_used: [] };
-  }
-  const systemPrompt = buildSystemPrompt(userName, liveSnapshot);
-  const MAX_ITER = 3;
-  const TIME_BUDGET_MS = 32e3;
-  let mutated = false;
-  const toolsUsed = [];
-  const gkKey = provider === "gatekeeper" ? apiKey : void 0;
-  if (provider === "anthropic") {
-    const msgs2 = [...apiMessages];
-    for (let i = 0; i < MAX_ITER; i++) {
-      if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break;
-      const resp = await callAnthropic(apiKey, model, msgs2, systemPrompt, toolDefs);
-      if (resp.stop_reason === "tool_use") {
-        msgs2.push({ role: "assistant", content: resp.content });
-        const toolBlocks = resp.content.filter((b2) => b2.type === "tool_use");
-        const results = await Promise.all(
-          toolBlocks.map(async (block) => {
-            toolsUsed.push(block.name);
-            const { output, isWrite } = await executeTool(actor, block.name, block.input ?? {}, gkKey);
-            if (isWrite) mutated = true;
-            return { type: "tool_result", tool_use_id: block.id, content: output };
-          })
-        );
-        msgs2.push({ role: "user", content: results });
-        continue;
-      }
-      const text = resp.content.find((b2) => b2.type === "text");
-      return { reply: text?.text || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };
+  const TOTAL_TIMEOUT_MS = 5e4;
+  const totalCtrl = new AbortController();
+  let timedOutTotal = false;
+  const totalTimer = setTimeout(() => {
+    timedOutTotal = true;
+    totalCtrl.abort();
+  }, TOTAL_TIMEOUT_MS);
+  const signal = clientSignal ? AbortSignal.any([clientSignal, totalCtrl.signal]) : totalCtrl.signal;
+  try {
+    if (onEvent) {
+      await onEvent({ type: "status", step: "thinking", label: "Menyusun jawaban\u2026" });
     }
-    const finalResp = await callAnthropic(apiKey, model, msgs2, systemPrompt, []);
-    const finalText = finalResp.content.find((b2) => b2.type === "text");
-    return { reply: finalText?.text || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };
-  }
-  if (provider === "google") {
-    const msgs2 = apiMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content) }] }));
-    for (let i = 0; i < MAX_ITER; i++) {
-      if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break;
-      const resp = await callGoogle(apiKey, model, msgs2, systemPrompt, toolDefs);
-      const parts2 = resp.candidates?.[0]?.content?.parts ?? [];
-      const fnCalls = parts2.filter((p) => p.functionCall);
-      if (fnCalls.length) {
-        msgs2.push({ role: "model", parts: parts2 });
-        const fnResponses = await Promise.all(
-          fnCalls.map(async (p) => {
-            toolsUsed.push(p.functionCall.name);
-            const { output, isWrite } = await executeTool(actor, p.functionCall.name, p.functionCall.args ?? {}, gkKey);
-            if (isWrite) mutated = true;
-            return { functionResponse: { name: p.functionCall.name, response: { result: output } } };
-          })
-        );
-        msgs2.push({ role: "user", parts: fnResponses });
-        continue;
+    const [config, userName, features, liveSnapshot] = await Promise.all([
+      getAiConfig(actor),
+      getUserName(actor),
+      getHouseholdFeatures(actor),
+      buildLiveSnapshot(actor)
+    ]);
+    const { provider, model: configuredModel, apiKey } = config;
+    const model = provider === "gatekeeper" && configuredModel === "kb-auto" ? "kb-fast" : configuredModel;
+    const allToolDefs = buildToolDefs(allowWrite, features);
+    const toolDefs = selectContextualTools(allToolDefs, messages2);
+    const apiMessages = messages2.slice(-20).map((m) => ({ role: m.role === "ai" ? "assistant" : "user", content: m.text }));
+    if (isToolsUnreliable(provider, model)) {
+      const prompt = await buildEnrichedPrompt(actor, userName);
+      const baseUrl2 = PROVIDER_BASE[provider] ?? PROVIDER_BASE.groq;
+      if (onEvent) {
+        const msg2 = await callOpenAiCompatibleStream(apiKey, model, apiMessages, prompt, baseUrl2, [], onEvent, actor.householdId, signal);
+        return { reply: msg2.content || "(Tidak ada jawaban)", mutated: false, tools_used: [] };
       }
-      return { reply: parts2.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };
+      const msg = await callOpenAiCompatible(apiKey, model, apiMessages, prompt, baseUrl2, [], actor.householdId, signal);
+      return { reply: msg.content || "(Tidak ada jawaban)", mutated: false, tools_used: [] };
     }
-    const finalResp = await callGoogle(apiKey, model, msgs2, systemPrompt, []);
-    const finalParts = finalResp.candidates?.[0]?.content?.parts ?? [];
-    return { reply: finalParts.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };
-  }
-  const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.openai;
-  const msgs = [...apiMessages];
-  const tools = toolDefs;
-  for (let i = 0; i < MAX_ITER; i++) {
-    if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break;
-    const msg = await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools, actor.householdId);
-    if (msg.tool_calls?.length) {
-      msgs.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-      const toolMsgs = await Promise.all(
-        msg.tool_calls.map(async (toolCall) => {
-          let args = {};
-          try {
-            args = JSON.parse(toolCall.function.arguments || "{}");
-          } catch {
+    const systemPrompt = buildSystemPrompt(userName, liveSnapshot);
+    const MAX_ITER = 3;
+    const TIME_BUDGET_MS = 32e3;
+    let mutated = false;
+    const toolsUsed = [];
+    const gkKey = provider === "gatekeeper" ? apiKey : void 0;
+    if (provider === "anthropic") {
+      const msgs2 = [...apiMessages];
+      for (let i = 0; i < MAX_ITER; i++) {
+        if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break;
+        const resp = await callAnthropic(apiKey, model, msgs2, systemPrompt, toolDefs, signal);
+        if (resp.stop_reason === "tool_use") {
+          msgs2.push({ role: "assistant", content: resp.content });
+          const toolBlocks = resp.content.filter((b2) => b2.type === "tool_use");
+          if (onEvent) {
+            for (const block of toolBlocks) {
+              await onEvent({ type: "status", step: "tool", tool: block.name, label: getToolLabel(block.name) });
+            }
           }
-          toolsUsed.push(toolCall.function.name);
-          const { output, isWrite } = await executeTool(actor, toolCall.function.name, args, gkKey);
-          if (isWrite) mutated = true;
-          return { role: "tool", tool_call_id: toolCall.id, content: output };
-        })
-      );
-      msgs.push(...toolMsgs);
-      continue;
+          const results = await Promise.all(
+            toolBlocks.map(async (block) => {
+              toolsUsed.push(block.name);
+              const { output, isWrite } = await executeTool(actor, block.name, block.input ?? {}, gkKey);
+              if (isWrite) mutated = true;
+              return { type: "tool_result", tool_use_id: block.id, content: output };
+            })
+          );
+          msgs2.push({ role: "user", content: results });
+          if (onEvent) {
+            await onEvent({ type: "status", step: "thinking", label: "Menyusun jawaban\u2026" });
+          }
+          continue;
+        }
+        const text = resp.content.find((b2) => b2.type === "text");
+        const reply2 = text?.text || "(Tidak ada jawaban)";
+        if (onEvent) {
+          await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
+          await onEvent({ type: "token", text: reply2 });
+        }
+        return { reply: reply2, mutated, tools_used: toolsUsed };
+      }
+      const finalResp = await callAnthropic(apiKey, model, msgs2, systemPrompt, [], signal);
+      const finalText = finalResp.content.find((b2) => b2.type === "text");
+      const reply = finalText?.text || "(Tidak ada jawaban)";
+      if (onEvent) {
+        await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
+        await onEvent({ type: "token", text: reply });
+      }
+      return { reply, mutated, tools_used: toolsUsed };
     }
-    return { reply: msg.content || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };
+    if (provider === "google") {
+      const msgs2 = apiMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content) }] }));
+      for (let i = 0; i < MAX_ITER; i++) {
+        if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break;
+        const resp = await callGoogle(apiKey, model, msgs2, systemPrompt, toolDefs, signal);
+        const parts2 = resp.candidates?.[0]?.content?.parts ?? [];
+        const fnCalls = parts2.filter((p) => p.functionCall);
+        if (fnCalls.length) {
+          msgs2.push({ role: "model", parts: parts2 });
+          if (onEvent) {
+            for (const p of fnCalls) {
+              const name = p.functionCall.name;
+              await onEvent({ type: "status", step: "tool", tool: name, label: getToolLabel(name) });
+            }
+          }
+          const fnResponses = await Promise.all(
+            fnCalls.map(async (p) => {
+              toolsUsed.push(p.functionCall.name);
+              const { output, isWrite } = await executeTool(actor, p.functionCall.name, p.functionCall.args ?? {}, gkKey);
+              if (isWrite) mutated = true;
+              return { functionResponse: { name: p.functionCall.name, response: { result: output } } };
+            })
+          );
+          msgs2.push({ role: "user", parts: fnResponses });
+          if (onEvent) {
+            await onEvent({ type: "status", step: "thinking", label: "Menyusun jawaban\u2026" });
+          }
+          continue;
+        }
+        const reply2 = parts2.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)";
+        if (onEvent) {
+          await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
+          await onEvent({ type: "token", text: reply2 });
+        }
+        return { reply: reply2, mutated, tools_used: toolsUsed };
+      }
+      const finalResp = await callGoogle(apiKey, model, msgs2, systemPrompt, [], signal);
+      const finalParts = finalResp.candidates?.[0]?.content?.parts ?? [];
+      const reply = finalParts.map((p) => p.text ?? "").join("") || "(Tidak ada jawaban)";
+      if (onEvent) {
+        await onEvent({ type: "status", step: "writing", label: "Menulis jawaban\u2026" });
+        await onEvent({ type: "token", text: reply });
+      }
+      return { reply, mutated, tools_used: toolsUsed };
+    }
+    const baseUrl = PROVIDER_BASE[provider] ?? PROVIDER_BASE.openai;
+    const msgs = [...apiMessages];
+    const tools = toolDefs;
+    let streamedPrefix = "";
+    for (let i = 0; i < MAX_ITER; i++) {
+      if (i > 0 && Date.now() - startMs > TIME_BUDGET_MS) break;
+      const msg = onEvent ? await callOpenAiCompatibleStream(apiKey, model, msgs, systemPrompt, baseUrl, tools, onEvent, actor.householdId, signal) : await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, tools, actor.householdId, signal);
+      if (msg.tool_calls?.length) {
+        if (onEvent && msg.content) {
+          streamedPrefix += msg.content;
+        }
+        msgs.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
+        if (onEvent) {
+          for (const toolCall of msg.tool_calls) {
+            const name = toolCall.function.name;
+            await onEvent({ type: "status", step: "tool", tool: name, label: getToolLabel(name) });
+          }
+        }
+        const toolMsgs = await Promise.all(
+          msg.tool_calls.map(async (toolCall) => {
+            let args = {};
+            try {
+              args = JSON.parse(toolCall.function.arguments || "{}");
+            } catch {
+            }
+            toolsUsed.push(toolCall.function.name);
+            const { output, isWrite } = await executeTool(actor, toolCall.function.name, args, gkKey);
+            if (isWrite) mutated = true;
+            return { role: "tool", tool_call_id: toolCall.id, content: output };
+          })
+        );
+        msgs.push(...toolMsgs);
+        if (onEvent) {
+          await onEvent({ type: "status", step: "thinking", label: "Menyusun jawaban\u2026" });
+        }
+        continue;
+      }
+      const fullReply2 = (streamedPrefix + (msg.content || "")).trim() || "(Tidak ada jawaban)";
+      return { reply: fullReply2, mutated, tools_used: toolsUsed };
+    }
+    const finalMsg = onEvent ? await callOpenAiCompatibleStream(apiKey, model, msgs, systemPrompt, baseUrl, [], onEvent, actor.householdId, signal) : await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId, signal);
+    const fullReply = (streamedPrefix + (finalMsg.content || "")).trim() || "(Tidak ada jawaban)";
+    return { reply: fullReply, mutated, tools_used: toolsUsed };
+  } catch (err) {
+    if (timedOutTotal && !clientSignal?.aborted) {
+      throw ApiError.fromCode("upstream_ai_error", { message: "Waktu habis, coba pertanyaan yang lebih spesifik" });
+    }
+    throw err;
+  } finally {
+    clearTimeout(totalTimer);
   }
-  const finalMsg = await callOpenAiCompatible(apiKey, model, msgs, systemPrompt, baseUrl, [], actor.householdId);
-  return { reply: finalMsg.content || "(Tidak ada jawaban)", mutated, tools_used: toolsUsed };
 }
 
 // src/services/ai/scan-receipt.ts
@@ -20127,6 +20522,83 @@ aiApp.openapi(
     return c.json(await chatWithAi(c.get("actor"), body.messages, body.allow_write), 200);
   }
 );
+aiApp.post("/v1/ai/chat/stream", async (c) => {
+  const actor = c.get("actor");
+  requireJwtOnly(actor);
+  let rawBody;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    throw ApiError.fromCode("validation_error", { message: "Body JSON tidak valid." });
+  }
+  const parsed = AiChatBodySchema.safeParse(rawBody);
+  if (!parsed.success) {
+    throw ApiError.fromCode("validation_error", {
+      message: parsed.error.issues[0]?.message ?? "Parameter permintaan tidak valid."
+    });
+  }
+  const { messages: messages2, allow_write } = parsed.data;
+  const startMs = Date.now();
+  c.header("Cache-Control", "no-cache");
+  c.header("X-Accel-Buffering", "no");
+  return streamSSE(c, async (stream2) => {
+    const abortCtrl = new AbortController();
+    c.req.raw.signal?.addEventListener("abort", () => abortCtrl.abort(), { once: true });
+    stream2.onAbort(() => abortCtrl.abort());
+    const pingInterval = setInterval(() => {
+      stream2.write(": ping\n\n").catch(() => {
+      });
+    }, 1e4);
+    try {
+      const result = await chatWithAi(
+        actor,
+        messages2,
+        allow_write,
+        async (ev) => {
+          if (abortCtrl.signal.aborted) return;
+          if (ev.type === "status") {
+            await stream2.writeSSE({
+              event: "status",
+              data: JSON.stringify({
+                step: ev.step,
+                ...ev.tool ? { tool: ev.tool } : {},
+                label: ev.label
+              })
+            });
+          } else if (ev.type === "token") {
+            await stream2.writeSSE({
+              event: "token",
+              data: JSON.stringify({ text: ev.text })
+            });
+          }
+        },
+        abortCtrl.signal
+      );
+      if (!abortCtrl.signal.aborted) {
+        await stream2.writeSSE({
+          event: "done",
+          data: JSON.stringify({
+            reply: result.reply,
+            mutated: result.mutated,
+            tools_used: result.tools_used,
+            elapsed_ms: Date.now() - startMs
+          })
+        });
+      }
+    } catch (err) {
+      if (abortCtrl.signal.aborted) return;
+      const code = err instanceof ApiError ? err.code : "upstream_ai_error";
+      const message2 = err instanceof Error ? err.message : "Terjadi kesalahan pada layanan AI";
+      await stream2.writeSSE({
+        event: "error",
+        data: JSON.stringify({ code, message: message2 })
+      }).catch(() => {
+      });
+    } finally {
+      clearInterval(pingInterval);
+    }
+  });
+});
 aiApp.openapi(
   createRoute({
     method: "post",
