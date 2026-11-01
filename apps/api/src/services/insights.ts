@@ -211,7 +211,7 @@ export function buildInsights(input: InsightsInput) {
       daily_allowance_left: daysLeft > 0 ? Math.max(0, Math.round(remaining / daysLeft)) : null,
       // Berapa rata-rata harian harus turun supaya pas budget di akhir periode (0 = laju sekarang sudah aman).
       cut_per_day_needed: daysLeft > 0 ? Math.max(0, perDay - Math.max(0, Math.round(remaining / daysLeft))) : 0,
-      status: total >= b ? 'over' : projected > b ? 'akan_lewat' : 'aman',
+      status: total > b ? 'over' : projected > b ? 'akan_lewat' : 'aman',
     }
   }
 

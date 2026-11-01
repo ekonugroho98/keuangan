@@ -6,6 +6,7 @@ import { resolveAccountRef, resolveEffectiveRecorder, resolveExplicitRecorder } 
 import { todayInTz } from './period'
 import { resolveReceiptUrl } from './storage'
 import { txSource } from './transactions'
+import { getPostTxFinancialSnapshot } from './budgets'
 
 export interface CreateTransferInput {
   amount?: number
@@ -72,6 +73,7 @@ export async function createTransfer(actor: Actor, input: CreateTransferInput, t
     const [toAcc] = await tx<{ name: string; balance: string }[]>`
       select a.name, v.balance::text from accounts a join v_account_balances v on v.account_id = a.id where a.id = ${toId}
     `
+    const snapshot = await getPostTxFinancialSnapshot(tx, actor, fromId, [], full!.date)
     return {
       transaction: {
         id: txRow!.id,
@@ -88,6 +90,8 @@ export async function createTransfer(actor: Actor, input: CreateTransferInput, t
       },
       from_account: { id: fromId, name: fromAcc!.name, balance: fromAcc!.balance !== null ? Number(fromAcc!.balance) : null },
       to_account: { id: toId, name: toAcc!.name, balance: toAcc!.balance !== null ? Number(toAcc!.balance) : null },
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
     }
   })
 }

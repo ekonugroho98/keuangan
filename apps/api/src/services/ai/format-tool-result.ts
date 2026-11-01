@@ -176,12 +176,47 @@ export function formatToolResult(name: string, result: unknown): string {
       return `Stok "${i.name}" sekarang ${i.qty} ${i.unit}.`
     }
     case 'ingest_receipt': {
-      const r = result as { transactions: Tx[]; account: { balance: number | null }; shopping?: { marked_bought: Array<{ name: string }>; unmatched: string[] }; pantry?: { updated: Array<{ name: string; qty_after: number }>; unmatched: string[] } }
+      const r = result as {
+        transactions: Tx[]
+        account: { name?: string; balance: number | null }
+        total_balance?: number
+        accounts_summary?: Array<{ name: string; balance: number }>
+        related_budgets?: Array<{ category: { name: string }; amount: number; spent: number; remaining: number; pct: number; status: string }>
+        shopping?: { marked_bought: Array<{ name: string }>; unmatched: string[] }
+        pantry?: { updated: Array<{ name: string; qty_after: number }>; unmatched: string[] }
+      }
       const total = r.transactions.reduce((a, t) => a + Number(t.amount), 0)
-      const lines = [`${r.transactions.length} item dicatat, total ${fmtRp(total)}${r.account.balance !== null ? `, saldo akun sekarang ${fmtRp(r.account.balance)}` : ''}.`]
+      const accLabel = r.account?.name || 'Akun'
+      const lines = [
+        `1. Total Transaksi Dicatat: ${r.transactions.length} item (${fmtRp(total)}) via ${accLabel}.`,
+      ]
+      if (r.related_budgets?.length) {
+        const bLines = r.related_budgets
+          .map((b) => `${b.category.name}: sisa ${fmtRp(b.remaining)} dari ${fmtRp(b.amount)} (terpakai ${fmtRp(b.spent)} / ${b.pct}%)`)
+          .join(' | ')
+        lines.push(`2. Sisa Anggaran Terkait: ${bLines}.`)
+      }
+      const accParts: string[] = []
+      if (r.account?.balance !== null && r.account?.balance !== undefined) {
+        accParts.push(`Sisa ${accLabel}: ${fmtRp(r.account.balance)}`)
+      }
+      if (typeof r.total_balance === 'number') {
+        const otherAccs = (r.accounts_summary ?? [])
+          .filter((a) => a.balance > 0)
+          .map((a) => `${a.name} ${fmtRp(a.balance)}`)
+          .join(', ')
+        accParts.push(`Sisa Keseluruhan Uang Keluarga: ${fmtRp(r.total_balance)}${otherAccs ? ` (${otherAccs})` : ''}`)
+      }
+      if (accParts.length) lines.push(`3. ${accParts.join(' | ')}.`)
       if (r.shopping) lines.push(`Belanja: ${r.shopping.marked_bought.length ? `dicoret ${r.shopping.marked_bought.map((s) => s.name).join(', ')}` : 'tidak ada yang cocok'}${r.shopping.unmatched.length ? ` (tidak di daftar: ${r.shopping.unmatched.join(', ')})` : ''}.`)
       if (r.pantry) lines.push(`Stok: ${r.pantry.updated.length ? r.pantry.updated.map((p) => `${p.name} → ${p.qty_after}`).join(', ') : 'tidak ada yang cocok'}${r.pantry.unmatched.length ? ` (tidak di stok: ${r.pantry.unmatched.join(', ')})` : ''}.`)
       return lines.join('\n')
+    }
+    case 'record_expense':
+    case 'record_income':
+    case 'record_expense_batch':
+    case 'record_transfer': {
+      return formatPostTxWriteResult(result)
     }
     case 'compare_prices': {
       const r = result as { query: string; products: Array<{ summary: string }> }
@@ -199,6 +234,71 @@ export function formatToolResult(name: string, result: unknown): string {
     default:
       return formatGenericWriteResult(result)
   }
+}
+
+function formatPostTxWriteResult(result: unknown): string {
+  if (!result || typeof result !== 'object') return 'Berhasil.'
+  const r = result as {
+    transaction?: Tx
+    transactions?: Tx[]
+    account?: { name?: string; balance: number | null }
+    from_account?: { name?: string; balance: number | null }
+    to_account?: { name?: string; balance: number | null }
+    total_balance?: number
+    accounts_summary?: Array<{ name: string; balance: number }>
+    related_budgets?: Array<{ category: { name: string }; amount: number; spent: number; remaining: number; pct: number; status: string }>
+  }
+  const txList = r.transactions ?? (r.transaction ? [r.transaction] : [])
+  const totalTx = txList.reduce((sum, t) => sum + Number(t.amount ?? 0), 0)
+  const accName = r.account?.name || txList[0]?.account?.name || r.from_account?.name || 'Akun'
+  const lines: string[] = []
+
+  if (r.from_account && r.to_account && r.transaction) {
+    lines.push(
+      `1. Total Transaksi Dicatat: Transfer ${fmtRp(r.transaction.amount)} dari ${r.from_account.name} ke ${r.to_account.name}${r.transaction.note ? ` (${r.transaction.note})` : ''}.`,
+    )
+  } else if (txList.length === 1) {
+    const t = txList[0]!
+    lines.push(
+      `1. Total Transaksi Dicatat: ${t.note || t.category?.name || 'Transaksi'} sebesar ${fmtRp(t.amount)} (${t.category?.name ?? '-'}, via ${accName}, tgl ${t.date}).`,
+    )
+  } else if (txList.length > 1) {
+    const itemsPreview = txList.map((t) => `${t.note || t.category?.name || 'Item'} ${fmtRp(t.amount)}`).join(', ')
+    lines.push(
+      `1. Total Transaksi Dicatat: ${txList.length} item dengan total ${fmtRp(totalTx)} via ${accName} (${itemsPreview}).`,
+    )
+  }
+
+  if (r.related_budgets?.length) {
+    const bText = r.related_budgets
+      .map(
+        (b) =>
+          `${b.category.name}: sisa ${fmtRp(b.remaining)} dari pagu ${fmtRp(b.amount)} (terpakai ${fmtRp(b.spent)} / ${b.pct}%${b.status === 'over' ? ' — MELEBIHI ANGGARAN' : b.status === 'warning' ? ' — HAMPIR HABIS' : ''})`,
+      )
+      .join(' | ')
+    lines.push(`2. Sisa Anggaran Kategori Terkait: ${bText}.`)
+  } else {
+    lines.push(`2. Sisa Anggaran Kategori Terkait: (kategori ini belum diatur anggarannya).`)
+  }
+
+  const balParts: string[] = []
+  if (r.from_account && r.to_account) {
+    if (r.from_account.balance !== null) balParts.push(`Sisa ${r.from_account.name}: ${fmtRp(r.from_account.balance)}`)
+    if (r.to_account.balance !== null) balParts.push(`Sisa ${r.to_account.name}: ${fmtRp(r.to_account.balance)}`)
+  } else if (r.account && r.account.balance !== null) {
+    balParts.push(`Sisa saldo ${accName}: ${fmtRp(r.account.balance)}`)
+  }
+  if (typeof r.total_balance === 'number') {
+    const breakdown = (r.accounts_summary ?? [])
+      .filter((a) => a.balance > 0)
+      .map((a) => `${a.name} ${fmtRp(a.balance)}`)
+      .join(', ')
+    balParts.push(`Sisa Keseluruhan Uang Keluarga: ${fmtRp(r.total_balance)}${breakdown ? ` (${breakdown})` : ''}`)
+  }
+  if (balParts.length) {
+    lines.push(`3. Sisa Uang Setelah Transaksi: ${balParts.join(' | ')}.`)
+  }
+  return lines.join('\n')
 }
 
 /** Fallback untuk resolve_name dan semua tool TULIS (record_*, update_*, delete_*, pay_debt, dst.). */

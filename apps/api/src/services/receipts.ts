@@ -13,6 +13,7 @@ import { createTitipanPiutang, detectTitipan, piutangCategoryId, titipanDisplayN
 import { todayInTz } from './period'
 import { getHouseholdTimezone } from './households'
 import { TX_SELECT, mapTx, txSource, type TxRow } from './transactions'
+import { getPostTxFinancialSnapshot } from './budgets'
 
 interface ReceiptItemInput {
   name: string
@@ -184,11 +185,21 @@ export async function ingestReceipt(actor: Actor, input: IngestReceiptInput) {
     const pricesRecorded = await recordPrices(tx, actor.householdId, input.merchant, date, priceItems)
 
     const fullRows = await tx.unsafe<TxRow[]>(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids])
-    const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
+    const snapshot = await getPostTxFinancialSnapshot(
+      tx,
+      actor,
+      accountId,
+      items.map((it) => it.category_id),
+      date,
+    )
 
     return {
       transactions: fullRows.map(mapTx),
-      account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
+      account: snapshot.account,
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
+      related_budgets: snapshot.related_budgets,
+      budget: snapshot.budget,
       ...(receiptUrl ? { receipt_url: receiptUrl } : {}),
       ...(piutang.length ? { piutang } : {}),
       prices_recorded: pricesRecorded,

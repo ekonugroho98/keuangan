@@ -120,8 +120,8 @@ export async function getSummary(
 
     const [budgetRow] = await tx<{ over: string; warning: string; total: string }[]>`
       select
-        count(*) filter (where spent >= b.amount)::text as over,
-        count(*) filter (where spent < b.amount and spent >= b.amount * 0.8)::text as warning,
+        count(*) filter (where spent > b.amount)::text as over,
+        count(*) filter (where spent <= b.amount and spent >= b.amount * 0.8)::text as warning,
         count(*)::text as total
       from budgets b
       cross join lateral (

@@ -62,12 +62,106 @@ export async function getBudgetStatus(actor: Actor, month: string, scope: 'house
         budget_id: r.budget_id,
         category: { id: r.category_id, name: r.category_name, icon: r.category_icon },
         amount, spent, remaining: amount - spent, pct,
-        status: spent >= amount ? 'over' : pct >= 80 ? 'warning' : 'ok',
+        status: spent > amount ? 'over' : pct >= 80 ? 'warning' : 'ok',
       }
     })
     const totals = items.reduce((acc, i) => ({ budgeted: acc.budgeted + i.amount, spent: acc.spent + i.spent, remaining: acc.remaining + i.remaining }), { budgeted: 0, spent: 0, remaining: 0 })
     return { period: { month, period_start: periodStart }, items, totals }
   })
+}
+
+export interface PostTxBudgetItem {
+  budget_id: string
+  category: { id: string; name: string; icon: string }
+  amount: number
+  spent: number
+  remaining: number
+  pct: number
+  status: 'ok' | 'warning' | 'over'
+}
+
+export interface PostTxFinancialSnapshot {
+  account: { id: string; name: string; balance: number }
+  total_balance: number
+  accounts_summary: Array<{ id: string; name: string; balance: number }>
+  related_budgets: PostTxBudgetItem[]
+  budget: PostTxBudgetItem | null
+}
+
+/**
+ * Ambil snapshot pasca-transaksi dalam 1 transaksi DB yang sama:
+ * 1) Saldo akun pembayar + total keseluruhan uang keluarga (semua akun terlihat)
+ * 2) Sisa anggaran kategori terkait (HANYA untuk kategori pengeluaran yang sudah di-setup anggarannya di bulan transaksi).
+ */
+export async function getPostTxFinancialSnapshot(
+  tx: Parameters<typeof resolveMemberRef>[0],
+  actor: Actor,
+  accountId: string,
+  categoryIds: string[],
+  txDate: string,
+): Promise<PostTxFinancialSnapshot> {
+  const accRows = await tx<{ id: string; name: string; balance: string | null }[]>`
+    select a.id, a.name, v.balance::text as balance
+    from accounts a
+    join v_account_balances v on v.account_id = a.id
+    where a.household_id = ${actor.householdId} and a.deleted_at is null
+    order by a.sort_order, a.created_at
+  `
+  const primaryAcc = accRows.find((r) => r.id === accountId)
+  const visibleAccounts = accRows
+    .filter((r) => r.balance !== null)
+    .map((r) => ({ id: r.id, name: r.name, balance: Number(r.balance) }))
+  const totalBalance = visibleAccounts.reduce((sum, a) => sum + a.balance, 0)
+
+  const uniqueCatIds = Array.from(new Set(categoryIds.filter(Boolean)))
+  const periodStart = `${(txDate || new Date().toISOString().slice(0, 10)).slice(0, 7)}-01`
+  let relatedBudgets: PostTxBudgetItem[] = []
+
+  if (uniqueCatIds.length > 0) {
+    const bRows = await tx.unsafe<
+      { budget_id: string; category_id: string; category_name: string; category_icon: string; amount: string; spent: string }[]
+    >(
+      `select b.id as budget_id, c.id as category_id, c.name as category_name, c.icon as category_icon, b.amount::text,
+        coalesce((
+          select sum(t.amount) from transactions t
+          where t.household_id = $1 and t.type = 'expense' and t.deleted_at is null
+            and t.category_id = c.id and t.date >= b.period_start and t.date < (b.period_start + interval '1 month')
+        ), 0)::text as spent
+       from budgets b
+       join categories c on c.id = b.category_id
+       where b.household_id = $1 and b.period_start = $2::date and b.deleted_at is null
+         and b.member_id is null and b.category_id = any($3::uuid[])
+       order by c.sort_order`,
+      [actor.householdId, periodStart, uniqueCatIds],
+    )
+    relatedBudgets = bRows.map((r) => {
+      const amount = Number(r.amount)
+      const spent = Number(r.spent)
+      const remaining = amount - spent
+      const pct = amount > 0 ? Math.round((spent / amount) * 1000) / 10 : 0
+      return {
+        budget_id: r.budget_id,
+        category: { id: r.category_id, name: r.category_name, icon: r.category_icon },
+        amount,
+        spent,
+        remaining,
+        pct,
+        status: spent > amount ? 'over' : pct >= 80 ? 'warning' : 'ok',
+      }
+    })
+  }
+
+  return {
+    account: {
+      id: accountId,
+      name: primaryAcc?.name ?? '',
+      balance: primaryAcc && primaryAcc.balance !== null ? Number(primaryAcc.balance) : 0,
+    },
+    total_balance: totalBalance,
+    accounts_summary: visibleAccounts,
+    related_budgets: relatedBudgets,
+    budget: relatedBudgets[0] ?? null,
+  }
 }
 
 export async function createBudget(actor: Actor, input: { category_id?: string; category?: string; amount: number; month: string; member_id?: string; member?: string }) {

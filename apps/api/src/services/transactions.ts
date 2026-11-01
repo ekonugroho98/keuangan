@@ -12,6 +12,7 @@ import { resolveReceiptUrl } from './storage'
 import { formatReceiptNote, parseReceiptNote } from '@karaya/shared/format'
 import { getHouseholdFeaturesInTx } from './features'
 import { syncPurchaseToPantry, reversePurchaseFromPantry } from './pantry'
+import { getPostTxFinancialSnapshot } from './budgets'
 
 // Gate fitur beneficiary ada di dalam resolveBeneficiaryRef (features.ts) — di sini hanya perlu
 // tahu apakah field disentuh, untuk memutuskan apakah key `beneficiary_id` ikut ditulis.
@@ -378,8 +379,21 @@ export async function createTransaction(actor: Actor, input: CreateTransactionIn
         })
       }
     }
-    const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
-    return { transaction: mapTx(rows[0]!), account: { id: accountId, balance: Number(accRow!.balance) } }
+    const snapshot = await getPostTxFinancialSnapshot(
+      tx,
+      actor,
+      accountId,
+      input.type === 'expense' ? [categoryId] : [],
+      txDate,
+    )
+    return {
+      transaction: mapTx(rows[0]!),
+      account: snapshot.account,
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
+      related_budgets: snapshot.related_budgets,
+      budget: snapshot.budget,
+    }
   })
 }
 
@@ -497,8 +511,22 @@ export async function createTransactionBatch(
         }
       }
     }
-    const [accRow] = await tx<{ balance: string }[]>`select balance::text from v_account_balances where account_id = ${accountId}`
-    return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow!.balance) }, ...(piutang.length ? { piutang } : {}) }
+    const snapshot = await getPostTxFinancialSnapshot(
+      tx,
+      actor,
+      accountId,
+      items.map((it) => it.category_id),
+      date,
+    )
+    return {
+      transactions: rows.map(mapTx),
+      account: snapshot.account,
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
+      related_budgets: snapshot.related_budgets,
+      budget: snapshot.budget,
+      ...(piutang.length ? { piutang } : {}),
+    }
   })
 }
 
