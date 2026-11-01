@@ -15992,6 +15992,199 @@ async function syncPurchasesForPeriod(actor, period = "this_month") {
   });
 }
 
+// src/services/budgets.ts
+async function resolveMemberRefWithMe(tx, actor, ref) {
+  if (ref?.member === "me") return actor.memberId;
+  return resolveMemberRef(tx, actor, ref ?? {});
+}
+async function listBudgets(actor, month, scope, memberRef) {
+  return withActor(actor, async (tx) => {
+    const periodStart = `${month}-01`;
+    const memberId = scope === "member" ? await resolveMemberRefWithMe(tx, actor, memberRef) ?? actor.memberId : null;
+    const rows = await tx`
+      select b.id, c.id as category_id, c.name as category_name, m.id as member_id, m.display_name as member_name,
+             b.period_start::text, b.amount::text
+      from budgets b join categories c on c.id = b.category_id left join household_members m on m.id = b.member_id
+      where b.household_id = ${actor.householdId} and b.period_start = ${periodStart} and b.deleted_at is null
+        ${scope === "household" ? tx`and b.member_id is null` : tx`and b.member_id = ${memberId}`}
+      order by c.sort_order
+    `;
+    return rows.map((r) => ({
+      id: r.id,
+      category: { id: r.category_id, name: r.category_name },
+      member: r.member_id ? { member_id: r.member_id, display_name: r.member_name } : null,
+      period_start: r.period_start,
+      amount: Number(r.amount)
+    }));
+  });
+}
+async function getBudgetStatus(actor, month, scope, memberRef) {
+  return withActor(actor, async (tx) => {
+    const periodStart = `${month}-01`;
+    const memberId = scope === "member" ? await resolveMemberRefWithMe(tx, actor, memberRef) ?? actor.memberId : null;
+    const rows = await tx`
+      select b.id as budget_id, c.id as category_id, c.name as category_name, c.icon as category_icon, b.amount::text,
+        coalesce((
+          select sum(t.amount) from transactions t
+          where t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
+            and t.category_id = c.id and t.date >= b.period_start and t.date < (b.period_start + interval '1 month')
+            ${scope === "member" ? tx`and t.account_id in (select id from accounts where owner_member_id = ${memberId})` : tx``}
+        ), 0)::text as spent
+      from budgets b join categories c on c.id = b.category_id
+      where b.household_id = ${actor.householdId} and b.period_start = ${periodStart} and b.deleted_at is null
+        ${scope === "household" ? tx`and b.member_id is null` : tx`and b.member_id = ${memberId}`}
+      order by c.sort_order
+    `;
+    const items = rows.map((r) => {
+      const amount = Number(r.amount);
+      const spent = Number(r.spent);
+      const pct2 = amount > 0 ? Math.round(spent / amount * 1e3) / 10 : 0;
+      return {
+        budget_id: r.budget_id,
+        category: { id: r.category_id, name: r.category_name, icon: r.category_icon },
+        amount,
+        spent,
+        remaining: amount - spent,
+        pct: pct2,
+        status: spent > amount ? "over" : pct2 >= 80 ? "warning" : "ok"
+      };
+    });
+    const totals = items.reduce((acc, i) => ({ budgeted: acc.budgeted + i.amount, spent: acc.spent + i.spent, remaining: acc.remaining + i.remaining }), { budgeted: 0, spent: 0, remaining: 0 });
+    return { period: { month, period_start: periodStart }, items, totals };
+  });
+}
+async function getPostTxFinancialSnapshot(tx, actor, accountId, categoryIds, txDate) {
+  const accRows = await tx`
+    select a.id, a.name, v.balance::text as balance
+    from accounts a
+    join v_account_balances v on v.account_id = a.id
+    where a.household_id = ${actor.householdId} and a.deleted_at is null
+    order by a.sort_order, a.created_at
+  `;
+  const primaryAcc = accRows.find((r) => r.id === accountId);
+  const visibleAccounts = accRows.filter((r) => r.balance !== null).map((r) => ({ id: r.id, name: r.name, balance: Number(r.balance) }));
+  const totalBalance = visibleAccounts.reduce((sum, a) => sum + a.balance, 0);
+  const uniqueCatIds = Array.from(new Set(categoryIds.filter(Boolean)));
+  const periodStart = `${(txDate || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)).slice(0, 7)}-01`;
+  let relatedBudgets = [];
+  if (uniqueCatIds.length > 0) {
+    const bRows = await tx.unsafe(
+      `select b.id as budget_id, c.id as category_id, c.name as category_name, c.icon as category_icon, b.amount::text,
+        coalesce((
+          select sum(t.amount) from transactions t
+          where t.household_id = $1 and t.type = 'expense' and t.deleted_at is null
+            and t.category_id = c.id and t.date >= b.period_start and t.date < (b.period_start + interval '1 month')
+        ), 0)::text as spent
+       from budgets b
+       join categories c on c.id = b.category_id
+       where b.household_id = $1 and b.period_start = $2::date and b.deleted_at is null
+         and b.member_id is null and b.category_id = any($3::uuid[])
+       order by c.sort_order`,
+      [actor.householdId, periodStart, uniqueCatIds]
+    );
+    relatedBudgets = bRows.map((r) => {
+      const amount = Number(r.amount);
+      const spent = Number(r.spent);
+      const remaining = amount - spent;
+      const pct2 = amount > 0 ? Math.round(spent / amount * 1e3) / 10 : 0;
+      return {
+        budget_id: r.budget_id,
+        category: { id: r.category_id, name: r.category_name, icon: r.category_icon },
+        amount,
+        spent,
+        remaining,
+        pct: pct2,
+        status: spent > amount ? "over" : pct2 >= 80 ? "warning" : "ok"
+      };
+    });
+  }
+  return {
+    account: {
+      id: accountId,
+      name: primaryAcc?.name ?? "",
+      balance: primaryAcc && primaryAcc.balance !== null ? Number(primaryAcc.balance) : 0
+    },
+    total_balance: totalBalance,
+    accounts_summary: visibleAccounts,
+    related_budgets: relatedBudgets,
+    budget: relatedBudgets[0] ?? null
+  };
+}
+async function createBudget(actor, input) {
+  return withActor(actor, async (tx) => {
+    const categoryId = await resolveCategoryRef(tx, actor, input);
+    const memberId = await resolveMemberRefWithMe(tx, actor, input);
+    try {
+      const [row] = await tx`
+        insert into budgets (household_id, category_id, member_id, period_start, amount)
+        values (${actor.householdId}, ${categoryId}, ${memberId ?? null}, ${`${input.month}-01`}, ${input.amount})
+        returning id
+      `;
+      return { id: row.id, category_id: categoryId, member_id: memberId ?? null, period_start: `${input.month}-01`, amount: input.amount };
+    } catch (err) {
+      if (err && typeof err === "object" && err.code === "23505") throw ApiError.fromCode("duplicate_budget");
+      throw err;
+    }
+  });
+}
+async function updateBudget(actor, id, amount) {
+  return withActor(actor, async (tx) => {
+    const [row] = await tx`
+      update budgets set amount = ${amount}, updated_at = now()
+      where id = ${id} and household_id = ${actor.householdId} and deleted_at is null
+      returning id
+    `;
+    if (!row) throw ApiError.fromCode("budget_not_found");
+    return { id: row.id, amount };
+  });
+}
+async function deleteBudget(actor, id) {
+  return withActor(actor, async (tx) => {
+    const [row] = await tx`
+      update budgets set deleted_at = now() where id = ${id} and household_id = ${actor.householdId} and deleted_at is null returning id
+    `;
+    if (!row) throw ApiError.fromCode("budget_not_found");
+    return { success: true };
+  });
+}
+async function copyBudgets(actor, fromMonth, toMonth, overwrite) {
+  return withActor(actor, async (tx) => {
+    const source = await tx`
+      select category_id, member_id, amount::text from budgets
+      where household_id = ${actor.householdId} and period_start = ${`${fromMonth}-01`} and deleted_at is null
+    `;
+    let copied = 0;
+    let skipped = 0;
+    for (const b2 of source) {
+      if (overwrite) {
+        await tx`
+          insert into budgets (household_id, category_id, member_id, period_start, amount)
+          values (${actor.householdId}, ${b2.category_id}, ${b2.member_id}, ${`${toMonth}-01`}, ${b2.amount})
+          on conflict (household_id, category_id, coalesce(member_id, '00000000-0000-0000-0000-000000000000'::uuid), period_start)
+          do update set amount = excluded.amount, deleted_at = null
+        `;
+        copied++;
+      } else {
+        const [existing] = await tx`
+          select id from budgets where household_id = ${actor.householdId} and category_id = ${b2.category_id}
+            and coalesce(member_id, '00000000-0000-0000-0000-000000000000'::uuid) = coalesce(${b2.member_id}, '00000000-0000-0000-0000-000000000000'::uuid)
+            and period_start = ${`${toMonth}-01`} and deleted_at is null
+        `;
+        if (existing) {
+          skipped++;
+          continue;
+        }
+        await tx`
+          insert into budgets (household_id, category_id, member_id, period_start, amount)
+          values (${actor.householdId}, ${b2.category_id}, ${b2.member_id}, ${`${toMonth}-01`}, ${b2.amount})
+        `;
+        copied++;
+      }
+    }
+    return { copied, skipped };
+  });
+}
+
 // src/services/transactions.ts
 function touchesBeneficiary(ref) {
   return ref.beneficiary_id !== void 0 || ref.beneficiary !== void 0;
@@ -16248,8 +16441,21 @@ async function createTransaction(actor, input, timezone) {
         });
       }
     }
-    const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
-    return { transaction: mapTx(rows[0]), account: { id: accountId, balance: Number(accRow.balance) } };
+    const snapshot = await getPostTxFinancialSnapshot(
+      tx,
+      actor,
+      accountId,
+      input.type === "expense" ? [categoryId] : [],
+      txDate
+    );
+    return {
+      transaction: mapTx(rows[0]),
+      account: snapshot.account,
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
+      related_budgets: snapshot.related_budgets,
+      budget: snapshot.budget
+    };
   });
 }
 async function createTransactionBatch(actor, input, timezone) {
@@ -16333,8 +16539,22 @@ async function createTransactionBatch(actor, input, timezone) {
         }
       }
     }
-    const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
-    return { transactions: rows.map(mapTx), account: { id: accountId, balance: Number(accRow.balance) }, ...piutang.length ? { piutang } : {} };
+    const snapshot = await getPostTxFinancialSnapshot(
+      tx,
+      actor,
+      accountId,
+      items.map((it) => it.category_id),
+      date
+    );
+    return {
+      transactions: rows.map(mapTx),
+      account: snapshot.account,
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
+      related_budgets: snapshot.related_budgets,
+      budget: snapshot.budget,
+      ...piutang.length ? { piutang } : {}
+    };
   });
 }
 async function updateTransaction(actor, id, input) {
@@ -16561,6 +16781,7 @@ async function createTransfer(actor, input, timezone) {
     const [toAcc] = await tx`
       select a.name, v.balance::text from accounts a join v_account_balances v on v.account_id = a.id where a.id = ${toId}
     `;
+    const snapshot = await getPostTxFinancialSnapshot(tx, actor, fromId, [], full.date);
     return {
       transaction: {
         id: txRow.id,
@@ -16576,7 +16797,9 @@ async function createTransfer(actor, input, timezone) {
         created_at: full.created_at
       },
       from_account: { id: fromId, name: fromAcc.name, balance: fromAcc.balance !== null ? Number(fromAcc.balance) : null },
-      to_account: { id: toId, name: toAcc.name, balance: toAcc.balance !== null ? Number(toAcc.balance) : null }
+      to_account: { id: toId, name: toAcc.name, balance: toAcc.balance !== null ? Number(toAcc.balance) : null },
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary
     };
   });
 }
@@ -16604,142 +16827,6 @@ transfersApp.openapi(
     return c.json(result, 201);
   }
 );
-
-// src/services/budgets.ts
-async function resolveMemberRefWithMe(tx, actor, ref) {
-  if (ref?.member === "me") return actor.memberId;
-  return resolveMemberRef(tx, actor, ref ?? {});
-}
-async function listBudgets(actor, month, scope, memberRef) {
-  return withActor(actor, async (tx) => {
-    const periodStart = `${month}-01`;
-    const memberId = scope === "member" ? await resolveMemberRefWithMe(tx, actor, memberRef) ?? actor.memberId : null;
-    const rows = await tx`
-      select b.id, c.id as category_id, c.name as category_name, m.id as member_id, m.display_name as member_name,
-             b.period_start::text, b.amount::text
-      from budgets b join categories c on c.id = b.category_id left join household_members m on m.id = b.member_id
-      where b.household_id = ${actor.householdId} and b.period_start = ${periodStart} and b.deleted_at is null
-        ${scope === "household" ? tx`and b.member_id is null` : tx`and b.member_id = ${memberId}`}
-      order by c.sort_order
-    `;
-    return rows.map((r) => ({
-      id: r.id,
-      category: { id: r.category_id, name: r.category_name },
-      member: r.member_id ? { member_id: r.member_id, display_name: r.member_name } : null,
-      period_start: r.period_start,
-      amount: Number(r.amount)
-    }));
-  });
-}
-async function getBudgetStatus(actor, month, scope, memberRef) {
-  return withActor(actor, async (tx) => {
-    const periodStart = `${month}-01`;
-    const memberId = scope === "member" ? await resolveMemberRefWithMe(tx, actor, memberRef) ?? actor.memberId : null;
-    const rows = await tx`
-      select b.id as budget_id, c.id as category_id, c.name as category_name, c.icon as category_icon, b.amount::text,
-        coalesce((
-          select sum(t.amount) from transactions t
-          where t.household_id = ${actor.householdId} and t.type = 'expense' and t.deleted_at is null
-            and t.category_id = c.id and t.date >= b.period_start and t.date < (b.period_start + interval '1 month')
-            ${scope === "member" ? tx`and t.account_id in (select id from accounts where owner_member_id = ${memberId})` : tx``}
-        ), 0)::text as spent
-      from budgets b join categories c on c.id = b.category_id
-      where b.household_id = ${actor.householdId} and b.period_start = ${periodStart} and b.deleted_at is null
-        ${scope === "household" ? tx`and b.member_id is null` : tx`and b.member_id = ${memberId}`}
-      order by c.sort_order
-    `;
-    const items = rows.map((r) => {
-      const amount = Number(r.amount);
-      const spent = Number(r.spent);
-      const pct2 = amount > 0 ? Math.round(spent / amount * 1e3) / 10 : 0;
-      return {
-        budget_id: r.budget_id,
-        category: { id: r.category_id, name: r.category_name, icon: r.category_icon },
-        amount,
-        spent,
-        remaining: amount - spent,
-        pct: pct2,
-        status: spent >= amount ? "over" : pct2 >= 80 ? "warning" : "ok"
-      };
-    });
-    const totals = items.reduce((acc, i) => ({ budgeted: acc.budgeted + i.amount, spent: acc.spent + i.spent, remaining: acc.remaining + i.remaining }), { budgeted: 0, spent: 0, remaining: 0 });
-    return { period: { month, period_start: periodStart }, items, totals };
-  });
-}
-async function createBudget(actor, input) {
-  return withActor(actor, async (tx) => {
-    const categoryId = await resolveCategoryRef(tx, actor, input);
-    const memberId = await resolveMemberRefWithMe(tx, actor, input);
-    try {
-      const [row] = await tx`
-        insert into budgets (household_id, category_id, member_id, period_start, amount)
-        values (${actor.householdId}, ${categoryId}, ${memberId ?? null}, ${`${input.month}-01`}, ${input.amount})
-        returning id
-      `;
-      return { id: row.id, category_id: categoryId, member_id: memberId ?? null, period_start: `${input.month}-01`, amount: input.amount };
-    } catch (err) {
-      if (err && typeof err === "object" && err.code === "23505") throw ApiError.fromCode("duplicate_budget");
-      throw err;
-    }
-  });
-}
-async function updateBudget(actor, id, amount) {
-  return withActor(actor, async (tx) => {
-    const [row] = await tx`
-      update budgets set amount = ${amount}, updated_at = now()
-      where id = ${id} and household_id = ${actor.householdId} and deleted_at is null
-      returning id
-    `;
-    if (!row) throw ApiError.fromCode("budget_not_found");
-    return { id: row.id, amount };
-  });
-}
-async function deleteBudget(actor, id) {
-  return withActor(actor, async (tx) => {
-    const [row] = await tx`
-      update budgets set deleted_at = now() where id = ${id} and household_id = ${actor.householdId} and deleted_at is null returning id
-    `;
-    if (!row) throw ApiError.fromCode("budget_not_found");
-    return { success: true };
-  });
-}
-async function copyBudgets(actor, fromMonth, toMonth, overwrite) {
-  return withActor(actor, async (tx) => {
-    const source = await tx`
-      select category_id, member_id, amount::text from budgets
-      where household_id = ${actor.householdId} and period_start = ${`${fromMonth}-01`} and deleted_at is null
-    `;
-    let copied = 0;
-    let skipped = 0;
-    for (const b2 of source) {
-      if (overwrite) {
-        await tx`
-          insert into budgets (household_id, category_id, member_id, period_start, amount)
-          values (${actor.householdId}, ${b2.category_id}, ${b2.member_id}, ${`${toMonth}-01`}, ${b2.amount})
-          on conflict (household_id, category_id, coalesce(member_id, '00000000-0000-0000-0000-000000000000'::uuid), period_start)
-          do update set amount = excluded.amount, deleted_at = null
-        `;
-        copied++;
-      } else {
-        const [existing] = await tx`
-          select id from budgets where household_id = ${actor.householdId} and category_id = ${b2.category_id}
-            and coalesce(member_id, '00000000-0000-0000-0000-000000000000'::uuid) = coalesce(${b2.member_id}, '00000000-0000-0000-0000-000000000000'::uuid)
-            and period_start = ${`${toMonth}-01`} and deleted_at is null
-        `;
-        if (existing) {
-          skipped++;
-          continue;
-        }
-        await tx`
-          insert into budgets (household_id, category_id, member_id, period_start, amount)
-          values (${actor.householdId}, ${b2.category_id}, ${b2.member_id}, ${`${toMonth}-01`}, ${b2.amount})
-        `;
-        copied++;
-      }
-    }
-    return { copied, skipped };
-  });
-}
 
 // src/routes/budgets.ts
 var budgetsApp = new OpenAPIHono();
@@ -17683,8 +17770,8 @@ async function getSummary(actor, opts) {
     `;
     const [budgetRow] = await tx`
       select
-        count(*) filter (where spent >= b.amount)::text as over,
-        count(*) filter (where spent < b.amount and spent >= b.amount * 0.8)::text as warning,
+        count(*) filter (where spent > b.amount)::text as over,
+        count(*) filter (where spent <= b.amount and spent >= b.amount * 0.8)::text as warning,
         count(*)::text as total
       from budgets b
       cross join lateral (
@@ -19505,10 +19592,20 @@ async function ingestReceipt(actor, input) {
     const piutang = titipanCreated.length ? await createTitipanPiutang(tx, actor, { accountId, merchant: input.merchant, ownerMemberId: recorderId, created: titipanCreated }) : [];
     const pricesRecorded = await recordPrices(tx, actor.householdId, input.merchant, date, priceItems);
     const fullRows = await tx.unsafe(`${TX_SELECT} where t.id = any($1::uuid[])`, [ids]);
-    const [accRow] = await tx`select balance::text from v_account_balances where account_id = ${accountId}`;
+    const snapshot = await getPostTxFinancialSnapshot(
+      tx,
+      actor,
+      accountId,
+      items.map((it) => it.category_id),
+      date
+    );
     return {
       transactions: fullRows.map(mapTx),
-      account: { id: accountId, balance: accRow ? Number(accRow.balance) : null },
+      account: snapshot.account,
+      total_balance: snapshot.total_balance,
+      accounts_summary: snapshot.accounts_summary,
+      related_budgets: snapshot.related_budgets,
+      budget: snapshot.budget,
       ...receiptUrl ? { receipt_url: receiptUrl } : {},
       ...piutang.length ? { piutang } : {},
       prices_recorded: pricesRecorded,
@@ -19659,7 +19756,7 @@ function buildInsights(input) {
       daily_allowance_left: daysLeft > 0 ? Math.max(0, Math.round(remaining / daysLeft)) : null,
       // Berapa rata-rata harian harus turun supaya pas budget di akhir periode (0 = laju sekarang sudah aman).
       cut_per_day_needed: daysLeft > 0 ? Math.max(0, perDay - Math.max(0, Math.round(remaining / daysLeft))) : 0,
-      status: total >= b2 ? "over" : projected > b2 ? "akan_lewat" : "aman"
+      status: total > b2 ? "over" : projected > b2 ? "akan_lewat" : "aman"
     };
   }
   const parts2 = [];
@@ -20735,10 +20832,32 @@ ${list.map((i) => `  [${i.id}] ${i.name}: ${i.qty} ${i.unit}${i.min_qty != null 
     case "ingest_receipt": {
       const r = result;
       const total = r.transactions.reduce((a, t) => a + Number(t.amount), 0);
-      const lines = [`${r.transactions.length} item dicatat, total ${fmtRp2(total)}${r.account.balance !== null ? `, saldo akun sekarang ${fmtRp2(r.account.balance)}` : ""}.`];
+      const accLabel = r.account?.name || "Akun";
+      const lines = [
+        `1. Total Transaksi Dicatat: ${r.transactions.length} item (${fmtRp2(total)}) via ${accLabel}.`
+      ];
+      if (r.related_budgets?.length) {
+        const bLines = r.related_budgets.map((b2) => `${b2.category.name}: sisa ${fmtRp2(b2.remaining)} dari ${fmtRp2(b2.amount)} (terpakai ${fmtRp2(b2.spent)} / ${b2.pct}%)`).join(" | ");
+        lines.push(`2. Sisa Anggaran Terkait: ${bLines}.`);
+      }
+      const accParts = [];
+      if (r.account?.balance !== null && r.account?.balance !== void 0) {
+        accParts.push(`Sisa ${accLabel}: ${fmtRp2(r.account.balance)}`);
+      }
+      if (typeof r.total_balance === "number") {
+        const otherAccs = (r.accounts_summary ?? []).filter((a) => a.balance > 0).map((a) => `${a.name} ${fmtRp2(a.balance)}`).join(", ");
+        accParts.push(`Sisa Keseluruhan Uang Keluarga: ${fmtRp2(r.total_balance)}${otherAccs ? ` (${otherAccs})` : ""}`);
+      }
+      if (accParts.length) lines.push(`3. ${accParts.join(" | ")}.`);
       if (r.shopping) lines.push(`Belanja: ${r.shopping.marked_bought.length ? `dicoret ${r.shopping.marked_bought.map((s) => s.name).join(", ")}` : "tidak ada yang cocok"}${r.shopping.unmatched.length ? ` (tidak di daftar: ${r.shopping.unmatched.join(", ")})` : ""}.`);
       if (r.pantry) lines.push(`Stok: ${r.pantry.updated.length ? r.pantry.updated.map((p) => `${p.name} \u2192 ${p.qty_after}`).join(", ") : "tidak ada yang cocok"}${r.pantry.unmatched.length ? ` (tidak di stok: ${r.pantry.unmatched.join(", ")})` : ""}.`);
       return lines.join("\n");
+    }
+    case "record_expense":
+    case "record_income":
+    case "record_expense_batch":
+    case "record_transfer": {
+      return formatPostTxWriteResult(result);
     }
     case "compare_prices": {
       const r = result;
@@ -20755,6 +20874,52 @@ Toko pemberi diskon: ${discPlaces.map((p) => `${p.place} (hemat ${fmtRp2(p.disco
     default:
       return formatGenericWriteResult(result);
   }
+}
+function formatPostTxWriteResult(result) {
+  if (!result || typeof result !== "object") return "Berhasil.";
+  const r = result;
+  const txList = r.transactions ?? (r.transaction ? [r.transaction] : []);
+  const totalTx = txList.reduce((sum, t) => sum + Number(t.amount ?? 0), 0);
+  const accName = r.account?.name || txList[0]?.account?.name || r.from_account?.name || "Akun";
+  const lines = [];
+  if (r.from_account && r.to_account && r.transaction) {
+    lines.push(
+      `1. Total Transaksi Dicatat: Transfer ${fmtRp2(r.transaction.amount)} dari ${r.from_account.name} ke ${r.to_account.name}${r.transaction.note ? ` (${r.transaction.note})` : ""}.`
+    );
+  } else if (txList.length === 1) {
+    const t = txList[0];
+    lines.push(
+      `1. Total Transaksi Dicatat: ${t.note || t.category?.name || "Transaksi"} sebesar ${fmtRp2(t.amount)} (${t.category?.name ?? "-"}, via ${accName}, tgl ${t.date}).`
+    );
+  } else if (txList.length > 1) {
+    const itemsPreview = txList.map((t) => `${t.note || t.category?.name || "Item"} ${fmtRp2(t.amount)}`).join(", ");
+    lines.push(
+      `1. Total Transaksi Dicatat: ${txList.length} item dengan total ${fmtRp2(totalTx)} via ${accName} (${itemsPreview}).`
+    );
+  }
+  if (r.related_budgets?.length) {
+    const bText = r.related_budgets.map(
+      (b2) => `${b2.category.name}: sisa ${fmtRp2(b2.remaining)} dari pagu ${fmtRp2(b2.amount)} (terpakai ${fmtRp2(b2.spent)} / ${b2.pct}%${b2.status === "over" ? " \u2014 MELEBIHI ANGGARAN" : b2.status === "warning" ? " \u2014 HAMPIR HABIS" : ""})`
+    ).join(" | ");
+    lines.push(`2. Sisa Anggaran Kategori Terkait: ${bText}.`);
+  } else {
+    lines.push(`2. Sisa Anggaran Kategori Terkait: (kategori ini belum diatur anggarannya).`);
+  }
+  const balParts = [];
+  if (r.from_account && r.to_account) {
+    if (r.from_account.balance !== null) balParts.push(`Sisa ${r.from_account.name}: ${fmtRp2(r.from_account.balance)}`);
+    if (r.to_account.balance !== null) balParts.push(`Sisa ${r.to_account.name}: ${fmtRp2(r.to_account.balance)}`);
+  } else if (r.account && r.account.balance !== null) {
+    balParts.push(`Sisa saldo ${accName}: ${fmtRp2(r.account.balance)}`);
+  }
+  if (typeof r.total_balance === "number") {
+    const breakdown = (r.accounts_summary ?? []).filter((a) => a.balance > 0).map((a) => `${a.name} ${fmtRp2(a.balance)}`).join(", ");
+    balParts.push(`Sisa Keseluruhan Uang Keluarga: ${fmtRp2(r.total_balance)}${breakdown ? ` (${breakdown})` : ""}`);
+  }
+  if (balParts.length) {
+    lines.push(`3. Sisa Uang Setelah Transaksi: ${balParts.join(" | ")}.`);
+  }
+  return lines.join("\n");
 }
 function formatGenericWriteResult(result) {
   if (result === null || result === void 0) return "Berhasil.";
@@ -21589,10 +21754,22 @@ ATURAN:
 7. BOLEH saran keuangan umum. TIDAK BOLEH rekomendasi saham/kripto spesifik.
 8. ATURAN GAJI, SIKLUS AKHIR BULAN, NAFKAH/UANG BELANJA, & ALOKASI POS (PAYDAY PLAYBOOK):
    - Siklus Gajian Akhir Bulan: Jika hari ini tanggal 28\u201331 akhir bulan, maka gaji baru yang cair, transfer alokasi nafkah ke istri, pembayaran cicilan/tagihan periode baru, serta belanja bulanan akhir bulan WAJIB dicatat ke tanggal 1 bulan depan (YYYY-MM-01) dan budget bulan depan (YYYY-MM).
-   - Eksekusi Langsung: Jika user minta mencatat gaji/pengeluaran/transfer/budget, LANGSUNG panggil tool tulis (record_income, record_expense, record_transfer, set_budget) sekarang juga tanpa menunda!
+   - Wajib Tanya Akun/Kas Jika Belum Disebutkan: Jika user meminta mencatat pengeluaran/pemasukan (misal "beli pecel lele 43 ribu") tetapi BELUM menyebutkan dibayar pakai akun/kas mana dan keluarga punya lebih dari 1 akun, JANGAN langsung memanggil record_expense/record_income dan JANGAN menebak akun sendiri! Tanyakan dulu dengan singkat: "Pakai akun/kas mana?" Baru panggil tool tulis setelah user menyebutkan akunnya.
+   - Eksekusi Langsung Jika Akun Sudah Jelas: Jika user sudah menyebutkan transaksi beserta akun/kas-nya (atau saat menjawab pertanyaan akun dari Anda), LANGSUNG panggil tool tulis (record_income, record_expense, record_transfer, set_budget) sekarang juga tanpa menunda!
    - Gaji/THR/Bonus masuk rekening: panggil record_income (category="Gaji") sebesar nominal bersih (take-home pay) yang masuk ke rekening agar saldo bank akurat.
    - Jatah Bulanan / Nafkah Suami ke Rekening Istri: Jika kedua akun (Suami & Istri) terdaftar di keluarga ini, pengiriman uang belanja dari Suami ke Istri WAJIB dicatat dengan record_transfer (Pindah Dana), BUKAN record_income lagi, supaya pemasukan keluarga tidak terhitung ganda.
    - Alokasi Gaji: Jika diminta membagi gaji ke pos bulanan, gunakan komposisi sehat keluarga (50-60% Kebutuhan Dapur/Tagihan/Anak, maks 30% Cicilan, min 10-20% Tabungan/Dana Darurat & Zakat/Ortu) dan pasang lewat set_budget atau kartu aksi apply_budget.
+   - FORMAT ULTRA-COMPACT KHUSUS SAAT MENCATAT TRANSAKSI BARU (vs Tanya-Jawab Biasa):
+     * HANYA saat selesai memanggil tool tulis transaksi (record_expense, record_income, record_expense_batch, record_transfer, ingest_receipt), gunakan format Ultra-Compact 3 bagian (tanpa perlu panggil tool baca lagi):
+       - 1 transaksi:
+         \u2705 **Tercatat:** [Nama] **[Nominal]** *([Akun] \xB7 [Kategori])*
+         \u{1F4CA} **Sisa Anggaran [Kategori]:** **[Sisa Budget]** *(dari [Pagu])* (tampilkan baris ini HANYA jika kategori memiliki anggaran aktif)
+         \u{1F4B0} **Sisa Uang:** [Akun] **[Saldo Akun]** \xB7 Total Keluarga **[Total Saldo Keluarga]**
+       - Multi-item / multi-kategori:
+         \u2705 **Tercatat [N] Transaksi \u2014 Total [Total Nominal]** *([Akun])*
+         \u2022 **[Kategori]**: -[Subtotal] \u27A1\uFE0F sisa budget **[Sisa Budget]**
+         \u{1F4B0} **Sisa Uang:** [Akun] **[Saldo Akun]** \xB7 Total Keluarga **[Total Saldo Keluarga]**
+     * Saat user hanya bertanya/diskusi seputar keuangan atau riwayat transaksi (bukan mencatat transaksi baru), JANGAN pakai format di atas \u2014 jawab bebas, natural, hangat, dan rapi.
 9. FORMAT JAWABAN (dirender sebagai Markdown di layar HP selebar 360 px):
    - Mulai dengan 1 kalimat jawaban langsung, baru rincian.
    - Boleh heading "###" maksimal 1 per jawaban. Jangan pakai "---".
